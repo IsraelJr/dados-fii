@@ -1,5 +1,7 @@
+import type { NextApiRequest, NextApiResponse } from "next";
 import admin from "firebase-admin";
 
+// Inicializa o Firebase Admin apenas uma vez
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.applicationDefault(),
@@ -8,10 +10,14 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-export default async function handler(req, res) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   try {
     const { ticker } = req.query; // /api/fii?ticker=MXRF11
-    if (!ticker) {
+
+    if (!ticker || typeof ticker !== "string") {
       return res.status(400).json({ error: "Ticker é obrigatório" });
     }
 
@@ -22,7 +28,7 @@ export default async function handler(req, res) {
     }
 
     res.status(200).json(doc.data());
-  } catch (error) {
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 }
