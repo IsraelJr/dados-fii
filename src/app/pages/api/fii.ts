@@ -4,9 +4,10 @@ import admin from "firebase-admin";
 // Inicializa o Firebase Admin apenas uma vez
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+    credential: admin.credential.cert(JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS!)),
   });
 }
+
 
 const db = admin.firestore();
 
