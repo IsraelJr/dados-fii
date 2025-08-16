@@ -30,29 +30,7 @@ export default function Home() {
     }
   };
 
-  // const getLast3MonthsDividends = (earnings: any) => {
-  //   if (!earnings) return [];
-  //   const currentYear = new Date().getFullYear();
-  //   const yearKey = `earnings${currentYear}`;
-  //   const yearData = earnings[yearKey];
-  //   if (!yearData) return [];
-
-  //   const monthsOrder = [
-  //     "January", "February", "March", "April", "May", "June",
-  //     "July", "August", "September", "October", "November", "December"
-  //   ];
-
-  //   const sorted = Object.entries(yearData)
-  //     .sort(([monthA], [monthB]) => monthsOrder.indexOf(monthB) - monthsOrder.indexOf(monthA));
-
-  //   return sorted.slice(0, 6); // últimos 3 meses
-  // };
-
-  const getCurrentYearDividends = (earnings: any) => {
-    if (!earnings) return [];
-    const currentYear = new Date().getFullYear();
-    const yearKey = `earnings${currentYear}`;
-    const yearData = earnings[yearKey];
+  const getCurrentYearDividends = (yearData: any) => {
     if (!yearData) return [];
 
     const monthsOrder = [
@@ -60,14 +38,10 @@ export default function Home() {
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // transforma em array e ordena do mês mais recente para o mais antigo
-    const sorted = Object.entries(yearData).sort(
-      ([monthA], [monthB]) => monthsOrder.indexOf(monthB) - monthsOrder.indexOf(monthA)
+    return Object.entries(yearData).sort(
+      ([monthA], [monthB]) => monthsOrder.indexOf(monthA) - monthsOrder.indexOf(monthB)
     );
-
-    return sorted; // retorna todos os meses disponíveis
   };
-
 
   const copyJSON = () => {
     if (!data) return;
@@ -79,12 +53,31 @@ export default function Home() {
       preço: data.price,
       segmento: data.segment_new,
       razãoSocial: data.socialReason,
-      últimosDividends: getCurrentYearDividends(data.earnings2025).map(
-        ([month, info]: any) => ({ month, earnings: info.earnings, payment_date: info.payment_date })
+      dividendos: getCurrentYearDividends(data.earnings2025).map(
+        ([month, info]: any) => {
+          const value = parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
+          return { month, earnings: value.toFixed(3), payment_date: info.payment_date };
+        }
       )
     };
     navigator.clipboard.writeText(JSON.stringify(filtered, null, 2));
     alert("JSON copiado para a área de transferência!");
+  };
+
+  // Mapeamento dos meses para PT-BR
+  const monthsPTBR: Record<string, string> = {
+    January: "Janeiro",
+    February: "Fevereiro",
+    March: "Março",
+    April: "Abril",
+    May: "Maio",
+    June: "Junho",
+    July: "Julho",
+    August: "Agosto",
+    September: "Setembro",
+    October: "Outubro",
+    November: "Novembro",
+    December: "Dezembro",
   };
 
   return (
@@ -100,7 +93,7 @@ export default function Home() {
           onChange={(e) => setTicker(e.target.value)}
           style={{
             padding: "8px",
-            width: "215px",
+            width: "220px",
             marginRight: "10px",
             borderRadius: "4px",
             border: "1px solid #888",
@@ -153,17 +146,21 @@ export default function Home() {
           <p><strong>Segmento:</strong> {data.segment_new}</p>
           <p><strong>Razão Social:</strong> {data.socialReason}</p>
 
-          <h3>Dividendos ({new Date().getFullYear()})</h3>
-          <ul>
-            <ul>
-              {getCurrentYearDividends(data.earnings2025).map(([month, info]: any) => (
+          <h3><strong>Dividendos ({new Date().getFullYear()}):</strong></h3>
+          <ul style={{ paddingLeft: "20px" }}>
+            {getCurrentYearDividends(data.earnings2025).map(([month, info]: any) => {
+              const monthPT = monthsPTBR[month] || month;
+              const value = parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
+              const formatted = `R$ ${value.toFixed(3)}`;
+
+              return (
                 <li key={month} style={{ marginBottom: "6px" }}>
-                  <strong>{month}:</strong> {info.earnings || "R$ 0,00"} | Pagamento: {info.payment_date || "-"} |
-                  Data Base: {info.date_with || "-"} | Preço Base: {info.price_date_with || "-"}
+                  <strong>{monthPT}:</strong> {formatted} | Pago em {info.payment_date}
                 </li>
-              ))}
-            </ul>
+              );
+            })}
           </ul>
+
           <button
             onClick={copyJSON}
             style={{
