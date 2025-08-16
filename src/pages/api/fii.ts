@@ -23,10 +23,10 @@ export default async function handler(
       return res.status(400).json({ error: "Ticker é obrigatório" });
     }
 
-    // Busca pelo campo 'Code'
+    // Busca pelo campo 'code'
     const querySnapshot = await db
       .collection("Fiis")
-      .where("Code", "==", ticker)
+      .where("code", "==", (ticker as string).toUpperCase())
       .limit(1)
       .get();
 
