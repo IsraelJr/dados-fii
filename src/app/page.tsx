@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from "react";
-import { CheckCircle, XCircle, DollarSign, Building2, BarChart3, ClipboardCopy, CalendarDays } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle, XCircle, DollarSign, Building2, BarChart3, ClipboardCopy, CalendarDays, Hash, DollarSign as DollarIcon } from "lucide-react";
 
 export default function Home() {
+    const [stats, setStats] = useState<{ visit: number; search: number }>({
+        visit: 0,
+        search: 0,
+    });
     const [ticker, setTicker] = useState("");
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState("");
+    const [dolar, setDolar] = useState<string>("...");
 
     const fetchFII = async () => {
         setError("");
@@ -26,22 +31,68 @@ export default function Home() {
             }
             const json = await res.json();
             setData(json);
+
+            // Incrementa estatística de busca
+            await fetch("/api/stats", {
+                method: "POST",
+                body: JSON.stringify({ type: "search" }),
+            });
+            const statsRes = await fetch("/api/stats");
+            const statsData = await statsRes.json();
+            setStats(statsData);
+
         } catch (err: any) {
             setError(err.message || "Erro desconhecido");
         }
     };
 
+    // Cotação do dólar
+    useEffect(() => {
+        const fetchDolar = async () => {
+            try {
+                const res = await fetch("/api/dolar");
+                const json = await res.json();
+                setDolar(json.formatted);
+            } catch {
+                setDolar("Erro");
+            }
+        };
+        fetchDolar();
+    }, []);
+
+    // Registrar visita
+    useEffect(() => {
+        fetch("/api/stats", {
+            method: "POST",
+            body: JSON.stringify({ type: "visit" }),
+        });
+    }, []);
+
+    // Carregar stats
+    useEffect(() => {
+        const loadStats = async () => {
+            const res = await fetch("/api/stats");
+            const data = await res.json();
+            setStats(data);
+        };
+        loadStats();
+    }, []);
+
     const getCurrentYearDividends = (yearData: any) => {
         if (!yearData) return [];
-
         const monthsOrder = [
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December"
         ];
-
         return Object.entries(yearData).sort(
             ([monthA], [monthB]) => monthsOrder.indexOf(monthA) - monthsOrder.indexOf(monthB)
         );
+    };
+
+    const monthsPTBR: Record<string, string> = {
+        January: "Janeiro", February: "Fevereiro", March: "Março", April: "Abril",
+        May: "Maio", June: "Junho", July: "Julho", August: "Agosto",
+        September: "Setembro", October: "Outubro", November: "Novembro", December: "Dezembro",
     };
 
     const copyJSON = () => {
@@ -52,6 +103,7 @@ export default function Home() {
             DY: data.dividendYield,
             isIFIX: data.isIFIX ? "Sim" : "Não",
             preço: data.price,
+            totalQuotas: data.numberShares,
             segmento: data.segment_new,
             razãoSocial: data.socialReason,
             dividendos: getCurrentYearDividends(data.earnings2025).map(
@@ -65,25 +117,14 @@ export default function Home() {
         alert("JSON copiado para a área de transferência!");
     };
 
-    const monthsPTBR: Record<string, string> = {
-        January: "Janeiro",
-        February: "Fevereiro",
-        March: "Março",
-        April: "Abril",
-        May: "Maio",
-        June: "Junho",
-        July: "Julho",
-        August: "Agosto",
-        September: "Setembro",
-        October: "Outubro",
-        November: "Novembro",
-        December: "Dezembro",
-    };
-
     return (
         <div className="font-sans text-center mt-12 px-4">
             <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
             <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
+
+            <div className="mt-4 text-gray-400">
+                💵 Cotação do dólar: {dolar}
+            </div>
 
             <div className="mt-6 flex justify-center gap-2">
                 <input
@@ -101,9 +142,7 @@ export default function Home() {
                 </button>
             </div>
 
-            {error && (
-                <div className="text-red-400 mt-4">{error}</div>
-            )}
+            {error && <div className="text-red-400 mt-4">{error}</div>}
 
             {data && (
                 <div className="mt-8 mx-auto max-w-3xl p-6 rounded-2xl bg-gray-900 text-gray-100 shadow-lg">
@@ -129,8 +168,13 @@ export default function Home() {
                         </div>
 
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                            <DollarSign className="text-green-400" />
-                            <span><strong>Preço:</strong> {data.price}</span>
+                            <DollarIcon className="text-green-400" />
+                            <span><strong>Preço:</strong> {data.price || "N/A"}</span>
+                        </div>
+
+                        <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
+                            <Hash className="text-orange-400" />
+                            <span><strong>Total de Quotas:</strong> {data.numberShares?.toLocaleString("pt-BR") || "N/A"}</span>
                         </div>
 
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
@@ -170,6 +214,11 @@ export default function Home() {
                     >
                         <ClipboardCopy size={18} /> Copiar JSON
                     </button>
+
+                    <div className="text-gray-400 text-sm mt-2">
+                        <br></br>
+                        👥 {stats.visit} visitantes | 🔎 {stats.search} buscas
+                    </div>
                 </div>
             )}
         </div>
