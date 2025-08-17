@@ -4,15 +4,15 @@ import admin from "firebase-admin";
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(
-      JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS!)
+      JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY!)
     ),
   });
 }
 
 const db = admin.firestore();
 
-const SHEET_ID = process.env.SHEET_ID;
-const API_KEY = process.env.GOOGLE_SHEETS_API_KEY;
+const SHEET_ID = process.env.SHEET_ID!;
+const API_KEY = process.env.GOOGLE_SHEETS_API_KEY!;
 const RANGE = "A1:B400";
 
 async function getPriceFromSheet(ticker: string) {
@@ -24,14 +24,11 @@ async function getPriceFromSheet(ticker: string) {
     if (!data.values) return null;
 
     const [header, ...rows] = data.values;
-    const match = rows.find((row: any) => {
-      if (!row[0]) return false;
-      return row[0].toString().trim().toUpperCase() === ticker.toUpperCase();
-    });
+    const match = rows.find((row: any) => row[0]?.toString().trim().toUpperCase() === ticker.toUpperCase());
 
     if (!match) return null;
 
-    return match[1].toString().trim(); // retorna "R$ XX,XX" ou valor da sheet
+    return match[1].toString().trim(); // retorna valor da Sheet, ex: "R$ 85,65"
   } catch (err) {
     console.error("Erro ao buscar preço da Sheet:", err);
     return null;
@@ -69,7 +66,7 @@ export async function GET(req: Request) {
       }),
       { status: 200 }
     );
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
