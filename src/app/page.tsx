@@ -221,6 +221,11 @@ export default function Home() {
                     </div>
                 </div>
             )}
+
+            <div className="fixed bottom-0 left-0 w-full bg-yellow-500 text-black text-center py-2 text-sm font-semibold shadow-md">
+                🚧 Este site está em versão Beta – Algumas funcionalidades podem mudar ou estar em testes.
+            </div>
+
         </div>
     );
 }
