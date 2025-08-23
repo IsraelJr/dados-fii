@@ -21,9 +21,14 @@ const RANGE = "A1:B400";
 async function getPriceFromSheet(ticker: string) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
   try {
+    console.log("SHEET_ID:", process.env.SHEET_ID);
+console.log("API_KEY:", process.env.GOOGLE_SHEETS_API_KEY);
+
     const res = await fetch(url);
     const data = await res.json();
-
+    console.log("Google Sheets status:", res.status);
+    console.log("Google Sheets data:", data);
+    
     if (!data.values) return null;
 
     const [header, ...rows] = data.values;
