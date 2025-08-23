@@ -50,7 +50,7 @@ const STATS_DOC = db.collection("SiteDadosFii").doc("stats");
 export async function POST(req: NextRequest) {
     try {
         const { type } = await req.json();
-
+        console.log("Executando Admin SDK");
         if (!["visit", "search"].includes(type)) {
             return new Response(JSON.stringify({ error: "Invalid type" }), { status: 400 });
         }

@@ -4,7 +4,7 @@ import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
 export async function POST(req: Request) {
     const { type } = await req.json(); // "visit" ou "search"
     const ref = doc(db, "SiteDadosFii", "stats");
-
+    console.log("Executando Client SDK");
     if (!["visit", "search"].includes(type)) {
         return Response.json({ error: "Invalid type" }, { status: 400 });
     }
