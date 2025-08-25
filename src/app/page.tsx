@@ -135,7 +135,7 @@ export default function Home() {
             <div className="mt-6 flex justify-center gap-2">
                 <input
                     type="text"
-                    placeholder="Digite o ticker (ex: TGAR11)"
+                    placeholder="Digite o ticker (ex: ABCD11)"
                     value={ticker}
                     onChange={(e) => setTicker(e.target.value)}
                     className="p-2 w-56 rounded-lg border border-gray-400 bg-gray-100 text-black"

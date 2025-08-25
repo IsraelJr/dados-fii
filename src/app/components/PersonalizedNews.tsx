@@ -78,7 +78,7 @@ export default function PersonalizedNews() {
                 }
 
                 setLoadingFII(true);
-            
+
                 // Inicializa estado com loader individual
                 setNews(topFiis.map((ticker) => ({ ticker, summary: "", sources: [], loading: true })));
 
@@ -107,7 +107,7 @@ export default function PersonalizedNews() {
         <div className="mt-12">
             <h2 className="text-xl font-bold mb-4">📰 Resumo das notícias dos FIIs mais buscados por você</h2>
             {news.length === 0 && <p className="text-gray-500">Nenhuma pesquisa registrada ainda.</p>}
-
+            <br /><br />
             <div className="grid md:grid-cols-3 gap-6">
                 {news.map(({ ticker, summary, sources, loading }) => (
                     <div key={ticker} className="bg-white rounded-2xl shadow-md p-5 text-left">
@@ -162,6 +162,7 @@ export default function PersonalizedNews() {
                     </div>
                 ))}
             </div>
+            <br /><br />
         </div>
     );
 }
