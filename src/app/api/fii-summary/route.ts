@@ -3,10 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const { ticker } = await req.json();
+  const rawPrompt = process.env.PERPLEXITY_PROMPT_ABOUT_FII ?? "";
+
   try {
     if (!ticker) {
       return NextResponse.json({ error: "Ticker não fornecido" }, { status: 400 });
     }
+
+    const prompt = rawPrompt ? rawPrompt.replace("{ticker}", ticker) : ticker;
 
     // Chamada para Perplexity
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
@@ -20,7 +24,7 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             role: "user",
-            content: `Resuma as notícias mais recentes e relevantes sobre o FII ${ticker} em 3-4 linhas. Destaque o último dividendo, o respectivo DY mensal e possíveis aquisições ou vendas.`,
+            content: prompt,
           },
         ],
       }),
@@ -38,13 +42,12 @@ export async function POST(req: NextRequest) {
 
     if (data?.choices?.[0]?.message?.content) {
       summary = (data?.choices?.[0]?.message?.content ?? summary).replace(/\[\d+\]/g, "");
-      let sources = data?.choices?.[0]?.citations ?? [];
-
-      return NextResponse.json({ ticker, summary, sources });
-
     }
 
-    return NextResponse.json({ ticker, summary });
+    let sources = data?.choices?.[0]?.citations ?? [];
+
+    return NextResponse.json({ ticker, summary, sources });
+
   } catch (err: any) {
     console.error(`Erro ao buscar resumo do FII: ${ticker}`, err);
     return NextResponse.json({ error: err.message }, { status: 500 });
