@@ -164,6 +164,14 @@ export default function Home() {
 
     return (
         <div className="font-sans text-center mt-12 px-4">
+            <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
+            <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
+
+            <div className="mt-4 text-gray-400">
+                💵 Cotação do dólar: {dolar}
+                <br /><br />
+            </div>
+
             <div>
                 {isMarketOpen ? (
                     <FiiTopPanels />
@@ -172,15 +180,7 @@ export default function Home() {
                         {`Painel de maiores altas e baixas só disponível entre ${Number(process.env.NEXT_PUBLIC_OPENING_TIME)}h e ${Number(process.env.NEXT_PUBLIC_CLOSING_TIME)}h.`}
                     </p>
                 )}
-                <br />
             </div>
-            <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
-            <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
-
-            <div className="mt-4 text-gray-400">
-                💵 Cotação do dólar: {dolar}
-            </div>
-
             <div className="mt-6 flex justify-center gap-2">
                 <input
                     type="text"
