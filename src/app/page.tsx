@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, DollarSign, Building2, BarChart3, ClipboardCopy, 
 import CookieBanner from "./components/CookieBanner";
 import PersonalizedNews from "./components/PersonalizedNews";
 import { SimulationCard } from "./components/SimulationCard";
+import FiiTopPanels from "./components/FiiTopPanels";
 
 export default function Home() {
     const [stats, setStats] = useState<{ visit: number; search: number }>({ visit: 0, search: 0 });
@@ -13,6 +14,7 @@ export default function Home() {
     const [error, setError] = useState("");
     const [dolar, setDolar] = useState<string>("...");
     const [loadingFII, setLoadingFII] = useState(false);
+    const [isMarketOpen, setIsMarketOpen] = useState(false);
 
     const fetchFII = async () => {
         setError("");
@@ -122,6 +124,22 @@ export default function Home() {
         loadStats();
     }, []);
 
+    useEffect(() => {
+        const checkMarketHours = () => {
+            const now = new Date();
+            const hours = now.getHours();
+
+            setIsMarketOpen(hours >= Number(process.env.NEXT_PUBLIC_OPENING_TIME) && hours < Number(process.env.NEXT_PUBLIC_CLOSING_TIME));
+        };
+
+        checkMarketHours();
+
+        // Atualiza a cada 5 minutos caso o usuário mantenha a página aberta
+        const interval = setInterval(checkMarketHours, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+
     // Último dividendo
     const lastDividend = useMemo(() => {
         const dividends = getCurrentYearDividends(data?.earnings2025 || {});
@@ -146,6 +164,16 @@ export default function Home() {
 
     return (
         <div className="font-sans text-center mt-12 px-4">
+            <div>
+                {isMarketOpen ? (
+                    <FiiTopPanels />
+                ) : (
+                    <p className="text-gray-400 italic text-center mt-4">
+                        {`Painel de maiores altas e baixas só disponível entre ${Number(process.env.NEXT_PUBLIC_OPENING_TIME)}h e ${Number(process.env.NEXT_PUBLIC_CLOSING_TIME)}h.`}
+                    </p>
+                )}
+                <br />
+            </div>
             <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
             <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
 
