@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from "react";
-import { CheckCircle, XCircle, DollarSign, Building2, BarChart3, ClipboardCopy, CalendarDays, Hash, Loader2 } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { CheckCircle, XCircle, DollarSign, Building2, BarChart3, ClipboardCopy, CalendarDays, Hash, Loader2, TrendingUp } from "lucide-react";
 import CookieBanner from "./components/CookieBanner";
 import PersonalizedNews from "./components/PersonalizedNews";
+import { SimulationCard } from "./components/SimulationCard";
 
 export default function Home() {
     const [stats, setStats] = useState<{ visit: number; search: number }>({ visit: 0, search: 0 });
@@ -32,14 +33,12 @@ export default function Home() {
             const json = await res.json();
             setData(json);
 
-            // Registra pesquisa no Firestore
             await fetch("/api/search", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ fii: ticker.toUpperCase().trim() }),
             });
 
-            // Incrementa estatística de busca
             await fetch("/api/stats", {
                 method: "POST",
                 body: JSON.stringify({ type: "search" }),
@@ -123,6 +122,28 @@ export default function Home() {
         loadStats();
     }, []);
 
+    // Último dividendo
+    const lastDividend = useMemo(() => {
+        const dividends = getCurrentYearDividends(data?.earnings2025 || {});
+        if (!dividends.length) return null;
+        const [, info]: any = dividends[dividends.length - 1];
+        return parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
+    }, [data]);
+
+    // Comparação
+    const comparacao = useMemo(() => {
+        if (!data || !lastDividend) return null;
+        const salarioMinimo = Number(process.env.NEXT_PUBLIC_BASIC_SALARY) || 0;
+        const precoAtual = Number(data.price?.replace("R$", "").replace(",", ".").trim()) || 0;
+        if (!salarioMinimo || !precoAtual) return null;
+
+        const cotasNecessarias = salarioMinimo / lastDividend;
+        const investimentoNecessario = cotasNecessarias * precoAtual;
+        const magicNumber = precoAtual / lastDividend;
+
+        return { cotasNecessarias, investimentoNecessario, magicNumber };
+    }, [data, lastDividend]);
+
     return (
         <div className="font-sans text-center mt-12 px-4">
             <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
@@ -147,6 +168,10 @@ export default function Home() {
                     Consultar
                 </button>
             </div>
+            <div className="text-gray-400 text-sm mt-2">
+                <br />
+                👥 {stats.visit} visitantes | 🔎 {stats.search} buscas
+            </div>
 
             {error && <div className="text-red-400 mt-4">{error}</div>}
 
@@ -161,20 +186,24 @@ export default function Home() {
                     {/* FII Details */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                            {data.active ? <CheckCircle className="text-green-400" /> : <XCircle className="text-red-400" />}
-                            <span><strong>Ativo:</strong> {data.active ? "Sim" : "Não"}</span>
-                        </div>
-                        <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                             <BarChart3 className="text-blue-400" />
                             <span><strong>Ticker:</strong> {data.code}</span>
                         </div>
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
+                            {data.active ? <CheckCircle className="text-green-400" /> : <XCircle className="text-red-400" />}
+                            <span><strong>Ativo:</strong> {data.active ? "Sim" : "Não"}</span>
+                        </div>
+                        {/* <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                             <DollarSign className="text-yellow-400" />
                             <span><strong>DY:</strong> {data.dividendYield}</span>
-                        </div>
+                        </div> */}
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                             {data.isIFIX ? <CheckCircle className="text-green-400" /> : <XCircle className="text-red-400" />}
                             <span><strong>IFIX:</strong> {data.isIFIX ? "Sim" : "Não"}</span>
+                        </div>
+                        <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2 col-span-2 md:col-span-3">
+                            <Building2 className="text-pink-400" />
+                            <span><strong>Razão Social:</strong> {data.socialReason}</span>
                         </div>
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                             <DollarSign className="text-green-400" />
@@ -188,25 +217,20 @@ export default function Home() {
                             <Building2 className="text-purple-400" />
                             <span><strong>Segmento:</strong> {data.segment_new}</span>
                         </div>
-                        <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2 col-span-2 md:col-span-3">
-                            <Building2 className="text-pink-400" />
-                            <span><strong>Razão Social:</strong> {data.socialReason}</span>
-                        </div>
                     </div>
 
                     {/* Dividendos */}
-                    <h3 className="text-xl font-bold mt-6 mb-2">💰 Dividendos ({new Date().getFullYear()}):</h3>
+                    <h3 className="text-xl font-bold mt-6 mb-2">💰 Dividendos ({new Date().getFullYear()})</h3>
                     <div className="bg-gray-800 rounded-xl p-4">
                         <ul className="space-y-2">
                             {getCurrentYearDividends(data.earnings2025).map(([month, info]: any) => {
                                 const monthPT = monthsPTBR[month] || month;
                                 const value = parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
-                                const formatted = `R$ ${value.toFixed(3)}`;
                                 return (
                                     <li key={month} className="flex items-center gap-2">
                                         <CalendarDays className="text-indigo-400" />
                                         <span>
-                                            <strong>{monthPT}:</strong> {formatted} | Pago em {info.payment_date}
+                                            <strong>{monthPT}:</strong> R$ {value.toFixed(3)} | Pago em {info.payment_date}
                                         </span>
                                     </li>
                                 );
@@ -214,22 +238,29 @@ export default function Home() {
                         </ul>
                     </div>
 
-                    <button
+                    {/* Simulacoes */}
+                    <h3 className="text-xl font-bold mt-6 mb-2">
+                        <TrendingUp size={24} className="text-indigo-400 inline-block mr-2" />
+                        Planejamento Financeiro
+                    </h3>
+
+                    <SimulationCard
+                        lastDividend={lastDividend}
+                        price={parseFloat(data.price.replace("R$ ", "").replace(",", "."))}
+                        basicSalary={Number(process.env.NEXT_PUBLIC_BASIC_SALARY)}
+                    />
+
+                    {/* <button
                         onClick={copyJSON}
                         className="mt-6 px-4 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 flex items-center gap-2"
                     >
                         <ClipboardCopy size={18} /> Copiar JSON
-                    </button>
+                    </button> */}
 
-                    <div className="text-gray-400 text-sm mt-2">
-                        <br />
-                        👥 {stats.visit} visitantes | 🔎 {stats.search} buscas
-                    </div>
+
                 </div>
             )}
 
-            {/* Painel de notícias personalizadas */}
-            <br />
             <PersonalizedNews />
 
             <br /><br />
@@ -240,3 +271,4 @@ export default function Home() {
         </div>
     );
 }
+
