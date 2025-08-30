@@ -185,6 +185,10 @@ export default function Home() {
                 <div className="mt-8 mx-auto max-w-3xl p-6 rounded-2xl bg-gray-900 text-gray-100 shadow-lg">
                     {/* FII Details */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2 col-span-2 md:col-span-3">
+                            <Building2 className="text-pink-400" />
+                            <span><strong>Razão Social:</strong> {data.socialReason}</span>
+                        </div>
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                             <BarChart3 className="text-blue-400" />
                             <span><strong>Ticker:</strong> {data.code}</span>
@@ -200,10 +204,6 @@ export default function Home() {
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                             {data.isIFIX ? <CheckCircle className="text-green-400" /> : <XCircle className="text-red-400" />}
                             <span><strong>IFIX:</strong> {data.isIFIX ? "Sim" : "Não"}</span>
-                        </div>
-                        <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2 col-span-2 md:col-span-3">
-                            <Building2 className="text-pink-400" />
-                            <span><strong>Razão Social:</strong> {data.socialReason}</span>
                         </div>
                         <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                             <DollarSign className="text-green-400" />
