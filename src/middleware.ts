@@ -10,11 +10,11 @@ export function middleware(req: NextRequest) {
     const existingCookie = req.cookies.get("anonId");
     if (!existingCookie) {
         const anonId = uuidv4();
-        res.cookies.set("anonId", anonId, {
+        res.cookies.set({
+            name: "anonId",
+            value: anonId,
             httpOnly: true,
-            // Para localhost, secure precisa ser false
             secure: process.env.NODE_ENV === "production",
-            // "lax" funciona bem para localhost
             sameSite: "lax",
             path: "/",
             maxAge: 60 * 60 * 24 * 365, // 1 ano
@@ -28,4 +28,6 @@ export function middleware(req: NextRequest) {
 }
 
 // Aplica o middleware em todas as rotas
-export const config = { matcher: "/:path*" };
+export const config = {
+    matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png).*)"],
+};

@@ -9,14 +9,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
     "firebase": "^12.1.0",
     "firebase-admin": "^13.4.0",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.539.0",
     "next": "15.4.6",
+    "node-telegram-bot-api": "^0.66.0",
+    "nodemailer": "^7.0.6",
     "openai": "^5.15.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "twilio": "^5.8.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -24,7 +30,22 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/twilio": "^3.19.2",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "description": "This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).",
+  "main": "testeOpenAI.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IsraelJr/dados-fii.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/IsraelJr/dados-fii/issues"
+  },
+  "homepage": "https://github.com/IsraelJr/dados-fii#readme"
 }

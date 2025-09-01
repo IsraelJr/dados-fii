@@ -128,8 +128,14 @@ export default function Home() {
         const checkMarketHours = () => {
             const now = new Date();
             const hours = now.getHours();
+            const day = now.getDay(); // 0 = Domingo, 6 = Sábado
 
-            setIsMarketOpen(hours >= Number(process.env.NEXT_PUBLIC_OPENING_TIME) && hours < Number(process.env.NEXT_PUBLIC_CLOSING_TIME));
+            const isWeekday = day >= 1 && day <= 5;
+            const isWithinHours =
+                hours >= Number(process.env.NEXT_PUBLIC_OPENING_TIME) &&
+                hours < Number(process.env.NEXT_PUBLIC_CLOSING_TIME);
+
+            setIsMarketOpen(isWeekday && isWithinHours);
         };
 
         checkMarketHours();
@@ -138,6 +144,7 @@ export default function Home() {
         const interval = setInterval(checkMarketHours, 5 * 60 * 1000);
         return () => clearInterval(interval);
     }, []);
+
 
 
     // Último dividendo
@@ -177,7 +184,7 @@ export default function Home() {
                     <FiiTopPanels />
                 ) : (
                     <p className="text-gray-400 italic text-center mt-4">
-                        {`Painel de maiores altas e baixas só disponível entre ${Number(process.env.NEXT_PUBLIC_OPENING_TIME)}h e ${Number(process.env.NEXT_PUBLIC_CLOSING_TIME)}h.`}
+                        {`Painel de maiores altas e baixas só disponível de segunda à sexta entre ${Number(process.env.NEXT_PUBLIC_OPENING_TIME)}h e ${Number(process.env.NEXT_PUBLIC_CLOSING_TIME)}h.`}
                     </p>
                 )}
             </div>
