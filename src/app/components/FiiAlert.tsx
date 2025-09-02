@@ -10,6 +10,7 @@ interface Props {
 
 export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
     const [email, setEmail] = useState("");
+    const [percent, setPercent] = useState(3); // valor inicial do percentual
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [success, setSuccess] = useState(false);
@@ -44,6 +45,7 @@ export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
                 setSuccess(false);
                 setProgress(0);
                 setEmail("");
+                setPercent(3);
                 setMessage("");
             }, totalTime);
         }
@@ -60,7 +62,6 @@ export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
         if (!email || !emailRegex.test(email)) {
             setMessage("Por favor, informe um email válido.");
 
-            // Efeito de vibração caso email inválido
             if (emailRef.current) {
                 emailRef.current.classList.add("shake");
                 setTimeout(() => emailRef.current?.classList.remove("shake"), 500);
@@ -76,7 +77,7 @@ export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
             const res = await fetch("/api/add-alert", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, fiiCode, isPremium }),
+                body: JSON.stringify({ email, fiiCode, isPremium, percent }),
             });
 
             const json = await res.json();
@@ -92,6 +93,15 @@ export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
             setMessage("❌ Falha ao configurar alerta. Tente novamente mais tarde.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handlePercentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = parseInt(e.target.value, 10);
+        if (!isNaN(value) && value >= 1 && value <= 20) {
+            setPercent(value);
+        } else if (e.target.value === "") {
+            setPercent(0);
         }
     };
 
@@ -112,8 +122,8 @@ export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
             >
                 <h3 className="text-lg font-bold mb-2">Alerta {fiiCode}</h3>
                 <p className="text-gray-300 mb-3 text-sm">
-                    O alerta dispara ao variar 3%.
-                    {isPremium && "\nComo usuário premium, você pode alterar os percentuais."}
+                    O alerta dispara ao variar {percent}%.
+                    {isPremium && " Como usuário premium, você pode alterar o percentual."}
                 </p>
 
                 <label className="block text-left mb-1 text-gray-300 text-sm">Email:</label>
@@ -125,6 +135,21 @@ export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
                     className="w-full p-2 rounded-lg bg-gray-800 text-white mb-3 transition-all"
                     disabled={success}
                 />
+
+                {isPremium && (
+                    <>
+                        <label className="block text-left mb-1 text-gray-300 text-sm">Percentual (1-20%):</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={20}
+                            value={percent}
+                            onChange={handlePercentChange}
+                            className="w-full p-2 rounded-lg bg-gray-800 text-white mb-3 transition-all"
+                            disabled={success}
+                        />
+                    </>
+                )}
 
                 <button
                     onClick={handleSubmit}
