@@ -8,7 +8,7 @@ interface Props {
     isPremium?: boolean;
 }
 
-export default function FiiAlert({ fiiCode, isPremium = true }: Props) {
+export default function FiiAlert({ fiiCode, isPremium = false }: Props) {
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
