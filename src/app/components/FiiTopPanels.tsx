@@ -1,14 +1,58 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 interface FII {
     code: string;
-    price: string;
-    variation: string; // ex: "-1,23" ou "0,45"
-    name?: string;
+    price: string;    // ex: "R$ 84,11"
+    opening: string;  // ex: "R$ 84,33"
+    variation: string; // ex: "-1,23" | "0,45" | "12,79" | "R$ 0,94"
 }
+
+type FiiWithNumeric = FII & {
+    priceNum: number;
+    openingNum: number;
+    variationNum: number;      // percentual (preferência: valor da sheet; fallback: calculado)
+    variationFromSheet: boolean;
+    absValue: number;          // price - opening (valor absoluto em R$)
+};
+
+const parseBRL = (s?: string) => {
+    if (!s) return NaN;
+    try {
+        const clean = String(s)
+            .replace(/R\$\s?/i, "")
+            .replace(/\s/g, "")
+            .replace(/\./g, "") // remove separador de milhar
+            .replace(",", "."); // decimal
+        return Number(clean);
+    } catch {
+        return NaN;
+    }
+};
+
+const parsePercent = (s?: string) => {
+    if (!s) return NaN;
+    try {
+        // se for algo do tipo "R$ 0,94" consideramos inválido como percentual
+        if (/R\$/i.test(s)) return NaN;
+        const clean = String(s).replace("%", "").replace(/\s/g, "").replace(",", ".");
+        return Number(clean);
+    } catch {
+        return NaN;
+    }
+};
+
+const formatBRL = (n: number) =>
+    Number.isFinite(n)
+        ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n)
+        : "-";
+
+const formatPercent = (n: number) =>
+    Number.isFinite(n)
+        ? `${n >= 0 ? "+" : ""}${new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}%`
+        : "-";
 
 export default function FiiTopPanels() {
     const [fiis, setFiis] = useState<FII[]>([]);
@@ -19,100 +63,122 @@ export default function FiiTopPanels() {
             try {
                 const res = await fetch("/api/fii");
                 const data: FII[] = await res.json();
-                setFiis(data);
+                setFiis(data ?? []);
             } catch (err) {
                 console.error("Erro ao buscar FIIs:", err);
+                setFiis([]);
             } finally {
                 setLoading(false);
             }
         };
-
         fetchFiis();
     }, []);
 
     if (loading) return <p>Carregando FIIs...</p>;
 
-    // Converter variação para número
-    const fiisWithVariation = fiis.map(fii => {
-        let value = 0;
-        if (fii.variation) {
-            value = Number(fii.variation.replace(",", ".").replace("%", ""));
+    const normalized: FiiWithNumeric[] = fiis.map((fii) => {
+        const priceNum = parseBRL(fii.price);
+        const openingNum = parseBRL(fii.opening);
+        const sheetVar = parsePercent(fii.variation);
+        const variationFromSheet = Number.isFinite(sheetVar);
+        let variationNum = sheetVar;
+
+        // fallback: calcular % se não houver valor percentual válido vindo da sheet
+        if (!variationFromSheet) {
+            if (Number.isFinite(priceNum) && Number.isFinite(openingNum) && openingNum !== 0) {
+                variationNum = ((priceNum - openingNum) / openingNum) * 100;
+            } else {
+                variationNum = 0;
+            }
         }
-        return { ...fii, variationNum: value };
+
+        const absValue = Number.isFinite(priceNum) && Number.isFinite(openingNum)
+            ? priceNum - openingNum
+            : NaN;
+
+        return {
+            ...fii,
+            priceNum,
+            openingNum,
+            variationNum,
+            variationFromSheet,
+            absValue,
+        };
     });
 
-    const topAltas = [...fiisWithVariation]
-        .sort((a, b) => b.variationNum - a.variationNum)
-        .slice(0, 3);
+    // Ordena usando variationNum (que prioriza sheet quando presente)
+    const topAltas = [...normalized].sort((a, b) => b.variationNum - a.variationNum).slice(0, 3);
+    const topBaixas = [...normalized].sort((a, b) => a.variationNum - b.variationNum).slice(0, 3);
 
-    const topBaixas = [...fiisWithVariation]
-        .sort((a, b) => a.variationNum - b.variationNum)
-        .slice(0, 3);
+    const Badge = ({
+        code,
+        variationNum,
+        priceNum,
+        absValue,
+        type,
+    }: {
+        code: string;
+        variationNum: number;
+        priceNum: number;
+        absValue: number;
+        type: "up" | "down";
+    }) => {
+        const percentLabel = formatPercent(variationNum);
+        let absLabel = "";
+        if (Number.isFinite(absValue)) {
+            // mostra sinal para o valor absoluto (mesmo sinal da variação)
+            const sign = absValue > 0 ? "+" : absValue < 0 ? "-" : "";
+            absLabel = ` (${sign}${formatBRL(Math.abs(absValue))})`;
+        }
+        return (
+            <div
+                className={`p-2 rounded shadow text-xs cursor-pointer flex items-center gap-2 ${type === "up" ? "bg-green-800 text-green-200" : "bg-red-800 text-red-200"
+                    }`}
+                title={`Preço atual: ${Number.isFinite(priceNum) ? formatBRL(priceNum) : "-"}`}
+            >
+                {type === "up" ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                <span className="font-bold">{code}</span>
+                <span>{percentLabel}{absLabel}</span>
+            </div>
+        );
+    };
 
     return (
-        // <div className="bg-gray-900 p-4 rounded-xl max-w-sm mx-auto">
-        //     <h3 className="text-center font-bold mb-2">📊 Top FIIs</h3>
-        //     <ul className="space-y-1 text-sm">
-        //         {topAltas.map(fii => (
-        //             <li key={fii.code} className="flex justify-between">
-        //                 <span>{fii.code}</span>
-        //                 <span className={fii.variationNum >= 0 ? "text-green-400" : "text-red-400"}>
-        //                     {fii.variationNum.toFixed(2)}%
-        //                 </span>
-        //             </li>
-        //         ))}
-        //     </ul>
-        // </div>
+        <div className="flex flex-col items-center gap-4 max-w-lg mx-auto">
+            {/* Top Altas */}
+            <div className="w-full">
+                <h3 className="text-center font-bold text-green-400 mb-2">📈 Maiores Altas</h3>
+                <div className="flex justify-center gap-2 flex-wrap">
+                    {topAltas.map((fii) => (
+                        <Badge
+                            key={`alta-${fii.code}`}
+                            code={fii.code}
+                            variationNum={fii.variationNum}
+                            priceNum={fii.priceNum}
+                            absValue={fii.absValue}
+                            type="up"
+                        />
+                    ))}
+                </div>
+            </div>
 
-        // <div className="flex justify-center gap-2 max-w-xs mx-auto">
-        //     {topAltas.concat(topBaixas).map(fii => (
-        //         <div
-        //             key={fii.code}
-        //             className={`p-2 rounded shadow text-xs ${fii.variationNum >= 0 ? "bg-green-800 text-green-200" : "bg-red-800 text-red-200"
-        //                 }`}
-        //         >
-        //             <span className="font-bold">{fii.code}</span>: {fii.variationNum.toFixed(2)}%
-        //         </div>
-        //     ))}
-        // </div>
-
-        // <div className="flex justify-center gap-2">
-        //     {topAltas.map(fii => (
-        //         <span key={fii.code} className="relative group">
-        //             <ArrowUp className="w-4 h-4 text-green-400" />
-        //             <span className="absolute -top-6 left-1/2 transform -translate-x-1/2 scale-0 group-hover:scale-100 bg-gray-800 text-white text-xs px-2 py-1 rounded">
-        //                 {fii.code}: {fii.variationNum.toFixed(2)}%
-        //             </span>
-        //         </span>
-        //     ))}
-        //     {topBaixas.map(fii => (
-        //         <span key={fii.code} className="relative group">
-        //             <ArrowDown className="w-4 h-4 text-red-400" />
-        //             <span className="absolute -top-6 left-1/2 transform -translate-x-1/2 scale-0 group-hover:scale-100 bg-gray-800 text-white text-xs px-2 py-1 rounded">
-        //                 {fii.code}: {fii.variationNum.toFixed(2)}%
-        //             </span>
-        //         </span>
-        //     ))}
-        // </div>
-
-        <div className="flex flex-wrap justify-center gap-2 max-w-xs mx-auto">
-            {topAltas.concat(topBaixas).map((fii, index) => {
-                const variation = fii.variationNum ?? 0;
-                const code = fii.code ?? "N/A";
-                const price = fii.price ?? "N/A";
-
-                return (
-                    <div
-                        key={`${code}-${index}`}
-                        className={`p-2 rounded shadow text-xs cursor-pointer ${variation >= 0 ? "bg-green-800 text-green-200" : "bg-red-800 text-red-200"
-                            }`}
-                        title={`Preço atual: ${price}`} // Tooltip
-                    >
-                        <span className="font-bold">{code}</span>: {variation.toFixed(2)}%
-                    </div>
-                );
-            })}
+            {/* Top Baixas */}
+            <div className="w-full">
+                <h3 className="text-center font-bold text-red-400 mb-2">📉 Maiores Baixas</h3>
+                <div className="flex justify-center gap-2 flex-wrap">
+                    {topBaixas.map((fii) => (
+                        <Badge
+                            key={`baixa-${fii.code}`}
+                            code={fii.code}
+                            variationNum={fii.variationNum}
+                            priceNum={fii.priceNum}
+                            absValue={fii.absValue}
+                            type="down"
+                        />
+                    ))}
+                </div>
+            </div>
+            <p className="text-gray-600">Possuí atraso de aproximadamente 15 minutos</p>
         </div>
-
     );
 }

@@ -10,7 +10,7 @@ export function SimulationCard({ lastDividend, price, basicSalary }: ComparisonC
     if (!lastDividend || !price) {
         return (
             <div className="bg-gray-800 p-4 rounded-xl text-center text-gray-400">
-                Dados insuficientes para calcular a comparação.
+                Dados insuficientes para realizar o planejamento.
             </div>
         );
     }
