@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { Loader2 } from "lucide-react";
@@ -16,6 +16,14 @@ export default function Home() {
     const [dolar, setDolar] = useState<string>("...");
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
+    const [showLogin, setShowLogin] = useState(false); // controla exibição do Login
+
+    // Mostrar botão de Login apenas em localhost
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            setShowLogin(window.location.hostname === "localhost");
+        }
+    }, []);
 
     const fetchFII = async () => {
         setError("");
@@ -115,10 +123,12 @@ export default function Home() {
 
     return (
         <div className="font-sans text-center mt-12 px-4">
-            {/* Login fixo no topo direito */}
-            <div className="fixed top-4 right-4">
-                <Login />
-            </div>
+            {/* Login fixo no topo direito, apenas em localhost */}
+            {showLogin && (
+                <div className="fixed top-4 right-4">
+                    <Login />
+                </div>
+            )}
 
             <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
             <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
