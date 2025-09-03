@@ -5,60 +5,89 @@ import { cookies } from "next/headers";
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { email, fiiCode, isPremium } = body;
+        const { email, fiiCode, isPremium, percentUp, percentDown } = body;
 
         if (!email || !fiiCode || typeof isPremium !== "boolean") {
-            return NextResponse.json({ error: "Email, FII e isPremium são obrigatórios." }, { status: 400 });
+            return NextResponse.json(
+                { error: "Email, FII e isPremium são obrigatórios." },
+                { status: 400 }
+            );
         }
 
-        // Pegar cookie do usuário
+        // Identificação pelo cookie de sessão
         const cookieStore = await cookies();
         const anonId = cookieStore.get("anonId")?.value;
-        
+
         if (!anonId) {
-            return NextResponse.json({ error: "Usuário não possui cookie de sessão." }, { status: 400 });
+            return NextResponse.json(
+                { error: "Usuário não possui cookie de sessão." },
+                { status: 400 }
+            );
         }
 
         const userRef = adminDb.collection("User").doc(anonId);
 
         // Ler documento existente
         const doc = await userRef.get();
-        let monitoredData: any = {
-            listFiis: [fiiCode],
-            percentUp: 3,
-            percentDown: -3,
-            phone: "+5511999999999"
-        };
+
+        // Estrutura de monitoramento: lista de FIIs
+        let monitoredData: any[] = [
+            {
+                fiiCode,
+                percentUp: Number(percentUp ?? 3),
+                percentDown: Number(percentDown ?? -3),
+            },
+        ];
 
         if (doc.exists) {
-            const existing = doc.data()?.monitored || {};
-            if (isPremium) {
-                const listFiis = Array.isArray(existing.listFiis) ? [...existing.listFiis] : [];
-                if (!listFiis.includes(fiiCode)) listFiis.push(fiiCode);
+            const existing = Array.isArray(doc.data()?.monitored)
+                ? doc.data()?.monitored
+                : [];
 
-                monitoredData = {
-                    ...existing,
-                    listFiis,
-                    percentUp: existing.percentUp ?? 3,
-                    percentDown: existing.percentDown ?? -3,
-                    phone: existing.phone ?? "+5511999999999",
-                };
+            if (isPremium) {
+                // Premium → pode monitorar vários FIIs
+                const alreadyExists = existing.find((f: any) => f.fiiCode === fiiCode);
+
+                if (alreadyExists) {
+                    // Atualiza o FII já monitorado
+                    monitoredData = existing.map((f: any) =>
+                        f.fiiCode === fiiCode
+                            ? {
+                                ...f,
+                                percentUp: Number(percentUp ?? f.percentUp),
+                                percentDown: Number(percentDown ?? f.percentDown),
+                            }
+                            : f
+                    );
+                } else {
+                    // Adiciona novo FII
+                    monitoredData = [
+                        ...existing,
+                        {
+                            fiiCode,
+                            percentUp: Number(percentUp ?? 3),
+                            percentDown: Number(percentDown ?? -3),
+                        },
+                    ];
+                }
             } else {
-                monitoredData = {
-                    ...existing,
-                    listFiis: [fiiCode],
-                    percentUp: existing.percentUp ?? 3,
-                    percentDown: existing.percentDown ?? -3,
-                    phone: existing.phone ?? "+5511999999999",
-                };
+                // Free → só pode monitorar 1 FII
+                monitoredData = [
+                    {
+                        fiiCode,
+                        percentUp: Number(percentUp ?? 3),
+                        percentDown: Number(percentDown ?? -3),
+                    },
+                ];
             }
         }
 
-        // Atualiza ou cria documento
+        // Atualiza ou cria documento no Firestore
         await userRef.set(
             {
                 email,
-                monitored: monitoredData
+                isPremium,
+                monitored: monitoredData,
             },
             { merge: true }
         );
@@ -66,6 +95,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
     } catch (err: any) {
         console.error("Erro ao adicionar alert:", err);
-        return NextResponse.json({ error: err.message || "Erro desconhecido" }, { status: 500 });
+        return NextResponse.json(
+            { error: err.message || "Erro desconhecido" },
+            { status: 500 }
+        );
     }
 }

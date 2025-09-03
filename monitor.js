@@ -18,23 +18,7 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const referencePrices = {}; // referência por usuário+FII
 
-// Função para pegar preço direto do Yahoo Finance
-async function getPrice(ticker) {
-    try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}.SA?interval=1m`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Erro Yahoo API: ${res.status}`);
-        const data = await res.json();
-        const lastPrice = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        if (!lastPrice) throw new Error(`Preço inválido retornado`);
-        return lastPrice;
-    } catch (err) {
-        console.error(`[getPrice] Falha para ${ticker}: ${err.message}`);
-        return null;
-    }
-}
 // --- Telegram ---
 async function sendTelegram(message) {
     try {
@@ -85,42 +69,60 @@ async function sendEmail(subject, text, emailTo) {
 async function sendAlert(message, email) {
     await Promise.all([
         // sendTelegram(message),
-        sendEmail(`[Dados FII] Alerta de ${message.includes("subiu") ? "Alta": "Baixa"}`, message, email)
+        sendEmail(`[Dados FII] Alerta de ${message.includes("subiu") ? "Alta" : "Baixa"}`, message, email),
     ]);
 }
 
-
 // Monitorar FIIs de um usuário
-async function monitorUser(cookie, monitored, email) {
-    if (!monitored || !Array.isArray(monitored.listFiis)) return;
+async function monitorUser(cookie, monitoredList, email, isPremium) {
+    if (!monitoredList || !Array.isArray(monitoredList)) return;
 
-    const { listFiis, percentDown, percentUp } = monitored;
+    // Free: só pega o primeiro
+    const listToCheck = isPremium ? monitoredList : [monitoredList[0]];
 
-    for (const fii of listFiis) {
-        const price = await getPrice(fii);
-        if (!price) continue;
+    for (const item of listToCheck) {
+        if (!item) continue;
 
-        const userKey = `${cookie}-${fii}`;
-        if (!referencePrices[userKey]) {
-            referencePrices[userKey] = price;
-            console.log(`[Init] Usuário ${cookie} monitora ${fii} @ R$${price}`);
-            continue;
-        }
+        const { fiiCode, percentUp, percentDown } = item;
+        if (!fiiCode) continue;
 
-        const refPrice = referencePrices[userKey];
-        const variation = (((price + 4) - refPrice) / refPrice) * 100;
+        const fiiData = await getFiiData(fiiCode);
+        if (!fiiData) continue;
 
-        console.log(`[Check] Usuário ${cookie} ${fii}: R$${price} (${variation.toFixed(2)}%)`);
-        if (variation <= percentDown || variation >= percentUp) {
+        const { price, variation } = fiiData;
+        const variationNum = parseFloat(variation.replace("%", "").replace(",", "."));
+
+        console.log(
+            `[Check] Usuário ${cookie} ${fiiCode}: ${price} (${variationNum.toFixed(2)}%)`
+        );
+
+        if (variationNum <= percentDown || variationNum >= percentUp) {
             const msg =
-                variation <= percentDown
-                    ? `🚨 ${fii} caiu ${variation.toFixed(2)}%!\nPreço atual: R$${price}`
-                    : `📈 ${fii} subiu ${variation.toFixed(2)}%!\nPreço atual: R$${price}`;
+                variationNum <= percentDown
+                    ? `🚨 ${fiiCode} caiu ${variationNum.toFixed(2)}%!\nPreço atual: ${price}`
+                    : `📈 ${fiiCode} subiu ${variationNum.toFixed(2)}%!\nPreço atual: ${price}`;
 
             await sendAlert(msg, email);
-
-            referencePrices[userKey] = price; // atualiza referência
         }
+    }
+}
+
+async function getFiiData(ticker) {
+    try {
+        const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/fii?ticker=${ticker}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erro rota /api/fii: ${res.status}`);
+        const data = await res.json();
+
+        return {
+            code: data.code,
+            price: data.price,
+            opening: data.opening,
+            variation: data.variation,
+        };
+    } catch (err) {
+        console.error(`[getFiiData] Falha para ${ticker}: ${err.message}`);
+        return null;
     }
 }
 
@@ -134,12 +136,13 @@ async function monitor() {
 
         for (const userDoc of usersSnap.docs) {
             const cookie = userDoc.id;
-            const monitored = userDoc.data()?.monitored;
-            const email = userDoc.data()?.email;
+            const data = userDoc.data();
+            const monitoredList = data?.monitored;
+            const email = data?.email;
+            const isPremium = data?.isPremium || false;
 
             if (!cookie.includes("gmail.com")) {
-                // console.log(`[DEBUG] Usuário ${cookie} monitored:`, monitored, `E-mail: ${email}`);
-                await monitorUser(cookie, monitored, email);
+                await monitorUser(cookie, monitoredList, email, isPremium);
             }
         }
     } catch (err) {

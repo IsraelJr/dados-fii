@@ -86,7 +86,6 @@ export default function LoginButton() {
                 doc(db, "User", anonId),
                 {
                     email,
-                    isPremium: false,
                     createdAt: new Date(),
                 },
                 { merge: true }
