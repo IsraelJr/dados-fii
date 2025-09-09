@@ -14,7 +14,8 @@ const db = admin.firestore();
 const SHEET_ID = process.env.SHEET_ID!;
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY!;
 const RANGE = "A1:D400";
-const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+const url = `${baseUrl}&t=${Date.now()}`;
 
 interface FiiData {
   code: string;
@@ -74,6 +75,10 @@ export async function GET(req: Request) {
 
       return new Response(
         JSON.stringify({
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+          },
           ...docData,
           ...match, // garante que sempre terá code, price, opening, variation
         }),
@@ -97,42 +102,26 @@ async function getAllPricesFromSheet() {
 
     const [header, ...rows] = data.values;
 
-    // Retorna um array de objetos: { code: string, price: number, opening: number, variation: number }
-    // const fiis = rows
-    //   .filter((row: any) => row[0] && row[1] && row[1] !== "#N/A") // garante ticker e preço válido
-    //   .map((row: any) => {
-    //     const rawPrice = row[1].toString().trim();
-
-    //     // Remove R$, troca vírgula por ponto e converte para número
-    //     const normalizedPrice = parseFloat(
-    //       rawPrice.replace("R$", "").replace(/\./g, "").replace(",", ".")
-    //     );
-
-    //     return {
-    //       code: row[0].toString().trim().toUpperCase(),
-    //       price: rawPrice,
-    //       opening: row[2].toString().trim().toUpperCase(),
-    //       variation: row[3].toString().trim().toUpperCase(),
-    //     };
-    //   });
-
-    // return fiis;
-
     return rows
-      .filter((row: any) => row[0] && row[1] && row[1] !== "#N/A")
+      .filter(
+        (row: any) =>
+          row[0] && // ticker
+          row[1] && row[1] !== "#N/A" && // preço válido
+          row[2] && row[2] !== "#N/A" // abertura válida (garante ativo)
+      )
       .map((row: any): FiiData => {
         const rawPrice = row[1].toString().trim();
-
-        // Remove R$, troca vírgula por ponto e converte para número
-        const normalizedPrice = parseFloat(
-          rawPrice.replace("R$", "").replace(/\./g, "").replace(",", ".")
-        );
 
         return {
           code: row[0].toString().trim().toUpperCase(),
           price: rawPrice,
           opening: row[2]?.toString().trim(),
-          variation: `${row[3]?.toString().trim().replace("R$", "").replace(/\./g, "").replace(",", ".")}%`,
+          variation: `${row[3]
+            ?.toString()
+            .trim()
+            .replace("R$", "")
+            .replace(/\./g, "")
+            .replace(",", ".")}%`,
         };
       });
   } catch (err) {

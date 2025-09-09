@@ -74,6 +74,7 @@ async function sendAlert(message, email) {
 }
 
 // Monitorar FIIs de um usuário
+// Monitorar FIIs de um usuário
 async function monitorUser(cookie, monitoredList, email, isPremium) {
     if (!monitoredList || !Array.isArray(monitoredList)) return;
 
@@ -86,16 +87,44 @@ async function monitorUser(cookie, monitoredList, email, isPremium) {
         const { fiiCode, percentUp, percentDown } = item;
         if (!fiiCode) continue;
 
-        const fiiData = await getFiiData(fiiCode);
-        if (!fiiData) continue;
+        // Busca Yahoo e Brapi em paralelo
+        const [fiiYahoo, fiiBrapi] = await Promise.all([
+            getPriceYahoo(fiiCode),
+            getPriceBrapi(fiiCode),
+        ]);
 
-        const { price, variation } = fiiData;
-        const variationNum = parseFloat(variation.replace("%", "").replace(",", "."));
+        if (!fiiYahoo && !fiiBrapi) continue; // nada retornou
+
+        // Decide qual usar para validar alerta
+        const candidates = [fiiYahoo, fiiBrapi].filter(Boolean);
+        const variationYahoo = fiiYahoo?.variation ?? null;
+        const variationBrapi = fiiBrapi?.variation ?? null;
+
+        // Se for subida, pega a MAIOR variação; se for queda, pega a MENOR
+        let finalData = null;
+        if (candidates.length === 2) {
+            if ((variationYahoo >= 0 && variationBrapi >= 0)) {
+                finalData = variationYahoo > variationBrapi ? fiiYahoo : fiiBrapi;
+            } else if ((variationYahoo <= 0 && variationBrapi <= 0)) {
+                finalData = variationYahoo < variationBrapi ? fiiYahoo : fiiBrapi;
+            } else {
+                // Se sinais diferentes, pega o Yahoo como preferencial (mas dá pra trocar)
+                finalData = fiiYahoo;
+            }
+        } else {
+            finalData = candidates[0];
+        }
+
+        if (!finalData) continue;
+
+        const { price, variation } = finalData;
+        const variationNum = variation;
 
         console.log(
             `[Check] Usuário ${cookie} ${fiiCode}: ${price} (${variationNum.toFixed(2)}%)`
         );
 
+        // Disparo do alerta
         if (variationNum <= percentDown || variationNum >= percentUp) {
             const msg =
                 variationNum <= percentDown
@@ -106,6 +135,7 @@ async function monitorUser(cookie, monitoredList, email, isPremium) {
         }
     }
 }
+
 
 async function getFiiData(ticker) {
     try {
@@ -125,6 +155,59 @@ async function getFiiData(ticker) {
         return null;
     }
 }
+
+// --- Yahoo Finance ---
+async function getPriceYahoo(ticker) {
+    try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}.SA?interval=1d&range=1d`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erro Yahoo API: ${res.status}`);
+        const data = await res.json();
+
+        const meta = data?.chart?.result?.[0]?.meta;
+        if (!meta) throw new Error(`Dados inválidos para ${ticker}`);
+
+        const price = meta.regularMarketPrice;
+        const previousClose = meta.chartPreviousClose || meta.previousClose;
+        const variation = ((price - previousClose) / previousClose) * 100;
+
+        if (ticker.toUpperCase() === "TGAR11") {
+            console.log(`[Yahoo] ${ticker} preço: ${price}, variação: ${variation.toFixed(2)}%`);
+        }
+
+        return { price, previousClose, variation };
+    } catch (err) {
+        console.error(`[getPriceYahoo] Falha para ${ticker}: ${err.message}`);
+        return null;
+    }
+}
+
+// --- BRAPI ---
+async function getPriceBrapi(ticker) {
+    try {
+        const url = `https://brapi.dev/api/quote/${ticker}?token=dqH9rMGGeyq2t9QDaMc8ia`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erro BRAPI: ${res.status}`);
+        const data = await res.json();
+
+        const result = data?.results?.[0];
+        if (!result) throw new Error(`Dados inválidos para ${ticker}`);
+
+        const price = result.regularMarketPrice;
+        const previousClose = result.regularMarketPreviousClose;
+        const variation = ((price - previousClose) / previousClose) * 100;
+
+        if (ticker.toUpperCase() === "TGAR11") {
+            console.log(`[Brapi] ${ticker} preço: ${price}, variação: ${variation.toFixed(2)}%`);
+        }
+
+        return { price, previousClose, variation };
+    } catch (err) {
+        console.error(`[getPriceBrapi] Falha para ${ticker}: ${err.message}`);
+        return null;
+    }
+}
+
 
 // Monitorar todos os usuários
 async function monitor() {

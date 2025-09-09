@@ -15,7 +15,7 @@ type FiiWithNumeric = FII & {
     openingNum: number;
     variationNum: number;      // percentual (preferência: valor da sheet; fallback: calculado)
     variationFromSheet: boolean;
-    absValue: number;          // price - opening (valor absoluto em R$)
+    // absValue: number;          // price - opening (valor absoluto em R$)
 };
 
 const parseBRL = (s?: string) => {
@@ -92,9 +92,9 @@ export default function FiiTopPanels() {
             }
         }
 
-        const absValue = Number.isFinite(priceNum) && Number.isFinite(openingNum)
-            ? priceNum - openingNum
-            : NaN;
+        // const absValue = Number.isFinite(priceNum) && Number.isFinite(openingNum)
+        //     ? priceNum - openingNum
+        //     : NaN;
 
         return {
             ...fii,
@@ -102,7 +102,7 @@ export default function FiiTopPanels() {
             openingNum,
             variationNum,
             variationFromSheet,
-            absValue,
+            // absValue,
         };
     });
 
@@ -114,22 +114,22 @@ export default function FiiTopPanels() {
         code,
         variationNum,
         priceNum,
-        absValue,
+        // absValue,
         type,
     }: {
         code: string;
         variationNum: number;
         priceNum: number;
-        absValue: number;
+        // absValue: number;
         type: "up" | "down";
     }) => {
         const percentLabel = formatPercent(variationNum);
         let absLabel = "";
-        if (Number.isFinite(absValue)) {
-            // mostra sinal para o valor absoluto (mesmo sinal da variação)
-            const sign = absValue > 0 ? "+" : absValue < 0 ? "-" : "";
-            absLabel = ` (${sign}${formatBRL(Math.abs(absValue))})`;
-        }
+        // if (Number.isFinite(absValue)) {
+        //     // mostra sinal para o valor absoluto (mesmo sinal da variação)
+        //     const sign = absValue > 0 ? "+" : absValue < 0 ? "-" : "";
+        //     absLabel = ` (${sign}${formatBRL(Math.abs(absValue))})`;
+        // }
         return (
             <div
                 className={`p-2 rounded shadow text-xs cursor-pointer flex items-center gap-2 ${type === "up" ? "bg-green-800 text-green-200" : "bg-red-800 text-red-200"
@@ -155,7 +155,7 @@ export default function FiiTopPanels() {
                             code={fii.code}
                             variationNum={fii.variationNum}
                             priceNum={fii.priceNum}
-                            absValue={fii.absValue}
+                            // absValue={fii.absValue}
                             type="up"
                         />
                     ))}
@@ -172,7 +172,7 @@ export default function FiiTopPanels() {
                             code={fii.code}
                             variationNum={fii.variationNum}
                             priceNum={fii.priceNum}
-                            absValue={fii.absValue}
+                            // absValue={fii.absValue}
                             type="down"
                         />
                     ))}

@@ -29,5 +29,5 @@ export function middleware(req: NextRequest) {
 
 // Aplica o middleware em todas as rotas
 export const config = {
-    matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png).*)"],
+    matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|api/fii).*)"],
 };
