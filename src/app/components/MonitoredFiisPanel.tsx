@@ -116,7 +116,7 @@ export default function MonitoredFiisPanel() {
                                         {fii.variation.toFixed(2)}%
                                     </span>
                                     <span className="text-xs text-gray-400">
-                                        🔻 {fii.percentDown}% / 🔺 {fii.percentUp}%
+                                    <span style={{ color: 'red' }}>▼</span> {fii.percentDown}% / <span style={{ color: 'green' }}>▲</span> {fii.percentUp}%
                                     </span>
                                 </div>
                             </div>
