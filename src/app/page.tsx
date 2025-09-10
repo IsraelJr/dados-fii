@@ -6,7 +6,8 @@ import CookieBanner from "./components/CookieBanner";
 import PersonalizedNews from "./components/PersonalizedNews";
 import FiiTopPanels from "./components/FiiTopPanels";
 import FiiSummary from "./components/FiiSummary";
-import Login from "./components/Login"; // <-- Importando Login
+import Login from "./components/Login";
+import MonitoredFiisPanel from "./components/MonitoredFiisPanel";
 
 export default function Home() {
     const [stats, setStats] = useState<{ visit: number; search: number }>({ visit: 0, search: 0 });
@@ -136,6 +137,10 @@ export default function Home() {
             <div className="mt-4 text-gray-400">
                 💵 Cotação do dólar: {dolar}
                 <br /><br />
+            </div>
+
+            <div className="flex top-4 left-4">
+                <MonitoredFiisPanel />
             </div>
 
             <div>
