@@ -134,6 +134,7 @@ export default function MonitoredFiisPanel() {
                     )}
                 </div>
             )}
+            <br />
         </aside>
     );
 }
