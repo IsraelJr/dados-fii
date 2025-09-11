@@ -159,6 +159,11 @@ export default function Home() {
                     placeholder="Digite o ticker (ex: ABCD11)"
                     value={ticker}
                     onChange={(e) => setTicker(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                            fetchFII();
+                        }
+                    }}
                     className="p-2 w-56 rounded-lg border border-gray-400 bg-gray-100 text-black"
                 />
                 <button
