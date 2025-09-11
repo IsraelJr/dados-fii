@@ -75,6 +75,24 @@ export default function MonitoredFiisPanel() {
         }
     };
 
+    const handleScroll = (direction: "left" | "right") => {
+        if (!scrollRef.current) return;
+
+        const container = scrollRef.current;
+        const cardWidth = 210 + 16; // largura do card + espaço (tailwind space-x-4 = 1rem = 16px)
+        const maxScroll = container.scrollWidth - container.clientWidth;
+
+        if (direction === "left") {
+            container.scrollBy({ left: -cardWidth, behavior: "smooth" });
+        } else {
+            // só scrolla se não estiver no final
+            if (container.scrollLeft < maxScroll) {
+                container.scrollBy({ left: cardWidth, behavior: "smooth" });
+            }
+        }
+    };
+
+
     // Define a largura do container de acordo com a quantidade de FIIs
     // container dinâmico
     const getContainerWidth = () => {
@@ -82,6 +100,23 @@ export default function MonitoredFiisPanel() {
         if (fiis.length === 2) return "sm:max-w-[420px]";
         return "sm:max-w-[525px]";
     };
+
+    const [atStart, setAtStart] = useState(true);
+    const [atEnd, setAtEnd] = useState(false);
+
+    useEffect(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+
+        const handleCheck = () => {
+            setAtStart(container.scrollLeft === 0);
+            setAtEnd(container.scrollLeft + container.clientWidth >= container.scrollWidth);
+        };
+
+        handleCheck();
+        container.addEventListener("scroll", handleCheck);
+        return () => container.removeEventListener("scroll", handleCheck);
+    }, []);
 
 
     return (
@@ -99,21 +134,21 @@ export default function MonitoredFiisPanel() {
                     {/* Botão Esquerda */}
                     {fiis.length > 2 && (
                         <button
-                            onClick={() => scroll("left")}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-gray-800 p-2 rounded-full shadow-md hover:bg-gray-700"
+                            onClick={() => handleScroll("left")}
+                            disabled={atStart}
+                            className={`absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-gray-800 ${atStart ? "opacity-40 cursor-not-allowed" : ""
+                                }`}
                         >
-                            <ChevronLeft className="w-5 h-5 text-white" />
+                            <ChevronLeft className="w-6 h-6" />
                         </button>
                     )}
 
                     {/* Carrossel */}
                     <div
                         ref={scrollRef}
-                        className={`flex ${fiis.length > 2
-                            ? "overflow-x-auto space-x-4 px-10 scrollbar-hide"
-                            : "justify-center space-x-4"
-                            }`}
+                        className="flex overflow-x-auto space-x-4 px-10 scrollbar-hide"
                     >
+
 
                         {fiis.map((fii) => (
                             <div
@@ -142,10 +177,12 @@ export default function MonitoredFiisPanel() {
                     {/* Botão Direita */}
                     {fiis.length > 2 && (
                         <button
-                            onClick={() => scroll("right")}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-gray-800 p-2 rounded-full shadow-md hover:bg-gray-700"
+                            onClick={() => handleScroll("right")}
+                            disabled={atEnd}
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-gray-800 ${atEnd ? "opacity-40 cursor-not-allowed" : ""
+                                }`}
                         >
-                            <ChevronRight className="w-5 h-5 text-white" />
+                            <ChevronRight className="w-6 h-6" />
                         </button>
                     )}
                 </div>
