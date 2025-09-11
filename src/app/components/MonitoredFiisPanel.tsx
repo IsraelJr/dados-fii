@@ -126,7 +126,7 @@ export default function MonitoredFiisPanel() {
                     {/* Carrossel */}
                     <div
                         ref={scrollRef}
-                        className="flex overflow-x-auto space-x-4 px-10 snap-x snap-mandatory scrollbar-hide"
+                        className="flex overflow-x-auto space-x-4 px-10 no-scrollbar"
                     >
                         {fiis.map((fii) => (
                             <div
