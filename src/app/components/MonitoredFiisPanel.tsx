@@ -19,6 +19,8 @@ interface FiiData {
 export default function MonitoredFiisPanel() {
     const [fiis, setFiis] = useState<(MonitoredFii & FiiData)[]>([]);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [atStart, setAtStart] = useState(true);
+    const [atEnd, setAtEnd] = useState(false);
 
     useEffect(() => {
         async function loadData() {
@@ -56,68 +58,48 @@ export default function MonitoredFiisPanel() {
 
         loadData();
 
-        // 🔄 Escuta quando novos FIIs forem adicionados
+        // 🔄 Atualiza sempre que novos FIIs forem adicionados
         const handleUpdate = () => loadData();
         window.addEventListener("fiis-updated", handleUpdate);
-
-        return () => {
-            window.removeEventListener("fiis-updated", handleUpdate);
-        };
+        return () => window.removeEventListener("fiis-updated", handleUpdate);
     }, []);
-
-    const scroll = (direction: "left" | "right") => {
-        if (scrollRef.current) {
-            const scrollAmount = 210; // largura base do card
-            scrollRef.current.scrollBy({
-                left: direction === "left" ? -scrollAmount : scrollAmount,
-                behavior: "smooth",
-            });
-        }
-    };
 
     const handleScroll = (direction: "left" | "right") => {
         if (!scrollRef.current) return;
 
         const container = scrollRef.current;
-        const cardWidth = 210 + 16; // largura do card + espaço (tailwind space-x-4 = 1rem = 16px)
+        const cardWidth = 210 + 16; // largura + gap
         const maxScroll = container.scrollWidth - container.clientWidth;
 
         if (direction === "left") {
-            container.scrollBy({ left: -cardWidth, behavior: "smooth" });
+            const newScroll = Math.max(container.scrollLeft - cardWidth, 0);
+            container.scrollTo({ left: newScroll, behavior: "smooth" });
         } else {
-            // só scrolla se não estiver no final
-            if (container.scrollLeft < maxScroll) {
-                container.scrollBy({ left: cardWidth, behavior: "smooth" });
-            }
+            const newScroll = Math.min(container.scrollLeft + cardWidth, maxScroll);
+            container.scrollTo({ left: newScroll, behavior: "smooth" });
         }
     };
 
-
-    // Define a largura do container de acordo com a quantidade de FIIs
-    // container dinâmico
+    // Define largura dinâmica do container
     const getContainerWidth = () => {
         if (fiis.length === 1) return "sm:max-w-[210px]";
         if (fiis.length === 2) return "sm:max-w-[420px]";
         return "sm:max-w-[525px]";
     };
 
-    const [atStart, setAtStart] = useState(true);
-    const [atEnd, setAtEnd] = useState(false);
-
     useEffect(() => {
         const container = scrollRef.current;
         if (!container) return;
 
         const handleCheck = () => {
-            setAtStart(container.scrollLeft === 0);
+            setAtStart(container.scrollLeft <= 0);
             setAtEnd(container.scrollLeft + container.clientWidth >= container.scrollWidth);
         };
 
         handleCheck();
         container.addEventListener("scroll", handleCheck);
         return () => container.removeEventListener("scroll", handleCheck);
-    }, []);
-
+    }, [fiis]);
 
     return (
         <aside className={`relative w-full mx-auto ${getContainerWidth()}`}>
@@ -126,17 +108,15 @@ export default function MonitoredFiisPanel() {
             </h2>
 
             {fiis.length === 0 ? (
-                <p className="text-center text-gray-400">
-                    Nenhum FII sendo monitorado
-                </p>
+                <p className="text-center text-gray-400">Nenhum FII sendo monitorado</p>
             ) : (
                 <div className="relative">
-                    {/* Botão Esquerda */}
+                    {/* Botão Esquerda (desktop apenas) */}
                     {fiis.length > 2 && (
                         <button
                             onClick={() => handleScroll("left")}
                             disabled={atStart}
-                            className={`absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-gray-800 ${atStart ? "opacity-40 cursor-not-allowed" : ""
+                            className={`hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-gray-800 ${atStart ? "opacity-40 cursor-not-allowed" : ""
                                 }`}
                         >
                             <ChevronLeft className="w-6 h-6" />
@@ -146,10 +126,8 @@ export default function MonitoredFiisPanel() {
                     {/* Carrossel */}
                     <div
                         ref={scrollRef}
-                        className="flex overflow-x-auto space-x-4 px-10 scrollbar-hide"
+                        className="flex overflow-x-auto space-x-4 px-10 snap-x snap-mandatory scrollbar-hide"
                     >
-
-
                         {fiis.map((fii) => (
                             <div
                                 key={fii.code}
@@ -167,19 +145,20 @@ export default function MonitoredFiisPanel() {
                                         {fii.variation.toFixed(2)}%
                                     </span>
                                     <span className="text-xs text-gray-400">
-                                        <span style={{ color: 'red' }}>▼</span> {fii.percentDown}% / <span style={{ color: 'green' }}>▲</span> {fii.percentUp}%
+                                        <span style={{ color: "red" }}>▼</span> {fii.percentDown}% /{" "}
+                                        <span style={{ color: "green" }}>▲</span> {fii.percentUp}%
                                     </span>
                                 </div>
                             </div>
                         ))}
                     </div>
 
-                    {/* Botão Direita */}
+                    {/* Botão Direita (desktop apenas) */}
                     {fiis.length > 2 && (
                         <button
                             onClick={() => handleScroll("right")}
                             disabled={atEnd}
-                            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-gray-800 ${atEnd ? "opacity-40 cursor-not-allowed" : ""
+                            className={`hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-gray-800 ${atEnd ? "opacity-40 cursor-not-allowed" : ""
                                 }`}
                         >
                             <ChevronRight className="w-6 h-6" />
@@ -187,7 +166,6 @@ export default function MonitoredFiisPanel() {
                     )}
                 </div>
             )}
-            <br />
         </aside>
     );
 }
