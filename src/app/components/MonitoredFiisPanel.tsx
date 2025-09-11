@@ -103,7 +103,7 @@ export default function MonitoredFiisPanel() {
 
     return (
         <aside className={`relative w-full mx-auto ${getContainerWidth()}`}>
-            <h2 className="text-lg font-bold mb-4 text-white text-center">
+            <h2 className="text-lg font-bold mb-2 text-center">
                 📊 FIIs Monitorados
             </h2>
 
