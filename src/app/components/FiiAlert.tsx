@@ -112,6 +112,9 @@ export default function FiiAlert({ fiiCode }: Props) {
                 setMessage("✅ Alerta programado com sucesso!");
                 setSuccess(true);
                 setAlertCreated(true); // muda o sino
+                // depois do sucesso no Firebase:
+                window.dispatchEvent(new Event("fiis-updated"));
+
             } else {
                 setMessage(`❌ Falha ao configurar alerta: ${json.error || "Erro desconhecido"}`);
             }
@@ -212,8 +215,8 @@ export default function FiiAlert({ fiiCode }: Props) {
                     onClick={handleSubmit}
                     disabled={loading || success}
                     className={`w-full mt-3 py-2 rounded-lg font-bold ${loading || success
-                            ? "bg-gray-600 cursor-not-allowed"
-                            : "bg-green-600 hover:bg-green-700"
+                        ? "bg-gray-600 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700"
                         } text-white`}
                 >
                     {loading ? "Salvando..." : success ? "Enviado" : "Enviar"}

@@ -26,7 +26,10 @@ export default function MonitoredFiisPanel() {
                 const userRes = await fetch("/api/get-user");
                 const userData = await userRes.json();
 
-                if (!userData?.monitored) return;
+                if (!userData?.monitored) {
+                    setFiis([]);
+                    return;
+                }
 
                 const monitored: MonitoredFii[] = userData.monitored;
                 const listToFetch = userData.isPremium ? monitored : [monitored[0]];
@@ -52,6 +55,14 @@ export default function MonitoredFiisPanel() {
         }
 
         loadData();
+
+        // 🔄 Escuta quando novos FIIs forem adicionados
+        const handleUpdate = () => loadData();
+        window.addEventListener("fiis-updated", handleUpdate);
+
+        return () => {
+            window.removeEventListener("fiis-updated", handleUpdate);
+        };
     }, []);
 
     const scroll = (direction: "left" | "right") => {
@@ -65,11 +76,13 @@ export default function MonitoredFiisPanel() {
     };
 
     // Define a largura do container de acordo com a quantidade de FIIs
+    // container dinâmico
     const getContainerWidth = () => {
-        if (fiis.length === 1) return "max-w-[210px]";
-        if (fiis.length === 2) return "max-w-[420px]";
-        return "max-w-[525px]"; // 2.5 cards para 3 ou mais
+        if (fiis.length === 1) return "sm:max-w-[210px]";
+        if (fiis.length === 2) return "sm:max-w-[420px]";
+        return "sm:max-w-[525px]";
     };
+
 
     return (
         <aside className={`relative w-full mx-auto ${getContainerWidth()}`}>
@@ -96,9 +109,12 @@ export default function MonitoredFiisPanel() {
                     {/* Carrossel */}
                     <div
                         ref={scrollRef}
-                        className={`flex ${fiis.length > 2 ? "overflow-hidden space-x-4 px-10" : "justify-center space-x-4"
+                        className={`flex ${fiis.length > 2
+                            ? "overflow-x-auto space-x-4 px-10 scrollbar-hide"
+                            : "justify-center space-x-4"
                             }`}
                     >
+
                         {fiis.map((fii) => (
                             <div
                                 key={fii.code}
@@ -116,7 +132,7 @@ export default function MonitoredFiisPanel() {
                                         {fii.variation.toFixed(2)}%
                                     </span>
                                     <span className="text-xs text-gray-400">
-                                    <span style={{ color: 'red' }}>▼</span> {fii.percentDown}% / <span style={{ color: 'green' }}>▲</span> {fii.percentUp}%
+                                        <span style={{ color: 'red' }}>▼</span> {fii.percentDown}% / <span style={{ color: 'green' }}>▲</span> {fii.percentUp}%
                                     </span>
                                 </div>
                             </div>
