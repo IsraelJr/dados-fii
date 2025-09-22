@@ -362,10 +362,7 @@ export default function Home() {
             </div>
 
             {/* BLOQUEIO COM ADSENSE */}
-            {!adsClosed && (
-                <GoogleAdsBlock onClose={() => setAdsClosed(true)} />
-            )}
-
+            {!adsClosed && <GoogleAdsBlock onClose={() => setAdsClosed(true)} />}
 
             {adsClosed && (
                 <div className="mt-6 flex justify-center gap-2">
@@ -375,9 +372,7 @@ export default function Home() {
                         value={ticker}
                         onChange={(e) => setTicker(e.target.value)}
                         onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                                fetchFII();
-                            }
+                            if (e.key === "Enter") fetchFII();
                         }}
                         className="p-2 w-56 rounded-lg border border-gray-400 bg-gray-100 text-black"
                     />
@@ -389,6 +384,7 @@ export default function Home() {
                     </button>
                 </div>
             )}
+
 
             <div className="text-gray-400 text-sm mt-2">
                 👥 {stats.visit} visitantes | 🔎 {stats.search} buscas

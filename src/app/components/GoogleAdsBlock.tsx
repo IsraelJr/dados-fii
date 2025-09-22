@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+
+// Carrega Google Ad somente no cliente
+const GoogleAd = dynamic(
+    () => import("./GoogleAd"), // componente GoogleAd.tsx
+    { ssr: false }
+);
 
 interface GoogleAdsBlockProps {
     onClose: () => void;
@@ -14,7 +21,7 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
             setCountdown((prev) => {
                 if (prev <= 1) {
                     clearInterval(interval);
-                    onClose(); // fecha automaticamente quando chegar em zero
+                    onClose();
                     return 0;
                 }
                 return prev - 1;
@@ -24,29 +31,18 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
         return () => clearInterval(interval);
     }, [onClose]);
 
-    const closeDisabled = countdown > 10; // bloqueado nos primeiros 5 segundos
+    const closeDisabled = countdown > 10; // bloqueado nos primeiros 5s
 
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-transparent z-50">
             <div
                 className="border rounded-lg shadow-md bg-white p-2 flex flex-col items-center justify-center"
-                style={{ width: "10cm", height: "10cm" }}
+                style={{ width: "2cm", height: "5cm" }}
             >
                 <p className="text-xs text-gray-500 mb-1">Publicidade</p>
 
-                <ins
-                    className="adsbygoogle"
-                    style={{ display: "block", width: "100%", height: "100%", backgroundColor: "#f0f0f0" }}
-                    data-ad-client={process.env.NEXT_PUBLIC_ADS_OPEN!}
-                    data-ad-slot="6300978111"
-                >
-                    {process.env.NODE_ENV === "development" && (
-                        <div className="flex items-center justify-center h-full text-gray-600">
-                            Anúncio de Teste (DEV)
-                        </div>
-                    )}
-                </ins>
-
+                {/* Google Ad */}
+                <GoogleAd />
 
                 <p className="mt-2 text-sm text-gray-700">
                     Liberando em {countdown}s
@@ -56,8 +52,8 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
                     onClick={onClose}
                     disabled={closeDisabled}
                     className={`mt-1 px-2 py-1 rounded text-xs ${closeDisabled
-                        ? "bg-gray-400 text-white cursor-not-allowed"
-                        : "bg-indigo-600 text-white hover:bg-indigo-700"
+                            ? "bg-gray-400 text-white cursor-not-allowed"
+                            : "bg-indigo-600 text-white hover:bg-indigo-700"
                         }`}
                 >
                     Fechar
