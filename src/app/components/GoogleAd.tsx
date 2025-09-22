@@ -5,13 +5,16 @@ import Script from "next/script";
 
 export default function GoogleAd() {
     useEffect(() => {
-        try {
-            window.adsbygoogle = window.adsbygoogle || [];
-            window.adsbygoogle.push({});
-        } catch (err) {
-            console.error("Adsense error:", err);
-        }
+        const timeout = setTimeout(() => {
+            try {
+                (window.adsbygoogle = window.adsbygoogle || []).push({});
+            } catch (err) {
+                console.error("Adsense error:", err);
+            }
+        }, 500); // aguarda renderização do container
+        return () => clearTimeout(timeout);
     }, []);
+
 
     return (
         <>
@@ -23,14 +26,16 @@ export default function GoogleAd() {
             />
 
             {/* Bloco do anúncio */}
-            <ins
-                className="adsbygoogle"
-                style={{ display: "block" }}
-                data-ad-client={process.env.NEXT_PUBLIC_ADS_OPEN!}
-                data-ad-slot="4266399988"
-                data-ad-format="auto"
-                data-full-width-responsive="true"
-            />
+            <div style={{ width: "100%", maxWidth: "320px", height: "100px" }}>
+                <ins
+                    className="adsbygoogle"
+                    style={{ display: "block", width: "100%", height: "100%" }}
+                    data-ad-client={process.env.NEXT_PUBLIC_ADS_OPEN!}
+                    data-ad-slot="4266399988"
+                    data-ad-format="auto"
+                    data-full-width-responsive="true"
+                />
+            </div >
         </>
     );
 }
