@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 
-// Carrega Google Ad somente no cliente
-const GoogleAd = dynamic(
-    () => import("./GoogleAd"), // componente GoogleAd.tsx
-    { ssr: false }
-);
+const GoogleAd = dynamic(() => import("./GoogleAd"), { ssr: false });
 
 interface GoogleAdsBlockProps {
     onClose: () => void;
@@ -17,11 +13,7 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
     const [countdown, setCountdown] = useState(15);
 
     useEffect(() => {
-        let mounted = true;
-
         const interval = setInterval(() => {
-            if (!mounted) return;
-
             setCountdown((prev) => {
                 if (prev <= 1) {
                     clearInterval(interval);
@@ -32,14 +24,10 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
             });
         }, 1000);
 
-        return () => {
-            mounted = false;
-            clearInterval(interval);
-        };
+        return () => clearInterval(interval);
     }, [onClose]);
 
-
-    const closeDisabled = countdown > 10; // bloqueado nos primeiros 5s
+    const closeDisabled = countdown > 10; // bloqueado nos primeiros 5 segundos
 
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-transparent z-50">
@@ -60,8 +48,8 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
                     onClick={onClose}
                     disabled={closeDisabled}
                     className={`mt-1 px-2 py-1 rounded text-xs ${closeDisabled
-                        ? "bg-gray-400 text-white cursor-not-allowed"
-                        : "bg-indigo-600 text-white hover:bg-indigo-700"
+                            ? "bg-gray-400 text-white cursor-not-allowed"
+                            : "bg-indigo-600 text-white hover:bg-indigo-700"
                         }`}
                 >
                     Fechar

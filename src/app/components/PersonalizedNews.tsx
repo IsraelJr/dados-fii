@@ -23,11 +23,25 @@ export default function PersonalizedNews() {
     const [loadingFII, setLoadingFII] = useState(false);
     const [error, setError] = useState("");
 
+    const isProduction = process.env.NODE_ENV === "production";
+
     const fetchSummary = async (ticker: string) => {
         setNews((prev) => [
             { ticker, summary: "", sources: [], loading: true },
             ...prev.filter((f) => f.ticker !== ticker),
         ]);
+
+        if (!isProduction) {
+            // Em ambientes que não sejam produção, exibe mensagem de teste
+            setNews((prev) =>
+                prev.map((fii) =>
+                    fii.ticker === ticker
+                        ? { ...fii, summary: "Sem consulta à API nesse ambiente", sources: [], loading: false }
+                        : fii
+                )
+            );
+            return;
+        }
 
         try {
             const res = await fetch("/api/fii-summary", {
@@ -59,7 +73,6 @@ export default function PersonalizedNews() {
             setError("");
 
             try {
-                // Verifica cookie
                 const cookieRes = await fetch("/api/check-cookie");
                 const cookieData = await cookieRes.json();
                 if (!cookieData.hasCookie) {
@@ -67,7 +80,6 @@ export default function PersonalizedNews() {
                     return;
                 }
 
-                // Busca FIIs mais buscados
                 const res = await fetch("/api/user-top-fiis");
                 if (!res.ok) throw new Error(`Erro ao buscar FIIs mais buscados: ${res.status}`);
                 const data = await res.json();
@@ -78,11 +90,8 @@ export default function PersonalizedNews() {
                 }
 
                 setLoadingFII(true);
-
-                // Inicializa estado com loader individual
                 setNews(topFiis.map((ticker) => ({ ticker, summary: "", sources: [], loading: true })));
 
-                // Busca resumo via IA para cada FII
                 await Promise.all(topFiis.map(fetchSummary));
             } catch (err: any) {
                 console.error(err);
@@ -129,11 +138,7 @@ export default function PersonalizedNews() {
                                         <h4 className="font-semibold text-sm text-gray-600 mb-1">Fontes:</h4>
                                         <ul className="list-disc list-inside space-y-1">
                                             {sources
-                                                .filter(
-                                                    (src) =>
-                                                        typeof src.url === "string" &&
-                                                        src.url.startsWith("http")
-                                                )
+                                                .filter((src) => typeof src.url === "string" && src.url.startsWith("http"))
                                                 .map((src, idx) => (
                                                     <li key={idx}>
                                                         <a

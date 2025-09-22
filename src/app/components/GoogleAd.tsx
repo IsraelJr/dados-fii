@@ -5,6 +5,8 @@ import Script from "next/script";
 
 export default function GoogleAd() {
     useEffect(() => {
+        if (typeof window === "undefined") return;
+
         const timeout = setTimeout(() => {
             try {
                 (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -12,9 +14,9 @@ export default function GoogleAd() {
                 console.error("Adsense error:", err);
             }
         }, 500); // aguarda renderização do container
+
         return () => clearTimeout(timeout);
     }, []);
-
 
     return (
         <>
@@ -35,7 +37,7 @@ export default function GoogleAd() {
                     data-ad-format="auto"
                     data-full-width-responsive="true"
                 />
-            </div >
+            </div>
         </>
     );
 }
