@@ -17,7 +17,11 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
     const [countdown, setCountdown] = useState(15);
 
     useEffect(() => {
+        let mounted = true;
+
         const interval = setInterval(() => {
+            if (!mounted) return;
+
             setCountdown((prev) => {
                 if (prev <= 1) {
                     clearInterval(interval);
@@ -28,8 +32,12 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
             });
         }, 1000);
 
-        return () => clearInterval(interval);
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
     }, [onClose]);
+
 
     const closeDisabled = countdown > 10; // bloqueado nos primeiros 5s
 
@@ -37,7 +45,7 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
         <div className="fixed inset-0 flex items-center justify-center bg-transparent z-50">
             <div
                 className="border rounded-lg shadow-md bg-white p-2 flex flex-col items-center justify-center"
-                style={{ width: "2cm", height: "5cm" }}
+                style={{ width: "10cm", height: "10cm" }}
             >
                 <p className="text-xs text-gray-500 mb-1">Publicidade</p>
 
@@ -52,8 +60,8 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
                     onClick={onClose}
                     disabled={closeDisabled}
                     className={`mt-1 px-2 py-1 rounded text-xs ${closeDisabled
-                            ? "bg-gray-400 text-white cursor-not-allowed"
-                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                        ? "bg-gray-400 text-white cursor-not-allowed"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700"
                         }`}
                 >
                     Fechar
