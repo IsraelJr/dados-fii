@@ -226,7 +226,7 @@ export default function Home() {
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
-    const [adsClosed, setAdsClosed] = useState(false); // controla se o usuário fechou o anúncio
+    const [adsClosed, setAdsClosed] = useState(true); // controla se o usuário fechou o anúncio
 
     // Mostrar botão de Login apenas em localhost
     useEffect(() => {
@@ -324,12 +324,27 @@ export default function Home() {
         return () => clearInterval(interval);
     }, []);
 
+    const currentYear = new Date().getFullYear();
+
+    // const lastDividend = useMemo(() => {
+    //     const dividends = getCurrentYearDividends(data?.earnings2025 || {});
+    //     if (!dividends.length) return null;
+    //     const [, info]: any = dividends[dividends.length - 1];
+    //     return parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
+    // }, [data]);
+
     const lastDividend = useMemo(() => {
-        const dividends = getCurrentYearDividends(data?.earnings2025 || {});
+        if (!data) return null;
+    
+        const yearKey = `earnings${currentYear}`;
+        const dividends = getCurrentYearDividends(data[yearKey] || {});
+    
         if (!dividends.length) return null;
+    
         const [, info]: any = dividends[dividends.length - 1];
         return parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
-    }, [data]);
+    }, [data, currentYear]);
+    
 
     return (
         <div className="font-sans text-center mt-12 px-4">

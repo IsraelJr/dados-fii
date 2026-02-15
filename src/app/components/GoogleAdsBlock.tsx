@@ -13,18 +13,18 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
     const [countdown, setCountdown] = useState(15);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setCountdown((prev) => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    onClose();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+        // const interval = setInterval(() => {
+        //     setCountdown((prev) => {
+        //         if (prev <= 1) {
+        //             clearInterval(interval);
+        //             onClose();
+        //             return 0;
+        //         }
+        //         return prev - 1;
+        //     });
+        // }, 1000);
 
-        return () => clearInterval(interval);
+        // return () => clearInterval(interval);
     }, [onClose]);
 
     const closeDisabled = countdown > 10; // bloqueado nos primeiros 5 segundos
