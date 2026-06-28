@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-declare global {
-    interface Window {
-        adsbygoogle?: Array<Record<string, unknown>>;
-    }
-}
+type AdsWindow = Window & {
+    adsbygoogle: Array<Record<string, unknown>>;
+};
 
 const ADSENSE_CLIENT =
     process.env.NEXT_PUBLIC_ADSENSE_CLIENT ||
@@ -25,8 +23,9 @@ export default function GoogleAd() {
 
         const timeout = window.setTimeout(() => {
             try {
-                window.adsbygoogle = window.adsbygoogle || [];
-                window.adsbygoogle.push({});
+                const adsWindow = window as AdsWindow;
+                adsWindow.adsbygoogle = adsWindow.adsbygoogle || [];
+                adsWindow.adsbygoogle.push({});
             } catch (err) {
                 console.error("AdSense error:", err);
                 setAdError("Publicidade indisponível no momento.");
