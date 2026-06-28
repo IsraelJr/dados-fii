@@ -1,117 +1,164 @@
 'use client';
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BarChart3, BookOpen, Loader2, Newspaper } from "lucide-react";
+import { Loader2, Link as LinkIcon, Newspaper } from "lucide-react";
 
-interface FiiInsight {
-    ticker: string;
+interface Source {
+    url: string;
+    metadata?: {
+        source?: string;
+        favicon?: string;
+    };
 }
 
+interface FiiNews {
+    ticker: string;
+    summary: string;
+    sources?: Source[];
+    loading: boolean;
+}
+
+const buildGoogleSearchUrl = (ticker: string) => {
+    const query = `${ticker} FII relatório gerencial dividendos vacância IFIX fatos relevantes`;
+    return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+};
+
 export default function PersonalizedNews() {
-    const [fiis, setFiis] = useState<FiiInsight[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [news, setNews] = useState<FiiNews[]>([]);
+    const [loadingFII, setLoadingFII] = useState(false);
     const [error, setError] = useState("");
+
+    const fetchSummary = async (ticker: string) => {
+        setNews((prev) => [
+            { ticker, summary: "", sources: [], loading: true },
+            ...prev.filter((f) => f.ticker !== ticker),
+        ]);
+
+        const googleUrl = buildGoogleSearchUrl(ticker);
+
+        setNews((prev) =>
+            prev.map((fii) =>
+                fii.ticker === ticker
+                    ? {
+                        ...fii,
+                        summary:
+                            "Resumo automático por IA temporariamente desativado. Para pesquisar este FII, consulte relatórios gerenciais, fatos relevantes, dividendos, vacância, participação no IFIX e notícias recentes.",
+                        sources: [
+                            {
+                                url: googleUrl,
+                                metadata: {
+                                    source: `Pesquisar ${ticker} no Google`,
+                                    favicon: "https://www.google.com/favicon.ico",
+                                },
+                            },
+                        ],
+                        loading: false,
+                    }
+                    : fii
+            )
+        );
+    };
 
     useEffect(() => {
         const loadTopFiis = async () => {
             setError("");
-            setLoading(true);
 
             try {
                 const cookieRes = await fetch("/api/check-cookie");
                 const cookieData = await cookieRes.json();
-
                 if (!cookieData.hasCookie) {
-                    setFiis([]);
+                    setNews([]);
                     return;
                 }
 
                 const res = await fetch("/api/user-top-fiis");
-                if (!res.ok) throw new Error(`Erro ao buscar FIIs mais consultados: ${res.status}`);
-
+                if (!res.ok) throw new Error(`Erro ao buscar FIIs mais buscados: ${res.status}`);
                 const data = await res.json();
                 const topFiis: string[] = data.topFiis || [];
-                setFiis(topFiis.map((ticker) => ({ ticker })));
-            } catch (err) {
+                if (topFiis.length === 0) {
+                    setNews([]);
+                    return;
+                }
+
+                setLoadingFII(true);
+                setNews(topFiis.map((ticker) => ({ ticker, summary: "", sources: [], loading: true })));
+
+                await Promise.all(topFiis.map(fetchSummary));
+            } catch (err: any) {
                 console.error(err);
-                setError("Não foi possível carregar seus FIIs mais consultados.");
+                setError("Não foi possível carregar os FIIs mais consultados.");
             } finally {
-                setLoading(false);
+                setLoadingFII(false);
             }
         };
 
         loadTopFiis();
     }, []);
 
-    if (loading) {
+    if (loadingFII)
         return (
-            <p className="mt-4 flex items-center justify-center text-gray-500 italic">
-                <Loader2 className="mr-2 animate-spin" size={20} /> Carregando FIIs mais consultados...
+            <p className="flex items-center justify-center text-gray-500 italic mt-4">
+                <Loader2 className="animate-spin mr-2" size={20} /> Carregando FIIs mais consultados enquanto você pesquisa...
             </p>
         );
-    }
-
     if (error) return <p className="text-red-500">{error}</p>;
 
     return (
-        <section className="mt-12">
-            <div className="mb-4 text-center">
-                <h2 className="text-xl font-bold">📌 FIIs mais consultados por você</h2>
-                <p className="mt-2 text-sm text-gray-500">
-                    Esta área não usa IA. Ela mostra seus tickers mais pesquisados e direciona para conceitos úteis de análise.
-                </p>
-            </div>
+        <div className="mt-12">
+            <h2 className="text-xl font-bold mb-4">📰 Resumo das notícias dos FIIs mais buscados por você</h2>
+            {news.length === 0 && <p className="text-gray-500">Nenhuma pesquisa registrada ainda.</p>}
+            <br />
+            <div className="grid md:grid-cols-3 gap-6">
+                {news.map(({ ticker, summary, sources, loading }) => (
+                    <div key={ticker} className="bg-white rounded-2xl shadow-md p-5 text-left">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Newspaper className="text-indigo-600" />
+                            <h3 className="text-lg font-semibold text-gray-400">{ticker}</h3>
+                        </div>
 
-            {fiis.length === 0 ? (
-                <p className="text-gray-500">Nenhuma pesquisa registrada ainda.</p>
-            ) : (
-                <div className="grid gap-6 md:grid-cols-3">
-                    {fiis.map(({ ticker }) => (
-                        <article key={ticker} className="rounded-2xl bg-white p-5 text-left shadow-md">
-                            <div className="mb-3 flex items-center gap-2">
-                                <Newspaper className="text-indigo-600" />
-                                <h3 className="text-lg font-semibold text-gray-700">{ticker}</h3>
-                            </div>
-
-                            <p className="text-sm text-gray-700">
-                                Antes de decidir aumentar posição, compare preço, dividendos, segmento, liquidez, participação no IFIX e riscos específicos do tipo de fundo.
+                        {loading ? (
+                            <p className="flex items-center gap-2 text-gray-600 italic">
+                                <Loader2 className="animate-spin" size={16} /> Preparando pesquisa...
                             </p>
+                        ) : (
+                            <>
+                                <p className="text-gray-800">{summary}</p>
 
-                            <div className="mt-4 space-y-2 text-sm">
-                                <Link
-                                    href="/glossario#dividendos-dy"
-                                    className="flex items-center gap-2 text-indigo-600 hover:underline"
-                                >
-                                    <BarChart3 size={16} /> Entender dividendos e DY
-                                </Link>
-                                <Link
-                                    href="/glossario#segmentos"
-                                    className="flex items-center gap-2 text-indigo-600 hover:underline"
-                                >
-                                    <BookOpen size={16} /> Ver riscos por segmento
-                                </Link>
-                                <Link
-                                    href="/glossario#ifix"
-                                    className="flex items-center gap-2 text-indigo-600 hover:underline"
-                                >
-                                    <BookOpen size={16} /> Entender IFIX e liquidez
-                                </Link>
-                            </div>
-
-                            <div className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-500">
-                                Recurso premium futuro: resumo automático com IA, notícias recentes e alertas personalizados.
-                            </div>
-                        </article>
-                    ))}
-                </div>
-            )}
-
-            <div className="mt-6 text-center text-sm text-gray-500">
-                <Link href="/glossario" className="font-medium text-indigo-600 hover:underline">
-                    Abrir glossário completo de FIIs
-                </Link>
+                                {sources && sources.length > 0 && (
+                                    <div className="mt-3">
+                                        <h4 className="font-semibold text-sm text-gray-600 mb-1">Fontes:</h4>
+                                        <ul className="list-disc list-inside space-y-1">
+                                            {sources
+                                                .filter((src) => typeof src.url === "string" && src.url.startsWith("http"))
+                                                .map((src, idx) => (
+                                                    <li key={idx}>
+                                                        <a
+                                                            href={src.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-indigo-600 text-sm flex items-center gap-1 hover:underline"
+                                                        >
+                                                            {src.metadata?.favicon && (
+                                                                <img
+                                                                    src={src.metadata.favicon}
+                                                                    alt={src.metadata.source || ""}
+                                                                    className="w-5 h-5"
+                                                                />
+                                                            )}
+                                                            <span>{src.metadata?.source || src.url}</span>
+                                                            <LinkIcon size={14} />
+                                                        </a>
+                                                    </li>
+                                                ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                ))}
             </div>
-        </section>
+            <br /><br />
+        </div>
     );
 }
