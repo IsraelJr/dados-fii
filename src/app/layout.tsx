@@ -20,7 +20,7 @@ const ADSENSE_CLIENT =
 
 export const metadata: Metadata = {
   title: "Dados FII",
-  description: "Monitoramento de FIIs",
+  description: "Consulta, acompanhamento e monitoramento de Fundos Imobiliários.",
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
@@ -44,6 +44,7 @@ export default function RootLayout({
           src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
           crossOrigin="anonymous"
           strategy="afterInteractive"
+          data-overlays="bottom"
         />
         {children}
       </body>
