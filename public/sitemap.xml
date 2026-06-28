@@ -3,4 +3,10 @@
   <url>
     <loc>https://dados-fii.vercel.app/</loc>
   </url>
+  <url>
+    <loc>https://dados-fii.vercel.app/glossario</loc>
+  </url>
+  <url>
+    <loc>https://dados-fii.vercel.app/privacy.html</loc>
+  </url>
 </urlset>
