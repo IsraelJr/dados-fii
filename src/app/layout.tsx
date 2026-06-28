@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,17 +13,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const ADSENSE_CLIENT =
+  process.env.NEXT_PUBLIC_ADSENSE_CLIENT ||
+  process.env.NEXT_PUBLIC_ADS_OPEN ||
+  "ca-pub-3245357129779122";
 
 export const metadata: Metadata = {
   title: "Dados FII",
   description: "Monitoramento de FIIs",
   icons: {
-    icon: "/favicon.ico",   // ícone padrão
+    icon: "/favicon.ico",
     shortcut: "/favicon.ico",
-    apple: "/logo.png",     // iOS / PWA
+    apple: "/logo.png",
   },
-}
-
+};
 
 export default function RootLayout({
   children,
@@ -30,10 +34,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Script
+          id="google-adsense"
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
         {children}
       </body>
     </html>
