@@ -1,43 +1,65 @@
 "use client";
 
-import { useEffect } from "react";
-import Script from "next/script";
+import { useEffect, useRef, useState } from "react";
+
+declare global {
+    interface Window {
+        adsbygoogle?: Array<Record<string, unknown>>;
+    }
+}
+
+const ADSENSE_CLIENT =
+    process.env.NEXT_PUBLIC_ADSENSE_CLIENT ||
+    process.env.NEXT_PUBLIC_ADS_OPEN ||
+    "ca-pub-3245357129779122";
+
+const ADSENSE_SLOT = process.env.NEXT_PUBLIC_ADSENSE_SLOT || "4266399988";
 
 export default function GoogleAd() {
+    const adRef = useRef<HTMLModElement | null>(null);
+    const [adError, setAdError] = useState("");
+
     useEffect(() => {
         if (typeof window === "undefined") return;
+        if (!adRef.current) return;
 
-        const timeout = setTimeout(() => {
+        const timeout = window.setTimeout(() => {
             try {
-                (window.adsbygoogle = window.adsbygoogle || []).push({});
+                window.adsbygoogle = window.adsbygoogle || [];
+                window.adsbygoogle.push({});
             } catch (err) {
-                console.error("Adsense error:", err);
+                console.error("AdSense error:", err);
+                setAdError("Publicidade indisponível no momento.");
             }
-        }, 500); // aguarda renderização do container
+        }, 800);
 
-        return () => clearTimeout(timeout);
+        return () => window.clearTimeout(timeout);
     }, []);
 
+    if (!ADSENSE_CLIENT || !ADSENSE_SLOT) {
+        return (
+            <div className="flex h-[250px] w-[300px] items-center justify-center rounded bg-gray-100 p-4 text-center text-xs text-gray-500">
+                Configure NEXT_PUBLIC_ADSENSE_CLIENT e NEXT_PUBLIC_ADSENSE_SLOT.
+            </div>
+        );
+    }
+
     return (
-        <>
-            {/* Script obrigatório do Google AdSense */}
-            <Script
-                src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3245357129779122"
-                strategy="afterInteractive"
-                crossOrigin="anonymous"
+        <div className="flex min-h-[250px] w-full items-center justify-center">
+            <ins
+                ref={adRef}
+                className="adsbygoogle"
+                style={{ display: "block", width: "300px", height: "250px" }}
+                data-ad-client={ADSENSE_CLIENT}
+                data-ad-slot={ADSENSE_SLOT}
+                data-adtest={process.env.NODE_ENV !== "production" ? "on" : undefined}
             />
 
-            {/* Bloco do anúncio */}
-            <div style={{ width: "100%", maxWidth: "320px", height: "100px" }}>
-                <ins
-                    className="adsbygoogle"
-                    style={{ display: "block", width: "100%", height: "100%" }}
-                    data-ad-client={process.env.NEXT_PUBLIC_ADS_OPEN!}
-                    data-ad-slot="4266399988"
-                    data-ad-format="auto"
-                    data-full-width-responsive="true"
-                />
-            </div>
-        </>
+            {adError && (
+                <p className="mt-2 text-center text-xs text-gray-500">
+                    {adError}
+                </p>
+            )}
+        </div>
     );
 }
