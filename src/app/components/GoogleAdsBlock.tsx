@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
-
-const GoogleAd = dynamic(() => import("./GoogleAd"), { ssr: false });
+import GoogleAd from "./GoogleAd";
 
 interface GoogleAdsBlockProps {
     onClose: () => void;
@@ -14,8 +12,15 @@ const BUTTON_LOCK_SECONDS = 5;
 
 export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
     const [countdown, setCountdown] = useState(TOTAL_SECONDS);
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (!mounted) return;
+
         const interval = window.setInterval(() => {
             setCountdown((prev) => {
                 if (prev <= 1) {
@@ -29,7 +34,7 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
         }, 1000);
 
         return () => window.clearInterval(interval);
-    }, [onClose]);
+    }, [mounted, onClose]);
 
     const closeDisabled = countdown > TOTAL_SECONDS - BUTTON_LOCK_SECONDS;
 
@@ -41,14 +46,18 @@ export default function GoogleAdsBlock({ onClose }: GoogleAdsBlockProps) {
         return "Fechar";
     }, [closeDisabled, countdown]);
 
+    if (!mounted) return null;
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-[1px]">
-            <div className="flex w-full max-w-[360px] flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-2xl">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+            <div className="flex w-full max-w-[380px] flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-2xl">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                     Publicidade
                 </p>
 
-                <GoogleAd />
+                <div className="flex h-[250px] w-[300px] items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+                    <GoogleAd />
+                </div>
 
                 <p className="mt-3 text-sm text-gray-700">
                     O conteúdo será liberado automaticamente em {countdown}s.
