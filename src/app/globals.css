@@ -33,4 +33,13 @@ body {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  .max-h-\[520px\] {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .max-h-\[520px\]::-webkit-scrollbar {
+    display: none;
+  }
 }
