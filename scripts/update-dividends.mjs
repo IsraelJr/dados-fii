@@ -2,6 +2,7 @@ import admin from "firebase-admin";
 
 const FIIS_COLLECTION = "Fiis";
 const BACKUP_COLLECTION = "Fiis_Backup";
+const PARAMETERS_COLLECTION = "Parameters";
 const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = [
   "January",
@@ -109,13 +110,23 @@ function getTitle(attrs) {
 async function fetchText(url) {
   const response = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.1)",
+      "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.2)",
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
   });
 
   if (!response.ok) throw new Error(`${url} HTTP ${response.status}`);
   return response.text();
+}
+
+async function updateBackupParameter(db, payload) {
+  await db.collection(PARAMETERS_COLLECTION).doc("backup").set(
+    {
+      lastFiisBackupAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...payload,
+    },
+    { merge: true }
+  );
 }
 
 async function backupFiis(db) {
@@ -152,6 +163,15 @@ async function backupFiis(db) {
   }
 
   if (batchCount > 0) await batch.commit();
+
+  await updateBackupParameter(db, {
+    lastFiisBackupId: backupId,
+    lastFiisBackupType: "full-collection",
+    lastFiisBackupSource: FIIS_COLLECTION,
+    lastFiisBackupTarget: BACKUP_COLLECTION,
+    lastFiisBackupDocuments: total,
+  });
+
   console.log(`Backup concluído: ${total} documentos copiados.`);
 }
 
@@ -181,6 +201,7 @@ function parseStatusInvestDividends(html, year = currentYear()) {
       date_with: dateWith,
       payment_date: payDate,
       earnings: value,
+      source: "statusinvest",
     });
   }
 
@@ -211,13 +232,48 @@ async function fetchStatusInvestHtml(ticker) {
   throw new Error(`Não consegui ler StatusInvest para ${code}. ${errors.join(" | ")}`);
 }
 
-function parseFiisPriceByPaymentDate(html) {
-  const blocks = [...String(html || "").matchAll(/<[^>]+class=["'][^"']*yieldChart__table__bloco[^"']*["'][^>]*>[\s\S]*?(?=<[^>]+class=["'][^"']*yieldChart__table__bloco|<\/body>|$)/gi)]
+function extractFiisDividendBlocks(html) {
+  return [...String(html || "").matchAll(/<[^>]+class=["'][^"']*yieldChart__table__bloco[^"']*["'][^>]*>[\s\S]*?(?=<[^>]+class=["'][^"']*yieldChart__table__bloco|<\/body>|$)/gi)]
     .map((match) => match[0]);
+}
 
+function parseFiisDividends(html, year = currentYear()) {
+  const dividends = [];
+
+  for (const block of extractFiisDividendBlocks(html)) {
+    const lines = [...block.matchAll(/<[^>]+class=["'][^"']*table__linha[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi)]
+      .map((match) => stripTags(match[1]));
+
+    if (lines.length < 5) continue;
+
+    const dateWith = normalizeDate(lines[0]);
+    const payDate = normalizeDate(lines[1]);
+    const priceDateWith = normalizeCurrency(lines[2]);
+    const earnings = normalizeCurrency(lines[4]);
+    const [, month, rowYear] = payDate.match(/(\d{2})\/(\d{2})\/(\d{4})/) || [];
+
+    if (!month || Number(rowYear) !== year) continue;
+
+    const monthName = MONTHS[Number(month) - 1];
+    if (!monthName) continue;
+
+    dividends.push({
+      monthName,
+      date_with: dateWith,
+      payment_date: payDate,
+      earnings,
+      price_date_with: priceDateWith,
+      source: "fiis.com.br",
+    });
+  }
+
+  return dividends;
+}
+
+function parseFiisPriceByPaymentDate(html) {
   const map = new Map();
 
-  for (const block of blocks) {
+  for (const block of extractFiisDividendBlocks(html)) {
     const lines = [...block.matchAll(/<[^>]+class=["'][^"']*table__linha[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi)]
       .map((match) => stripTags(match[1]));
 
@@ -231,14 +287,8 @@ function parseFiisPriceByPaymentDate(html) {
   return map;
 }
 
-async function fetchPriceDateWithMap(ticker) {
-  try {
-    const html = await fetchText(`https://fiis.com.br/${normalizeTicker(ticker)}/`);
-    return parseFiisPriceByPaymentDate(html);
-  } catch (err) {
-    console.warn(`Não consegui buscar preço-base no fiis.com.br para ${ticker}: ${err.message}`);
-    return new Map();
-  }
+async function fetchFiisHtml(ticker) {
+  return fetchText(`https://fiis.com.br/${normalizeTicker(ticker)}/`);
 }
 
 function toEarningsObject(dividends, priceByPaymentDate) {
@@ -249,11 +299,20 @@ function toEarningsObject(dividends, priceByPaymentDate) {
       payment_date: item.payment_date,
       date_with: item.date_with,
       earnings: item.earnings,
-      price_date_with: priceByPaymentDate.get(item.payment_date) || "R$ 0,0",
+      price_date_with: item.price_date_with || priceByPaymentDate.get(item.payment_date) || "R$ 0,0",
     };
   });
 
   return output;
+}
+
+function mergeDividendsByMonth(fiisDividends, statusDividends) {
+  const byMonth = new Map();
+
+  fiisDividends.forEach((item) => byMonth.set(item.monthName, item));
+  statusDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
+
+  return [...byMonth.values()].sort((a, b) => MONTHS.indexOf(a.monthName) - MONTHS.indexOf(b.monthName));
 }
 
 async function updateTickerDividends(db, ticker, year = currentYear()) {
@@ -267,18 +326,38 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
   const yearField = `earnings${year}`;
   const previousYearData = doc.data()?.[yearField] || {};
 
-  const html = await fetchStatusInvestHtml(code);
-  const dividends = parseStatusInvestDividends(html, year);
-  if (dividends.length === 0) throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}.`);
+  let statusDividends = [];
+  let fiisDividends = [];
+  let priceByPaymentDate = new Map();
+  const sourceErrors = [];
 
-  const priceByPaymentDate = await fetchPriceDateWithMap(code);
+  try {
+    const html = await fetchStatusInvestHtml(code);
+    statusDividends = parseStatusInvestDividends(html, year);
+  } catch (err) {
+    sourceErrors.push(`statusinvest: ${err.message}`);
+  }
+
+  try {
+    const fiisHtml = await fetchFiisHtml(code);
+    fiisDividends = parseFiisDividends(fiisHtml, year);
+    priceByPaymentDate = parseFiisPriceByPaymentDate(fiisHtml);
+  } catch (err) {
+    sourceErrors.push(`fiis.com.br: ${err.message}`);
+  }
+
+  const dividends = mergeDividendsByMonth(fiisDividends, statusDividends);
+  if (dividends.length === 0) {
+    throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}. ${sourceErrors.join(" | ")}`);
+  }
+
   const fetchedEarnings = toEarningsObject(dividends, priceByPaymentDate);
   const mergedEarnings = {
     ...previousYearData,
     ...fetchedEarnings,
   };
 
-  const fetchedMonths = Object.keys(fetchedEarnings);
+  const fetchedMonths = Object.keys(fetchedEarnings).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
   const mergedMonths = Object.keys(mergedEarnings).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
   const currentMonthIncluded = Boolean(mergedEarnings[currentMonthKey()]);
 
@@ -291,6 +370,11 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
       dividendsSource: "statusinvest+fiis.com.br",
       dividendsFetchedMonths: fetchedMonths,
       dividendsMergedMonths: mergedMonths,
+      dividendsSourceMonths: {
+        statusinvest: statusDividends.map((item) => item.monthName),
+        fiisComBr: fiisDividends.map((item) => item.monthName),
+      },
+      dividendsSourceErrors: sourceErrors,
       dividendsCurrentMonthIncluded: currentMonthIncluded,
       modified_in: admin.firestore.FieldValue.serverTimestamp(),
     },
@@ -302,6 +386,11 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
     year,
     fetchedMonths,
     mergedMonths,
+    sourceMonths: {
+      statusinvest: statusDividends.map((item) => item.monthName),
+      fiisComBr: fiisDividends.map((item) => item.monthName),
+    },
+    sourceErrors,
     count: mergedMonths.length,
     currentMonth: currentMonthKey(),
     currentMonthIncluded,
