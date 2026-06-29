@@ -13,13 +13,12 @@ interface Source {
 
 interface FiiNews {
     ticker: string;
-    summary: string;
     sources?: Source[];
     loading: boolean;
 }
 
 const buildGoogleSearchUrl = (ticker: string) => {
-    const query = `${ticker} FII relatório gerencial dividendos vacância IFIX fatos relevantes`;
+    const query = `${ticker} FII site oficial administradora gestor relatório gerencial fatos relevantes dividendos`;
     return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 };
 
@@ -28,9 +27,9 @@ export default function PersonalizedNews() {
     const [loadingFII, setLoadingFII] = useState(false);
     const [error, setError] = useState("");
 
-    const fetchSummary = async (ticker: string) => {
+    const prepareSearchLink = async (ticker: string) => {
         setNews((prev) => [
-            { ticker, summary: "", sources: [], loading: true },
+            { ticker, sources: [], loading: true },
             ...prev.filter((f) => f.ticker !== ticker),
         ]);
 
@@ -41,13 +40,11 @@ export default function PersonalizedNews() {
                 fii.ticker === ticker
                     ? {
                         ...fii,
-                        summary:
-                            "Resumo automático por IA temporariamente desativado. Para pesquisar este FII, consulte relatórios gerenciais, fatos relevantes, dividendos, vacância, participação no IFIX e notícias recentes.",
                         sources: [
                             {
                                 url: googleUrl,
                                 metadata: {
-                                    source: `Pesquisar ${ticker} no Google`,
+                                    source: `Buscar site oficial e administradora de ${ticker}`,
                                     favicon: "https://www.google.com/favicon.ico",
                                 },
                             },
@@ -81,9 +78,9 @@ export default function PersonalizedNews() {
                 }
 
                 setLoadingFII(true);
-                setNews(topFiis.map((ticker) => ({ ticker, summary: "", sources: [], loading: true })));
+                setNews(topFiis.map((ticker) => ({ ticker, sources: [], loading: true })));
 
-                await Promise.all(topFiis.map(fetchSummary));
+                await Promise.all(topFiis.map(prepareSearchLink));
             } catch (err: any) {
                 console.error(err);
                 setError("Não foi possível carregar os FIIs mais consultados.");
@@ -109,7 +106,7 @@ export default function PersonalizedNews() {
             {news.length === 0 && <p className="text-gray-500">Nenhuma pesquisa registrada ainda.</p>}
             <br />
             <div className="grid md:grid-cols-3 gap-6">
-                {news.map(({ ticker, summary, sources, loading }) => (
+                {news.map(({ ticker, sources, loading }) => (
                     <div key={ticker} className="bg-white rounded-2xl shadow-md p-5 text-left">
                         <div className="flex items-center gap-2 mb-3">
                             <Newspaper className="text-indigo-600" />
@@ -121,39 +118,24 @@ export default function PersonalizedNews() {
                                 <Loader2 className="animate-spin" size={16} /> Preparando pesquisa...
                             </p>
                         ) : (
-                            <>
-                                <p className="text-gray-800">{summary}</p>
-
-                                {sources && sources.length > 0 && (
-                                    <div className="mt-3">
-                                        <h4 className="font-semibold text-sm text-gray-600 mb-1">Fontes:</h4>
-                                        <ul className="list-disc list-inside space-y-1">
-                                            {sources
-                                                .filter((src) => typeof src.url === "string" && src.url.startsWith("http"))
-                                                .map((src, idx) => (
-                                                    <li key={idx}>
-                                                        <a
-                                                            href={src.url}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-indigo-600 text-sm flex items-center gap-1 hover:underline"
-                                                        >
-                                                            {src.metadata?.favicon && (
-                                                                <img
-                                                                    src={src.metadata.favicon}
-                                                                    alt={src.metadata.source || ""}
-                                                                    className="w-5 h-5"
-                                                                />
-                                                            )}
-                                                            <span>{src.metadata?.source || src.url}</span>
-                                                            <LinkIcon size={14} />
-                                                        </a>
-                                                    </li>
-                                                ))}
-                                        </ul>
-                                    </div>
-                                )}
-                            </>
+                            sources && sources.length > 0 && (
+                                <a
+                                    href={sources[0].url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:underline"
+                                >
+                                    {sources[0].metadata?.favicon && (
+                                        <img
+                                            src={sources[0].metadata.favicon}
+                                            alt="Google"
+                                            className="h-5 w-5"
+                                        />
+                                    )}
+                                    <span>{sources[0].metadata?.source || `Pesquisar ${ticker} no Google`}</span>
+                                    <LinkIcon size={14} />
+                                </a>
+                            )
                         )}
                     </div>
                 ))}
