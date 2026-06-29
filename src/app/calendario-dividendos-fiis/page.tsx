@@ -18,21 +18,6 @@ type CalendarEvent = {
 const INITIAL_VISIBLE_ITEMS = 10;
 const ITEMS_STEP = 10;
 
-const MONTHS_PTBR: Record<string, string> = {
-  January: "Janeiro",
-  February: "Fevereiro",
-  March: "Março",
-  April: "Abril",
-  May: "Maio",
-  June: "Junho",
-  July: "Julho",
-  August: "Agosto",
-  September: "Setembro",
-  October: "Outubro",
-  November: "Novembro",
-  December: "Dezembro",
-};
-
 function EventList({
   title,
   events,
@@ -71,31 +56,27 @@ function EventList({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="text-gray-400">
                 <tr className="border-b border-gray-800">
-                  <th className="py-3">FII</th>
-                  <th>Rendimento</th>
-                  <th>Data-com</th>
-                  <th>Pagamento</th>
-                  <th>Mês</th>
-                  <th>Segmento</th>
+                  <th className="py-4 pr-4">FII</th>
+                  <th className="py-4 pr-4">Rendimento</th>
+                  <th className="py-4 pr-4">Data-com</th>
+                  <th className="py-4">Pagamento</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleEvents.map((event) => (
                   <tr key={`${event.ticker}-${event.paymentDate}-${event.month}`} className="border-b border-gray-800 text-gray-100">
-                    <td className="py-3">
+                    <td className="py-4 pr-4 align-top">
                       <Link href={`/?ticker=${event.ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">
                         {event.ticker}
                       </Link>
-                      {event.socialReason && <p className="max-w-xs truncate text-xs text-gray-500">{event.socialReason}</p>}
+                      {event.socialReason && <p className="mt-1 max-w-[180px] truncate text-xs text-gray-500">{event.socialReason}</p>}
                     </td>
-                    <td className="font-bold text-green-300">{event.earnings || "-"}</td>
-                    <td>{event.dateWith || "-"}</td>
-                    <td>{event.paymentDate || "-"}</td>
-                    <td>{MONTHS_PTBR[event.month] || event.month}</td>
-                    <td>{event.segment || "-"}</td>
+                    <td className="py-4 pr-4 align-top font-bold text-green-300">{event.earnings || "-"}</td>
+                    <td className="py-4 pr-4 align-top">{event.dateWith || "-"}</td>
+                    <td className="py-4 align-top">{event.paymentDate || "-"}</td>
                   </tr>
                 ))}
               </tbody>
