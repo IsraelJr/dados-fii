@@ -415,15 +415,15 @@ export default function WalletPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 shadow-lg">
-        <h2 className="mb-4 text-xl font-bold">Adicionar FII</h2>
+      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+        <h2 className="mb-4 text-xl font-extrabold text-white">Adicionar FII</h2>
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
           <input
             value={ticker}
             onChange={(event) => setTicker(event.target.value.toUpperCase())}
             onKeyDown={(event) => { if (event.key === "Enter") addItem(); }}
             placeholder="Ticker, ex: TGAR11"
-            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none focus:border-indigo-400"
+            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
           />
           <input
             value={quotas}
@@ -431,7 +431,7 @@ export default function WalletPage() {
             onKeyDown={(event) => { if (event.key === "Enter") addItem(); }}
             placeholder="Quantidade de cotas"
             inputMode="decimal"
-            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none focus:border-indigo-400"
+            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
           />
           <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700">
             <Plus size={18} /> Adicionar
@@ -440,31 +440,31 @@ export default function WalletPage() {
             <Download size={18} /> Exportar CSV
           </button>
         </div>
-        {message && <p className="mt-3 text-sm text-yellow-200">{message}</p>}
+        {message && <p className="mt-3 text-sm font-medium text-yellow-200">{message}</p>}
       </section>
 
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 shadow-lg">
+      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold">FIIs na carteira</h2>
-          {loading && <span className="inline-flex items-center gap-2 text-sm text-gray-400"><Loader2 className="animate-spin" size={16} /> Atualizando...</span>}
+          <h2 className="text-xl font-extrabold text-white">FIIs na carteira</h2>
+          {loading && <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-300"><Loader2 className="animate-spin" size={16} /> Atualizando...</span>}
         </div>
 
         {!items.length ? (
-          <p className="rounded-xl border border-dashed border-gray-700 p-6 text-center text-gray-400">
+          <p className="rounded-xl border border-dashed border-gray-700 p-6 text-center text-sm font-medium text-gray-300">
             Sua carteira ainda está vazia. Comece adicionando um ticker e a quantidade de cotas.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[940px] text-left text-sm">
-              <thead className="text-gray-400">
+              <thead className="text-gray-300">
                 <tr className="border-b border-gray-800">
-                  <th className="py-3">FII</th>
-                  <th>Cotas</th>
-                  <th>Preço</th>
-                  <th>Último rendimento</th>
-                  <th>Anunciado no mês</th>
-                  <th>Renda estimada</th>
-                  <th>Próximo pagamento</th>
+                  <th className="py-3 font-bold">FII</th>
+                  <th className="font-bold">Cotas</th>
+                  <th className="font-bold">Preço</th>
+                  <th className="font-bold">Último rendimento</th>
+                  <th className="font-bold">Anunciado no mês</th>
+                  <th className="font-bold">Renda estimada</th>
+                  <th className="font-bold">Próximo pagamento</th>
                   <th></th>
                 </tr>
               </thead>
@@ -496,11 +496,11 @@ export default function WalletPage() {
                           </button>
                         </div>
                       </td>
-                      <td>{item.data?.price || "-"}</td>
-                      <td>{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
-                      <td>{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
+                      <td className="font-medium text-gray-200">{item.data?.price || "-"}</td>
+                      <td className="font-medium text-gray-200">{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
+                      <td className="font-medium text-gray-200">{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
                       <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
-                      <td>
+                      <td className="font-medium text-gray-200">
                         {nextPayment
                           ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}${nextPayment.dateWith ? ` · Data-com ${nextPayment.dateWith}` : ""}`
                           : "Sem pagamento futuro na base"}
@@ -525,20 +525,20 @@ export default function WalletPage() {
         <RankingCard title="Distribuição por segmento" items={insights.segmentBreakdown} />
       </section>
 
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 shadow-lg">
-        <h2 className="mb-4 flex items-center gap-2 text-xl font-bold">
+      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+        <h2 className="mb-4 flex items-center gap-2 text-xl font-extrabold text-white">
           <CalendarDays className="text-green-300" /> Próximos pagamentos
         </h2>
 
         {!upcomingPayments.length ? (
-          <p className="text-gray-400">Ainda não há pagamentos futuros identificados para os FIIs da sua carteira.</p>
+          <p className="text-sm font-medium text-gray-300">Ainda não há pagamentos futuros identificados para os FIIs da sua carteira.</p>
         ) : (
           <ul className="space-y-3">
             {upcomingPayments.slice(0, 12).map((payment) => (
               <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center">
                 <div>
                   <strong className="text-indigo-200">{payment.ticker}</strong>
-                  <span className="ml-2 text-gray-400">
+                  <span className="ml-2 text-sm font-medium text-gray-300">
                     {MONTHS_PTBR[payment.month] || payment.month} · Data-com {payment.dateWith || "-"} · Pagamento em {payment.date}
                   </span>
                 </div>
@@ -554,15 +554,15 @@ export default function WalletPage() {
 
 function RankingCard({ title, items }: { title: string; items: Array<{ ticker: string; value: string }> }) {
   return (
-    <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-      <h3 className="mb-3 text-lg font-bold">{title}</h3>
+    <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+      <h3 className="mb-3 text-base font-extrabold text-white">{title}</h3>
       {!items.length ? (
-        <p className="text-sm text-gray-500">Sem dados ainda.</p>
+        <p className="text-sm font-medium text-gray-300">Sem dados ainda.</p>
       ) : (
         <ol className="space-y-2 text-sm">
           {items.map((item, index) => (
-            <li key={`${title}-${item.ticker}`} className="flex justify-between rounded-lg bg-gray-800 px-3 py-2">
-              <span><strong className="text-gray-500">#{index + 1}</strong> {item.ticker}</span>
+            <li key={`${title}-${item.ticker}`} className="flex justify-between gap-3 rounded-lg bg-gray-800 px-3 py-2 text-gray-200">
+              <span><strong className="text-gray-400">#{index + 1}</strong> {item.ticker}</span>
               <strong className="text-indigo-200">{item.value}</strong>
             </li>
           ))}
