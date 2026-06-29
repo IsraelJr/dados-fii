@@ -5,7 +5,7 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 const FIIS_COLLECTION = "Fiis";
 const BACKUP_COLLECTION = "Fiis_Backup";
 const REQUEST_COLLECTION = "DividendUpdateRequests";
-const CURRENT_YEAR = new Date().getFullYear();
+const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = [
     "January",
     "February",
@@ -21,8 +21,28 @@ const MONTHS = [
     "December",
 ];
 
+function saoPauloDateParts() {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(new Date());
+
+    return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
 function todayKey() {
-    return new Date().toISOString().slice(0, 10);
+    const parts = saoPauloDateParts();
+    return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function currentYear() {
+    return Number(saoPauloDateParts().year);
+}
+
+function currentMonthKey() {
+    return MONTHS[Number(saoPauloDateParts().month) - 1];
 }
 
 function normalizeTicker(value: string) {
@@ -74,19 +94,16 @@ async function fetchText(url: string) {
     const response = await fetch(url, {
         cache: "no-store",
         headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.0)",
+            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.1)",
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
     });
 
-    if (!response.ok) {
-        throw new Error(`${url} HTTP ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`${url} HTTP ${response.status}`);
     return response.text();
 }
 
-function parseStatusInvestDividends(html: string, year = CURRENT_YEAR) {
+function parseStatusInvestDividends(html: string, year = currentYear()) {
     const rows = extractRows(html);
     const dividends: Array<{
         monthName: string;
@@ -105,8 +122,8 @@ function parseStatusInvestDividends(html: string, year = CURRENT_YEAR) {
         const dateWith = normalizeDate(cells[1].text);
         const payDate = normalizeDate(cells[2].text);
         const value = normalizeCurrency(cells[3].html);
-
         const [, month, rowYear] = payDate.match(/(\d{2})\/(\d{2})\/(\d{4})/) || [];
+
         if (!month || Number(rowYear) !== year) continue;
 
         const monthName = MONTHS[Number(month) - 1];
@@ -132,12 +149,12 @@ async function fetchStatusInvestHtml(ticker: string) {
     ];
 
     const errors: string[] = [];
+
     for (const path of paths) {
         const url = `https://statusinvest.com.br/${path}`;
         try {
             const html = await fetchText(url);
-            const rows = extractRows(html);
-            if (rows.length > 0) return html;
+            if (extractRows(html).length > 0) return html;
             errors.push(`${url}: sem linhas úteis`);
         } catch (err: any) {
             errors.push(err.message);
@@ -199,9 +216,7 @@ async function backupTicker(code: string) {
     const docRef = adminDb.collection(FIIS_COLLECTION).doc(code);
     const doc = await docRef.get();
 
-    if (!doc.exists) {
-        throw new Error(`Ticker ${code} não encontrado em /${FIIS_COLLECTION}.`);
-    }
+    if (!doc.exists) throw new Error(`Ticker ${code} não encontrado em /${FIIS_COLLECTION}.`);
 
     await adminDb.collection(BACKUP_COLLECTION).doc(code).set(
         {
@@ -216,26 +231,38 @@ async function backupTicker(code: string) {
     return doc;
 }
 
-async function updateTickerDividends(code: string, year = CURRENT_YEAR) {
+async function updateTickerDividends(code: string, year = currentYear()) {
     const doc = await backupTicker(code);
+    const yearField = `earnings${year}`;
+    const previousYearData = doc.data()?.[yearField] || {};
+
     const html = await fetchStatusInvestHtml(code);
     const dividends = parseStatusInvestDividends(html, year);
 
-    if (dividends.length === 0) {
-        throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}.`);
-    }
+    if (dividends.length === 0) throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}.`);
 
     const priceByPaymentDate = await fetchPriceDateWithMap(code);
-    const earnings = toEarningsObject(dividends, priceByPaymentDate);
-    const yearField = `earnings${year}`;
+    const fetchedEarnings = toEarningsObject(dividends, priceByPaymentDate);
+    const mergedEarnings = {
+        ...previousYearData,
+        ...fetchedEarnings,
+    };
+
+    const fetchedMonths = Object.keys(fetchedEarnings);
+    const mergedMonths = Object.keys(mergedEarnings).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+    const monthKey = currentMonthKey();
+    const currentMonthIncluded = Boolean(mergedEarnings[monthKey]);
 
     await doc.ref.set(
         {
-            [`${yearField}_previousBackup`]: doc.data()?.[yearField] || null,
-            [yearField]: earnings,
+            [`${yearField}_previousBackup`]: previousYearData,
+            [yearField]: mergedEarnings,
             dividendsUpdatedAt: adminFieldValue.serverTimestamp(),
             dividendsUpdatedBy: "user-button",
             dividendsSource: "statusinvest+fiis.com.br",
+            dividendsFetchedMonths: fetchedMonths,
+            dividendsMergedMonths: mergedMonths,
+            dividendsCurrentMonthIncluded: currentMonthIncluded,
             modified_in: adminFieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -244,8 +271,11 @@ async function updateTickerDividends(code: string, year = CURRENT_YEAR) {
     return {
         ticker: code,
         year,
-        months: Object.keys(earnings),
-        count: Object.keys(earnings).length,
+        fetchedMonths,
+        mergedMonths,
+        count: mergedMonths.length,
+        currentMonth: monthKey,
+        currentMonthIncluded,
     };
 }
 
@@ -255,17 +285,30 @@ async function reserveDailyRequest(anonId: string, ticker: string) {
 
     await adminDb.runTransaction(async (transaction) => {
         const doc = await transaction.get(ref);
-        if (doc.exists) {
+        const data = doc.data() || {};
+        const status = data.status;
+
+        if (doc.exists && status === "success") {
             throw new Error("Você já solicitou atualização deste FII hoje.");
         }
 
-        transaction.set(ref, {
-            anonId,
-            ticker,
-            requestDate: todayKey(),
-            createdAt: adminFieldValue.serverTimestamp(),
-            status: "reserved",
-        });
+        if (doc.exists && status === "reserved") {
+            throw new Error("Já existe uma atualização em andamento para este FII.");
+        }
+
+        transaction.set(
+            ref,
+            {
+                anonId,
+                ticker,
+                requestDate: todayKey(),
+                attempts: Number(data.attempts || 0) + 1,
+                createdAt: data.createdAt || adminFieldValue.serverTimestamp(),
+                updatedAt: adminFieldValue.serverTimestamp(),
+                status: "reserved",
+            },
+            { merge: true }
+        );
     });
 
     return ref;
@@ -276,9 +319,7 @@ export async function POST(req: NextRequest) {
         const { ticker } = await req.json();
         const code = normalizeTicker(ticker);
 
-        if (!code) {
-            return NextResponse.json({ error: "Ticker inválido." }, { status: 400 });
-        }
+        if (!code) return NextResponse.json({ error: "Ticker inválido." }, { status: 400 });
 
         const cookieStore = await cookies();
         const anonId = cookieStore.get("anonId")?.value;
@@ -293,15 +334,28 @@ export async function POST(req: NextRequest) {
         const requestRef = await reserveDailyRequest(anonId, code);
 
         try {
-            const result = await updateTickerDividends(code, CURRENT_YEAR);
+            const result = await updateTickerDividends(code, currentYear());
+            const status = result.currentMonthIncluded ? "success" : "partial";
+
             await requestRef.set(
                 {
-                    status: "success",
+                    status,
                     result,
                     finishedAt: adminFieldValue.serverTimestamp(),
                 },
                 { merge: true }
             );
+
+            if (!result.currentMonthIncluded) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        message: `Atualizei os meses encontrados (${result.mergedMonths.join(", ")}), mas ${result.currentMonth} ainda não foi localizado na fonte automática. Você poderá tentar novamente hoje.`,
+                        result,
+                    },
+                    { status: 202 }
+                );
+            }
 
             return NextResponse.json({ success: true, result });
         } catch (err: any) {
@@ -316,7 +370,8 @@ export async function POST(req: NextRequest) {
             throw err;
         }
     } catch (err: any) {
-        const status = String(err.message || "").includes("já solicitou") ? 429 : 500;
-        return NextResponse.json({ error: err.message || "Erro ao atualizar dividendos." }, { status });
+        const message = err.message || "Erro ao atualizar dividendos.";
+        const status = message.includes("já solicitou") || message.includes("em andamento") ? 429 : 500;
+        return NextResponse.json({ error: message }, { status });
     }
 }
