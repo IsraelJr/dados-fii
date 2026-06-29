@@ -357,31 +357,31 @@ export default function WalletPage() {
           <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900">
             ← Voltar para consulta
           </Link>
-          <h1 className="mt-4 text-3xl font-extrabold text-slate-800">Minha Carteira FIIs</h1>
+          <h1 className="mt-4 text-3xl font-extrabold text-slate-800">Minha Carteira</h1>
           <p className="mt-2 text-slate-600">
             Salva neste navegador. Adicione seus FIIs e veja renda estimada e próximos pagamentos.
           </p>
         </div>
-        <Link href="/calendario-dividendos-fiis" className="rounded-full bg-gray-800 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-gray-700">
+        <Link href="/calendario-dividendos-fiis" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
           Calendário público
         </Link>
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm text-gray-400">Renda mensal estimada</p>
+          <p className="text-sm font-bold text-gray-300">Renda mensal estimada</p>
           <strong className="mt-2 block text-3xl text-green-300">{formatCurrency(insights.monthlyIncome)}</strong>
           <p className="mt-2 text-xs text-gray-500">Baseada no último rendimento disponível.</p>
         </div>
 
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm text-gray-400">Valor aproximado da carteira</p>
+          <p className="text-sm font-bold text-gray-300">Valor aproximado da carteira</p>
           <strong className="mt-2 block text-3xl text-indigo-300">{formatCurrency(insights.currentValue)}</strong>
           <p className="mt-2 text-xs text-gray-500">Calculado pelo preço atual retornado pela consulta.</p>
         </div>
 
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm text-gray-400">Segmento principal</p>
+          <p className="text-sm font-bold text-gray-300">Segmento principal</p>
           <strong className="mt-2 block text-3xl text-yellow-300">{insights.mainSegment?.value || "-"}</strong>
           <p className="mt-2 text-xs text-gray-500">{insights.mainSegment?.ticker || "Adicione FIIs para calcular."}</p>
         </div>
