@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Loader2, Plus, Save, Trash2, Wallet } from "lucide-react";
+import { AlertTriangle, CalendarDays, Download, Loader2, Plus, RefreshCw, Save, Trash2, Wallet } from "lucide-react";
 
 type WalletItem = {
   ticker: string;
@@ -12,6 +12,16 @@ type WalletItem = {
 type LoadedFii = WalletItem & {
   data?: any;
   error?: string;
+};
+
+type Payment = {
+  ticker: string;
+  quotas: number;
+  date: string;
+  dateWith?: string;
+  amount: number;
+  dividend: number;
+  month: string;
 };
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
@@ -46,6 +56,10 @@ function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function getCurrentMonthName() {
+  return MONTHS[new Date().getMonth()];
+}
+
 function getCurrentYearData(data: any) {
   const year = new Date().getFullYear();
   return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {};
@@ -59,9 +73,15 @@ function getLastDividend(data: any) {
   return { month: lastMonth, info: yearData[lastMonth] };
 }
 
+function getCurrentMonthDividend(data: any) {
+  const month = getCurrentMonthName();
+  const yearData = getCurrentYearData(data);
+  return yearData?.[month] ? { month, info: yearData[month] } : null;
+}
+
 function getUpcomingPayments(items: LoadedFii[]) {
   const today = new Date();
-  const payments: Array<{ ticker: string; quotas: number; date: string; amount: number; dividend: number; month: string }> = [];
+  const payments: Payment[] = [];
 
   items.forEach((item) => {
     if (!item.data) return;
@@ -80,6 +100,7 @@ function getUpcomingPayments(items: LoadedFii[]) {
         ticker: item.ticker,
         quotas: item.quotas,
         date: info.payment_date,
+        dateWith: info.date_with,
         amount: dividend * item.quotas,
         dividend,
         month,
@@ -94,6 +115,31 @@ function getUpcomingPayments(items: LoadedFii[]) {
   });
 }
 
+function buildCsv(items: LoadedFii[]) {
+  const header = ["Ticker", "Cotas", "Preco", "Ultimo rendimento", "Mes ultimo rendimento", "Renda estimada", "Rendimento mes atual", "Renda anunciada mes atual"];
+  const rows = items.map((item) => {
+    const lastDividend = getLastDividend(item.data);
+    const currentDividend = getCurrentMonthDividend(item.data);
+    const lastValue = parseCurrency(lastDividend?.info?.earnings);
+    const currentValue = parseCurrency(currentDividend?.info?.earnings);
+
+    return [
+      item.ticker,
+      String(item.quotas),
+      item.data?.price || "",
+      lastDividend?.info?.earnings || "",
+      MONTHS_PTBR[lastDividend?.month || ""] || lastDividend?.month || "",
+      formatCurrency(lastValue * item.quotas),
+      currentDividend?.info?.earnings || "",
+      formatCurrency(currentValue * item.quotas),
+    ];
+  });
+
+  return [header, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
+    .join("\n");
+}
+
 export default function WalletPage() {
   const [ticker, setTicker] = useState("");
   const [quotas, setQuotas] = useState("");
@@ -102,6 +148,7 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [editingQuotas, setEditingQuotas] = useState<Record<string, string>>({});
+  const [updatingMissing, setUpdatingMissing] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -158,16 +205,48 @@ export default function WalletPage() {
     loadWallet();
   }, [items]);
 
-  const summary = useMemo(() => {
-    return loaded.reduce((acc, item) => {
+  const insights = useMemo(() => {
+    const currentMonth = getCurrentMonthName();
+    const enriched = loaded.map((item) => {
       const lastDividend = getLastDividend(item.data);
-      const dividend = parseCurrency(lastDividend?.info?.earnings);
+      const currentDividend = getCurrentMonthDividend(item.data);
+      const lastValue = parseCurrency(lastDividend?.info?.earnings);
+      const currentValue = parseCurrency(currentDividend?.info?.earnings);
       const price = parseCurrency(item.data?.price);
+      const estimatedIncome = lastValue * item.quotas;
+      const announcedIncome = currentValue * item.quotas;
+      const currentValuePosition = price * item.quotas;
+      const estimatedYield = currentValuePosition > 0 ? (estimatedIncome / currentValuePosition) * 100 : 0;
 
-      acc.monthlyIncome += dividend * item.quotas;
-      acc.currentValue += price * item.quotas;
-      return acc;
-    }, { monthlyIncome: 0, currentValue: 0 });
+      return {
+        ...item,
+        lastDividend,
+        currentDividend,
+        estimatedIncome,
+        announcedIncome,
+        currentValuePosition,
+        estimatedYield,
+        waitingAnnouncement: Boolean(item.data) && !currentDividend,
+      };
+    });
+
+    const monthlyIncome = enriched.reduce((acc, item) => acc + item.estimatedIncome, 0);
+    const announcedIncome = enriched.reduce((acc, item) => acc + item.announcedIncome, 0);
+    const currentValue = enriched.reduce((acc, item) => acc + item.currentValuePosition, 0);
+    const waiting = enriched.filter((item) => item.waitingAnnouncement);
+
+    return {
+      currentMonth,
+      enriched,
+      monthlyIncome,
+      announcedIncome,
+      currentValue,
+      pendingIncome: Math.max(monthlyIncome - announcedIncome, 0),
+      waiting,
+      topIncome: [...enriched].sort((a, b) => b.estimatedIncome - a.estimatedIncome).slice(0, 5),
+      topWeight: [...enriched].sort((a, b) => b.currentValuePosition - a.currentValuePosition).slice(0, 5),
+      topYield: [...enriched].sort((a, b) => b.estimatedYield - a.estimatedYield).slice(0, 5),
+    };
   }, [loaded]);
 
   const upcomingPayments = useMemo(() => getUpcomingPayments(loaded), [loaded]);
@@ -216,8 +295,48 @@ export default function WalletPage() {
     });
   }
 
+  function exportCsv() {
+    const csv = buildCsv(loaded);
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "minha-carteira-fiis.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function updateMissingDividends() {
+    if (!insights.waiting.length) return;
+    setUpdatingMissing(true);
+    setMessage("");
+
+    let updated = 0;
+    let failed = 0;
+
+    for (const item of insights.waiting) {
+      try {
+        const response = await fetch("/api/update-dividends", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticker: item.ticker }),
+        });
+
+        if (response.ok) updated += 1;
+        else failed += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    const tickers = items.map((item) => item.ticker);
+    setItems(tickers.map((code) => ({ ticker: code, quotas: items.find((item) => item.ticker === code)?.quotas || 0 })));
+    setUpdatingMissing(false);
+    setMessage(`Atualização concluída. Sucesso: ${updated}. Falhas ou limite diário: ${failed}.`);
+  }
+
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 text-gray-100">
+    <main className="mx-auto max-w-6xl px-4 py-8 text-gray-100">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <Link href="/" className="text-sm text-indigo-300 hover:text-indigo-100">← Voltar para consulta</Link>
@@ -228,33 +347,70 @@ export default function WalletPage() {
             Salva neste navegador. Adicione seus FIIs e veja renda estimada e próximos pagamentos.
           </p>
         </div>
+        <Link href="/calendario-dividendos-fiis" className="rounded-full bg-gray-800 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-gray-700">
+          Calendário público
+        </Link>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
           <p className="text-sm text-gray-400">Renda mensal estimada</p>
-          <strong className="mt-2 block text-3xl text-green-300">{formatCurrency(summary.monthlyIncome)}</strong>
-          <p className="mt-2 text-xs text-gray-500">Baseada no último rendimento disponível de cada FII.</p>
+          <strong className="mt-2 block text-3xl text-green-300">{formatCurrency(insights.monthlyIncome)}</strong>
+          <p className="mt-2 text-xs text-gray-500">Baseada no último rendimento disponível.</p>
+        </div>
+
+        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
+          <p className="text-sm text-gray-400">Já anunciado em {MONTHS_PTBR[insights.currentMonth]}</p>
+          <strong className="mt-2 block text-3xl text-emerald-300">{formatCurrency(insights.announcedIncome)}</strong>
+          <p className="mt-2 text-xs text-gray-500">Somente FIIs com rendimento do mês atual.</p>
         </div>
 
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
           <p className="text-sm text-gray-400">Valor aproximado da carteira</p>
-          <strong className="mt-2 block text-3xl text-indigo-300">{formatCurrency(summary.currentValue)}</strong>
+          <strong className="mt-2 block text-3xl text-indigo-300">{formatCurrency(insights.currentValue)}</strong>
           <p className="mt-2 text-xs text-gray-500">Calculado pelo preço atual retornado pela consulta.</p>
         </div>
 
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
           <p className="text-sm text-gray-400">Yield mensal estimado</p>
           <strong className="mt-2 block text-3xl text-yellow-300">
-            {summary.currentValue > 0 ? `${((summary.monthlyIncome / summary.currentValue) * 100).toFixed(2).replace(".", ",")}%` : "0,00%"}
+            {insights.currentValue > 0 ? `${((insights.monthlyIncome / insights.currentValue) * 100).toFixed(2).replace(".", ",")}%` : "0,00%"}
           </strong>
           <p className="mt-2 text-xs text-gray-500">Indicador aproximado, não é recomendação.</p>
         </div>
       </section>
 
+      <section className="mt-6 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5 shadow-lg">
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-bold text-yellow-100">
+              <AlertTriangle size={20} /> Aguardando comunicado
+            </h2>
+            <p className="mt-1 text-sm text-yellow-50/80">
+              {insights.waiting.length
+                ? `${insights.waiting.length} FII(s) da carteira ainda não têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base. Estimativa pendente: ${formatCurrency(insights.pendingIncome)}.`
+                : `Todos os FIIs carregados já têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base.`}
+            </p>
+            {insights.waiting.length > 0 && (
+              <p className="mt-2 text-sm text-yellow-50">
+                {insights.waiting.map((item) => item.ticker).join(", ")}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={updateMissingDividends}
+            disabled={!insights.waiting.length || updatingMissing}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-500 px-4 py-2 font-bold text-black hover:bg-yellow-400 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-300"
+          >
+            <RefreshCw size={16} className={updatingMissing ? "animate-spin" : ""} /> Atualizar pendentes
+          </button>
+        </div>
+      </section>
+
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 shadow-lg">
         <h2 className="mb-4 text-xl font-bold">Adicionar FII</h2>
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
           <input
             value={ticker}
             onChange={(event) => setTicker(event.target.value.toUpperCase())}
@@ -273,6 +429,9 @@ export default function WalletPage() {
           <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700">
             <Plus size={18} /> Adicionar
           </button>
+          <button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500">
+            <Download size={18} /> Exportar CSV
+          </button>
         </div>
         {message && <p className="mt-3 text-sm text-yellow-200">{message}</p>}
       </section>
@@ -289,22 +448,21 @@ export default function WalletPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[780px] text-left text-sm">
+            <table className="w-full min-w-[940px] text-left text-sm">
               <thead className="text-gray-400">
                 <tr className="border-b border-gray-800">
                   <th className="py-3">FII</th>
                   <th>Cotas</th>
                   <th>Preço</th>
                   <th>Último rendimento</th>
+                  <th>Anunciado no mês</th>
                   <th>Renda estimada</th>
                   <th>Próximo pagamento</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {loaded.map((item) => {
-                  const lastDividend = getLastDividend(item.data);
-                  const dividend = parseCurrency(lastDividend?.info?.earnings);
+                {insights.enriched.map((item) => {
                   const nextPayment = upcomingPayments.find((payment) => payment.ticker === item.ticker);
                   const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas);
                   const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas;
@@ -332,9 +490,14 @@ export default function WalletPage() {
                         </div>
                       </td>
                       <td>{item.data?.price || "-"}</td>
-                      <td>{lastDividend ? `${MONTHS_PTBR[lastDividend.month] || lastDividend.month}: ${lastDividend.info.earnings}` : item.error || "-"}</td>
-                      <td className="font-bold text-green-300">{formatCurrency(dividend * item.quotas)}</td>
-                      <td>{nextPayment ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}` : "Sem pagamento futuro na base"}</td>
+                      <td>{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
+                      <td>{item.currentDividend ? `${item.currentDividend.info.earnings} · ${formatCurrency(item.announcedIncome)}` : "Aguardando"}</td>
+                      <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
+                      <td>
+                        {nextPayment
+                          ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}${nextPayment.dateWith ? ` · Data-com ${nextPayment.dateWith}` : ""}`
+                          : "Sem pagamento futuro na base"}
+                      </td>
                       <td className="text-right">
                         <button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover">
                           <Trash2 size={18} />
@@ -347,6 +510,12 @@ export default function WalletPage() {
             </table>
           </div>
         )}
+      </section>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-3">
+        <RankingCard title="Maior renda estimada" items={insights.topIncome.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.estimatedIncome) }))} />
+        <RankingCard title="Maior peso financeiro" items={insights.topWeight.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.currentValuePosition) }))} />
+        <RankingCard title="Maior yield mensal" items={insights.topYield.map((item) => ({ ticker: item.ticker, value: `${item.estimatedYield.toFixed(2).replace(".", ",")}%` }))} />
       </section>
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 shadow-lg">
@@ -362,7 +531,9 @@ export default function WalletPage() {
               <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center">
                 <div>
                   <strong className="text-indigo-200">{payment.ticker}</strong>
-                  <span className="ml-2 text-gray-400">{MONTHS_PTBR[payment.month] || payment.month} · pagamento em {payment.date}</span>
+                  <span className="ml-2 text-gray-400">
+                    {MONTHS_PTBR[payment.month] || payment.month} · Data-com {payment.dateWith || "-"} · Pagamento em {payment.date}
+                  </span>
                 </div>
                 <strong className="text-green-300">{formatCurrency(payment.amount)}</strong>
               </li>
@@ -371,5 +542,25 @@ export default function WalletPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function RankingCard({ title, items }: { title: string; items: Array<{ ticker: string; value: string }> }) {
+  return (
+    <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
+      <h3 className="mb-3 text-lg font-bold">{title}</h3>
+      {!items.length ? (
+        <p className="text-sm text-gray-500">Sem dados ainda.</p>
+      ) : (
+        <ol className="space-y-2 text-sm">
+          {items.map((item, index) => (
+            <li key={`${title}-${item.ticker}`} className="flex justify-between rounded-lg bg-gray-800 px-3 py-2">
+              <span><strong className="text-gray-500">#{index + 1}</strong> {item.ticker}</span>
+              <strong className="text-indigo-200">{item.value}</strong>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
