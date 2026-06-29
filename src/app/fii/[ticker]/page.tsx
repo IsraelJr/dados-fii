@@ -39,6 +39,12 @@ function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatDividend(value: unknown) {
+  const parsed = parseCurrency(value);
+  if (!parsed) return "-";
+  return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
+}
+
 function getYearData(data: any) {
   const year = new Date().getFullYear();
   return {
@@ -158,10 +164,10 @@ export default function FiiPage() {
       {!loading && !error && data && (
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-4">
-            <MetricCard title="Preço atual" value={data.price || "-"} description="Cotação retornada pela base atual." tone="indigo" />
-            <MetricCard title="Último rendimento" value={lastDividend?.info?.earnings || "-"} description={lastDividend ? MONTHS_PTBR[lastDividend.month] || lastDividend.month : "Sem rendimento no ano."} tone="green" />
+            <MetricCard title="Preço atual" value={data.price || "-"} tone="indigo" />
+            <MetricCard title="Último rendimento" value={formatDividend(lastDividend?.info?.earnings)} description={lastDividend ? MONTHS_PTBR[lastDividend.month] || lastDividend.month : "Sem rendimento no ano."} tone="green" />
             <MetricCard title="Yield mensal" value={monthlyYield ? `${monthlyYield.toFixed(2).replace(".", ",")}%` : "-"} description="Último rendimento dividido pelo preço atual." tone="yellow" />
-            <MetricCard title="Segmento" value={segment} description="Classificação cadastrada na base." tone="indigo" />
+            <MetricCard title="Segmento" value={segment} tone="indigo" />
           </section>
 
           <section className="grid gap-4 md:grid-cols-[1fr_1fr]">
@@ -177,7 +183,7 @@ export default function FiiPage() {
               {nextPayment ? (
                 <>
                   <InfoLine label="Mês de referência" value={MONTHS_PTBR[nextPayment.month] || nextPayment.month} />
-                  <InfoLine label="Rendimento por cota" value={nextPayment.info?.earnings || "-"} />
+                  <InfoLine label="Rendimento por cota" value={formatDividend(nextPayment.info?.earnings)} />
                   <InfoLine label="Data-com" value={nextPayment.info?.date_with || "-"} />
                   <InfoLine label="Pagamento" value={nextPayment.info?.payment_date || "-"} />
                 </>
@@ -188,14 +194,9 @@ export default function FiiPage() {
           </section>
 
           <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-            <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
-              <div>
-                <h2 className="text-xl font-extrabold text-white">Histórico de rendimentos</h2>
-                <p className="mt-1 text-sm font-medium text-gray-300">Eventos carregados para {orderedDividends.year}.</p>
-              </div>
-              <Link href={`/?ticker=${ticker}`} className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-                Consultar na Home
-              </Link>
+            <div className="mb-4">
+              <h2 className="text-xl font-extrabold text-white">Histórico de rendimentos</h2>
+              <p className="mt-1 text-sm font-medium text-gray-300">Eventos carregados para {orderedDividends.year}.</p>
             </div>
 
             {!orderedDividends.items.length ? (
@@ -215,7 +216,7 @@ export default function FiiPage() {
                     {orderedDividends.items.map(({ month, info }: any) => (
                       <tr key={`${ticker}-${month}`} className="border-b border-gray-800 text-gray-100">
                         <td className="py-3 font-bold text-indigo-200">{MONTHS_PTBR[month] || month}</td>
-                        <td className="font-bold text-green-300">{info?.earnings || "-"}</td>
+                        <td className="font-bold text-green-300">{formatDividend(info?.earnings)}</td>
                         <td className="font-medium text-gray-200">{info?.date_with || "-"}</td>
                         <td className="font-medium text-gray-200">{info?.payment_date || "-"}</td>
                       </tr>
@@ -231,7 +232,7 @@ export default function FiiPage() {
   );
 }
 
-function MetricCard({ title, value, description, tone }: { title: string; value: string; description: string; tone: "green" | "indigo" | "yellow" }) {
+function MetricCard({ title, value, description, tone }: { title: string; value: string; description?: string; tone: "green" | "indigo" | "yellow" }) {
   const toneClass = {
     green: "text-green-300",
     indigo: "text-indigo-300",
@@ -242,7 +243,7 @@ function MetricCard({ title, value, description, tone }: { title: string; value:
     <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <p className="text-base font-extrabold text-white">{title}</p>
       <strong className={`mt-2 block break-words text-3xl ${toneClass}`}>{value}</strong>
-      <p className="mt-2 text-sm font-medium text-gray-300">{description}</p>
+      {description && <p className="mt-2 text-sm font-medium text-gray-300">{description}</p>}
     </div>
   );
 }
