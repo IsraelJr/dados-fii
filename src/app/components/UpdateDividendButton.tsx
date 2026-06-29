@@ -33,9 +33,16 @@ export default function UpdateDividendButton({ ticker }: Props) {
                 return;
             }
 
+            if (data.success === false) {
+                setDisabled(false);
+                setMessage(data.message || "A fonte automática ainda não trouxe o mês atual. Você pode tentar novamente hoje.");
+                return;
+            }
+
             setDisabled(true);
-            setMessage("Atualização solicitada com sucesso. Consulte o FII novamente em instantes.");
+            setMessage("Atualização concluída com sucesso. Consulte o FII novamente em instantes.");
         } catch {
+            setDisabled(false);
             setMessage("Erro ao solicitar atualização. Tente novamente mais tarde.");
         } finally {
             setLoading(false);
@@ -57,7 +64,7 @@ export default function UpdateDividendButton({ ticker }: Props) {
                     }`}
             >
                 <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                {loading ? "Atualizando..." : disabled ? "Solicitação enviada hoje" : "Atualizar dividendos"}
+                {loading ? "Atualizando..." : disabled ? "Atualização feita hoje" : "Atualizar dividendos"}
             </button>
             {message && <p className="mt-3 text-xs text-yellow-50">{message}</p>}
         </div>
