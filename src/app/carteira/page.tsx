@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, Download, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import PageHeader from "../components/PageHeader";
 
 type WalletItem = {
   ticker: string;
@@ -286,6 +287,8 @@ export default function WalletPage() {
   const upcomingPayments = useMemo(() => getUpcomingPayments(loaded), [loaded]);
   const displayedUpcomingPayments = upcomingPayments.slice(0, 12);
   const shouldScrollUpcomingPayments = displayedUpcomingPayments.length > 4;
+  const firstPayment = upcomingPayments[0];
+  const topIncome = insights.topIncome[0];
 
   function addItem() {
     const code = ticker.trim().toUpperCase();
@@ -373,20 +376,15 @@ export default function WalletPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900">
-            ← Voltar para consulta
+      <PageHeader
+        title="Minha Carteira"
+        subtitle="Salva neste navegador. Adicione seus FIIs e veja renda estimada e próximos pagamentos."
+        action={(
+          <Link href="/calendario-dividendos-fiis" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+            Calendário público
           </Link>
-          <h1 className="mt-4 text-3xl font-extrabold text-slate-800">Minha Carteira</h1>
-          <p className="mt-2 text-slate-600">
-            Salva neste navegador. Adicione seus FIIs e veja renda estimada e próximos pagamentos.
-          </p>
-        </div>
-        <Link href="/calendario-dividendos-fiis" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-          Calendário público
-        </Link>
-      </div>
+        )}
+      />
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10">
@@ -406,6 +404,32 @@ export default function WalletPage() {
           <strong className="mt-2 block text-3xl text-yellow-300">{insights.mainSegment?.value || "-"}</strong>
           <p className="mt-2 text-sm font-medium text-gray-300">{insights.mainSegment?.ticker || "Adicione FIIs para calcular."}</p>
         </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+        <h2 className="text-xl font-extrabold text-white">Resumo da carteira</h2>
+        {!items.length ? (
+          <p className="mt-3 text-sm font-medium text-gray-300">Adicione FIIs para gerar um resumo automático da carteira.</p>
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <SummaryItem
+              label="Concentração por cotas"
+              value={insights.mainSegment ? `${insights.mainSegment.ticker} concentra ${insights.mainSegment.value} das cotas cadastradas.` : "Sem segmento calculado."}
+            />
+            <SummaryItem
+              label="Maior fonte de renda estimada"
+              value={topIncome ? `${topIncome.ticker} lidera com ${formatCurrency(topIncome.estimatedIncome)} por mês estimado.` : "Sem renda estimada ainda."}
+            />
+            <SummaryItem
+              label="Comunicados do mês"
+              value={insights.waiting.length ? `${insights.waiting.length} FII(s) ainda aguardam comunicado de ${MONTHS_PTBR[insights.currentMonth]}.` : `Todos os FIIs carregados já têm comunicado de ${MONTHS_PTBR[insights.currentMonth]}.`}
+            />
+            <SummaryItem
+              label="Próximo pagamento"
+              value={firstPayment ? `${firstPayment.ticker} em ${firstPayment.date}, estimado em ${formatCurrency(firstPayment.amount)}.` : "Nenhum pagamento futuro identificado na base."}
+            />
+          </div>
+        )}
       </section>
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
@@ -593,6 +617,15 @@ export default function WalletPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-gray-800 p-4 ring-1 ring-white/5">
+      <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p>
+      <p className="mt-2 text-sm font-bold text-gray-100">{value}</p>
+    </div>
   );
 }
 
