@@ -171,7 +171,7 @@ export default function DividendCalendarPage() {
           <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900">
             ← Voltar para consulta
           </Link>
-          <h1 className="mt-4 text-3xl font-extrabold text-slate-800">Calendário de Dividendos de FIIs</h1>
+          <h1 className="mt-4 text-3xl font-extrabold text-slate-800">Calendário de Dividendos</h1>
           <p className="mt-2 max-w-3xl text-slate-600">
             Consulte próximos pagamentos, data-com e rendimentos anunciados pelos fundos imobiliários da base Dados FII.
           </p>
@@ -206,15 +206,15 @@ export default function DividendCalendarPage() {
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
-              <p className="text-sm text-gray-400">Eventos na base</p>
+              <p className="text-sm font-bold text-gray-300">Eventos na base</p>
               <strong className="mt-2 block text-3xl text-indigo-300">{data?.total || 0}</strong>
             </div>
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
-              <p className="text-sm text-gray-400">Próximos pagamentos</p>
+              <p className="text-sm font-bold text-gray-300">Próximos pagamentos</p>
               <strong className="mt-2 block text-3xl text-green-300">{data?.nextEvents?.length || 0}</strong>
             </div>
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
-              <p className="text-sm text-gray-400">Anunciados no mês</p>
+              <p className="text-sm font-bold text-gray-300">Anunciados no mês</p>
               <strong className="mt-2 block text-3xl text-yellow-300">{data?.currentMonth?.length || 0}</strong>
             </div>
           </section>
