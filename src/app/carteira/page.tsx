@@ -543,7 +543,9 @@ export default function WalletPage() {
 
                     return (
                       <tr key={item.ticker} className="border-b border-gray-800 text-gray-100">
-                        <td className="py-3 font-bold text-indigo-200">{item.ticker}</td>
+                        <td className="py-3 font-bold">
+                          <FiiTickerLink ticker={item.ticker} />
+                        </td>
                         <td>
                           <div className="flex items-center gap-2">
                             <input
@@ -605,7 +607,7 @@ export default function WalletPage() {
             {displayedUpcomingPayments.map((payment) => (
               <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center">
                 <div>
-                  <strong className="text-indigo-200">{payment.ticker}</strong>
+                  <FiiTickerLink ticker={payment.ticker} />
                   <span className="ml-2 text-sm font-medium text-gray-300">
                     {MONTHS_PTBR[payment.month] || payment.month} · Data-com {payment.dateWith || "-"} · Pagamento em {payment.date}
                   </span>
@@ -626,6 +628,14 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p>
       <p className="mt-2 text-sm font-bold text-gray-100">{value}</p>
     </div>
+  );
+}
+
+function FiiTickerLink({ ticker }: { ticker: string }) {
+  return (
+    <Link href={`/fii/${ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">
+      {ticker}
+    </Link>
   );
 }
 
@@ -650,7 +660,9 @@ function WalletMobileCard({
     <article className="rounded-2xl bg-gray-800 p-4 text-gray-100 ring-1 ring-white/10">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-xl font-extrabold text-indigo-200">{item.ticker}</h3>
+          <h3 className="text-xl font-extrabold">
+            <FiiTickerLink ticker={item.ticker} />
+          </h3>
           <p className="mt-1 text-sm font-medium text-gray-300">{item.quotas} cotas</p>
         </div>
         <button onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover">
@@ -724,7 +736,7 @@ function RankingCard({ title, items }: { title: string; items: Array<{ ticker: s
         <ol className="space-y-2 text-sm">
           {items.map((item, index) => (
             <li key={`${title}-${item.ticker}`} className="flex justify-between gap-3 rounded-lg bg-gray-800 px-3 py-2 text-gray-200">
-              <span><strong className="text-gray-400">#{index + 1}</strong> {item.ticker}</span>
+              <span><strong className="text-gray-400">#{index + 1}</strong> <FiiTickerLink ticker={item.ticker} /></span>
               <strong className="text-indigo-200">{item.value}</strong>
             </li>
           ))}
