@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/update-dividends?limit=10",
+      "schedule": "0 12 * * *"
+    }
+  ]
+}
