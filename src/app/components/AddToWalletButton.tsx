@@ -65,13 +65,13 @@ export default function AddToWalletButton({ ticker }: Props) {
     }
 
     return (
-        <div className="mt-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-sm text-indigo-50">
-            <div className="mb-3 flex items-center gap-2 font-bold">
+        <div className="mt-4 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+            <div className="mb-3 flex items-center gap-2 text-base font-extrabold text-white">
                 <Wallet size={18} className="text-indigo-300" />
                 Minha Carteira
             </div>
 
-            <p className="mb-3 text-indigo-100/90">
+            <p className="mb-4 text-sm font-medium text-gray-300">
                 {isInWallet
                     ? `${ticker} já está na sua carteira. Atualize a quantidade de cotas, se necessário.`
                     : `Adicione ${ticker} à sua carteira para acompanhar renda estimada e próximos pagamentos.`}
@@ -84,26 +84,26 @@ export default function AddToWalletButton({ ticker }: Props) {
                     onKeyDown={(event) => { if (event.key === "Enter") addToWallet(); }}
                     placeholder="Quantidade de cotas"
                     inputMode="decimal"
-                    className="rounded-lg border border-indigo-400/30 bg-gray-900 p-2 text-white outline-none focus:border-indigo-300"
+                    className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
                 />
 
                 <button
                     type="button"
                     onClick={addToWallet}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
                 >
                     <Plus size={16} /> {isInWallet ? "Atualizar" : "Adicionar"}
                 </button>
 
                 <Link
                     href="/carteira"
-                    className="inline-flex items-center justify-center rounded-lg bg-gray-800 px-4 py-2 font-bold text-indigo-100 hover:bg-gray-700"
+                    className="inline-flex items-center justify-center rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900"
                 >
                     Ver carteira
                 </Link>
             </div>
 
-            {message && <p className="mt-3 text-xs text-indigo-100">{message}</p>}
+            {message && <p className="mt-3 text-sm font-medium text-green-300">{message}</p>}
         </div>
     );
 }
