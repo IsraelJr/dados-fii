@@ -10,6 +10,7 @@ import FiiSummary from "./components/FiiSummary";
 import Login from "./components/Login";
 import MonitoredFiisPanel from "./components/MonitoredFiisPanel";
 import GoogleAdsBlock from "./components/GoogleAdsBlock";
+import HomeDividendCalendar from "./components/HomeDividendCalendar";
 
 export default function Home() {
     const [stats, setStats] = useState<{ visit: number; search: number }>({ visit: 0, search: 0 });
@@ -202,6 +203,8 @@ export default function Home() {
             >
                 <Wallet size={18} /> Minha Carteira e Dividendos
             </Link>
+
+            <HomeDividendCalendar />
 
             <div className="flex top-4 left-4">
                 <MonitoredFiisPanel />
