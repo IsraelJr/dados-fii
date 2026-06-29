@@ -21,6 +21,23 @@ type CalendarEvent = {
 const INITIAL_VISIBLE_ITEMS = 10;
 const ITEMS_STEP = 10;
 
+function parseCurrency(value: unknown) {
+  if (typeof value === "number") return value;
+  return Number(
+    String(value || "0")
+      .replace("R$", "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .trim()
+  ) || 0;
+}
+
+function formatDividend(value: unknown) {
+  const parsed = parseCurrency(value);
+  if (!parsed) return "-";
+  return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
+}
+
 function EventList({
   title,
   events,
@@ -78,7 +95,7 @@ function EventList({
                       </Link>
                       {event.socialReason && <p className="mt-1 max-w-[180px] truncate text-xs font-medium text-gray-300">{event.socialReason}</p>}
                     </td>
-                    <td className="py-4 pr-4 align-top font-bold text-green-300">{event.earnings || "-"}</td>
+                    <td className="py-4 pr-4 align-top font-bold text-green-300">{formatDividend(event.earnings)}</td>
                     <td className="py-4 pr-4 align-top font-medium text-gray-200">{event.dateWith || "-"}</td>
                     <td className="py-4 pr-4 align-top font-medium text-gray-200">{event.paymentDate || "-"}</td>
                     <td className="py-4 align-top">
