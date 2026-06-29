@@ -1,208 +1,112 @@
 import { NextRequest, NextResponse } from "next/server";
-import admin, { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const STATE_DOC = "dividendRoutineState";
+const DEFAULT_INTERVAL_DAYS = 5;
 
-type FiiDoc = FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>;
-
-function clean(html: string) {
-  return String(html || "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#160;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
+function envInt(name: string, fallback: number) {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
-function tickerOf(value: unknown) {
-  return String(value || "").trim().toUpperCase();
+function toDate(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === "function") return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function noAccent(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function daysSince(value: any) {
+  const date = toDate(value);
+  if (!date) return Number.POSITIVE_INFINITY;
+  return (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24);
 }
 
-function authorized(req: NextRequest) {
+function isAuthorized(req: NextRequest) {
   const expected = process.env.CRON_SECRET || process.env.ADMIN_UPDATE_SECRET;
-  const authorization = req.headers.get("authorization") || "";
+  const auth = req.headers.get("authorization") || "";
   const querySecret = new URL(req.url).searchParams.get("secret") || "";
-
-  return Boolean(expected && (
-    authorization === `Bearer ${expected}` ||
-    querySecret === expected
-  ));
-}
-
-async function getStatusInvestPage(ticker: string) {
-  const code = ticker.toLowerCase();
-  const urls = [
-    `https://statusinvest.com.br/fundos-imobiliarios/${code}`,
-    `https://statusinvest.com.br/fiagros/${code}`,
-    `https://statusinvest.com.br/fiinfras/${code}`,
-  ];
-  const ignored: string[] = [];
-
-  for (const url of urls) {
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "text/html" },
-    });
-
-    if (!res.ok) {
-      ignored.push(`${url} HTTP ${res.status}`);
-      continue;
-    }
-
-    const html = await res.text();
-    const text = clean(html);
-    const upperText = text.toUpperCase();
-    const normalized = noAccent(upperText);
-
-    if (normalized.includes("OPS") && normalized.includes("NAO ENCONTRAMOS")) {
-      ignored.push(`${url} não encontrado`);
-      continue;
-    }
-
-    if (!upperText.includes(ticker)) {
-      ignored.push(`${url} sem ticker`);
-      continue;
-    }
-
-    if (!upperText.includes("TIPO DATA COM") && !upperText.includes("DIVIDENDOS DO")) {
-      ignored.push(`${url} sem dividendos`);
-      continue;
-    }
-
-    return { text, url };
-  }
-
-  throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
-}
-
-function parseDividends(text: string, year: number) {
-  const output: Record<string, any> = {};
-  const parts = text.split("Rendimento ").slice(1);
-
-  for (const part of parts) {
-    const tokens = part.trim().split(" ");
-    const dateWith = tokens[0];
-    const paymentDate = tokens[1];
-    const value = tokens[2];
-
-    if (!dateWith || !paymentDate || !value) continue;
-    if (!paymentDate.includes(`/${year}`)) continue;
-
-    const [, month] = paymentDate.match(/\d{2}\/(\d{2})\/\d{4}/) || [];
-    const monthName = MONTHS[Number(month) - 1];
-    if (!monthName) continue;
-
-    output[monthName] = {
-      payment_date: paymentDate,
-      date_with: dateWith,
-      earnings: value.startsWith("R$") ? value : `R$ ${value}`,
-      price_date_with: "R$ 0,0",
-    };
-  }
-
-  return output;
-}
-
-async function updateOne(doc: FiiDoc, year: number) {
-  const previous = doc.data() || {};
-  const ticker = tickerOf(previous.code || doc.id);
-  if (!ticker) throw new Error("Documento sem ticker no ID e sem campo code.");
-
-  const page = await getStatusInvestPage(ticker);
-  const fetched = parseDividends(page.text, year);
-  const fetchedMonths = Object.keys(fetched).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
-
-  if (!fetchedMonths.length) throw new Error(`Nenhum dividendo de ${year} encontrado no StatusInvest.`);
-
-  const field = `earnings${year}`;
-  const previousYear = previous[field] || {};
-  const merged = { ...previousYear, ...fetched };
-
-  await adminDb.collection("Fiis_Backup").doc(ticker).set({
-    ...previous,
-    backup_date: adminFieldValue.serverTimestamp(),
-    backup_reason: "scheduled-dividend-update",
-  }, { merge: false });
-
-  await doc.ref.set({
-    [field]: merged,
-    modified_in: adminFieldValue.serverTimestamp(),
-  }, { merge: true });
-
-  return { ticker, documentId: doc.id, source: page.url, fetchedMonths };
-}
-
-async function getBatch(limit: number, cursor?: string) {
-  let query = adminDb
-    .collection("Fiis")
-    .orderBy(admin.firestore.FieldPath.documentId())
-    .limit(limit);
-
-  if (cursor) query = query.startAfter(cursor);
-
-  const snapshot = await query.get();
-  return snapshot.docs as FiiDoc[];
+  return Boolean(expected && (auth === `Bearer ${expected}` || querySecret === expected));
 }
 
 export async function GET(req: NextRequest) {
   try {
-    if (!authorized(req)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    if (!isAuthorized(req)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
     const url = new URL(req.url);
+    const intervalDays = envInt("DIVIDEND_UPDATE_INTERVAL_DAYS", DEFAULT_INTERVAL_DAYS);
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 10), 1), 50);
     const year = Number(url.searchParams.get("year") || new Date().getFullYear());
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 10), 1), 30);
     const stateRef = adminDb.collection("Parameters").doc(STATE_DOC);
     const stateSnap = await stateRef.get();
     const state = stateSnap.data() || {};
-    const cursor = typeof state.cursor === "string" && state.cursor ? state.cursor : undefined;
-    const docs = await getBatch(limit, cursor);
-    const results: any[] = [];
+    const cursor = typeof state.cursor === "string" && state.cursor ? state.cursor : "";
+    const intervalReference = state.lastCycleStartedAt || state.completedCycleAt || state.lastRunAt;
+    const intervalElapsed = daysSince(intervalReference);
 
-    for (const doc of docs) {
-      const ticker = tickerOf((doc.data() || {}).code || doc.id);
-      try {
-        const result = await updateOne(doc, year);
-        results.push({ ok: true, ...result });
-      } catch (err: any) {
-        results.push({ ok: false, ticker, documentId: doc.id, error: err.message });
-      }
+    if (!cursor && intervalElapsed < intervalDays) {
+      await stateRef.set({
+        skippedAt: adminFieldValue.serverTimestamp(),
+        skipReason: `Intervalo de ${intervalDays} dias ainda não atingido.`,
+        intervalDays,
+        daysSinceLastCycle: Number(intervalElapsed.toFixed(2)),
+      }, { merge: true });
+
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: `Intervalo de ${intervalDays} dias ainda não atingido.`,
+        intervalDays,
+        daysSinceLastCycle: Number(intervalElapsed.toFixed(2)),
+      });
     }
 
-    const nextCursor = docs.length ? docs[docs.length - 1].id : null;
-    const hasMore = docs.length === limit;
-    const cursorToSave = hasMore ? nextCursor : null;
+    const batchUrl = new URL("/api/admin/update-dividends-batch", req.url);
+    const response = await fetch(batchUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secret": process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET || "",
+      },
+      body: JSON.stringify({
+        secret: process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET || "",
+        year,
+        limit,
+        cursor: cursor || undefined,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) return NextResponse.json(data, { status: response.status });
+
+    const hasMore = Boolean(data.hasMore);
+    const nextCursor = hasMore ? data.nextCursor : null;
 
     await stateRef.set({
       year,
-      cursor: cursorToSave,
-      lastCursor: nextCursor,
+      intervalDays,
+      cursor: nextCursor,
+      lastCursor: data.nextCursor || null,
+      lastCycleStartedAt: cursor ? state.lastCycleStartedAt || adminFieldValue.serverTimestamp() : adminFieldValue.serverTimestamp(),
       completedCycleAt: hasMore ? state.completedCycleAt || null : adminFieldValue.serverTimestamp(),
       lastRunAt: adminFieldValue.serverTimestamp(),
-      lastProcessed: docs.length,
-      updated: results.filter((item) => item.ok).length,
-      failed: results.filter((item) => !item.ok).length,
-      lastResults: results.slice(-100),
+      lastProcessed: data.processed || 0,
+      updated: data.updated || 0,
+      failed: data.failed || 0,
+      lastResults: data.results || [],
     }, { merge: true });
 
     return NextResponse.json({
       ok: true,
-      year,
-      processed: docs.length,
-      updated: results.filter((item) => item.ok).length,
-      failed: results.filter((item) => !item.ok).length,
+      skipped: false,
+      intervalDays,
       previousCursor: cursor || null,
-      nextCursor: cursorToSave,
-      hasMore,
-      results,
+      nextCursor,
+      batch: data,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Erro na rotina de dividendos." }, { status: 500 });
