@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Loader2, Plus, Trash2, Wallet } from "lucide-react";
+import { CalendarDays, Loader2, Plus, Save, Trash2, Wallet } from "lucide-react";
 
 type WalletItem = {
   ticker: string;
@@ -101,6 +101,7 @@ export default function WalletPage() {
   const [loaded, setLoaded] = useState<LoadedFii[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [editingQuotas, setEditingQuotas] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -116,6 +117,13 @@ export default function WalletPage() {
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    setEditingQuotas((current) => {
+      const next: Record<string, string> = {};
+      items.forEach((item) => {
+        next[item.ticker] = current[item.ticker] ?? String(item.quotas);
+      });
+      return next;
+    });
   }, [items]);
 
   useEffect(() => {
@@ -187,8 +195,25 @@ export default function WalletPage() {
     setMessage("");
   }
 
+  function updateQuotas(code: string) {
+    const totalQuotas = Number(String(editingQuotas[code] || "").replace(",", "."));
+
+    if (!Number.isFinite(totalQuotas) || totalQuotas <= 0) {
+      setMessage("Informe uma quantidade de cotas válida para salvar.");
+      return;
+    }
+
+    setItems((current) => current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item));
+    setMessage(`${code} atualizado para ${totalQuotas} cotas.`);
+  }
+
   function removeItem(code: string) {
     setItems((current) => current.filter((item) => item.ticker !== code));
+    setEditingQuotas((current) => {
+      const next = { ...current };
+      delete next[code];
+      return next;
+    });
   }
 
   return (
@@ -264,7 +289,7 @@ export default function WalletPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[780px] text-left text-sm">
               <thead className="text-gray-400">
                 <tr className="border-b border-gray-800">
                   <th className="py-3">FII</th>
@@ -281,11 +306,31 @@ export default function WalletPage() {
                   const lastDividend = getLastDividend(item.data);
                   const dividend = parseCurrency(lastDividend?.info?.earnings);
                   const nextPayment = upcomingPayments.find((payment) => payment.ticker === item.ticker);
+                  const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas);
+                  const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas;
 
                   return (
                     <tr key={item.ticker} className="border-b border-gray-800 text-gray-100">
                       <td className="py-3 font-bold text-indigo-200">{item.ticker}</td>
-                      <td>{item.quotas}</td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={draftQuotas}
+                            onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))}
+                            onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }}
+                            inputMode="decimal"
+                            className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400"
+                          />
+                          <button
+                            onClick={() => updateQuotas(item.ticker)}
+                            disabled={!changed}
+                            className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`}
+                            title="Salvar cotas"
+                          >
+                            <Save size={17} />
+                          </button>
+                        </div>
+                      </td>
                       <td>{item.data?.price || "-"}</td>
                       <td>{lastDividend ? `${MONTHS_PTBR[lastDividend.month] || lastDividend.month}: ${lastDividend.info.earnings}` : item.error || "-"}</td>
                       <td className="font-bold text-green-300">{formatCurrency(dividend * item.quotas)}</td>
