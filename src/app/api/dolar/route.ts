@@ -61,7 +61,7 @@ async function getFromOpenExchangeRateApi(): Promise<DollarQuote> {
         throw new Error("open.er-api.com retornou cotação inválida");
     }
 
-    return { brl: value, source: "open.er-api.com" };
+    return { brl: value, source: "ExchangeRate-API" };
 }
 
 async function getFromFrankfurter(): Promise<DollarQuote> {
