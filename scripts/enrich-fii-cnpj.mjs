@@ -122,8 +122,7 @@ async function enrichTicker(db, ticker) {
   await docRef.set(
     {
       cnpj,
-      cnpjUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      cnpjSource: url,
+      modified_in: admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true }
   );
