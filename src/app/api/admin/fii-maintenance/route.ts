@@ -52,7 +52,7 @@ async function fetchText(url: string) {
     const response = await fetch(url, {
         cache: "no-store",
         headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIMaintenance/1.0)",
+            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIMaintenance/1.1)",
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
     });
@@ -157,7 +157,36 @@ async function backupTicker(ticker: string, data: FirebaseFirestore.DocumentData
     );
 }
 
-async function getBatch(limit: number, cursor?: string) {
+async function getSpecificTickerDocs(tickerInput: string) {
+    const tickers = tickerInput
+        .split(",")
+        .map(normalizeTicker)
+        .filter(Boolean);
+
+    const docs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+
+    for (const ticker of tickers) {
+        const directDoc = await adminDb.collection(FIIS_COLLECTION).doc(ticker).get();
+        if (directDoc.exists) {
+            docs.push(directDoc as FirebaseFirestore.QueryDocumentSnapshot);
+            continue;
+        }
+
+        const byCode = await adminDb
+            .collection(FIIS_COLLECTION)
+            .where("code", "==", ticker)
+            .limit(1)
+            .get();
+
+        if (!byCode.empty) docs.push(byCode.docs[0]);
+    }
+
+    return docs;
+}
+
+async function getBatch(limit: number, cursor?: string, tickerInput?: string) {
+    if (tickerInput) return getSpecificTickerDocs(tickerInput);
+
     let query = adminDb
         .collection(FIIS_COLLECTION)
         .orderBy(admin.firestore.FieldPath.documentId())
@@ -184,15 +213,19 @@ export async function POST(req: NextRequest) {
         const year = Number(body.year || new Date().getFullYear());
         const limit = Math.min(Math.max(Number(body.limit || 5), 1), 20);
         const cursor = body.cursor ? String(body.cursor) : undefined;
-        const docs = await getBatch(limit, cursor);
+        const tickerInput = body.ticker ? String(body.ticker) : "";
+        const docs = await getBatch(limit, cursor, tickerInput);
         const results: any[] = [];
 
         for (const doc of docs) {
-            const ticker = normalizeTicker(doc.id);
             const previous = doc.data() || {};
+            const ticker = normalizeTicker(previous.code || doc.id);
+            const backupId = normalizeTicker(previous.code || doc.id || doc.ref.id);
             const update: Record<string, any> = {};
 
             try {
+                if (!ticker) throw new Error("Documento sem ticker no ID e sem campo code.");
+
                 const { html, url } = await fetchStatusInvestHtml(ticker);
 
                 if (action === "cnpj" || action === "both") {
@@ -206,6 +239,10 @@ export async function POST(req: NextRequest) {
 
                 if (action === "dividends" || action === "both") {
                     const dividends = parseStatusInvestTextDividends(html, year);
+                    if (!dividends.length) {
+                        throw new Error(`Nenhum rendimento de ${year} encontrado no texto do StatusInvest.`);
+                    }
+
                     const yearField = `earnings${year}`;
                     const previousYearData = previous?.[yearField] || {};
                     const fetchedEarnings = Object.fromEntries(
@@ -230,28 +267,37 @@ export async function POST(req: NextRequest) {
                     update.dividendsFetchedMonths = Object.keys(fetchedEarnings).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
                     update.dividendsMergedMonths = mergedMonths;
                     update.dividendsCurrentMonthIncluded = Boolean(mergedEarnings[MONTHS[new Date().getMonth()]]);
+                    update.dividendsSourceUrl = url;
                 }
 
                 if (Object.keys(update).length === 0) {
                     throw new Error("Nenhum dado novo encontrado no StatusInvest.");
                 }
 
-                await backupTicker(ticker, previous);
+                await backupTicker(backupId, previous);
                 await doc.ref.set({ ...update, modified_in: adminFieldValue.serverTimestamp() }, { merge: true });
 
-                results.push({ ticker, ok: true, updatedFields: Object.keys(update) });
+                results.push({
+                    ticker,
+                    documentId: doc.id,
+                    ok: true,
+                    updatedFields: Object.keys(update),
+                    fetchedMonths: update.dividendsFetchedMonths || [],
+                    cnpj: update.cnpj || previous.cnpj || "",
+                });
             } catch (err: any) {
-                results.push({ ticker, ok: false, error: err.message });
+                results.push({ ticker, documentId: doc.id, ok: false, error: err.message });
             }
         }
 
-        const nextCursor = docs.length ? docs[docs.length - 1].id : null;
-        const hasMore = docs.length === limit;
+        const nextCursor = tickerInput ? null : docs.length ? docs[docs.length - 1].id : null;
+        const hasMore = tickerInput ? false : docs.length === limit;
 
         await adminDb.collection(PARAMETERS_COLLECTION).doc("temporaryMaintenance").set(
             {
                 action,
                 year,
+                tickerInput,
                 lastCursor: nextCursor,
                 lastBatchAt: adminFieldValue.serverTimestamp(),
                 lastResults: results,
@@ -264,6 +310,7 @@ export async function POST(req: NextRequest) {
             year,
             limit,
             cursor,
+            tickerInput,
             nextCursor,
             hasMore,
             processed: results.length,
