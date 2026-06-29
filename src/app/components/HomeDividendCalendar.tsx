@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Loader2, Wallet } from "lucide-react";
+import { CalendarDays, Loader2 } from "lucide-react";
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -178,9 +178,6 @@ export default function HomeDividendCalendar() {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Link href="/carteira" className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-                        <Wallet size={16} /> Minha carteira
-                    </Link>
                     <Link href="/calendario-dividendos-fiis" className="rounded-full bg-gray-800 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-gray-700">
                         Calendário completo
                     </Link>
