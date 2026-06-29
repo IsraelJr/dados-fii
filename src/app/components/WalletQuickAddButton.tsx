@@ -52,7 +52,7 @@ export default function WalletQuickAddButton({ ticker }: { ticker: string }) {
             <button
                 type="button"
                 onClick={() => setOpen((value) => !value)}
-                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${saved ? "bg-green-500/20 text-white ring-1 ring-green-300/40 hover:bg-green-500/30" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-extrabold shadow-sm ${saved ? "bg-emerald-700 text-emerald-50 ring-1 ring-emerald-300 hover:bg-emerald-600" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}
             >
                 {saved ? <Wallet size={14} /> : <Plus size={14} />}
                 {saved ? "Na carteira" : "Carteira"}
