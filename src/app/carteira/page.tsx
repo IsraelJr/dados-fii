@@ -258,8 +258,7 @@ export default function WalletPage() {
     const currentValue = enriched.reduce((acc, item) => acc + item.currentValuePosition, 0);
     const waiting = enriched.filter((item) => item.waitingAnnouncement);
     const segmentTotals = enriched.reduce((acc: Record<string, number>, item) => {
-      const value = item.currentValuePosition > 0 ? item.currentValuePosition : item.quotas;
-      acc[item.segment] = (acc[item.segment] || 0) + value;
+      acc[item.segment] = (acc[item.segment] || 0) + item.quotas;
       return acc;
     }, {});
     const segmentBase = Object.values(segmentTotals).reduce((acc, value) => acc + value, 0);
@@ -403,7 +402,7 @@ export default function WalletPage() {
         </div>
 
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10">
-          <p className="text-base font-extrabold text-white">Segmento principal</p>
+          <p className="text-base font-extrabold text-white">Segmento principal por cotas</p>
           <strong className="mt-2 block text-3xl text-yellow-300">{insights.mainSegment?.value || "-"}</strong>
           <p className="mt-2 text-sm font-medium text-gray-300">{insights.mainSegment?.ticker || "Adicione FIIs para calcular."}</p>
         </div>
@@ -544,7 +543,7 @@ export default function WalletPage() {
       <section className="mt-6 grid gap-4 md:grid-cols-3">
         <RankingCard title="Maior renda estimada" items={insights.topIncome.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.estimatedIncome) }))} />
         <RankingCard title="Maior peso financeiro" items={insights.topWeight.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.currentValuePosition) }))} />
-        <RankingCard title="Distribuição por segmento" items={insights.segmentBreakdown} />
+        <RankingCard title="Distribuição por segmento (cotas)" items={insights.segmentBreakdown} />
       </section>
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
@@ -575,7 +574,7 @@ export default function WalletPage() {
 }
 
 function RankingCard({ title, items }: { title: string; items: Array<{ ticker: string; value: string }> }) {
-  const isSegmentDistribution = title === "Distribuição por segmento";
+  const isSegmentDistribution = title.includes("Distribuição por segmento");
 
   return (
     <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
