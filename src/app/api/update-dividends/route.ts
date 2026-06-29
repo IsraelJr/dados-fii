@@ -287,8 +287,9 @@ async function reserveDailyRequest(anonId: string, ticker: string) {
         const doc = await transaction.get(ref);
         const data = doc.data() || {};
         const status = data.status;
+        const confirmedCurrentMonth = data?.result?.currentMonthIncluded === true;
 
-        if (doc.exists && status === "success") {
+        if (doc.exists && status === "success" && confirmedCurrentMonth) {
             throw new Error("Você já solicitou atualização deste FII hoje.");
         }
 
