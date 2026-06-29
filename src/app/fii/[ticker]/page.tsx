@@ -313,12 +313,9 @@ function RecentNews({ ticker, news, loading }: { ticker: string; news: NewsItem[
   return (
     <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
-        <div>
-          <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
-            <Newspaper className="text-indigo-300" size={20} /> Notícias recentes
-          </h2>
-          <p className="mt-1 text-sm font-medium text-gray-300">Mais recente em destaque, seguida por até 2 notícias relacionadas ao {ticker}.</p>
-        </div>
+        <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
+          <Newspaper className="text-indigo-300" size={20} /> Notícias recentes
+        </h2>
         <a
           href={`https://news.google.com/search?q=${encodeURIComponent(`${ticker} FII fundo imobiliário dividendos relatório`)}`}
           target="_blank"
