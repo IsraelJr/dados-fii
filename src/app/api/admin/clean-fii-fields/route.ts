@@ -16,6 +16,7 @@ const FIELDS_TO_DELETE = [
   "earnings2026_previousBackup",
   "dividendsUpdatedAt",
   "cnpjUpdatedAt",
+  "cnpjSource",
 ];
 
 function authorized(req: NextRequest, body: any) {
