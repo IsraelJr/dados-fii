@@ -43,7 +43,8 @@ export default function Home() {
         setLoadingFII(true);
 
         try {
-            const res = await fetch(`/api/fii?ticker=${ticker.toUpperCase().trim()}`);
+            const normalizedTicker = ticker.toUpperCase().trim();
+            const res = await fetch(`/api/fii?ticker=${normalizedTicker}`);
 
             if (!res.ok) {
                 const err = await res.json();
@@ -57,7 +58,7 @@ export default function Home() {
             await fetch("/api/search", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ fii: ticker.toUpperCase().trim() }),
+                body: JSON.stringify({ fii: normalizedTicker }),
             });
 
             await fetch("/api/stats", {
@@ -249,6 +250,7 @@ export default function Home() {
                     getCurrentYearDividends={getCurrentYearDividends}
                     monthsPTBR={monthsPTBR}
                     lastDividend={lastDividend}
+                    onDividendUpdate={fetchFII}
                 />
             )}
 
