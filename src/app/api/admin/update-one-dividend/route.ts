@@ -36,12 +36,11 @@ async function getDoc(ticker: string) {
 
 async function getHtml(ticker: string) {
   const code = ticker.toLowerCase();
-  const primaryUrl = `https://statusinvest.com.br/fundos-imobiliarios/${code}`;
-  const fallbackUrls = [
+  const urls = [
+    `https://statusinvest.com.br/fundos-imobiliarios/${code}`,
     `https://statusinvest.com.br/fiagros/${code}`,
     `https://statusinvest.com.br/fiinfras/${code}`,
   ];
-  const urls = [primaryUrl, ...fallbackUrls];
   const ignored: string[] = [];
 
   for (const url of urls) {
@@ -75,7 +74,7 @@ async function getHtml(ticker: string) {
       continue;
     }
 
-    return { html, text, url, ignored };
+    return { text, url, ignored };
   }
 
   throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
@@ -138,14 +137,7 @@ export async function POST(req: NextRequest) {
     await adminDb.collection("Fiis_Backup").doc(ticker).set({ ...previous, backup_date: adminFieldValue.serverTimestamp(), backup_reason: "update-one-dividend" }, { merge: false });
 
     await doc.ref.set({
-      [`${field}_previousBackup`]: previousYear,
       [field]: merged,
-      dividendsUpdatedAt: adminFieldValue.serverTimestamp(),
-      dividendsUpdatedBy: "update-one-dividend",
-      dividendsSource: "statusinvest-split-text",
-      dividendsSourceUrl: page.url,
-      dividendsFetchedMonths: months,
-      dividendsMergedMonths: mergedMonths,
       modified_in: adminFieldValue.serverTimestamp(),
     }, { merge: true });
 
