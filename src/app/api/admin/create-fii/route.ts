@@ -210,8 +210,6 @@ export async function POST(req: NextRequest) {
       [field]: fetched.earnings,
       statusInvestUrl: fetched.sourceUrl,
       assetType: fetched.assetType,
-      dividendsSource: "StatusInvest",
-      dividendsUpdatedBy: "admin-create-fii",
       created_in: now,
       modified_in: now,
       createdBy: "admin-create-fii",
