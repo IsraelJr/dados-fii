@@ -475,68 +475,91 @@ export default function WalletPage() {
             Sua carteira ainda está vazia. Comece adicionando um ticker e a quantidade de cotas.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[940px] text-left text-sm">
-              <thead className="text-gray-300">
-                <tr className="border-b border-gray-800">
-                  <th className="py-3 font-bold">FII</th>
-                  <th className="font-bold">Cotas</th>
-                  <th className="font-bold">Preço</th>
-                  <th className="font-bold">Último rendimento</th>
-                  <th className="font-bold">Anunciado no mês</th>
-                  <th className="font-bold">Renda estimada</th>
-                  <th className="font-bold">Próximo pagamento</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {insights.enriched.map((item) => {
-                  const nextPayment = upcomingPayments.find((payment) => payment.ticker === item.ticker);
-                  const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas);
-                  const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas;
+          <>
+            <div className="space-y-3 md:hidden">
+              {insights.enriched.map((item) => {
+                const nextPayment = upcomingPayments.find((payment) => payment.ticker === item.ticker);
+                const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas);
+                const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas;
 
-                  return (
-                    <tr key={item.ticker} className="border-b border-gray-800 text-gray-100">
-                      <td className="py-3 font-bold text-indigo-200">{item.ticker}</td>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <input
-                            value={draftQuotas}
-                            onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))}
-                            onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }}
-                            inputMode="decimal"
-                            className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400"
-                          />
-                          <button
-                            onClick={() => updateQuotas(item.ticker)}
-                            disabled={!changed}
-                            className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`}
-                            title="Salvar cotas"
-                          >
-                            <Save size={17} />
+                return (
+                  <WalletMobileCard
+                    key={`mobile-${item.ticker}`}
+                    item={item}
+                    nextPayment={nextPayment}
+                    draftQuotas={draftQuotas}
+                    changed={changed}
+                    onQuotaChange={(value) => setEditingQuotas((current) => ({ ...current, [item.ticker]: value }))}
+                    onSave={() => updateQuotas(item.ticker)}
+                    onRemove={() => removeItem(item.ticker)}
+                  />
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[940px] text-left text-sm">
+                <thead className="text-gray-300">
+                  <tr className="border-b border-gray-800">
+                    <th className="py-3 font-bold">FII</th>
+                    <th className="font-bold">Cotas</th>
+                    <th className="font-bold">Preço</th>
+                    <th className="font-bold">Último rendimento</th>
+                    <th className="font-bold">Anunciado no mês</th>
+                    <th className="font-bold">Renda estimada</th>
+                    <th className="font-bold">Próximo pagamento</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {insights.enriched.map((item) => {
+                    const nextPayment = upcomingPayments.find((payment) => payment.ticker === item.ticker);
+                    const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas);
+                    const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas;
+
+                    return (
+                      <tr key={item.ticker} className="border-b border-gray-800 text-gray-100">
+                        <td className="py-3 font-bold text-indigo-200">{item.ticker}</td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={draftQuotas}
+                              onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))}
+                              onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }}
+                              inputMode="decimal"
+                              className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400"
+                            />
+                            <button
+                              onClick={() => updateQuotas(item.ticker)}
+                              disabled={!changed}
+                              className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`}
+                              title="Salvar cotas"
+                            >
+                              <Save size={17} />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="font-medium text-gray-200">{item.data?.price || "-"}</td>
+                        <td className="font-medium text-gray-200">{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
+                        <td className="font-medium text-gray-200">{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
+                        <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
+                        <td className="font-medium text-gray-200">
+                          {nextPayment
+                            ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}${nextPayment.dateWith ? ` · Data-com ${nextPayment.dateWith}` : ""}`
+                            : "Sem pagamento futuro na base"}
+                        </td>
+                        <td className="text-right">
+                          <button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover">
+                            <Trash2 size={18} />
                           </button>
-                        </div>
-                      </td>
-                      <td className="font-medium text-gray-200">{item.data?.price || "-"}</td>
-                      <td className="font-medium text-gray-200">{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
-                      <td className="font-medium text-gray-200">{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
-                      <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
-                      <td className="font-medium text-gray-200">
-                        {nextPayment
-                          ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}${nextPayment.dateWith ? ` · Data-com ${nextPayment.dateWith}` : ""}`
-                          : "Sem pagamento futuro na base"}
-                      </td>
-                      <td className="text-right">
-                        <button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover">
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
@@ -570,6 +593,75 @@ export default function WalletPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function WalletMobileCard({
+  item,
+  nextPayment,
+  draftQuotas,
+  changed,
+  onQuotaChange,
+  onSave,
+  onRemove,
+}: {
+  item: any;
+  nextPayment?: Payment;
+  draftQuotas: string;
+  changed: boolean;
+  onQuotaChange: (value: string) => void;
+  onSave: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <article className="rounded-2xl bg-gray-800 p-4 text-gray-100 ring-1 ring-white/10">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-xl font-extrabold text-indigo-200">{item.ticker}</h3>
+          <p className="mt-1 text-sm font-medium text-gray-300">{item.quotas} cotas</p>
+        </div>
+        <button onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover">
+          <Trash2 size={18} />
+        </button>
+      </div>
+
+      <div className="grid gap-3">
+        <InfoRow label="Preço atual" value={item.data?.price || "-"} />
+        <InfoRow label="Último rendimento" value={item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"} />
+        <InfoRow label="Anunciado no mês" value={item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"} />
+        <InfoRow label="Renda estimada" value={formatCurrency(item.estimatedIncome)} highlight="green" />
+        <InfoRow
+          label="Próximo pagamento"
+          value={nextPayment ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}${nextPayment.dateWith ? ` · Data-com ${nextPayment.dateWith}` : ""}` : "Sem pagamento futuro na base"}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+        <input
+          value={draftQuotas}
+          onChange={(event) => onQuotaChange(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") onSave(); }}
+          inputMode="decimal"
+          className="rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400"
+        />
+        <button
+          onClick={onSave}
+          disabled={!changed}
+          className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-bold ${changed ? "bg-indigo-600 text-white hover:bg-indigo-700" : "cursor-not-allowed bg-gray-700 text-gray-400"}`}
+        >
+          <Save size={16} /> Salvar
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" }) {
+  return (
+    <div className="rounded-xl bg-gray-900 p-3 ring-1 ring-white/5">
+      <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p>
+      <p className={`mt-1 text-sm font-bold ${highlight === "green" ? "text-green-300" : "text-gray-100"}`}>{value}</p>
+    </div>
   );
 }
 
