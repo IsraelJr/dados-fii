@@ -19,7 +19,7 @@ export default function Home() {
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
-    const [adsClosed, setAdsClosed] = useState(false);
+    const [adsClosed, setAdsClosed] = useState(true);
 
     const closeAds = useCallback(() => {
         setAdsClosed(true);
