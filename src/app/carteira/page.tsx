@@ -368,22 +368,22 @@ export default function WalletPage() {
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm font-bold text-gray-300">Renda mensal estimada</p>
+        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10">
+          <p className="text-base font-extrabold text-white">Renda mensal estimada</p>
           <strong className="mt-2 block text-3xl text-green-300">{formatCurrency(insights.monthlyIncome)}</strong>
-          <p className="mt-2 text-xs text-gray-500">Baseada no último rendimento disponível.</p>
+          <p className="mt-2 text-sm font-medium text-gray-300">Baseada no último rendimento disponível.</p>
         </div>
 
-        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm font-bold text-gray-300">Valor aproximado da carteira</p>
+        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10">
+          <p className="text-base font-extrabold text-white">Valor aproximado da carteira</p>
           <strong className="mt-2 block text-3xl text-indigo-300">{formatCurrency(insights.currentValue)}</strong>
-          <p className="mt-2 text-xs text-gray-500">Calculado pelo preço atual retornado pela consulta.</p>
+          <p className="mt-2 text-sm font-medium text-gray-300">Calculado pelo preço atual retornado pela consulta.</p>
         </div>
 
-        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm font-bold text-gray-300">Segmento principal</p>
+        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10">
+          <p className="text-base font-extrabold text-white">Segmento principal</p>
           <strong className="mt-2 block text-3xl text-yellow-300">{insights.mainSegment?.value || "-"}</strong>
-          <p className="mt-2 text-xs text-gray-500">{insights.mainSegment?.ticker || "Adicione FIIs para calcular."}</p>
+          <p className="mt-2 text-sm font-medium text-gray-300">{insights.mainSegment?.ticker || "Adicione FIIs para calcular."}</p>
         </div>
       </section>
 
