@@ -40,6 +40,11 @@ function parseGoogleNewsUrl(value: string) {
   }
 }
 
+function newsTimestamp(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
 function parseItems(xml: string): NewsItem[] {
   const items = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
 
@@ -53,6 +58,7 @@ function parseItems(xml: string): NewsItem[] {
       return { title, url, source, publishedAt };
     })
     .filter((item) => item.title && item.url)
+    .sort((a, b) => newsTimestamp(b.publishedAt) - newsTimestamp(a.publishedAt))
     .slice(0, 3);
 }
 
