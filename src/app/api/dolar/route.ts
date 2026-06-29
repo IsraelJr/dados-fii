@@ -12,8 +12,8 @@ const formatBRL = (value: number) =>
     new Intl.NumberFormat("pt-BR", {
         style: "currency",
         currency: "BRL",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
     }).format(value);
 
 async function fetchWithTimeout(url: string, timeoutMs = 7000) {
