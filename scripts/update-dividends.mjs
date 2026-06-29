@@ -38,6 +38,10 @@ function currentMonthKey() {
   return MONTHS[Number(saoPauloDateParts().month) - 1];
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function getArg(name) {
   const prefix = `--${name}=`;
   const withEquals = process.argv.find((arg) => arg.startsWith(prefix));
@@ -47,6 +51,10 @@ function getArg(name) {
   if (index >= 0) return process.argv[index + 1]?.trim();
 
   return "";
+}
+
+function hasFlag(name) {
+  return process.argv.includes(`--${name}`);
 }
 
 function initFirebase() {
@@ -90,6 +98,28 @@ function normalizeCurrency(value) {
   return text.startsWith("R$") ? text : `R$ ${text.replace("R$", "").trim()}`;
 }
 
+function formatCurrency(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "R$ 0,0";
+  return `R$ ${number.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 8,
+  })}`;
+}
+
+function toDateOnly(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
+function monthNameFromDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return MONTHS[date.getUTCMonth()];
+}
+
 function extractRows(html) {
   return [...String(html || "").matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((match) => match[0]);
 }
@@ -107,10 +137,33 @@ function getTitle(attrs) {
   return decodeHtml(match?.[1] || "");
 }
 
+function getBrapiToken() {
+  return process.env.BRAPI_API_TOKEN || process.env.BRAPI_TOKEN || "";
+}
+
+async function fetchJson(url, headers = {}) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "DadosFIIUpdater/1.3",
+      ...headers,
+    },
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = data?.message || data?.error || `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+
+  return data;
+}
+
 async function fetchText(url) {
   const response = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.2)",
+      "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.3)",
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
   });
@@ -173,6 +226,44 @@ async function backupFiis(db) {
   });
 
   console.log(`Backup concluído: ${total} documentos copiados.`);
+}
+
+async function fetchBrapiDividends(ticker, year = currentYear()) {
+  const token = getBrapiToken();
+  if (!token) throw new Error("BRAPI_API_TOKEN/BRAPI_TOKEN não configurado.");
+
+  const code = normalizeTicker(ticker);
+  const url = new URL("https://brapi.dev/api/v2/fii/dividends");
+  url.searchParams.set("symbols", code);
+  url.searchParams.set("startDate", `${year}-01-01`);
+  url.searchParams.set("endDate", `${year}-12-31`);
+  url.searchParams.set("sortOrder", "asc");
+
+  const data = await fetchJson(url.toString(), {
+    Authorization: `Bearer ${token}`,
+  });
+
+  const rows = Array.isArray(data?.dividends) ? data.dividends : [];
+
+  return rows
+    .filter((item) => normalizeTicker(item.symbol) === code)
+    .filter((item) => String(item.label || "").toUpperCase().includes("RENDIMENTO"))
+    .map((item) => {
+      const paymentDate = item.paymentDate || item.payment_date;
+      const dateWith = item.lastDatePrior || item.last_date_prior || item.approvedOn;
+      const monthName = monthNameFromDate(paymentDate);
+
+      if (!monthName) return null;
+
+      return {
+        monthName,
+        date_with: toDateOnly(dateWith),
+        payment_date: toDateOnly(paymentDate),
+        earnings: formatCurrency(item.rate),
+        source: "brapi",
+      };
+    })
+    .filter(Boolean);
 }
 
 function parseStatusInvestDividends(html, year = currentYear()) {
@@ -306,11 +397,12 @@ function toEarningsObject(dividends, priceByPaymentDate) {
   return output;
 }
 
-function mergeDividendsByMonth(fiisDividends, statusDividends) {
+function mergeDividendsByMonth(brapiDividends, fiisDividends, statusDividends) {
   const byMonth = new Map();
 
-  fiisDividends.forEach((item) => byMonth.set(item.monthName, item));
-  statusDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
+  statusDividends.forEach((item) => byMonth.set(item.monthName, item));
+  fiisDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
+  brapiDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
 
   return [...byMonth.values()].sort((a, b) => MONTHS.indexOf(a.monthName) - MONTHS.indexOf(b.monthName));
 }
@@ -326,10 +418,17 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
   const yearField = `earnings${year}`;
   const previousYearData = doc.data()?.[yearField] || {};
 
+  let brapiDividends = [];
   let statusDividends = [];
   let fiisDividends = [];
   let priceByPaymentDate = new Map();
   const sourceErrors = [];
+
+  try {
+    brapiDividends = await fetchBrapiDividends(code, year);
+  } catch (err) {
+    sourceErrors.push(`brapi: ${err.message}`);
+  }
 
   try {
     const html = await fetchStatusInvestHtml(code);
@@ -346,7 +445,7 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
     sourceErrors.push(`fiis.com.br: ${err.message}`);
   }
 
-  const dividends = mergeDividendsByMonth(fiisDividends, statusDividends);
+  const dividends = mergeDividendsByMonth(brapiDividends, fiisDividends, statusDividends);
   if (dividends.length === 0) {
     throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}. ${sourceErrors.join(" | ")}`);
   }
@@ -367,10 +466,11 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
       [yearField]: mergedEarnings,
       dividendsUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
       dividendsUpdatedBy: "manual-script",
-      dividendsSource: "statusinvest+fiis.com.br",
+      dividendsSource: "brapi+statusinvest+fiis.com.br",
       dividendsFetchedMonths: fetchedMonths,
       dividendsMergedMonths: mergedMonths,
       dividendsSourceMonths: {
+        brapi: brapiDividends.map((item) => item.monthName),
         statusinvest: statusDividends.map((item) => item.monthName),
         fiisComBr: fiisDividends.map((item) => item.monthName),
       },
@@ -387,6 +487,7 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
     fetchedMonths,
     mergedMonths,
     sourceMonths: {
+      brapi: brapiDividends.map((item) => item.monthName),
       statusinvest: statusDividends.map((item) => item.monthName),
       fiisComBr: fiisDividends.map((item) => item.monthName),
     },
@@ -397,22 +498,74 @@ async function updateTickerDividends(db, ticker, year = currentYear()) {
   };
 }
 
-async function main() {
-  const ticker = normalizeTicker(getArg("ticker"));
-  const year = Number(getArg("year") || currentYear());
+async function getTickersToUpdate(db) {
+  const rawTickers = getArg("tickers");
+  if (rawTickers) {
+    return rawTickers.split(",").map(normalizeTicker).filter(Boolean);
+  }
 
-  if (!ticker) {
+  const ticker = normalizeTicker(getArg("ticker"));
+  if (ticker) return [ticker];
+
+  if (!hasFlag("all")) return [];
+
+  const snapshot = await db.collection(FIIS_COLLECTION).get();
+  return snapshot.docs.map((doc) => normalizeTicker(doc.id)).filter(Boolean);
+}
+
+async function main() {
+  const year = Number(getArg("year") || currentYear());
+  const limit = Number(getArg("limit") || 0);
+  const delay = Number(getArg("delay") || 750);
+  const db = initFirebase();
+  const tickers = await getTickersToUpdate(db);
+
+  if (tickers.length === 0) {
     console.error("Uso: node scripts/update-dividends.mjs --ticker TGAR11 [--year 2026]");
+    console.error("Ou:  node scripts/update-dividends.mjs --tickers TGAR11,MXRF11 [--year 2026]");
+    console.error("Ou:  node scripts/update-dividends.mjs --all [--limit 50] [--delay 750]");
     process.exit(1);
   }
 
-  const db = initFirebase();
+  const selectedTickers = limit > 0 ? tickers.slice(0, limit) : tickers;
 
   await backupFiis(db);
-  const result = await updateTickerDividends(db, ticker, year);
 
-  console.log("Atualização concluída:");
-  console.log(JSON.stringify(result, null, 2));
+  const summary = {
+    year,
+    requested: selectedTickers.length,
+    updated: 0,
+    failed: 0,
+    details: [],
+  };
+
+  for (const code of selectedTickers) {
+    try {
+      console.log(`Atualizando ${code}...`);
+      const result = await updateTickerDividends(db, code, year);
+      summary.updated += 1;
+      summary.details.push({ ticker: code, ok: true, result });
+      console.log(`OK ${code}: ${result.mergedMonths.join(", ")}`);
+    } catch (err) {
+      summary.failed += 1;
+      summary.details.push({ ticker: code, ok: false, error: err.message });
+      console.error(`ERRO ${code}: ${err.message}`);
+    }
+
+    if (delay > 0) await sleep(delay);
+  }
+
+  await db.collection(PARAMETERS_COLLECTION).doc("dividendsMassUpdate").set(
+    {
+      ...summary,
+      details: summary.details.slice(-100),
+      finishedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  console.log("Resumo da atualização:");
+  console.log(JSON.stringify(summary, null, 2));
 }
 
 main().catch((err) => {
