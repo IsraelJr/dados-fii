@@ -32,6 +32,21 @@ function formatDollarUpdateTime(value?: string | null) {
     }
 }
 
+function isDollarRefreshWindow(date = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Sao_Paulo",
+        weekday: "short",
+        hour: "2-digit",
+        hour12: false,
+    }).formatToParts(date);
+
+    const weekday = parts.find((part) => part.type === "weekday")?.value;
+    const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+    const isWeekday = weekday !== "Sat" && weekday !== "Sun";
+
+    return isWeekday && hour >= 9 && hour < 18;
+}
+
 export default function Home() {
     const [stats, setStats] = useState<{ visit: number; search: number }>({ visit: 0, search: 0 });
     const [ticker, setTicker] = useState("");
@@ -157,7 +172,9 @@ export default function Home() {
         };
 
         fetchDolar();
-        const interval = setInterval(fetchDolar, 5 * 60 * 1000);
+        const interval = setInterval(() => {
+            if (isDollarRefreshWindow()) fetchDolar();
+        }, 5 * 60 * 1000);
 
         return () => {
             active = false;
