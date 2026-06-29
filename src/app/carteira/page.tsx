@@ -487,7 +487,7 @@ export default function WalletPage() {
                       </td>
                       <td>{item.data?.price || "-"}</td>
                       <td>{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
-                      <td>{item.currentDividend ? `${item.currentDividend.info.earnings} · ${formatCurrency(item.announcedIncome)}` : "Aguardando"}</td>
+                      <td>{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
                       <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
                       <td>
                         {nextPayment
