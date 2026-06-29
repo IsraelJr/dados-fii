@@ -52,6 +52,11 @@ function formatDividend(value: unknown) {
   return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
 }
 
+function newsTimestamp(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
 function formatNewsDate(value: string) {
   if (!value) return "";
 
@@ -158,7 +163,13 @@ export default function FiiPage() {
       try {
         const response = await fetch(`/api/fii-news?ticker=${ticker}`, { cache: "no-store" });
         const json = await response.json();
-        setNews(Array.isArray(json.news) ? json.news.slice(0, 3) : []);
+        const orderedNews = Array.isArray(json.news)
+          ? [...json.news]
+            .sort((a: NewsItem, b: NewsItem) => newsTimestamp(b.publishedAt) - newsTimestamp(a.publishedAt))
+            .slice(0, 3)
+          : [];
+
+        setNews(orderedNews);
       } catch {
         setNews([]);
       } finally {
@@ -297,6 +308,8 @@ function MetricCard({ title, value, description, tone }: { title: string; value:
 }
 
 function RecentNews({ ticker, news, loading }: { ticker: string; news: NewsItem[]; loading: boolean }) {
+  const [mainNews, ...secondaryNews] = news;
+
   return (
     <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
@@ -304,7 +317,7 @@ function RecentNews({ ticker, news, loading }: { ticker: string; news: NewsItem[
           <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
             <Newspaper className="text-indigo-300" size={20} /> Notícias recentes
           </h2>
-          <p className="mt-1 text-sm font-medium text-gray-300">Até 3 notícias recentes relacionadas ao {ticker}.</p>
+          <p className="mt-1 text-sm font-medium text-gray-300">Mais recente em destaque, seguida por até 2 notícias relacionadas ao {ticker}.</p>
         </div>
         <a
           href={`https://news.google.com/search?q=${encodeURIComponent(`${ticker} FII fundo imobiliário dividendos relatório`)}`}
@@ -323,27 +336,42 @@ function RecentNews({ ticker, news, loading }: { ticker: string; news: NewsItem[
       ) : !news.length ? (
         <p className="rounded-xl bg-gray-800 p-4 text-sm font-medium text-gray-300">Nenhuma notícia recente encontrada para este ticker.</p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-3">
-          {news.map((item) => (
-            <a
-              key={`${item.url}-${item.title}`}
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-h-[150px] flex-col justify-between rounded-xl bg-gray-800 p-4 text-left ring-1 ring-white/5 hover:bg-gray-700"
-            >
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-indigo-200">{item.source || "Notícia"}</p>
-                <h3 className="mt-2 line-clamp-3 text-sm font-extrabold text-white">{item.title}</h3>
-              </div>
-              <p className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-green-300">
-                {formatNewsDate(item.publishedAt) || "Abrir notícia"} <ExternalLink size={13} />
-              </p>
-            </a>
-          ))}
+        <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
+          <NewsCard item={mainNews} featured />
+          {!!secondaryNews.length && (
+            <div className="grid gap-3">
+              {secondaryNews.map((item) => (
+                <NewsCard key={`${item.url}-${item.title}`} item={item} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>
+  );
+}
+
+function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boolean }) {
+  return (
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${featured ? "min-h-[260px] p-5" : "min-h-[124px] p-4"} flex flex-col justify-between rounded-xl bg-gray-800 text-left ring-1 ring-white/5 hover:bg-gray-700`}
+    >
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wide text-indigo-200">{item.source || "Notícia"}</p>
+        <h3 className={`${featured ? "mt-3 text-xl leading-snug" : "mt-2 text-sm"} line-clamp-3 font-extrabold text-white`}>
+          {item.title}
+        </h3>
+        {featured && (
+          <p className="mt-3 text-sm font-medium text-gray-300">Notícia mais recente encontrada para este fundo.</p>
+        )}
+      </div>
+      <p className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-green-300">
+        {formatNewsDate(item.publishedAt) || "Abrir notícia"} <ExternalLink size={13} />
+      </p>
+    </a>
   );
 }
 
