@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronUp, Loader2, Search } from "lucide-react";
+import WalletQuickAddButton from "../components/WalletQuickAddButton";
+import FiiAlert from "../components/FiiAlert";
 
 type CalendarEvent = {
   ticker: string;
@@ -39,7 +41,7 @@ function EventList({
   const canShowLess = shouldLimit && visibleEvents.length > INITIAL_VISIBLE_ITEMS;
 
   return (
-    <section className="rounded-2xl bg-gray-900 p-5 shadow-lg">
+    <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
       <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
         <h2 className="flex items-center gap-2 text-xl font-bold">
           <CalendarDays className="text-green-300" /> {title}
@@ -56,13 +58,14 @@ function EventList({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="text-gray-400">
                 <tr className="border-b border-gray-800">
                   <th className="py-4 pr-4">FII</th>
                   <th className="py-4 pr-4">Rendimento</th>
                   <th className="py-4 pr-4">Data-com</th>
-                  <th className="py-4">Pagamento</th>
+                  <th className="py-4 pr-4">Pagamento</th>
+                  <th className="py-4">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -76,7 +79,13 @@ function EventList({
                     </td>
                     <td className="py-4 pr-4 align-top font-bold text-green-300">{event.earnings || "-"}</td>
                     <td className="py-4 pr-4 align-top">{event.dateWith || "-"}</td>
-                    <td className="py-4 align-top">{event.paymentDate || "-"}</td>
+                    <td className="py-4 pr-4 align-top">{event.paymentDate || "-"}</td>
+                    <td className="py-4 align-top">
+                      <div className="flex items-center gap-2">
+                        <WalletQuickAddButton ticker={event.ticker} />
+                        <FiiAlert fiiCode={event.ticker} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -156,12 +165,12 @@ export default function DividendCalendarPage() {
   const paidRecently = useMemo(() => filterEvents(data?.paidRecently || []), [data, query]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 text-gray-100">
+    <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <Link href="/" className="text-sm text-indigo-300 hover:text-indigo-100">← Voltar para consulta</Link>
-          <h1 className="mt-3 text-3xl font-bold">Calendário de Dividendos de FIIs</h1>
-          <p className="mt-2 max-w-3xl text-gray-400">
+          <Link href="/" className="text-sm font-bold text-indigo-700 hover:text-indigo-900">← Voltar para consulta</Link>
+          <h1 className="mt-3 text-3xl font-extrabold text-slate-800">Calendário de Dividendos de FIIs</h1>
+          <p className="mt-2 max-w-3xl text-slate-600">
             Consulte próximos pagamentos, data-com e rendimentos anunciados pelos fundos imobiliários da base Dados FII.
           </p>
         </div>
@@ -170,7 +179,7 @@ export default function DividendCalendarPage() {
         </Link>
       </div>
 
-      <div className="mb-6 rounded-2xl bg-gray-900 p-5 shadow-lg">
+      <div className="mb-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
         <label className="mb-2 block text-sm font-bold text-gray-300">Filtrar por ticker, nome ou segmento</label>
         <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2">
           <Search size={18} className="text-gray-500" />
@@ -184,25 +193,25 @@ export default function DividendCalendarPage() {
       </div>
 
       {loading && (
-        <p className="flex items-center justify-center gap-2 text-gray-400">
+        <p className="flex items-center justify-center gap-2 text-slate-600">
           <Loader2 className="animate-spin" size={20} /> Carregando calendário...
         </p>
       )}
 
-      {error && <p className="rounded-xl bg-red-950/40 p-4 text-red-200">{error}</p>}
+      {error && <p className="rounded-xl bg-red-100 p-4 text-red-700">{error}</p>}
 
       {!loading && !error && (
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
+            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
               <p className="text-sm text-gray-400">Eventos na base</p>
               <strong className="mt-2 block text-3xl text-indigo-300">{data?.total || 0}</strong>
             </div>
-            <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
+            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
               <p className="text-sm text-gray-400">Próximos pagamentos</p>
               <strong className="mt-2 block text-3xl text-green-300">{data?.nextEvents?.length || 0}</strong>
             </div>
-            <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
+            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
               <p className="text-sm text-gray-400">Anunciados no mês</p>
               <strong className="mt-2 block text-3xl text-yellow-300">{data?.currentMonth?.length || 0}</strong>
             </div>
