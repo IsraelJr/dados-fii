@@ -16,6 +16,23 @@ function dateKey(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function parseCurrency(value: unknown) {
+  if (typeof value === "number") return value;
+  return Number(
+    String(value || "0")
+      .replace("R$", "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .trim()
+  ) || 0;
+}
+
+function formatDividend(value: unknown) {
+  const parsed = parseCurrency(value);
+  if (!parsed) return "";
+  return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -37,7 +54,7 @@ export async function GET(req: Request) {
         if (!paymentDate) return;
 
         const dateWith = parseDate(info?.date_with);
-        const amountText = String(info?.earnings || "");
+        const amountText = formatDividend(info?.earnings);
         const isFuture = paymentDate >= today;
         const isCurrentMonth = MONTHS[paymentDate.getMonth()] === MONTHS[new Date().getMonth()];
 
