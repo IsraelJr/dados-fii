@@ -20,6 +20,10 @@ function tickerOf(value: unknown) {
   return String(value || "").trim().toUpperCase();
 }
 
+function normalizeNotFoundText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 async function getDoc(ticker: string) {
   const direct = await adminDb.collection("Fiis").doc(ticker).get();
   if (direct.exists) return direct;
@@ -31,11 +35,16 @@ async function getDoc(ticker: string) {
 }
 
 async function getHtml(ticker: string) {
-  const paths = ["fundos-imobiliarios", "fiagros", "fiinfras"];
+  const code = ticker.toLowerCase();
+  const primaryUrl = `https://statusinvest.com.br/fundos-imobiliarios/${code}`;
+  const fallbackUrls = [
+    `https://statusinvest.com.br/fiagros/${code}`,
+    `https://statusinvest.com.br/fiinfras/${code}`,
+  ];
+  const urls = [primaryUrl, ...fallbackUrls];
   const ignored: string[] = [];
 
-  for (const group of paths) {
-    const url = `https://statusinvest.com.br/${group}/${ticker.toLowerCase()}`;
+  for (const url of urls) {
     const res = await fetch(url, {
       cache: "no-store",
       headers: { "User-Agent": "Mozilla/5.0", Accept: "text/html" },
@@ -47,24 +56,26 @@ async function getHtml(ticker: string) {
     }
 
     const html = await res.text();
-    const text = clean(html).toUpperCase();
+    const text = clean(html);
+    const upperText = text.toUpperCase();
+    const noAccent = normalizeNotFoundText(upperText);
 
-    if (text.includes("OPS") && text.includes("NÃO ENCONTRAMOS")) {
+    if (noAccent.includes("OPS") && noAccent.includes("NAO ENCONTRAMOS")) {
       ignored.push(`${url} não encontrado`);
       continue;
     }
 
-    if (!text.includes(ticker)) {
+    if (!upperText.includes(ticker)) {
       ignored.push(`${url} sem ticker`);
       continue;
     }
 
-    if (!text.includes("TIPO DATA COM") && !text.includes("DIVIDENDOS DO")) {
+    if (!upperText.includes("TIPO DATA COM") && !upperText.includes("DIVIDENDOS DO")) {
       ignored.push(`${url} sem dividendos`);
       continue;
     }
 
-    return { html, text: clean(html), url, ignored };
+    return { html, text, url, ignored };
   }
 
   throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
@@ -138,7 +149,7 @@ export async function POST(req: NextRequest) {
       modified_in: adminFieldValue.serverTimestamp(),
     }, { merge: true });
 
-    return NextResponse.json({ ok: true, ticker, source: page.url, fetchedMonths: months, mergedMonths });
+    return NextResponse.json({ ok: true, ticker, source: page.url, fetchedMonths: months, mergedMonths, ignored: page.ignored });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Erro" }, { status: 500 });
   }
