@@ -73,7 +73,7 @@ function EventList({
                 {visibleEvents.map((event) => (
                   <tr key={`${event.ticker}-${event.paymentDate}-${event.month}`} className="border-b border-gray-800 text-gray-100">
                     <td className="py-4 pr-4 align-top">
-                      <Link href={`/?ticker=${event.ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">
+                      <Link href={`/fii/${event.ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">
                         {event.ticker}
                       </Link>
                       {event.socialReason && <p className="mt-1 max-w-[180px] truncate text-xs font-medium text-gray-300">{event.socialReason}</p>}
