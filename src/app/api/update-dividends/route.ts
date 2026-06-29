@@ -83,6 +83,28 @@ function normalizeCurrency(value: string) {
     return text.startsWith("R$") ? text : `R$ ${text.replace("R$", "").trim()}`;
 }
 
+function formatCurrency(value: number | string) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "R$ 0,0";
+    return `R$ ${number.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 8,
+    })}`;
+}
+
+function toDateOnly(value: string) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
+function monthNameFromDate(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return MONTHS[date.getUTCMonth()];
+}
+
 function extractRows(html: string) {
     return [...String(html || "").matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((match) => match[0]);
 }
@@ -100,11 +122,35 @@ function getTitle(attrs: string) {
     return decodeHtml(match?.[1] || "");
 }
 
+function getBrapiToken() {
+    return process.env.BRAPI_API_TOKEN || process.env.BRAPI_TOKEN || "";
+}
+
+async function fetchJson(url: string, headers: Record<string, string> = {}) {
+    const response = await fetch(url, {
+        cache: "no-store",
+        headers: {
+            Accept: "application/json",
+            "User-Agent": "DadosFIIUpdater/1.3",
+            ...headers,
+        },
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+        const message = data?.message || data?.error || `HTTP ${response.status}`;
+        throw new Error(message);
+    }
+
+    return data;
+}
+
 async function fetchText(url: string) {
     const response = await fetch(url, {
         cache: "no-store",
         headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.2)",
+            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.3)",
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
     });
@@ -121,6 +167,44 @@ async function updateBackupParameter(payload: Record<string, any>) {
         },
         { merge: true }
     );
+}
+
+async function fetchBrapiDividends(ticker: string, year = currentYear()): Promise<DividendItem[]> {
+    const token = getBrapiToken();
+    if (!token) throw new Error("BRAPI_API_TOKEN/BRAPI_TOKEN não configurado.");
+
+    const code = normalizeTicker(ticker);
+    const url = new URL("https://brapi.dev/api/v2/fii/dividends");
+    url.searchParams.set("symbols", code);
+    url.searchParams.set("startDate", `${year}-01-01`);
+    url.searchParams.set("endDate", `${year}-12-31`);
+    url.searchParams.set("sortOrder", "asc");
+
+    const data = await fetchJson(url.toString(), {
+        Authorization: `Bearer ${token}`,
+    });
+
+    const rows = Array.isArray(data?.dividends) ? data.dividends : [];
+
+    return rows
+        .filter((item: any) => normalizeTicker(item.symbol) === code)
+        .filter((item: any) => String(item.label || "").toUpperCase().includes("RENDIMENTO"))
+        .map((item: any) => {
+            const paymentDate = item.paymentDate || item.payment_date;
+            const dateWith = item.lastDatePrior || item.last_date_prior || item.approvedOn;
+            const monthName = monthNameFromDate(paymentDate);
+
+            if (!monthName) return null;
+
+            return {
+                monthName,
+                date_with: toDateOnly(dateWith),
+                payment_date: toDateOnly(paymentDate),
+                earnings: formatCurrency(item.rate),
+                source: "brapi",
+            };
+        })
+        .filter(Boolean) as DividendItem[];
 }
 
 function parseStatusInvestDividends(html: string, year = currentYear()): DividendItem[] {
@@ -254,11 +338,12 @@ function toEarningsObject(dividends: DividendItem[], priceByPaymentDate: Map<str
     return output;
 }
 
-function mergeDividendsByMonth(fiisDividends: DividendItem[], statusDividends: DividendItem[]) {
+function mergeDividendsByMonth(brapiDividends: DividendItem[], fiisDividends: DividendItem[], statusDividends: DividendItem[]) {
     const byMonth = new Map<string, DividendItem>();
 
-    fiisDividends.forEach((item) => byMonth.set(item.monthName, item));
-    statusDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
+    statusDividends.forEach((item) => byMonth.set(item.monthName, item));
+    fiisDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
+    brapiDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
 
     return [...byMonth.values()].sort((a, b) => MONTHS.indexOf(a.monthName) - MONTHS.indexOf(b.monthName));
 }
@@ -294,10 +379,17 @@ async function updateTickerDividends(code: string, year = currentYear()) {
     const yearField = `earnings${year}`;
     const previousYearData = doc.data()?.[yearField] || {};
 
+    let brapiDividends: DividendItem[] = [];
     let statusDividends: DividendItem[] = [];
     let fiisDividends: DividendItem[] = [];
     let priceByPaymentDate = new Map<string, string>();
     const sourceErrors: string[] = [];
+
+    try {
+        brapiDividends = await fetchBrapiDividends(code, year);
+    } catch (err: any) {
+        sourceErrors.push(`brapi: ${err.message}`);
+    }
 
     try {
         const html = await fetchStatusInvestHtml(code);
@@ -314,7 +406,7 @@ async function updateTickerDividends(code: string, year = currentYear()) {
         sourceErrors.push(`fiis.com.br: ${err.message}`);
     }
 
-    const dividends = mergeDividendsByMonth(fiisDividends, statusDividends);
+    const dividends = mergeDividendsByMonth(brapiDividends, fiisDividends, statusDividends);
     if (dividends.length === 0) {
         throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}. ${sourceErrors.join(" | ")}`);
     }
@@ -336,10 +428,11 @@ async function updateTickerDividends(code: string, year = currentYear()) {
             [yearField]: mergedEarnings,
             dividendsUpdatedAt: adminFieldValue.serverTimestamp(),
             dividendsUpdatedBy: "user-button",
-            dividendsSource: "statusinvest+fiis.com.br",
+            dividendsSource: "brapi+statusinvest+fiis.com.br",
             dividendsFetchedMonths: fetchedMonths,
             dividendsMergedMonths: mergedMonths,
             dividendsSourceMonths: {
+                brapi: brapiDividends.map((item) => item.monthName),
                 statusinvest: statusDividends.map((item) => item.monthName),
                 fiisComBr: fiisDividends.map((item) => item.monthName),
             },
@@ -356,6 +449,7 @@ async function updateTickerDividends(code: string, year = currentYear()) {
         fetchedMonths,
         mergedMonths,
         sourceMonths: {
+            brapi: brapiDividends.map((item) => item.monthName),
             statusinvest: statusDividends.map((item) => item.monthName),
             fiisComBr: fiisDividends.map((item) => item.monthName),
         },
