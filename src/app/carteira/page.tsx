@@ -83,6 +83,25 @@ function getSegmentName(data: any) {
   return data?.segment_new || data?.segment || "Sem segmento";
 }
 
+function percentToNumber(value: string) {
+  return Number(String(value || "0").replace("%", "").replace(",", ".")) || 0;
+}
+
+function getBarWidthClass(value: string) {
+  const percent = percentToNumber(value);
+  if (percent >= 90) return "w-full";
+  if (percent >= 80) return "w-10/12";
+  if (percent >= 70) return "w-9/12";
+  if (percent >= 60) return "w-8/12";
+  if (percent >= 50) return "w-7/12";
+  if (percent >= 40) return "w-6/12";
+  if (percent >= 30) return "w-5/12";
+  if (percent >= 20) return "w-4/12";
+  if (percent >= 10) return "w-3/12";
+  if (percent > 0) return "w-2/12";
+  return "w-0";
+}
+
 function getUpcomingPayments(items: LoadedFii[]) {
   const today = new Date();
   const payments: Payment[] = [];
@@ -555,11 +574,27 @@ export default function WalletPage() {
 }
 
 function RankingCard({ title, items }: { title: string; items: Array<{ ticker: string; value: string }> }) {
+  const isSegmentDistribution = title === "Distribuição por segmento";
+
   return (
     <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <h3 className="mb-3 text-base font-extrabold text-white">{title}</h3>
       {!items.length ? (
         <p className="text-sm font-medium text-gray-300">Sem dados ainda.</p>
+      ) : isSegmentDistribution ? (
+        <ol className="space-y-4 text-sm">
+          {items.map((item, index) => (
+            <li key={`${title}-${item.ticker}`} className="rounded-lg bg-gray-800 px-3 py-3 text-gray-200">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="font-medium"><strong className="text-gray-400">#{index + 1}</strong> {item.ticker}</span>
+                <strong className="text-indigo-200">{item.value}</strong>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-gray-700">
+                <div className={`h-full rounded-full bg-indigo-400 ${getBarWidthClass(item.value)}`} />
+              </div>
+            </li>
+          ))}
+        </ol>
       ) : (
         <ol className="space-y-2 text-sm">
           {items.map((item, index) => (
