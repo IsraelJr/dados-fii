@@ -60,6 +60,12 @@ function formatCurrency(value: number) {
     return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatDividend(value: unknown) {
+    const parsed = parseCurrency(value);
+    if (!parsed) return "-";
+    return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
+}
+
 function parseDateKey(value: string) {
     const [day, month, year] = String(value || "").split("/").map(Number);
     if (!day || !month || !year) return "9999-12-31";
@@ -247,7 +253,7 @@ export default function HomeDividendCalendar() {
                                 </span>
                             </div>
                             <p className="mt-2 text-sm text-gray-300">
-                                {MONTHS_PTBR[event.month] || event.month}: <strong className="text-green-300">{event.earnings}</strong>
+                                {MONTHS_PTBR[event.month] || event.month}: <strong className="text-green-300">{formatDividend(event.earnings)}</strong>
                             </p>
                             <p className="mt-1 text-xs text-gray-400">
                                 Data-com {event.dateWith || "-"} · Pagamento {event.paymentDate}
