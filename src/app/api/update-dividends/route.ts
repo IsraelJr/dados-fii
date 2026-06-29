@@ -4,7 +4,8 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 
 const FIIS_COLLECTION = "Fiis";
 const BACKUP_COLLECTION = "Fiis_Backup";
-const REQUEST_COLLECTION = "DividendUpdateRequests";
+const PARAMETERS_COLLECTION = "Parameters";
+const DIVIDEND_REQUESTS_DOC = "DividendUpdateRequests";
 const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = [
     "January",
@@ -20,6 +21,15 @@ const MONTHS = [
     "November",
     "December",
 ];
+
+type DividendItem = {
+    monthName: string;
+    date_with: string;
+    payment_date: string;
+    earnings: string;
+    price_date_with?: string;
+    source: string;
+};
 
 function saoPauloDateParts() {
     const parts = new Intl.DateTimeFormat("en-CA", {
@@ -94,7 +104,7 @@ async function fetchText(url: string) {
     const response = await fetch(url, {
         cache: "no-store",
         headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.1)",
+            "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.2)",
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
     });
@@ -103,14 +113,19 @@ async function fetchText(url: string) {
     return response.text();
 }
 
-function parseStatusInvestDividends(html: string, year = currentYear()) {
+async function updateBackupParameter(payload: Record<string, any>) {
+    await adminDb.collection(PARAMETERS_COLLECTION).doc("backup").set(
+        {
+            lastFiisBackupAt: adminFieldValue.serverTimestamp(),
+            ...payload,
+        },
+        { merge: true }
+    );
+}
+
+function parseStatusInvestDividends(html: string, year = currentYear()): DividendItem[] {
     const rows = extractRows(html);
-    const dividends: Array<{
-        monthName: string;
-        date_with: string;
-        payment_date: string;
-        earnings: string;
-    }> = [];
+    const dividends: DividendItem[] = [];
 
     for (const row of rows) {
         const cells = extractCells(row);
@@ -134,6 +149,7 @@ function parseStatusInvestDividends(html: string, year = currentYear()) {
             date_with: dateWith,
             payment_date: payDate,
             earnings: value,
+            source: "statusinvest",
         });
     }
 
@@ -164,13 +180,48 @@ async function fetchStatusInvestHtml(ticker: string) {
     throw new Error(`Não consegui ler StatusInvest para ${code}. ${errors.join(" | ")}`);
 }
 
-function parseFiisPriceByPaymentDate(html: string) {
-    const blocks = [...String(html || "").matchAll(/<[^>]+class=["'][^"']*yieldChart__table__bloco[^"']*["'][^>]*>[\s\S]*?(?=<[^>]+class=["'][^"']*yieldChart__table__bloco|<\/body>|$)/gi)]
+function extractFiisDividendBlocks(html: string) {
+    return [...String(html || "").matchAll(/<[^>]+class=["'][^"']*yieldChart__table__bloco[^"']*["'][^>]*>[\s\S]*?(?=<[^>]+class=["'][^"']*yieldChart__table__bloco|<\/body>|$)/gi)]
         .map((match) => match[0]);
+}
 
+function parseFiisDividends(html: string, year = currentYear()): DividendItem[] {
+    const dividends: DividendItem[] = [];
+
+    for (const block of extractFiisDividendBlocks(html)) {
+        const lines = [...block.matchAll(/<[^>]+class=["'][^"']*table__linha[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi)]
+            .map((match) => stripTags(match[1]));
+
+        if (lines.length < 5) continue;
+
+        const dateWith = normalizeDate(lines[0]);
+        const payDate = normalizeDate(lines[1]);
+        const priceDateWith = normalizeCurrency(lines[2]);
+        const earnings = normalizeCurrency(lines[4]);
+        const [, month, rowYear] = payDate.match(/(\d{2})\/(\d{2})\/(\d{4})/) || [];
+
+        if (!month || Number(rowYear) !== year) continue;
+
+        const monthName = MONTHS[Number(month) - 1];
+        if (!monthName) continue;
+
+        dividends.push({
+            monthName,
+            date_with: dateWith,
+            payment_date: payDate,
+            earnings,
+            price_date_with: priceDateWith,
+            source: "fiis.com.br",
+        });
+    }
+
+    return dividends;
+}
+
+function parseFiisPriceByPaymentDate(html: string) {
     const map = new Map<string, string>();
 
-    for (const block of blocks) {
+    for (const block of extractFiisDividendBlocks(html)) {
         const lines = [...block.matchAll(/<[^>]+class=["'][^"']*table__linha[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi)]
             .map((match) => stripTags(match[1]));
 
@@ -184,20 +235,11 @@ function parseFiisPriceByPaymentDate(html: string) {
     return map;
 }
 
-async function fetchPriceDateWithMap(ticker: string) {
-    try {
-        const html = await fetchText(`https://fiis.com.br/${normalizeTicker(ticker)}/`);
-        return parseFiisPriceByPaymentDate(html);
-    } catch (err: any) {
-        console.warn(`Não consegui buscar preço-base no fiis.com.br para ${ticker}: ${err.message}`);
-        return new Map<string, string>();
-    }
+async function fetchFiisHtml(ticker: string) {
+    return fetchText(`https://fiis.com.br/${normalizeTicker(ticker)}/`);
 }
 
-function toEarningsObject(
-    dividends: Array<{ monthName: string; date_with: string; payment_date: string; earnings: string }>,
-    priceByPaymentDate: Map<string, string>
-) {
+function toEarningsObject(dividends: DividendItem[], priceByPaymentDate: Map<string, string>) {
     const output: Record<string, any> = {};
 
     dividends.forEach((item) => {
@@ -205,11 +247,20 @@ function toEarningsObject(
             payment_date: item.payment_date,
             date_with: item.date_with,
             earnings: item.earnings,
-            price_date_with: priceByPaymentDate.get(item.payment_date) || "R$ 0,0",
+            price_date_with: item.price_date_with || priceByPaymentDate.get(item.payment_date) || "R$ 0,0",
         };
     });
 
     return output;
+}
+
+function mergeDividendsByMonth(fiisDividends: DividendItem[], statusDividends: DividendItem[]) {
+    const byMonth = new Map<string, DividendItem>();
+
+    fiisDividends.forEach((item) => byMonth.set(item.monthName, item));
+    statusDividends.forEach((item) => byMonth.set(item.monthName, { ...byMonth.get(item.monthName), ...item }));
+
+    return [...byMonth.values()].sort((a, b) => MONTHS.indexOf(a.monthName) - MONTHS.indexOf(b.monthName));
 }
 
 async function backupTicker(code: string) {
@@ -228,6 +279,13 @@ async function backupTicker(code: string) {
         { merge: false }
     );
 
+    await updateBackupParameter({
+        lastFiisBackupType: "single-document",
+        lastFiisBackupSource: `${FIIS_COLLECTION}/${code}`,
+        lastFiisBackupTarget: `${BACKUP_COLLECTION}/${code}`,
+        lastFiisBackupTicker: code,
+    });
+
     return doc;
 }
 
@@ -236,19 +294,38 @@ async function updateTickerDividends(code: string, year = currentYear()) {
     const yearField = `earnings${year}`;
     const previousYearData = doc.data()?.[yearField] || {};
 
-    const html = await fetchStatusInvestHtml(code);
-    const dividends = parseStatusInvestDividends(html, year);
+    let statusDividends: DividendItem[] = [];
+    let fiisDividends: DividendItem[] = [];
+    let priceByPaymentDate = new Map<string, string>();
+    const sourceErrors: string[] = [];
 
-    if (dividends.length === 0) throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}.`);
+    try {
+        const html = await fetchStatusInvestHtml(code);
+        statusDividends = parseStatusInvestDividends(html, year);
+    } catch (err: any) {
+        sourceErrors.push(`statusinvest: ${err.message}`);
+    }
 
-    const priceByPaymentDate = await fetchPriceDateWithMap(code);
+    try {
+        const fiisHtml = await fetchFiisHtml(code);
+        fiisDividends = parseFiisDividends(fiisHtml, year);
+        priceByPaymentDate = parseFiisPriceByPaymentDate(fiisHtml);
+    } catch (err: any) {
+        sourceErrors.push(`fiis.com.br: ${err.message}`);
+    }
+
+    const dividends = mergeDividendsByMonth(fiisDividends, statusDividends);
+    if (dividends.length === 0) {
+        throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}. ${sourceErrors.join(" | ")}`);
+    }
+
     const fetchedEarnings = toEarningsObject(dividends, priceByPaymentDate);
     const mergedEarnings = {
         ...previousYearData,
         ...fetchedEarnings,
     };
 
-    const fetchedMonths = Object.keys(fetchedEarnings);
+    const fetchedMonths = Object.keys(fetchedEarnings).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
     const mergedMonths = Object.keys(mergedEarnings).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
     const monthKey = currentMonthKey();
     const currentMonthIncluded = Boolean(mergedEarnings[monthKey]);
@@ -262,6 +339,11 @@ async function updateTickerDividends(code: string, year = currentYear()) {
             dividendsSource: "statusinvest+fiis.com.br",
             dividendsFetchedMonths: fetchedMonths,
             dividendsMergedMonths: mergedMonths,
+            dividendsSourceMonths: {
+                statusinvest: statusDividends.map((item) => item.monthName),
+                fiisComBr: fiisDividends.map((item) => item.monthName),
+            },
+            dividendsSourceErrors: sourceErrors,
             dividendsCurrentMonthIncluded: currentMonthIncluded,
             modified_in: adminFieldValue.serverTimestamp(),
         },
@@ -273,15 +355,28 @@ async function updateTickerDividends(code: string, year = currentYear()) {
         year,
         fetchedMonths,
         mergedMonths,
+        sourceMonths: {
+            statusinvest: statusDividends.map((item) => item.monthName),
+            fiisComBr: fiisDividends.map((item) => item.monthName),
+        },
+        sourceErrors,
         count: mergedMonths.length,
         currentMonth: monthKey,
         currentMonthIncluded,
     };
 }
 
-async function reserveDailyRequest(anonId: string, ticker: string) {
+function requestDocumentRef(anonId: string, ticker: string) {
     const key = `${todayKey()}_${anonId}_${ticker}`;
-    const ref = adminDb.collection(REQUEST_COLLECTION).doc(key);
+    return adminDb
+        .collection(PARAMETERS_COLLECTION)
+        .doc(DIVIDEND_REQUESTS_DOC)
+        .collection("requests")
+        .doc(key);
+}
+
+async function reserveDailyRequest(anonId: string, ticker: string) {
+    const ref = requestDocumentRef(anonId, ticker);
 
     await adminDb.runTransaction(async (transaction) => {
         const doc = await transaction.get(ref);
@@ -351,7 +446,7 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json(
                     {
                         success: false,
-                        message: `Atualizei os meses encontrados (${result.mergedMonths.join(", ")}), mas ${result.currentMonth} ainda não foi localizado na fonte automática. Você poderá tentar novamente hoje.`,
+                        message: `Atualizei os meses encontrados (${result.mergedMonths.join(", ")}), mas ${result.currentMonth} ainda não foi localizado nas fontes automáticas. Você poderá tentar novamente hoje.`,
                         result,
                     },
                     { status: 202 }
