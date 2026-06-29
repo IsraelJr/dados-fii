@@ -84,7 +84,12 @@ export default function FiiSummary({
 
                 <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
                     <BarChart3 className="text-blue-400" />
-                    <span><strong>Ticker:</strong> {data.code}</span>
+                    <span>
+                        <strong>Ticker:</strong>{" "}
+                        <Link href={`/fii/${data.code}`} className="font-bold text-indigo-200 hover:text-indigo-100">
+                            {data.code}
+                        </Link>
+                    </span>
                 </div>
 
                 <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
