@@ -24,6 +24,43 @@ interface FiiData {
   variation?: string;
 }
 
+function parseCurrency(value: unknown) {
+  if (typeof value === "number") return value;
+  return Number(
+    String(value || "0")
+      .replace("R$", "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .trim()
+  ) || 0;
+}
+
+function formatDividend(value: unknown) {
+  const parsed = parseCurrency(value);
+  if (!parsed) return value || "";
+  return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
+}
+
+function normalizeDividendFields(data: any) {
+  const normalized = { ...(data || {}) };
+
+  Object.keys(normalized).forEach((key) => {
+    if (!/^earnings\d{4}$/.test(key) || !normalized[key] || typeof normalized[key] !== "object") return;
+
+    normalized[key] = Object.fromEntries(
+      Object.entries(normalized[key]).map(([month, info]: any) => [
+        month,
+        {
+          ...info,
+          earnings: formatDividend(info?.earnings),
+        },
+      ])
+    );
+  });
+
+  return normalized;
+}
+
 async function getPriceFromSheet(ticker: string) {
   try {
     const res = await fetch(url);
@@ -71,7 +108,7 @@ export async function GET(req: Request) {
 
       const docData = querySnapshot.empty
         ? {}
-        : querySnapshot.docs[0].data();
+        : normalizeDividendFields(querySnapshot.docs[0].data());
 
       return new Response(
         JSON.stringify({
