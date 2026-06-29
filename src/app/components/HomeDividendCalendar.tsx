@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Loader2 } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
 const CALENDAR_CACHE_KEY = "dados-fii-home-calendar-cache-v1";
@@ -231,6 +231,7 @@ export default function HomeDividendCalendar() {
     }, [tickers, tickersKey, wallet, events.length]);
 
     if (!wallet.length && !topFiis.length && !events.length && !loading) return null;
+    if (loading && !events.length) return null;
 
     return (
         <div className="mx-auto mt-6 max-w-4xl rounded-2xl border border-indigo-500/20 bg-gray-900 p-5 text-left text-gray-100 shadow-lg">
@@ -250,11 +251,7 @@ export default function HomeDividendCalendar() {
                 </div>
             </div>
 
-            {loading && !events.length ? (
-                <p className="flex items-center justify-center gap-2 rounded-xl bg-gray-800 p-4 text-sm text-gray-400">
-                    <Loader2 className="animate-spin" size={18} /> Buscando próximos pagamentos...
-                </p>
-            ) : !events.length ? (
+            {!events.length ? (
                 <div className="rounded-xl bg-gray-800 p-4 text-sm text-gray-400">
                     <p>Nenhum pagamento futuro encontrado para esses FIIs no momento.</p>
                     <p className="mt-1">Adicione FIIs à carteira para personalizar este bloco.</p>
