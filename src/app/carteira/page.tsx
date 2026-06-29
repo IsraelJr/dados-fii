@@ -265,6 +265,8 @@ export default function WalletPage() {
   }, [loaded]);
 
   const upcomingPayments = useMemo(() => getUpcomingPayments(loaded), [loaded]);
+  const displayedUpcomingPayments = upcomingPayments.slice(0, 12);
+  const shouldScrollUpcomingPayments = displayedUpcomingPayments.length > 4;
 
   function addItem() {
     const code = ticker.trim().toUpperCase();
@@ -530,11 +532,11 @@ export default function WalletPage() {
           <CalendarDays className="text-green-300" /> Próximos pagamentos
         </h2>
 
-        {!upcomingPayments.length ? (
+        {!displayedUpcomingPayments.length ? (
           <p className="text-sm font-medium text-gray-300">Ainda não há pagamentos futuros identificados para os FIIs da sua carteira.</p>
         ) : (
-          <ul className="space-y-3">
-            {upcomingPayments.slice(0, 12).map((payment) => (
+          <ul className={`${shouldScrollUpcomingPayments ? "max-h-[520px] overflow-y-auto pr-2" : ""} space-y-3`}>
+            {displayedUpcomingPayments.map((payment) => (
               <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center">
                 <div>
                   <strong className="text-indigo-200">{payment.ticker}</strong>
