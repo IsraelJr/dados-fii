@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { SimulationCard } from "./SimulationCard";
 import FiiAlert from "./FiiAlert";
+import UpdateDividendButton from "./UpdateDividendButton";
 
 interface Props {
     data: any;
@@ -21,6 +22,21 @@ interface Props {
     monthsPTBR: Record<string, string>;
     lastDividend: number | null;
 }
+
+const monthsOrder = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
 
 function GlossaryLink({ href }: { href: string }) {
     return (
@@ -41,6 +57,9 @@ export default function FiiSummary({
     lastDividend,
 }: Props) {
     const currentYear = new Date().getFullYear();
+    const currentMonthKey = monthsOrder[new Date().getMonth()];
+    const currentYearData = data?.[`earnings${currentYear}`] || {};
+    const isCurrentMonthMissing = !currentYearData?.[currentMonthKey];
 
     const earningsYearData =
         data?.[`earnings${currentYear}`] ||
@@ -139,6 +158,10 @@ export default function FiiSummary({
                             );
                         })}
                     </ul>
+                )}
+
+                {isCurrentMonthMissing && data?.code && (
+                    <UpdateDividendButton ticker={data.code} />
                 )}
             </div>
 
