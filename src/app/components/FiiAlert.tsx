@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function FiiAlert({ fiiCode }: Props) {
-    const ALERT_VALUE = Number(process.env.NEXT_PUBLIC_DEFAULT_ALERT_VALUE);
+    const ALERT_VALUE = Number(process.env.NEXT_PUBLIC_DEFAULT_ALERT_VALUE || 3);
     const [email, setEmail] = useState("");
     const [percentDown, setPercentDown] = useState(-ALERT_VALUE);
     const [percentUp, setPercentUp] = useState(ALERT_VALUE);
@@ -22,7 +22,6 @@ export default function FiiAlert({ fiiCode }: Props) {
 
     const emailRef = useRef<HTMLInputElement>(null);
 
-    // Buscar user do Firebase
     useEffect(() => {
         const fetchUser = async () => {
             try {
@@ -39,7 +38,6 @@ export default function FiiAlert({ fiiCode }: Props) {
         fetchUser();
     }, []);
 
-    // Gerencia barra de progresso
     useEffect(() => {
         let timer: NodeJS.Timeout;
         let interval: NodeJS.Timeout;
@@ -76,13 +74,13 @@ export default function FiiAlert({ fiiCode }: Props) {
             clearTimeout(timer);
             clearInterval(interval);
         };
-    }, [success]);
+    }, [success, ALERT_VALUE]);
 
     const handleSubmit = async () => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (!email || !emailRegex.test(email)) {
-            setMessage("Por favor, informe um email válido.");
+            setMessage("Informe um email válido para receber o alerta.");
             if (emailRef.current) {
                 emailRef.current.classList.add("shake");
                 setTimeout(() => emailRef.current?.classList.remove("shake"), 500);
@@ -109,18 +107,16 @@ export default function FiiAlert({ fiiCode }: Props) {
             const json = await res.json();
 
             if (res.ok && json.success) {
-                setMessage("✅ Alerta programado com sucesso!");
+                setMessage("Alerta criado com sucesso.");
                 setSuccess(true);
-                setAlertCreated(true); // muda o sino
-                // depois do sucesso no Firebase:
+                setAlertCreated(true);
                 window.dispatchEvent(new Event("fiis-updated"));
-
             } else {
-                setMessage(`❌ Falha ao configurar alerta: ${json.error || "Erro desconhecido"}`);
+                setMessage(`Falha ao configurar alerta: ${json.error || "erro desconhecido"}`);
             }
         } catch (err: any) {
             console.error(err);
-            setMessage("❌ Falha ao configurar alerta. Tente novamente mais tarde.");
+            setMessage("Falha ao configurar alerta. Tente novamente mais tarde.");
         } finally {
             setLoading(false);
         }
@@ -146,67 +142,83 @@ export default function FiiAlert({ fiiCode }: Props) {
 
     return (
         <div className="relative inline-block">
-            {/* Botão do sino */}
             <button
                 onClick={() => setOpen(!open)}
-                className="rounded-full p-2 hover:bg-gray-700 transition-colors"
+                className="rounded-full p-2 transition-colors hover:bg-gray-700"
+                aria-label={`Criar alerta para ${fiiCode}`}
             >
                 {alertCreated ? (
-                    <BellRing className="h-5 w-5 text-green-500" />
+                    <BellRing className="h-5 w-5 text-green-400" />
                 ) : (
                     <Bell className="h-5 w-5 text-yellow-400" />
                 )}
             </button>
 
-            {/* Popover */}
             <div
-                className={`absolute right-0 mt-2 w-80 bg-gray-900 text-white rounded-xl shadow-xl border border-gray-700 p-4 z-50 transform transition-all duration-300 origin-top-right ${open ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none"
-                    }`}
+                className={`absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-2xl border border-gray-700 bg-gray-900 p-4 text-white shadow-xl transition-all duration-300 ${open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"}`}
             >
-                <h3 className="text-lg font-bold mb-2">Alerta {fiiCode}</h3>
-                <p className="text-gray-300 mb-3 text-sm">
-                    O alerta dispara ao variar {ALERT_VALUE}%.
-                    {isPremium && " Como usuário premium, você pode alterar o percentual."}
-                </p>
+                <div className="mb-3 rounded-xl bg-gray-800 p-3 ring-1 ring-white/10">
+                    <p className="text-xs font-bold uppercase tracking-wide text-indigo-200">Alerta de preço</p>
+                    <h3 className="mt-1 text-lg font-extrabold text-white">Receba alertas do {fiiCode}</h3>
+                    <p className="mt-2 text-sm font-medium text-gray-300">
+                        Plano grátis: avisamos quando o FII subir ou cair {ALERT_VALUE}%.
+                    </p>
+                </div>
 
-                <label className="block text-left mb-1 text-gray-300 text-sm">Email:</label>
+                <div className="mb-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
+                    <p className="text-sm font-bold text-indigo-100">
+                        {isPremium ? "Premium ativo" : "Quer escolher o percentual?"}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-gray-300">
+                        {isPremium
+                            ? "Você pode ajustar os percentuais de queda e alta abaixo."
+                            : "No Premium, você poderá personalizar os percentuais de alta e queda."}
+                    </p>
+                </div>
+
+                <label className="mb-1 block text-left text-sm font-bold text-gray-300">Email para receber o alerta</label>
                 <input
                     ref={emailRef}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-2 rounded-lg bg-gray-800 text-white mb-3 transition-all"
+                    placeholder="seuemail@exemplo.com"
+                    className="mb-3 w-full rounded-lg border border-gray-700 bg-gray-800 p-2 text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
                     disabled={success}
                 />
 
                 {isPremium && (
-                    <div className="flex justify-between gap-3">
-                        {/* Campo de baixa */}
-                        <div className="flex items-center gap-2">
-                            <ArrowDown className="text-red-500 w-5 h-5" />
-                            <input
-                                type="number"
-                                min={-20}
-                                max={-1}
-                                value={percentDown}
-                                onChange={handleChangeDown}
-                                className="w-20 text-center p-2 rounded-lg bg-gray-800 text-white"
-                                disabled={success}
-                            />
+                    <div className="mb-3 grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="mb-1 block text-xs font-bold text-gray-300">Queda</label>
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                                <ArrowDown className="h-5 w-5 text-red-400" />
+                                <input
+                                    type="number"
+                                    min={-20}
+                                    max={-1}
+                                    value={percentDown}
+                                    onChange={handleChangeDown}
+                                    className="w-full bg-transparent p-1 text-center text-white outline-none"
+                                    disabled={success}
+                                />
+                            </div>
                         </div>
 
-                        {/* Campo de alta */}
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                min={1}
-                                max={20}
-                                value={percentUp}
-                                onChange={handleChangeUp}
-                                className="w-20 text-center p-2 rounded-lg bg-gray-800 text-white"
-                                disabled={success}
-                            />
-                            <ArrowUp className="text-green-500 w-5 h-5" />
+                        <div>
+                            <label className="mb-1 block text-xs font-bold text-gray-300">Alta</label>
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={percentUp}
+                                    onChange={handleChangeUp}
+                                    className="w-full bg-transparent p-1 text-center text-white outline-none"
+                                    disabled={success}
+                                />
+                                <ArrowUp className="h-5 w-5 text-green-400" />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -214,20 +226,20 @@ export default function FiiAlert({ fiiCode }: Props) {
                 <button
                     onClick={handleSubmit}
                     disabled={loading || success}
-                    className={`w-full mt-3 py-2 rounded-lg font-bold ${loading || success
-                        ? "bg-gray-600 cursor-not-allowed"
-                        : "bg-green-600 hover:bg-green-700"
-                        } text-white`}
+                    className={`mt-1 w-full rounded-lg py-2 font-bold text-white ${loading || success
+                        ? "cursor-not-allowed bg-gray-700 text-gray-400"
+                        : "bg-indigo-600 hover:bg-indigo-700"
+                        }`}
                 >
-                    {loading ? "Salvando..." : success ? "Enviado" : "Enviar"}
+                    {loading ? "Salvando..." : success ? "Alerta criado" : "Criar alerta"}
                 </button>
 
-                {message && <p className="mt-3 text-center text-sm">{message}</p>}
+                {message && <p className="mt-3 text-center text-sm font-medium text-gray-300">{message}</p>}
 
                 {success && (
-                    <div className="w-full h-1 bg-gray-700 rounded-full mt-3 overflow-hidden">
+                    <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-gray-700">
                         <div
-                            className="h-1 bg-green-500 transition-all"
+                            className="h-1 bg-green-400 transition-all"
                             style={{ width: `${progress}%` }}
                         />
                     </div>
