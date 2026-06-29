@@ -41,31 +41,31 @@ function EventList({
   const canShowLess = shouldLimit && visibleEvents.length > INITIAL_VISIBLE_ITEMS;
 
   return (
-    <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
+    <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
-        <h2 className="flex items-center gap-2 text-xl font-bold">
+        <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
           <CalendarDays className="text-green-300" /> {title}
         </h2>
         {!!events.length && (
-          <span className="text-sm text-gray-400">
+          <span className="text-sm font-medium text-gray-300">
             Mostrando {visibleEvents.length} de {events.length}
           </span>
         )}
       </div>
 
       {!events.length ? (
-        <p className="text-gray-400">{emptyText}</p>
+        <p className="text-sm font-medium text-gray-300">{emptyText}</p>
       ) : (
         <>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="text-gray-400">
+              <thead className="text-gray-300">
                 <tr className="border-b border-gray-800">
-                  <th className="py-4 pr-4">FII</th>
-                  <th className="py-4 pr-4">Rendimento</th>
-                  <th className="py-4 pr-4">Data-com</th>
-                  <th className="py-4 pr-4">Pagamento</th>
-                  <th className="py-4">Ações</th>
+                  <th className="py-4 pr-4 font-bold">FII</th>
+                  <th className="py-4 pr-4 font-bold">Rendimento</th>
+                  <th className="py-4 pr-4 font-bold">Data-com</th>
+                  <th className="py-4 pr-4 font-bold">Pagamento</th>
+                  <th className="py-4 font-bold">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,11 +75,11 @@ function EventList({
                       <Link href={`/?ticker=${event.ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">
                         {event.ticker}
                       </Link>
-                      {event.socialReason && <p className="mt-1 max-w-[180px] truncate text-xs text-gray-500">{event.socialReason}</p>}
+                      {event.socialReason && <p className="mt-1 max-w-[180px] truncate text-xs font-medium text-gray-300">{event.socialReason}</p>}
                     </td>
                     <td className="py-4 pr-4 align-top font-bold text-green-300">{event.earnings || "-"}</td>
-                    <td className="py-4 pr-4 align-top">{event.dateWith || "-"}</td>
-                    <td className="py-4 pr-4 align-top">{event.paymentDate || "-"}</td>
+                    <td className="py-4 pr-4 align-top font-medium text-gray-200">{event.dateWith || "-"}</td>
+                    <td className="py-4 pr-4 align-top font-medium text-gray-200">{event.paymentDate || "-"}</td>
                     <td className="py-4 align-top">
                       <div className="flex items-center gap-2">
                         <WalletQuickAddButton ticker={event.ticker} />
@@ -181,15 +181,15 @@ export default function DividendCalendarPage() {
         </Link>
       </div>
 
-      <div className="mb-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
-        <label className="mb-2 block text-sm font-bold text-gray-300">Filtrar por ticker, nome ou segmento</label>
+      <div className="mb-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+        <label className="mb-2 block text-base font-extrabold text-white">Filtrar por ticker, nome ou segmento</label>
         <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2">
-          <Search size={18} className="text-gray-500" />
+          <Search size={18} className="text-gray-300" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Ex: TGAR11, logística, papel..."
-            className="w-full bg-transparent text-white outline-none"
+            className="w-full bg-transparent text-gray-100 outline-none placeholder:text-gray-400"
           />
         </div>
       </div>
@@ -205,17 +205,20 @@ export default function DividendCalendarPage() {
       {!loading && !error && (
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
-              <p className="text-sm font-bold text-gray-300">Eventos na base</p>
+            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+              <p className="text-base font-extrabold text-white">Eventos na base</p>
               <strong className="mt-2 block text-3xl text-indigo-300">{data?.total || 0}</strong>
+              <p className="mt-2 text-sm font-medium text-gray-300">Total de eventos carregados no calendário.</p>
             </div>
-            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
-              <p className="text-sm font-bold text-gray-300">Próximos pagamentos</p>
+            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+              <p className="text-base font-extrabold text-white">Próximos pagamentos</p>
               <strong className="mt-2 block text-3xl text-green-300">{data?.nextEvents?.length || 0}</strong>
+              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos futuros identificados na base.</p>
             </div>
-            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg">
-              <p className="text-sm font-bold text-gray-300">Anunciados no mês</p>
+            <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+              <p className="text-base font-extrabold text-white">Anunciados no mês</p>
               <strong className="mt-2 block text-3xl text-yellow-300">{data?.currentMonth?.length || 0}</strong>
+              <p className="mt-2 text-sm font-medium text-gray-300">Comunicados do mês atual encontrados.</p>
             </div>
           </section>
 
