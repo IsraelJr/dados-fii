@@ -2,7 +2,7 @@ import admin from "firebase-admin";
 
 const FIIS_COLLECTION = "Fiis";
 const BACKUP_COLLECTION = "Fiis_Backup";
-const CURRENT_YEAR = new Date().getFullYear();
+const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = [
   "January",
   "February",
@@ -18,6 +18,25 @@ const MONTHS = [
   "December",
 ];
 
+function saoPauloDateParts() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+function currentYear() {
+  return Number(saoPauloDateParts().year);
+}
+
+function currentMonthKey() {
+  return MONTHS[Number(saoPauloDateParts().month) - 1];
+}
+
 function getArg(name) {
   const prefix = `--${name}=`;
   const withEquals = process.argv.find((arg) => arg.startsWith(prefix));
@@ -31,9 +50,7 @@ function getArg(name) {
 
 function initFirebase() {
   const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!rawKey) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY não configurada.");
-  }
+  if (!rawKey) throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY não configurada.");
 
   if (!admin.apps.length) {
     admin.initializeApp({
@@ -42,10 +59,6 @@ function initFirebase() {
   }
 
   return admin.firestore();
-}
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function normalizeTicker(value) {
@@ -96,15 +109,12 @@ function getTitle(attrs) {
 async function fetchText(url) {
   const response = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.0)",
+      "User-Agent": "Mozilla/5.0 (compatible; DadosFIIUpdater/1.1)",
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
   });
 
-  if (!response.ok) {
-    throw new Error(`${url} HTTP ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`${url} HTTP ${response.status}`);
   return response.text();
 }
 
@@ -112,19 +122,16 @@ async function backupFiis(db) {
   console.log(`Iniciando backup de /${FIIS_COLLECTION} para /${BACKUP_COLLECTION}...`);
 
   const snapshot = await db.collection(FIIS_COLLECTION).get();
-  if (snapshot.empty) {
-    throw new Error(`Coleção /${FIIS_COLLECTION} vazia. Backup abortado.`);
-  }
+  if (snapshot.empty) throw new Error(`Coleção /${FIIS_COLLECTION} vazia. Backup abortado.`);
 
-  let batch = db.batch();
-  let count = 0;
-  let batchCount = 0;
   const backupId = new Date().toISOString();
+  let batch = db.batch();
+  let batchCount = 0;
+  let total = 0;
 
-  snapshot.docs.forEach((doc) => {
-    const ref = db.collection(BACKUP_COLLECTION).doc(doc.id);
+  for (const doc of snapshot.docs) {
     batch.set(
-      ref,
+      db.collection(BACKUP_COLLECTION).doc(doc.id),
       {
         ...doc.data(),
         backup_source_collection: FIIS_COLLECTION,
@@ -134,19 +141,21 @@ async function backupFiis(db) {
       { merge: false }
     );
 
-    count += 1;
     batchCount += 1;
+    total += 1;
 
-    if (batchCount === 450) {
-      throw new Error("Backup possui mais de 450 documentos; execute em lotes menores ou ajuste o script para commit assíncrono por páginas.");
+    if (batchCount >= 450) {
+      await batch.commit();
+      batch = db.batch();
+      batchCount = 0;
     }
-  });
+  }
 
-  await batch.commit();
-  console.log(`Backup concluído: ${count} documentos copiados.`);
+  if (batchCount > 0) await batch.commit();
+  console.log(`Backup concluído: ${total} documentos copiados.`);
 }
 
-function parseStatusInvestDividends(html, year = CURRENT_YEAR) {
+function parseStatusInvestDividends(html, year = currentYear()) {
   const rows = extractRows(html);
   const dividends = [];
 
@@ -160,8 +169,8 @@ function parseStatusInvestDividends(html, year = CURRENT_YEAR) {
     const dateWith = normalizeDate(cells[1].text);
     const payDate = normalizeDate(cells[2].text);
     const value = normalizeCurrency(cells[3].html);
-
     const [, month, rowYear] = payDate.match(/(\d{2})\/(\d{2})\/(\d{4})/) || [];
+
     if (!month || Number(rowYear) !== year) continue;
 
     const monthName = MONTHS[Number(month) - 1];
@@ -187,12 +196,12 @@ async function fetchStatusInvestHtml(ticker) {
   ];
 
   const errors = [];
+
   for (const path of paths) {
     const url = `https://statusinvest.com.br/${path}`;
     try {
       const html = await fetchText(url);
-      const rows = extractRows(html);
-      if (rows.length > 0) return html;
+      if (extractRows(html).length > 0) return html;
       errors.push(`${url}: sem linhas úteis`);
     } catch (err) {
       errors.push(err.message);
@@ -247,34 +256,42 @@ function toEarningsObject(dividends, priceByPaymentDate) {
   return output;
 }
 
-async function updateTickerDividends(db, ticker, year = CURRENT_YEAR) {
+async function updateTickerDividends(db, ticker, year = currentYear()) {
   const code = normalizeTicker(ticker);
   if (!code) throw new Error("Informe --ticker TICKER11");
 
   const docRef = db.collection(FIIS_COLLECTION).doc(code);
   const doc = await docRef.get();
-  if (!doc.exists) {
-    throw new Error(`Ticker ${code} não encontrado em /${FIIS_COLLECTION}.`);
-  }
+  if (!doc.exists) throw new Error(`Ticker ${code} não encontrado em /${FIIS_COLLECTION}.`);
+
+  const yearField = `earnings${year}`;
+  const previousYearData = doc.data()?.[yearField] || {};
 
   const html = await fetchStatusInvestHtml(code);
   const dividends = parseStatusInvestDividends(html, year);
-
-  if (dividends.length === 0) {
-    throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}.`);
-  }
+  if (dividends.length === 0) throw new Error(`Nenhum rendimento de ${year} encontrado para ${code}.`);
 
   const priceByPaymentDate = await fetchPriceDateWithMap(code);
-  const earnings = toEarningsObject(dividends, priceByPaymentDate);
-  const yearField = `earnings${year}`;
+  const fetchedEarnings = toEarningsObject(dividends, priceByPaymentDate);
+  const mergedEarnings = {
+    ...previousYearData,
+    ...fetchedEarnings,
+  };
+
+  const fetchedMonths = Object.keys(fetchedEarnings);
+  const mergedMonths = Object.keys(mergedEarnings).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+  const currentMonthIncluded = Boolean(mergedEarnings[currentMonthKey()]);
 
   await docRef.set(
     {
-      [`${yearField}_previousBackup`]: doc.data()?.[yearField] || null,
-      [yearField]: earnings,
+      [`${yearField}_previousBackup`]: previousYearData,
+      [yearField]: mergedEarnings,
       dividendsUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
       dividendsUpdatedBy: "manual-script",
       dividendsSource: "statusinvest+fiis.com.br",
+      dividendsFetchedMonths: fetchedMonths,
+      dividendsMergedMonths: mergedMonths,
+      dividendsCurrentMonthIncluded: currentMonthIncluded,
       modified_in: admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true }
@@ -283,17 +300,20 @@ async function updateTickerDividends(db, ticker, year = CURRENT_YEAR) {
   return {
     ticker: code,
     year,
-    months: Object.keys(earnings),
-    count: Object.keys(earnings).length,
+    fetchedMonths,
+    mergedMonths,
+    count: mergedMonths.length,
+    currentMonth: currentMonthKey(),
+    currentMonthIncluded,
   };
 }
 
 async function main() {
   const ticker = normalizeTicker(getArg("ticker"));
-  const year = Number(getArg("year") || CURRENT_YEAR);
+  const year = Number(getArg("year") || currentYear());
 
   if (!ticker) {
-    console.error("Uso: npm run update:dividends -- --ticker TGAR11 [--year 2026]");
+    console.error("Uso: node scripts/update-dividends.mjs --ticker TGAR11 [--year 2026]");
     process.exit(1);
   }
 
