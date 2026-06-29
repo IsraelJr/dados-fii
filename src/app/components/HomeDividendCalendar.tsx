@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Loader2 } from "lucide-react";
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
+const CALENDAR_CACHE_KEY = "dados-fii-home-calendar-cache-v1";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const MONTHS_PTBR: Record<string, string> = {
     January: "Janeiro",
@@ -36,6 +37,12 @@ type CalendarItem = {
     quotas?: number;
     estimatedAmount?: number;
     paymentKey: string;
+};
+
+type HomeCalendarCache = {
+    dateKey: string;
+    tickersKey: string;
+    events: CalendarItem[];
 };
 
 function parseCurrency(value: unknown) {
@@ -78,6 +85,32 @@ function readWallet(): WalletItem[] {
     }
 }
 
+function readCache(tickersKey: string): CalendarItem[] | null {
+    try {
+        const stored = window.localStorage.getItem(CALENDAR_CACHE_KEY);
+        if (!stored) return null;
+        const parsed = JSON.parse(stored) as HomeCalendarCache;
+        if (parsed.dateKey !== todayKey()) return null;
+        if (parsed.tickersKey !== tickersKey) return null;
+        return Array.isArray(parsed.events) ? parsed.events : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveCache(tickersKey: string, events: CalendarItem[]) {
+    try {
+        const payload: HomeCalendarCache = {
+            dateKey: todayKey(),
+            tickersKey,
+            events,
+        };
+        window.localStorage.setItem(CALENDAR_CACHE_KEY, JSON.stringify(payload));
+    } catch {
+        return;
+    }
+}
+
 function getCurrentYearData(data: any) {
     const year = new Date().getFullYear();
     return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {};
@@ -112,10 +145,18 @@ export default function HomeDividendCalendar() {
         return Array.from(new Set([...walletTickers, ...topFiis])).slice(0, 12);
     }, [wallet, topFiis]);
 
+    const tickersKey = useMemo(() => tickers.join("|"), [tickers]);
+
     useEffect(() => {
         async function loadEvents() {
             if (!tickers.length) {
                 setEvents([]);
+                return;
+            }
+
+            const cached = readCache(tickersKey);
+            if (cached) {
+                setEvents(cached);
                 return;
             }
 
@@ -157,12 +198,14 @@ export default function HomeDividendCalendar() {
             }
 
             items.sort((a, b) => a.paymentKey.localeCompare(b.paymentKey) || a.ticker.localeCompare(b.ticker));
-            setEvents(items.slice(0, 6));
+            const nextEvents = items.slice(0, 6);
+            setEvents(nextEvents);
+            saveCache(tickersKey, nextEvents);
             setLoading(false);
         }
 
         loadEvents();
-    }, [tickers, wallet]);
+    }, [tickers, tickersKey, wallet]);
 
     if (!wallet.length && !topFiis.length && !loading) return null;
 
