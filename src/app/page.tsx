@@ -12,12 +12,32 @@ import MonitoredFiisPanel from "./components/MonitoredFiisPanel";
 import GoogleAdsBlock from "./components/GoogleAdsBlock";
 import HomeDividendCalendar from "./components/HomeDividendCalendar";
 
+type DollarState = {
+    formatted: string;
+    source?: string | null;
+    updatedAt?: string | null;
+};
+
+function formatDollarUpdateTime(value?: string | null) {
+    if (!value) return "";
+
+    try {
+        return new Intl.DateTimeFormat("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        }).format(new Date(value));
+    } catch {
+        return "";
+    }
+}
+
 export default function Home() {
     const [stats, setStats] = useState<{ visit: number; search: number }>({ visit: 0, search: 0 });
     const [ticker, setTicker] = useState("");
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState("");
-    const [dolar, setDolar] = useState<string>("...");
+    const [dolar, setDolar] = useState<DollarState>({ formatted: "..." });
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
@@ -117,17 +137,32 @@ export default function Home() {
     };
 
     useEffect(() => {
+        let active = true;
+
         const fetchDolar = async () => {
             try {
-                const res = await fetch("/api/dolar");
+                const res = await fetch(`/api/dolar?ts=${Date.now()}`, { cache: "no-store" });
                 const json = await res.json();
-                setDolar(json.formatted);
+
+                if (!active) return;
+
+                setDolar({
+                    formatted: json.formatted || "Indisponível",
+                    source: json.source,
+                    updatedAt: json.updatedAt,
+                });
             } catch {
-                setDolar("Erro");
+                if (active) setDolar({ formatted: "Erro" });
             }
         };
 
         fetchDolar();
+        const interval = setInterval(fetchDolar, 5 * 60 * 1000);
+
+        return () => {
+            active = false;
+            clearInterval(interval);
+        };
     }, []);
 
     useEffect(() => {
@@ -180,6 +215,8 @@ export default function Home() {
         return parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
     }, [data, currentYear]);
 
+    const dollarUpdatedAt = formatDollarUpdateTime(dolar.updatedAt);
+
     return (
         <div className="font-sans text-center mt-12 px-4">
             {showLogin && (
@@ -191,11 +228,15 @@ export default function Home() {
             <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
             <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
 
-            <div className="mt-4 text-gray-400">
-                💵 Cotação do dólar: {dolar}
-                <br />
-                <br />
+            <div className="mx-auto mt-4 max-w-fit rounded-2xl bg-gray-900 px-5 py-3 text-gray-100 shadow-lg ring-1 ring-white/10">
+                <p className="text-sm font-bold text-white">💵 Dólar comercial: {dolar.formatted}</p>
+                <p className="mt-1 text-xs font-medium text-gray-300">
+                    {dolar.source ? `Fonte: ${dolar.source}` : "Fonte indisponível"}
+                    {dollarUpdatedAt ? ` · Atualizado às ${dollarUpdatedAt}` : ""}
+                </p>
             </div>
+
+            <br />
 
             <Link
                 href="/carteira"
