@@ -18,6 +18,30 @@ type DollarState = {
     updatedAt?: string | null;
 };
 
+const DOLLAR_CACHE_KEY = "dados-fii-dollar-cache-v1";
+
+function getCachedDollar(): DollarState {
+    if (typeof window === "undefined") return { formatted: "..." };
+
+    try {
+        const stored = window.localStorage.getItem(DOLLAR_CACHE_KEY);
+        if (!stored) return { formatted: "..." };
+
+        const parsed = JSON.parse(stored) as DollarState;
+        return parsed?.formatted ? parsed : { formatted: "..." };
+    } catch {
+        return { formatted: "..." };
+    }
+}
+
+function saveCachedDollar(value: DollarState) {
+    try {
+        window.localStorage.setItem(DOLLAR_CACHE_KEY, JSON.stringify(value));
+    } catch {
+        return;
+    }
+}
+
 function formatDollarUpdateTime(value?: string | null) {
     if (!value) return "";
 
@@ -52,7 +76,7 @@ export default function Home() {
     const [ticker, setTicker] = useState("");
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState("");
-    const [dolar, setDolar] = useState<DollarState>({ formatted: "..." });
+    const [dolar, setDolar] = useState<DollarState>(() => getCachedDollar());
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
@@ -161,13 +185,16 @@ export default function Home() {
 
                 if (!active) return;
 
-                setDolar({
+                const nextDollar = {
                     formatted: json.formatted || "Indisponível",
                     source: json.source,
                     updatedAt: json.updatedAt,
-                });
+                };
+
+                setDolar(nextDollar);
+                saveCachedDollar(nextDollar);
             } catch {
-                if (active) setDolar({ formatted: "Erro" });
+                if (active && !dolar.formatted) setDolar({ formatted: "Erro" });
             }
         };
 
