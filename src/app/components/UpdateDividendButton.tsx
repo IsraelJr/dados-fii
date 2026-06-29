@@ -5,9 +5,10 @@ import { RefreshCw } from "lucide-react";
 
 interface Props {
     ticker: string;
+    onSuccess?: () => void | Promise<void>;
 }
 
-export default function UpdateDividendButton({ ticker }: Props) {
+export default function UpdateDividendButton({ ticker, onSuccess }: Props) {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [disabled, setDisabled] = useState(false);
@@ -42,11 +43,8 @@ export default function UpdateDividendButton({ ticker }: Props) {
 
             setDisabled(true);
             setShowCard(false);
-            setMessage("Atualização concluída com sucesso. Recarregando...");
-
-            window.setTimeout(() => {
-                window.location.reload();
-            }, 600);
+            setMessage("Atualização concluída com sucesso. Atualizando consulta...");
+            await onSuccess?.();
         } catch {
             setDisabled(false);
             setMessage("Erro ao solicitar atualização. Tente novamente mais tarde.");
