@@ -104,6 +104,22 @@ function readCache(tickersKey: string): CalendarItem[] | null {
     }
 }
 
+function readLatestCache(): CalendarItem[] {
+    if (typeof window === "undefined") return [];
+
+    try {
+        const stored = window.localStorage.getItem(CALENDAR_CACHE_KEY);
+        if (!stored) return [];
+
+        const parsed = JSON.parse(stored) as HomeCalendarCache;
+        if (parsed.dateKey !== todayKey()) return [];
+
+        return Array.isArray(parsed.events) ? parsed.events : [];
+    } catch {
+        return [];
+    }
+}
+
 function saveCache(tickersKey: string, events: CalendarItem[]) {
     try {
         const payload: HomeCalendarCache = {
@@ -125,7 +141,7 @@ function getCurrentYearData(data: any) {
 export default function HomeDividendCalendar() {
     const [wallet, setWallet] = useState<WalletItem[]>([]);
     const [topFiis, setTopFiis] = useState<string[]>([]);
-    const [events, setEvents] = useState<CalendarItem[]>([]);
+    const [events, setEvents] = useState<CalendarItem[]>(() => readLatestCache());
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -156,17 +172,18 @@ export default function HomeDividendCalendar() {
     useEffect(() => {
         async function loadEvents() {
             if (!tickers.length) {
-                setEvents([]);
+                if (!events.length) setEvents([]);
                 return;
             }
 
             const cached = readCache(tickersKey);
             if (cached) {
                 setEvents(cached);
+                setLoading(false);
                 return;
             }
 
-            setLoading(true);
+            setLoading((current) => events.length ? current : true);
             const items: CalendarItem[] = [];
             const today = todayKey();
 
@@ -211,9 +228,9 @@ export default function HomeDividendCalendar() {
         }
 
         loadEvents();
-    }, [tickers, tickersKey, wallet]);
+    }, [tickers, tickersKey, wallet, events.length]);
 
-    if (!wallet.length && !topFiis.length && !loading) return null;
+    if (!wallet.length && !topFiis.length && !events.length && !loading) return null;
 
     return (
         <div className="mx-auto mt-6 max-w-4xl rounded-2xl border border-indigo-500/20 bg-gray-900 p-5 text-left text-gray-100 shadow-lg">
@@ -233,7 +250,7 @@ export default function HomeDividendCalendar() {
                 </div>
             </div>
 
-            {loading ? (
+            {loading && !events.length ? (
                 <p className="flex items-center justify-center gap-2 rounded-xl bg-gray-800 p-4 text-sm text-gray-400">
                     <Loader2 className="animate-spin" size={18} /> Buscando próximos pagamentos...
                 </p>
