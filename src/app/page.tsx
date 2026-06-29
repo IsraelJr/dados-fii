@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wallet } from "lucide-react";
 import CookieBanner from "./components/CookieBanner";
 import PersonalizedNews from "./components/PersonalizedNews";
 import FiiTopPanels from "./components/FiiTopPanels";
@@ -194,6 +195,13 @@ export default function Home() {
                 <br />
                 <br />
             </div>
+
+            <Link
+                href="/carteira"
+                className="mx-auto mb-6 inline-flex max-w-fit items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 font-bold text-white shadow-lg transition-colors hover:bg-indigo-700"
+            >
+                <Wallet size={18} /> Minha Carteira e Dividendos
+            </Link>
 
             <div className="flex top-4 left-4">
                 <MonitoredFiisPanel />
