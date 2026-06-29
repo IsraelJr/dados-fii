@@ -387,19 +387,19 @@ export default function WalletPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5 shadow-lg">
+      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-bold text-yellow-100">
-              <AlertTriangle size={20} /> Aguardando comunicado
+            <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
+              <AlertTriangle size={20} className="text-yellow-300" /> Aguardando comunicado
             </h2>
-            <p className="mt-1 text-sm text-yellow-50/80">
+            <p className="mt-2 text-sm font-medium text-gray-300">
               {insights.waiting.length
                 ? `${insights.waiting.length} FII(s) da carteira ainda não têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base. Estimativa pendente: ${formatCurrency(insights.pendingIncome)}.`
                 : `Todos os FIIs carregados já têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base.`}
             </p>
             {insights.waiting.length > 0 && (
-              <p className="mt-2 text-sm text-yellow-50">
+              <p className="mt-2 text-sm font-medium text-gray-200">
                 {insights.waiting.map((item) => item.ticker).join(", ")}
               </p>
             )}
@@ -408,7 +408,7 @@ export default function WalletPage() {
             type="button"
             onClick={updateMissingDividends}
             disabled={!insights.waiting.length || updatingMissing}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-500 px-4 py-2 font-bold text-black hover:bg-yellow-400 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-300"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
           >
             <RefreshCw size={16} className={updatingMissing ? "animate-spin" : ""} /> Atualizar pendentes
           </button>
