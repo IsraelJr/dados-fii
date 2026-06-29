@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronUp, Loader2, Search } from "lucide-react";
 import WalletQuickAddButton from "../components/WalletQuickAddButton";
 import FiiAlert from "../components/FiiAlert";
+import PageHeader from "../components/PageHeader";
 
 type CalendarEvent = {
   ticker: string;
@@ -166,20 +167,15 @@ export default function DividendCalendarPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900">
-            ← Voltar para consulta
+      <PageHeader
+        title="Calendário de Dividendos"
+        subtitle="Consulte próximos pagamentos, data-com e rendimentos anunciados pelos fundos imobiliários da base Dados FII."
+        action={(
+          <Link href="/carteira" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+            Minha carteira
           </Link>
-          <h1 className="mt-4 text-3xl font-extrabold text-slate-800">Calendário de Dividendos</h1>
-          <p className="mt-2 max-w-3xl text-slate-600">
-            Consulte próximos pagamentos, data-com e rendimentos anunciados pelos fundos imobiliários da base Dados FII.
-          </p>
-        </div>
-        <Link href="/carteira" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
-          Minha carteira
-        </Link>
-      </div>
+        )}
+      />
 
       <div className="mb-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <label className="mb-2 block text-base font-extrabold text-white">Filtrar por ticker, nome ou segmento</label>
