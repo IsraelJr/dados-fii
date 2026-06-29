@@ -79,6 +79,10 @@ function getCurrentMonthDividend(data: any) {
   return yearData?.[month] ? { month, info: yearData[month] } : null;
 }
 
+function getSegmentName(data: any) {
+  return data?.segment_new || data?.segment || "Sem segmento";
+}
+
 function getUpcomingPayments(items: LoadedFii[]) {
   const today = new Date();
   const payments: Payment[] = [];
@@ -216,7 +220,7 @@ export default function WalletPage() {
       const estimatedIncome = lastValue * item.quotas;
       const announcedIncome = currentValue * item.quotas;
       const currentValuePosition = price * item.quotas;
-      const estimatedYield = currentValuePosition > 0 ? (estimatedIncome / currentValuePosition) * 100 : 0;
+      const segment = getSegmentName(item.data);
 
       return {
         ...item,
@@ -225,7 +229,7 @@ export default function WalletPage() {
         estimatedIncome,
         announcedIncome,
         currentValuePosition,
-        estimatedYield,
+        segment,
         waitingAnnouncement: Boolean(item.data) && !currentDividend,
       };
     });
@@ -234,6 +238,16 @@ export default function WalletPage() {
     const announcedIncome = enriched.reduce((acc, item) => acc + item.announcedIncome, 0);
     const currentValue = enriched.reduce((acc, item) => acc + item.currentValuePosition, 0);
     const waiting = enriched.filter((item) => item.waitingAnnouncement);
+    const segmentTotals = enriched.reduce((acc: Record<string, number>, item) => {
+      const value = item.currentValuePosition > 0 ? item.currentValuePosition : item.quotas;
+      acc[item.segment] = (acc[item.segment] || 0) + value;
+      return acc;
+    }, {});
+    const segmentBase = Object.values(segmentTotals).reduce((acc, value) => acc + value, 0);
+    const segmentBreakdown = Object.entries(segmentTotals)
+      .sort((a, b) => b[1] - a[1])
+      .map(([segment, value]) => ({ ticker: segment, value: `${segmentBase > 0 ? ((value / segmentBase) * 100).toFixed(1).replace(".", ",") : "0,0"}%` }));
+    const mainSegment = segmentBreakdown[0];
 
     return {
       currentMonth,
@@ -245,7 +259,8 @@ export default function WalletPage() {
       waiting,
       topIncome: [...enriched].sort((a, b) => b.estimatedIncome - a.estimatedIncome).slice(0, 5),
       topWeight: [...enriched].sort((a, b) => b.currentValuePosition - a.currentValuePosition).slice(0, 5),
-      topYield: [...enriched].sort((a, b) => b.estimatedYield - a.estimatedYield).slice(0, 5),
+      segmentBreakdown,
+      mainSegment,
     };
   }, [loaded]);
 
@@ -366,11 +381,9 @@ export default function WalletPage() {
         </div>
 
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm text-gray-400">Yield mensal estimado</p>
-          <strong className="mt-2 block text-3xl text-yellow-300">
-            {insights.currentValue > 0 ? `${((insights.monthlyIncome / insights.currentValue) * 100).toFixed(2).replace(".", ",")}%` : "0,00%"}
-          </strong>
-          <p className="mt-2 text-xs text-gray-500">Indicador aproximado, não é recomendação.</p>
+          <p className="text-sm text-gray-400">Segmento principal</p>
+          <strong className="mt-2 block text-3xl text-yellow-300">{insights.mainSegment?.value || "-"}</strong>
+          <p className="mt-2 text-xs text-gray-500">{insights.mainSegment?.ticker || "Adicione FIIs para calcular."}</p>
         </div>
       </section>
 
@@ -509,7 +522,7 @@ export default function WalletPage() {
       <section className="mt-6 grid gap-4 md:grid-cols-3">
         <RankingCard title="Maior renda estimada" items={insights.topIncome.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.estimatedIncome) }))} />
         <RankingCard title="Maior peso financeiro" items={insights.topWeight.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.currentValuePosition) }))} />
-        <RankingCard title="Maior yield mensal" items={insights.topYield.map((item) => ({ ticker: item.ticker, value: `${item.estimatedYield.toFixed(2).replace(".", ",")}%` }))} />
+        <RankingCard title="Distribuição por segmento" items={insights.segmentBreakdown} />
       </section>
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 shadow-lg">
