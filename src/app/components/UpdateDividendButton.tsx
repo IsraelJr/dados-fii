@@ -36,13 +36,17 @@ export default function UpdateDividendButton({ ticker }: Props) {
 
             if (data.success === false) {
                 setDisabled(false);
-                setMessage(data.message || "A fonte automática ainda não trouxe o mês atual. Você pode tentar novamente hoje.");
+                setMessage(data.message || "Atualizei os meses encontrados, mas o mês atual ainda não apareceu.");
                 return;
             }
 
             setDisabled(true);
-            setMessage("Atualização concluída com sucesso.");
             setShowCard(false);
+            setMessage("Atualização concluída com sucesso. Recarregando...");
+
+            window.setTimeout(() => {
+                window.location.reload();
+            }, 600);
         } catch {
             setDisabled(false);
             setMessage("Erro ao solicitar atualização. Tente novamente mais tarde.");
