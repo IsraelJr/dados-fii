@@ -27,8 +27,10 @@ function noAccent(value: string) {
 }
 
 function authorized(req: NextRequest, body: any) {
-  const expected = process.env.ADMIN_UPDATE_SECRET;
-  return Boolean(expected && (req.headers.get("x-admin-secret") === expected || body?.secret === expected));
+  const allowedSecrets = [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
+  const headerSecret = req.headers.get("x-admin-secret");
+  const bodySecret = body?.secret;
+  return allowedSecrets.some((secret) => secret === headerSecret || secret === bodySecret);
 }
 
 async function getStatusInvestPage(ticker: string) {
