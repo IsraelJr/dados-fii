@@ -11,6 +11,7 @@ export default function UpdateDividendButton({ ticker }: Props) {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [disabled, setDisabled] = useState(false);
+    const [showCard, setShowCard] = useState(true);
 
     const requestUpdate = async () => {
         if (loading || disabled) return;
@@ -40,7 +41,8 @@ export default function UpdateDividendButton({ ticker }: Props) {
             }
 
             setDisabled(true);
-            setMessage("Atualização concluída com sucesso. Consulte o FII novamente em instantes.");
+            setMessage("Atualização concluída com sucesso.");
+            setShowCard(false);
         } catch {
             setDisabled(false);
             setMessage("Erro ao solicitar atualização. Tente novamente mais tarde.");
@@ -48,6 +50,8 @@ export default function UpdateDividendButton({ ticker }: Props) {
             setLoading(false);
         }
     };
+
+    if (!showCard) return null;
 
     return (
         <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-100">
