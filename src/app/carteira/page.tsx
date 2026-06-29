@@ -265,6 +265,7 @@ export default function WalletPage() {
     const segmentBase = Object.values(segmentTotals).reduce((acc, value) => acc + value, 0);
     const segmentBreakdown = Object.entries(segmentTotals)
       .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
       .map(([segment, value]) => ({ ticker: segment, value: `${segmentBase > 0 ? ((value / segmentBase) * 100).toFixed(1).replace(".", ",") : "0,0"}%` }));
     const mainSegment = segmentBreakdown[0];
 
@@ -276,8 +277,8 @@ export default function WalletPage() {
       currentValue,
       pendingIncome: Math.max(monthlyIncome - announcedIncome, 0),
       waiting,
-      topIncome: [...enriched].sort((a, b) => b.estimatedIncome - a.estimatedIncome).slice(0, 5),
-      topWeight: [...enriched].sort((a, b) => b.currentValuePosition - a.currentValuePosition).slice(0, 5),
+      topIncome: [...enriched].sort((a, b) => b.estimatedIncome - a.estimatedIncome).slice(0, 3),
+      topWeight: [...enriched].sort((a, b) => b.currentValuePosition - a.currentValuePosition).slice(0, 3),
       segmentBreakdown,
       mainSegment,
     };
