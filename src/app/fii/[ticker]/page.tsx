@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Newspaper } from "lucide-react";
 import PageHeader from "../../components/PageHeader";
 import WalletQuickAddButton from "../../components/WalletQuickAddButton";
 import FiiAlert from "../../components/FiiAlert";
@@ -22,6 +22,13 @@ const MONTHS_PTBR: Record<string, string> = {
   October: "Outubro",
   November: "Novembro",
   December: "Dezembro",
+};
+
+type NewsItem = {
+  title: string;
+  url: string;
+  source: string;
+  publishedAt: string;
 };
 
 function parseCurrency(value: unknown) {
@@ -43,6 +50,22 @@ function formatDividend(value: unknown) {
   const parsed = parseCurrency(value);
   if (!parsed) return "-";
   return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
+}
+
+function formatNewsDate(value: string) {
+  if (!value) return "";
+
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  } catch {
+    return "";
+  }
 }
 
 function getYearData(data: any) {
@@ -94,6 +117,8 @@ export default function FiiPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loadingNews, setLoadingNews] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -121,6 +146,27 @@ export default function FiiPage() {
     }
 
     load();
+  }, [ticker]);
+
+  useEffect(() => {
+    async function loadNews() {
+      if (!ticker) return;
+
+      setLoadingNews(true);
+      setNews([]);
+
+      try {
+        const response = await fetch(`/api/fii-news?ticker=${ticker}`, { cache: "no-store" });
+        const json = await response.json();
+        setNews(Array.isArray(json.news) ? json.news.slice(0, 3) : []);
+      } catch {
+        setNews([]);
+      } finally {
+        setLoadingNews(false);
+      }
+    }
+
+    loadNews();
   }, [ticker]);
 
   const orderedDividends = useMemo(() => getOrderedDividends(data), [data]);
@@ -193,6 +239,8 @@ export default function FiiPage() {
             </InfoCard>
           </section>
 
+          <RecentNews ticker={ticker} news={news} loading={loadingNews} />
+
           <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
             <div className="mb-4">
               <h2 className="text-xl font-extrabold text-white">Histórico de rendimentos</h2>
@@ -245,6 +293,57 @@ function MetricCard({ title, value, description, tone }: { title: string; value:
       <strong className={`mt-2 block break-words text-3xl ${toneClass}`}>{value}</strong>
       {description && <p className="mt-2 text-sm font-medium text-gray-300">{description}</p>}
     </div>
+  );
+}
+
+function RecentNews({ ticker, news, loading }: { ticker: string; news: NewsItem[]; loading: boolean }) {
+  return (
+    <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+      <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
+            <Newspaper className="text-indigo-300" size={20} /> Notícias recentes
+          </h2>
+          <p className="mt-1 text-sm font-medium text-gray-300">Até 3 notícias recentes relacionadas ao {ticker}.</p>
+        </div>
+        <a
+          href={`https://news.google.com/search?q=${encodeURIComponent(`${ticker} FII fundo imobiliário dividendos relatório`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+        >
+          Ver mais <ExternalLink size={14} />
+        </a>
+      </div>
+
+      {loading ? (
+        <p className="flex items-center gap-2 rounded-xl bg-gray-800 p-4 text-sm font-medium text-gray-300">
+          <Loader2 className="animate-spin" size={18} /> Buscando notícias recentes...
+        </p>
+      ) : !news.length ? (
+        <p className="rounded-xl bg-gray-800 p-4 text-sm font-medium text-gray-300">Nenhuma notícia recente encontrada para este ticker.</p>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-3">
+          {news.map((item) => (
+            <a
+              key={`${item.url}-${item.title}`}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-[150px] flex-col justify-between rounded-xl bg-gray-800 p-4 text-left ring-1 ring-white/5 hover:bg-gray-700"
+            >
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-indigo-200">{item.source || "Notícia"}</p>
+                <h3 className="mt-2 line-clamp-3 text-sm font-extrabold text-white">{item.title}</h3>
+              </div>
+              <p className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-green-300">
+                {formatNewsDate(item.publishedAt) || "Abrir notícia"} <ExternalLink size={13} />
+              </p>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
