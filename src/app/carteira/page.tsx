@@ -336,14 +336,16 @@ export default function WalletPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 text-gray-100">
+    <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <Link href="/" className="text-sm text-indigo-300 hover:text-indigo-100">← Voltar para consulta</Link>
-          <h1 className="mt-3 flex items-center gap-2 text-3xl font-bold">
-            <Wallet className="text-indigo-300" /> Minha Carteira FIIs
+          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900">
+            ← Voltar para consulta
+          </Link>
+          <h1 className="mt-4 flex items-center gap-2 text-3xl font-extrabold text-slate-800">
+            <Wallet className="text-indigo-700" /> Minha Carteira FIIs
           </h1>
-          <p className="mt-2 text-gray-400">
+          <p className="mt-2 text-slate-600">
             Salva neste navegador. Adicione seus FIIs e veja renda estimada e próximos pagamentos.
           </p>
         </div>
