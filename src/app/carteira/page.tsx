@@ -354,17 +354,11 @@ export default function WalletPage() {
         </Link>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
           <p className="text-sm text-gray-400">Renda mensal estimada</p>
           <strong className="mt-2 block text-3xl text-green-300">{formatCurrency(insights.monthlyIncome)}</strong>
           <p className="mt-2 text-xs text-gray-500">Baseada no último rendimento disponível.</p>
-        </div>
-
-        <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
-          <p className="text-sm text-gray-400">Já anunciado em {MONTHS_PTBR[insights.currentMonth]}</p>
-          <strong className="mt-2 block text-3xl text-emerald-300">{formatCurrency(insights.announcedIncome)}</strong>
-          <p className="mt-2 text-xs text-gray-500">Somente FIIs com rendimento do mês atual.</p>
         </div>
 
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg">
