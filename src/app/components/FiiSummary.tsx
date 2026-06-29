@@ -15,6 +15,7 @@ import {
 import { SimulationCard } from "./SimulationCard";
 import FiiAlert from "./FiiAlert";
 import UpdateDividendButton from "./UpdateDividendButton";
+import AddToWalletButton from "./AddToWalletButton";
 
 interface Props {
     data: any;
@@ -128,6 +129,8 @@ export default function FiiSummary({
                     </span>
                 </div>
             </div>
+
+            {data?.code && <AddToWalletButton ticker={data.code} />}
 
             <h3 className="text-xl font-bold mt-6 mb-2">
                 💰 Dividendos ({earningsYearData === data?.[`earnings${currentYear}`]
