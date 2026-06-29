@@ -361,9 +361,6 @@ function NewsCard({ item, featured = false }: { item: NewsItem; featured?: boole
         <h3 className={`${featured ? "mt-3 text-xl leading-snug" : "mt-2 text-sm"} line-clamp-3 font-extrabold text-white`}>
           {item.title}
         </h3>
-        {featured && (
-          <p className="mt-3 text-sm font-medium text-gray-300">Notícia mais recente encontrada para este fundo.</p>
-        )}
       </div>
       <p className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-green-300">
         {formatNewsDate(item.publishedAt) || "Abrir notícia"} <ExternalLink size={13} />
