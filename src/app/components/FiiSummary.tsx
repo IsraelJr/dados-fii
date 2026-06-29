@@ -21,6 +21,7 @@ interface Props {
     getCurrentYearDividends: (yearData: any) => [string, any][];
     monthsPTBR: Record<string, string>;
     lastDividend: number | null;
+    onDividendUpdate?: () => void | Promise<void>;
 }
 
 const monthsOrder = [
@@ -55,6 +56,7 @@ export default function FiiSummary({
     getCurrentYearDividends,
     monthsPTBR,
     lastDividend,
+    onDividendUpdate,
 }: Props) {
     const currentYear = new Date().getFullYear();
     const currentMonthKey = monthsOrder[new Date().getMonth()];
@@ -161,7 +163,7 @@ export default function FiiSummary({
                 )}
 
                 {isCurrentMonthMissing && data?.code && (
-                    <UpdateDividendButton ticker={data.code} />
+                    <UpdateDividendButton ticker={data.code} onSuccess={onDividendUpdate} />
                 )}
             </div>
 
