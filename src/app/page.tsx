@@ -271,7 +271,7 @@ export default function Home() {
                             <div className="flex flex-col gap-2 sm:flex-row">
                                 <input
                                     type="text"
-                                    placeholder="Digite o ticker, ex: TGAR11"
+                                    placeholder="Digite o ticker, ex: ABCD11"
                                     value={ticker}
                                     onChange={(e) => setTicker(e.target.value.toUpperCase())}
                                     onKeyDown={(e) => {
