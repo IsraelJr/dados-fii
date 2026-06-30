@@ -269,8 +269,36 @@ export default function Home() {
                 </div>
             )}
 
-            <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
-            <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
+            <header className="mx-auto max-w-4xl">
+                <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
+                <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
+                <p className="mx-auto mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                    O Dados FII reúne consulta de fundos imobiliários, calendário de dividendos, próximos pagamentos,
+                    carteira de FIIs e notícias para ajudar investidores a acompanhar rendimentos e dados importantes
+                    de fundos imobiliários brasileiros.
+                </p>
+            </header>
+
+            <section className="mx-auto mt-5 grid max-w-4xl gap-3 text-left md:grid-cols-3" aria-label="Principais recursos do Dados FII">
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <h2 className="text-base font-extrabold text-slate-800">Consulta de FIIs</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Pesquise tickers de fundos imobiliários e acompanhe preço, dividendos, DY, P/VP e dados do fundo.
+                    </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <h2 className="text-base font-extrabold text-slate-800">Calendário de dividendos</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Veja datas de pagamento, data-com e rendimentos por cota anunciados pelos FIIs da base.
+                    </p>
+                </div>
+                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <h2 className="text-base font-extrabold text-slate-800">Carteira de FIIs</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Salve seus fundos no navegador e estime renda mensal, próximos pagamentos e distribuição por segmento.
+                    </p>
+                </div>
+            </section>
 
             <div className="mx-auto mt-4 max-w-fit rounded-2xl bg-gray-900 px-5 py-3 text-gray-100 shadow-lg ring-1 ring-white/10">
                 <p className="text-sm font-bold text-white">💵 Dólar comercial: {dolar.formatted}</p>
@@ -370,6 +398,15 @@ export default function Home() {
                         Ver livros
                     </Link>
                 </div>
+            </section>
+
+            <section className="mx-auto mt-8 max-w-4xl rounded-2xl bg-slate-50 p-5 text-left ring-1 ring-slate-200">
+                <h2 className="text-xl font-extrabold text-slate-800">Acompanhe FIIs com mais clareza</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Use o Dados FII para consultar fundos imobiliários, acompanhar rendimentos, verificar próximos dividendos
+                    e organizar sua carteira. As informações ajudam no acompanhamento, mas não substituem análise própria,
+                    leitura de relatórios gerenciais e comunicados oficiais dos fundos.
+                </p>
             </section>
 
             <br />
