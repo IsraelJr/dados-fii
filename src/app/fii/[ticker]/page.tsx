@@ -92,6 +92,15 @@ function getAgioDiscount(price: number, equityValuePerShare: number) {
   return Number.isFinite(result) ? result : null;
 }
 
+function getDailyVariation(variation: unknown, price: number, opening: number) {
+  const apiVariation = parseNumber(variation);
+  if (apiVariation !== 0) return apiVariation;
+  if (!price || !opening || price === opening) return apiVariation;
+
+  const calculated = ((price - opening) / opening) * 100;
+  return Number.isFinite(calculated) ? calculated : apiVariation;
+}
+
 function newsTimestamp(value: string) {
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? time : 0;
@@ -225,6 +234,8 @@ export default function FiiPage() {
   const nextPayment = useMemo(() => getNextPayment(data), [data]);
   const lastDividendValue = parseCurrency(lastDividend?.info?.earnings);
   const price = parseCurrency(data?.price);
+  const opening = parseCurrency(data?.opening);
+  const dailyVariation = getDailyVariation(data?.variation, price, opening);
   const equityValuePerShare = parseNumber(data?.equityValuePerShare);
   const pvp = parseNumber(data?.pvp) || (price && equityValuePerShare ? price / equityValuePerShare : 0);
   const agioDiscount = getAgioDiscount(price, equityValuePerShare);
@@ -266,7 +277,7 @@ export default function FiiPage() {
           <section className="grid gap-4 md:grid-cols-4">
             <MetricCard title="Preço atual" value={data.price || "-"} tone="indigo" />
             <MetricCard title="Abertura" value={data.opening || "-"} tone="gray" />
-            <MetricCard title="Variação do dia" value={formatPercent(data.variation)} tone={getVariationTone(data.variation)} />
+            <MetricCard title="Variação do dia" value={formatPercent(dailyVariation)} tone={getVariationTone(dailyVariation)} />
             <MetricCard title="Segmento" value={segment} tone="indigo" />
           </section>
 
