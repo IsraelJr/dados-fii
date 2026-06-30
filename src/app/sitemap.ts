@@ -7,7 +7,7 @@ const STATIC_ROUTES = [
   "",
   "/carteira",
   "/calendario-dividendos-fiis",
-  "/livros",
+  "/educacao",
 ];
 
 const FEATURED_TICKERS = [
