@@ -29,9 +29,6 @@ function fallbackInsights(tickers: string[]): FiiInsight[] {
 function extractOutputText(payload: any) {
   if (typeof payload?.output_text === "string") return payload.output_text;
 
-  const responseText = payload?.choices?.[0]?.message?.content;
-  if (typeof responseText === "string") return responseText;
-
   const texts = payload?.output
     ?.flatMap((item: any) => item?.content || [])
     ?.map((content: any) => content?.text)
@@ -55,9 +52,7 @@ function safeJsonParse(text: string) {
 }
 
 function buildPrompt(tickers: string[]) {
-  const basePrompt = process.env.OPENAI_PROMPT_ABOUT_FII?.trim()
-    || process.env.PERPLEXITY_PROMPT_ABOUT_FII?.trim()
-    || `
+  const basePrompt = process.env.OPENAI_PROMPT_ABOUT_FII?.trim() || `
 Resuma as notícias mais recentes e relevantes sobre o FII {ticker} em 3-4 linhas.
 Destaque o último dividendo, o respectivo DY mensal, possíveis aquisições ou vendas e como está a saúde do fundo.
 `;
@@ -69,12 +64,13 @@ Destaque o último dividendo, o respectivo DY mensal, possíveis aquisições ou
   return `
 Você é um analista editorial do site Dados FII.
 
-Faça uma pesquisa na web e responda com um resumo útil, no estilo de uma resposta direta de chat, para os FIIs abaixo.
+Pesquise na web e responda com um resumo útil, direto e específico para os FIIs abaixo.
 
 ${promptByTicker}
 
 Regras:
-- Use informações recentes encontradas na web, relatórios gerenciais, comunicados oficiais, notícias de mercado e dados públicos.
+- Use busca web obrigatoriamente.
+- Priorize relatórios gerenciais, comunicados oficiais, fatos relevantes, páginas de RI/administradora e notícias recentes de mercado.
 - Não use dados internos da base Dados FII como fonte principal.
 - Não dê recomendação de compra ou venda.
 - Se não encontrar algum dado, diga isso de forma natural, sem inventar.
@@ -100,46 +96,9 @@ Formato obrigatório:
 `;
 }
 
-async function callPerplexity(prompt: string) {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) return null;
-
-  const response = await fetch("https://api.perplexity.ai/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: process.env.PERPLEXITY_MODEL || "sonar-pro",
-      messages: [
-        {
-          role: "system",
-          content: "Você pesquisa informações atuais na web e responde somente no JSON solicitado, sem markdown.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      temperature: 0.2,
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    console.error("Perplexity personalized FII news error:", response.status, detail);
-    return null;
-  }
-
-  return response.json();
-}
-
 async function callOpenAI(prompt: string) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
-
-  const shouldUseWebSearch = process.env.OPENAI_USE_WEB_SEARCH !== "false";
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -148,19 +107,16 @@ async function callOpenAI(prompt: string) {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_SEARCH_MODEL || process.env.OPENAI_MODEL || "gpt-4o",
+      model: process.env.OPENAI_SEARCH_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini",
       input: prompt,
       temperature: 0.2,
-      ...(shouldUseWebSearch
-        ? {
-          tools: [
-            {
-              type: "web_search_preview",
-              search_context_size: "medium",
-            },
-          ],
-        }
-        : {}),
+      tools: [
+        {
+          type: "web_search",
+          search_context_size: "medium",
+        },
+      ],
+      tool_choice: "required",
     }),
   });
 
@@ -208,17 +164,6 @@ export async function POST(req: Request) {
   const prompt = buildPrompt(tickers);
 
   try {
-    const perplexityPayload = await callPerplexity(prompt);
-    if (perplexityPayload) {
-      const text = extractOutputText(perplexityPayload);
-      const parsed = safeJsonParse(text);
-      const aiInsights = Array.isArray(parsed?.insights) ? parsed.insights : [];
-
-      if (aiInsights.length) {
-        return NextResponse.json({ ok: true, mode: "perplexity", insights: normalizeInsights(tickers, aiInsights, fallback) });
-      }
-    }
-
     const openAiPayload = await callOpenAI(prompt);
     if (openAiPayload) {
       const text = extractOutputText(openAiPayload);
