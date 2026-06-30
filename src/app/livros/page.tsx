@@ -7,11 +7,11 @@ const books = [
     title: "A Moedinha de Léo",
     author: "Israel Alves",
     category: "Educação financeira infantil",
-    status: "Em análise na Amazon",
+    status: "Disponível na Amazon",
     description:
       "Uma história infantil sobre escolhas, paciência e o primeiro contato da criança com o dinheiro, feita para aproximar pais e filhos de conversas simples sobre educação financeira.",
     audience: "Crianças, pais e educadores",
-    href: "",
+    href: "https://www.amazon.com.br/dp/B0H6Y7VS9C?dplnkId=077632c1-bf54-456d-8e9f-607a32bff63b&nodl=1",
   },
 ];
 
@@ -66,7 +66,7 @@ export default function BooksPage() {
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Status</p>
-                <p className="mt-1 text-sm font-bold text-yellow-300">{book.status}</p>
+                <p className="mt-1 text-sm font-bold text-green-300">{book.status}</p>
               </div>
             </div>
 
