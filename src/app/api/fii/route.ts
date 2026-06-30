@@ -13,7 +13,7 @@ const db = admin.firestore();
 
 const SHEET_ID = process.env.SHEET_ID!;
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY!;
-const RANGE = "A1:D400";
+const RANGE = "A1:F400";
 const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
 const url = `${baseUrl}&t=${Date.now()}`;
 
@@ -22,6 +22,8 @@ interface FiiData {
   price: string;
   opening?: string;
   variation?: string;
+  minimum?: string;
+  maximum?: string;
 }
 
 function parseCurrency(value: unknown) {
@@ -117,7 +119,7 @@ export async function GET(req: Request) {
             "Pragma": "no-cache",
           },
           ...docData,
-          ...match, // garante que sempre terá code, price, opening, variation
+          ...match, // garante que sempre terá code, price, opening, variation, minimum, maximum
         }),
         { status: 200 }
       );
@@ -159,6 +161,8 @@ async function getAllPricesFromSheet() {
             .replace("R$", "")
             .replace(/\./g, "")
             .replace(",", ".")}%`,
+          minimum: row[4]?.toString().trim() || "",
+          maximum: row[5]?.toString().trim() || "",
         };
       });
   } catch (err) {
