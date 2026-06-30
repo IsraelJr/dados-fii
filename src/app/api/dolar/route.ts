@@ -35,7 +35,7 @@ async function fetchWithTimeout(url: string, timeoutMs = 7000) {
 }
 
 async function getFromAwesomeApi(): Promise<DollarQuote> {
-    const res = await fetchWithTimeout("https://economia.awesomeapi.com.br/json/last/USD-BRL");
+    const res = await fetchWithTimeout(`https://economia.awesomeapi.com.br/json/last/USD-BRL?ts=${Date.now()}`);
 
     if (!res.ok) throw new Error(`AwesomeAPI HTTP ${res.status}`);
 
@@ -49,8 +49,29 @@ async function getFromAwesomeApi(): Promise<DollarQuote> {
     return { brl: value, source: "AwesomeAPI" };
 }
 
+async function getFromYahoo(): Promise<DollarQuote> {
+    const res = await fetchWithTimeout(`https://query1.finance.yahoo.com/v8/finance/chart/USDBRL=X?interval=1m&range=1d&ts=${Date.now()}`);
+
+    if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
+
+    const data = await res.json();
+    const result = data?.chart?.result?.[0];
+    const metaPrice = Number(result?.meta?.regularMarketPrice);
+    const closePrices = Array.isArray(result?.indicators?.quote?.[0]?.close)
+        ? result.indicators.quote[0].close.filter((value: unknown) => Number.isFinite(Number(value)))
+        : [];
+    const lastClose = Number(closePrices[closePrices.length - 1]);
+    const value = Number.isFinite(lastClose) && lastClose > 0 ? lastClose : metaPrice;
+
+    if (!Number.isFinite(value) || value <= 0) {
+        throw new Error("Yahoo retornou cotação inválida");
+    }
+
+    return { brl: value, source: "Yahoo Finance" };
+}
+
 async function getFromOpenExchangeRateApi(): Promise<DollarQuote> {
-    const res = await fetchWithTimeout("https://open.er-api.com/v6/latest/USD");
+    const res = await fetchWithTimeout(`https://open.er-api.com/v6/latest/USD?ts=${Date.now()}`);
 
     if (!res.ok) throw new Error(`open.er-api.com HTTP ${res.status}`);
 
@@ -65,7 +86,7 @@ async function getFromOpenExchangeRateApi(): Promise<DollarQuote> {
 }
 
 async function getFromFrankfurter(): Promise<DollarQuote> {
-    const res = await fetchWithTimeout("https://api.frankfurter.app/latest?from=USD&to=BRL");
+    const res = await fetchWithTimeout(`https://api.frankfurter.app/latest?from=USD&to=BRL&ts=${Date.now()}`);
 
     if (!res.ok) throw new Error(`Frankfurter HTTP ${res.status}`);
 
@@ -79,27 +100,12 @@ async function getFromFrankfurter(): Promise<DollarQuote> {
     return { brl: value, source: "Frankfurter" };
 }
 
-async function getFromYahoo(): Promise<DollarQuote> {
-    const res = await fetchWithTimeout("https://query1.finance.yahoo.com/v8/finance/chart/USDBRL=X?interval=1d&range=1d");
-
-    if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
-
-    const data = await res.json();
-    const value = Number(data?.chart?.result?.[0]?.meta?.regularMarketPrice);
-
-    if (!Number.isFinite(value) || value <= 0) {
-        throw new Error("Yahoo retornou cotação inválida");
-    }
-
-    return { brl: value, source: "Yahoo Finance" };
-}
-
 export async function GET() {
     const providers = [
+        getFromYahoo,
         getFromAwesomeApi,
         getFromOpenExchangeRateApi,
         getFromFrankfurter,
-        getFromYahoo,
     ];
 
     const errors: string[] = [];
@@ -120,7 +126,9 @@ export async function GET() {
                 {
                     status: 200,
                     headers: {
-                        "Cache-Control": "no-store, no-cache, must-revalidate",
+                        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0",
+                        Pragma: "no-cache",
+                        Expires: "0",
                     },
                 }
             );
@@ -143,7 +151,9 @@ export async function GET() {
         {
             status: 200,
             headers: {
-                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0",
+                Pragma: "no-cache",
+                Expires: "0",
             },
         }
     );
