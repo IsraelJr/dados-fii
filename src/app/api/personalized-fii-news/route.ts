@@ -3,32 +3,6 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type NewsItem = {
-  title?: string;
-  source?: string;
-  publishedAt?: string;
-  url?: string;
-};
-
-type FiiContext = {
-  ticker: string;
-  data?: any;
-  news: NewsItem[];
-  lastDividend?: {
-    month: string;
-    earnings: string;
-    dateWith?: string;
-    paymentDate?: string;
-    monthlyYield?: string;
-  } | null;
-  nextPayment?: {
-    month: string;
-    earnings: string;
-    dateWith?: string;
-    paymentDate?: string;
-  } | null;
-};
-
 type FiiInsight = {
   ticker: string;
   title: string;
@@ -37,116 +11,23 @@ type FiiInsight = {
   searchUrl: string;
 };
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const MONTHS_PTBR: Record<string, string> = {
-  January: "Janeiro",
-  February: "Fevereiro",
-  March: "Março",
-  April: "Abril",
-  May: "Maio",
-  June: "Junho",
-  July: "Julho",
-  August: "Agosto",
-  September: "Setembro",
-  October: "Outubro",
-  November: "Novembro",
-  December: "Dezembro",
-};
-
 function buildGoogleSearchUrl(ticker: string) {
-  const query = `${ticker} FII site oficial administradora gestor relatório gerencial fatos relevantes dividendos`;
+  const query = `${ticker} FII site oficial administradora gestor relatório gerencial fatos relevantes dividendos relatório gerencial`;
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
-function parseCurrency(value: unknown) {
-  if (typeof value === "number") return value;
-  return Number(
-    String(value || "0")
-      .replace("R$", "")
-      .replace(/\./g, "")
-      .replace(",", ".")
-      .trim()
-  ) || 0;
-}
-
-function formatPercent(value: number) {
-  if (!Number.isFinite(value)) return "";
-  return `${value.toFixed(2).replace(".", ",")}%`;
-}
-
-function getCurrentYearData(data: any) {
-  const year = new Date().getFullYear();
-  return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {};
-}
-
-function getOrderedDividends(data: any) {
-  const yearData = getCurrentYearData(data);
-  return Object.entries(yearData)
-    .sort(([a], [b]) => MONTHS.indexOf(a) - MONTHS.indexOf(b))
-    .map(([month, info]: any) => ({ month, info }));
-}
-
-function parseDate(value: string) {
-  const [day, month, year] = String(value || "").split("/").map(Number);
-  if (!day || !month || !year) return null;
-  return new Date(year, month - 1, day, 23, 59, 59);
-}
-
-function getDividendContext(data: any) {
-  const ordered = getOrderedDividends(data);
-  const price = parseCurrency(data?.price);
-
-  const last = [...ordered]
-    .filter(({ info }: any) => info?.earnings)
-    .reverse()[0];
-
-  const lastDividend = last
-    ? {
-      month: MONTHS_PTBR[last.month] || last.month,
-      earnings: String(last.info?.earnings || ""),
-      dateWith: last.info?.date_with,
-      paymentDate: last.info?.payment_date,
-      monthlyYield: price ? formatPercent((parseCurrency(last.info?.earnings) / price) * 100) : "",
-    }
-    : null;
-
-  const today = new Date();
-  const next = ordered
-    .map(({ month, info }: any) => ({ month, info, date: parseDate(info?.payment_date) }))
-    .filter((item: any) => item.date && item.date >= today)
-    .sort((a: any, b: any) => a.date.getTime() - b.date.getTime())[0];
-
-  const nextPayment = next
-    ? {
-      month: MONTHS_PTBR[next.month] || next.month,
-      earnings: String(next.info?.earnings || ""),
-      dateWith: next.info?.date_with,
-      paymentDate: next.info?.payment_date,
-    }
-    : null;
-
-  return { lastDividend, nextPayment };
-}
-
-function fallbackInsights(contexts: FiiContext[]): FiiInsight[] {
-  return contexts.map((context) => {
-    const segment = context.data?.segment_new || context.data?.segment || "segmento não informado";
-    const price = context.data?.price || "preço não informado";
-    const lastDividend = context.lastDividend;
-    const newsTitles = context.news.map((item) => item.title).filter(Boolean).slice(0, 2).join("; ");
-
-    return {
-      ticker: context.ticker,
-      title: `Resumo de ${context.ticker}`,
-      summary: `${context.ticker} está classificado como ${segment}, com preço atual de ${price}. ${lastDividend ? `O último rendimento encontrado foi ${lastDividend.earnings} em ${lastDividend.month}${lastDividend.monthlyYield ? `, equivalente a DY mensal aproximado de ${lastDividend.monthlyYield}` : ""}.` : "Não há rendimento recente suficiente na base para calcular o DY mensal."} ${newsTitles ? `Últimas notícias encontradas: ${newsTitles}.` : "Consulte fontes oficiais para notícias recentes e relatório gerencial."}`,
-      attentionPoints: [
-        context.nextPayment ? `Próximo pagamento na base: ${context.nextPayment.earnings} com pagamento em ${context.nextPayment.paymentDate || "data não informada"}.` : "Verifique se há novos pagamentos anunciados no relatório ou comunicado oficial.",
-        "Leia o relatório gerencial para avaliar vacância, inadimplência, aquisições, vendas e mudanças de estratégia.",
-        "Use notícias como ponto de partida, mas confirme fatos relevantes e comunicados na fonte oficial do fundo.",
-      ],
-      searchUrl: buildGoogleSearchUrl(context.ticker),
-    };
-  });
+function fallbackInsights(tickers: string[]): FiiInsight[] {
+  return tickers.map((ticker: string) => ({
+    ticker,
+    title: `Pesquisar ${ticker}`,
+    summary: `Não foi possível gerar um resumo com IA para ${ticker} neste momento. Consulte fontes oficiais, relatórios gerenciais, fatos relevantes e notícias recentes antes de tomar qualquer decisão.`,
+    attentionPoints: [
+      "Abrir a busca por fontes oficiais e relatório gerencial.",
+      "Verificar último dividendo, data-com, pagamento e DY mensal.",
+      "Confirmar aquisições, vendas e riscos diretamente nos comunicados do fundo.",
+    ],
+    searchUrl: buildGoogleSearchUrl(ticker),
+  }));
 }
 
 function extractOutputText(payload: any) {
@@ -174,118 +55,68 @@ function safeJsonParse(text: string) {
   }
 }
 
-function getOrigin(req: Request) {
-  const url = new URL(req.url);
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
-  const protocol = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "") || "https";
-  return `${protocol}://${host}`;
-}
-
-async function fetchJson(url: string) {
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-async function buildFiiContexts(tickers: string[], origin: string): Promise<FiiContext[]> {
-  return Promise.all(
-    tickers.map(async (ticker: string) => {
-      const [data, newsData] = await Promise.all([
-        fetchJson(`${origin}/api/fii?ticker=${encodeURIComponent(ticker)}`),
-        fetchJson(`${origin}/api/fii-news?ticker=${encodeURIComponent(ticker)}`),
-      ]);
-
-      const dividendContext = data ? getDividendContext(data) : { lastDividend: null, nextPayment: null };
-      const news = Array.isArray(newsData?.news) ? newsData.news.slice(0, 3) : [];
-
-      return {
-        ticker,
-        data,
-        news,
-        ...dividendContext,
-      };
-    })
-  );
-}
-
-function buildPrompt(contexts: FiiContext[]) {
-  const tickers = contexts.map((context) => context.ticker);
+function buildPrompt(tickers: string[]) {
   const basePrompt = process.env.OPENAI_PROMPT_ABOUT_FII?.trim() || `
-Resuma de forma prudente os dados disponíveis sobre o FII {ticker}.
-Use apenas as informações fornecidas pelo sistema e não invente notícias, aquisições, vendas ou dividendos.
-Quando não houver dados suficientes, diga o que o investidor deve verificar em fontes oficiais.
-Se houver dados de dividendos, destaque o último rendimento e o DY mensal calculado.
-Se houver notícias ou fatos relevantes fornecidos, resuma em 3-4 linhas.
+Resuma as notícias mais recentes e relevantes sobre o FII {ticker} em 3-4 linhas.
+Destaque o último dividendo, o respectivo DY mensal, possíveis aquisições ou vendas e como está a saúde do fundo.
 `;
 
-  const promptByTicker = contexts
-    .map((context) => `Ticker ${context.ticker}: ${basePrompt.replace(/\{ticker\}/g, context.ticker)}`)
+  const promptByTicker = tickers
+    .map((ticker) => `Para ${ticker}: ${basePrompt.replace(/\{ticker\}/g, ticker)}`)
     .join("\n\n");
 
-  const suppliedContext = contexts.map((context) => ({
-    ticker: context.ticker,
-    price: context.data?.price || null,
-    opening: context.data?.opening || null,
-    variation: context.data?.variation || null,
-    minimum: context.data?.minimum || null,
-    maximum: context.data?.maximum || null,
-    segment: context.data?.segment_new || context.data?.segment || null,
-    socialReason: context.data?.socialReason || context.data?.name || null,
-    cnpj: context.data?.cnpj || null,
-    dividendYield: context.data?.dividendYield || null,
-    pvp: context.data?.pvp || null,
-    equityValuePerShare: context.data?.equityValuePerShare || null,
-    administrator: context.data?.administrator || context.data?.admin || null,
-    report: context.data?.report || context.data?.reportUrl || context.data?.managementReport || null,
-    lastDividend: context.lastDividend,
-    nextPayment: context.nextPayment,
-    latestNews: context.news.map((item) => ({
-      title: item.title || null,
-      source: item.source || null,
-      publishedAt: item.publishedAt || null,
-      url: item.url || null,
-    })),
-  }));
-
   return `
-Você é o assistente editorial do site Dados FII, um site brasileiro de consulta de fundos imobiliários.
+Você é um analista editorial do site Dados FII.
 
-Tarefa:
-Gerar um resumo curto, útil e fundamentado para os FIIs mais pesquisados pelo usuário.
+Faça uma pesquisa na web e responda com um resumo útil, no estilo de uma resposta direta de chat, para os FIIs abaixo.
 
-Instruções configuradas:
 ${promptByTicker}
 
-Dados fornecidos pelo sistema. Use somente estes dados e não invente nada além deles:
-${JSON.stringify(suppliedContext, null, 2)}
-
-Regras obrigatórias:
-- Responda em português do Brasil.
-- Use linguagem simples, objetiva e prudente.
+Regras:
+- Use informações recentes encontradas na web, relatórios gerenciais, comunicados oficiais, notícias de mercado e dados públicos.
+- Não use dados internos da base Dados FII como fonte principal.
 - Não dê recomendação de compra ou venda.
-- Não invente notícias, aquisições, vendas, dividendos ou dados de relatório que não estejam no contexto fornecido.
-- Quando não houver relatório gerencial ou dados suficientes, diga claramente que o investidor deve verificar o relatório oficial.
-- Use os títulos das notícias fornecidas como base para o resumo de mercado, sem afirmar fatos além do título/fonte.
-- Cada ticker deve ter uma frase de resumo e 3 pontos de atenção específicos, não genéricos.
+- Se não encontrar algum dado, diga isso de forma natural, sem inventar.
+- A resposta deve ser específica por ticker, não genérica.
 - Preserve todos os tickers recebidos: ${tickers.join(", ")}.
 - Retorne somente JSON válido, sem markdown.
 
-Formato esperado:
+Formato obrigatório:
 {
   "insights": [
     {
       "ticker": "TGAR11",
-      "title": "Resumo de acompanhamento",
-      "summary": "texto curto baseado nos dados fornecidos",
-      "attentionPoints": ["ponto específico 1", "ponto específico 2", "ponto específico 3"]
+      "title": "TGAR11 – Resumo das notícias mais recentes",
+      "summary": "Resumo corrido em 3-4 linhas, citando dividendo, DY mensal, aquisições/vendas quando houver e saúde do fundo.",
+      "attentionPoints": [
+        "Ponto específico 1, baseado na pesquisa.",
+        "Ponto específico 2, baseado na pesquisa.",
+        "Ponto específico 3, baseado na pesquisa."
+      ]
     }
   ]
 }
 `;
+}
+
+function responseBody(prompt: string) {
+  const shouldUseWebSearch = process.env.OPENAI_USE_WEB_SEARCH !== "false";
+
+  return {
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    input: prompt,
+    temperature: 0.2,
+    ...(shouldUseWebSearch
+      ? {
+        tools: [
+          {
+            type: "web_search_preview",
+            search_context_size: "medium",
+          },
+        ],
+      }
+      : {}),
+  };
 }
 
 export async function POST(req: Request) {
@@ -301,16 +132,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, mode: "empty", insights: [] });
   }
 
-  const origin = getOrigin(req);
-  const contexts = await buildFiiContexts(tickers, origin);
-  const fallback = fallbackInsights(contexts);
+  const fallback = fallbackInsights(tickers);
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
   }
 
-  const prompt = buildPrompt(contexts);
+  const prompt = buildPrompt(tickers);
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -319,11 +148,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        input: prompt,
-        temperature: 0.2,
-      }),
+      body: JSON.stringify(responseBody(prompt)),
     });
 
     if (!response.ok) {
@@ -341,19 +166,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
     }
 
-    const normalized: FiiInsight[] = contexts.map((context: FiiContext) => {
-      const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === context.ticker);
-      const fallbackItem = fallback.find((item) => item.ticker === context.ticker);
+    const normalized: FiiInsight[] = tickers.map((ticker: string) => {
+      const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
+      const fallbackItem = fallback.find((item) => item.ticker === ticker);
       if (!found || !fallbackItem) return fallbackItem || fallback[0];
 
       return {
-        ticker: context.ticker,
-        title: String(found.title || `Resumo de ${context.ticker}`),
+        ticker,
+        title: String(found.title || `${ticker} – Resumo das notícias mais recentes`),
         summary: String(found.summary || fallbackItem.summary || ""),
         attentionPoints: Array.isArray(found.attentionPoints)
           ? found.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
           : fallbackItem.attentionPoints,
-        searchUrl: buildGoogleSearchUrl(context.ticker),
+        searchUrl: buildGoogleSearchUrl(ticker),
       };
     });
 
