@@ -12,20 +12,18 @@ type FiiNews = {
     loading: boolean;
 };
 
+type NewsMode = "openai" | "perplexity" | "fallback" | "empty";
+
 const buildGoogleSearchUrl = (ticker: string) => {
-    const query = `${ticker} FII site oficial administradora gestor relatório gerencial fatos relevantes dividendos`;
+    const query = `${ticker} FII site oficial administradora gestor relatório gerencial fatos relevantes dividendos relatório gerencial`;
     return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 };
 
 const buildFallbackInsight = (ticker: string): FiiNews => ({
     ticker,
-    title: `Acompanhe ${ticker}`,
-    summary: "Consulte notícias, site oficial, administradora, relatórios gerenciais, fatos relevantes e próximos dividendos antes de tomar qualquer decisão.",
-    attentionPoints: [
-        "Verifique comunicados oficiais e relatórios recentes.",
-        "Confira dividendos, vacância, inadimplência e mudanças na gestão.",
-        "Evite decidir apenas por notícias ou variação de preço no curto prazo.",
-    ],
+    title: `Pesquisar ${ticker}`,
+    summary: "",
+    attentionPoints: [],
     searchUrl: buildGoogleSearchUrl(ticker),
     loading: false,
 });
@@ -34,7 +32,7 @@ export default function PersonalizedNews() {
     const [news, setNews] = useState<FiiNews[]>([]);
     const [loadingFII, setLoadingFII] = useState(false);
     const [error, setError] = useState("");
-    const [mode, setMode] = useState<"openai" | "fallback" | "empty">("empty");
+    const [mode, setMode] = useState<NewsMode>("empty");
 
     useEffect(() => {
         const loadTopFiis = async () => {
@@ -79,7 +77,8 @@ export default function PersonalizedNews() {
                     return;
                 }
 
-                setMode(aiData.mode === "openai" ? "openai" : "fallback");
+                const nextMode: NewsMode = aiData.mode === "perplexity" || aiData.mode === "openai" ? aiData.mode : "fallback";
+                setMode(nextMode);
                 setNews(
                     topFiis.map((ticker) => {
                         const insight = insights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
@@ -89,10 +88,12 @@ export default function PersonalizedNews() {
                         return {
                             ticker,
                             title: String(insight.title || fallback.title),
-                            summary: String(insight.summary || fallback.summary),
-                            attentionPoints: Array.isArray(insight.attentionPoints) && insight.attentionPoints.length
-                                ? insight.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
-                                : fallback.attentionPoints,
+                            summary: nextMode === "fallback" ? "" : String(insight.summary || fallback.summary),
+                            attentionPoints: nextMode === "fallback"
+                                ? []
+                                : Array.isArray(insight.attentionPoints) && insight.attentionPoints.length
+                                    ? insight.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
+                                    : fallback.attentionPoints,
                             searchUrl: String(insight.searchUrl || fallback.searchUrl),
                             loading: false,
                         };
@@ -101,7 +102,7 @@ export default function PersonalizedNews() {
             } catch (err: any) {
                 console.error(err);
                 setMode("fallback");
-                setError("Não foi possível gerar o resumo personalizado. Exibindo links de pesquisa.");
+                setError("Não foi possível gerar o resumo personalizado agora.");
             } finally {
                 setLoadingFII(false);
             }
@@ -121,13 +122,13 @@ export default function PersonalizedNews() {
         <div className="mt-12">
             <div className="mb-4 flex flex-col items-center gap-2">
                 <h2 className="text-xl font-bold">📰 Resumo dos FIIs mais buscados por você</h2>
-                {mode === "openai" && (
+                {(mode === "openai" || mode === "perplexity") && (
                     <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
                         <Bot size={14} /> Resumo gerado por IA
                     </p>
                 )}
                 {mode === "fallback" && (
-                    <p className="text-sm text-gray-500">Modo simples: links de pesquisa e pontos de atenção.</p>
+                    <p className="text-sm text-gray-500">Resumo indisponível no momento. Consulte as fontes oficiais.</p>
                 )}
             </div>
 
@@ -149,8 +150,8 @@ export default function PersonalizedNews() {
                             </p>
                         ) : (
                             <>
-                                <p className="text-sm font-bold text-gray-800">{title}</p>
-                                <p className="mt-2 text-sm leading-6 text-gray-600">{summary}</p>
+                                {title && <p className="text-sm font-bold text-gray-800">{title}</p>}
+                                {summary && <p className="mt-2 text-sm leading-6 text-gray-600">{summary}</p>}
 
                                 {!!attentionPoints.length && (
                                     <ul className="mt-3 space-y-2 text-sm text-gray-600">
