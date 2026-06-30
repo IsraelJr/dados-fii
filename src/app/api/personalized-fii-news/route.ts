@@ -82,8 +82,8 @@ Formato obrigatório:
 {
   "insights": [
     {
-      "ticker": "TGAR11",
-      "title": "TGAR11 – Resumo das notícias mais recentes",
+      "ticker": "ABCD11",
+      "title": "ABCD11 – Resumo das notícias mais recentes",
       "summary": "Resumo corrido em 3-4 linhas, citando dividendo, DY mensal, aquisições/vendas quando houver e saúde do fundo.",
       "attentionPoints": [
         "Ponto específico 1, baseado na pesquisa.",
