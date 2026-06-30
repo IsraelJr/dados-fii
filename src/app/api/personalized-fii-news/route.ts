@@ -55,6 +55,52 @@ function safeJsonParse(text: string) {
   }
 }
 
+function buildPrompt(tickers: string[]) {
+  const basePrompt = process.env.OPENAI_PROMPT_ABOUT_FII?.trim() || `
+Resuma de forma prudente os dados disponíveis sobre o FII {ticker}.
+Use apenas as informações fornecidas pelo sistema e não invente notícias, aquisições, vendas ou dividendos.
+Quando não houver dados suficientes, diga o que o investidor deve verificar em fontes oficiais.
+Se houver dados de dividendos, destaque o último rendimento e o DY mensal calculado.
+Se houver notícias ou fatos relevantes fornecidos, resuma em 3-4 linhas.
+`;
+
+  const promptByTicker = tickers
+    .map((ticker) => `Ticker ${ticker}: ${basePrompt.replace(/\{ticker\}/g, ticker)}`)
+    .join("\n\n");
+
+  return `
+Você é o assistente editorial do site Dados FII, um site brasileiro de consulta de fundos imobiliários.
+
+Tarefa:
+Gerar um resumo curto e útil para os FIIs mais pesquisados pelo usuário.
+
+Instruções configuradas:
+${promptByTicker}
+
+Regras obrigatórias:
+- Responda em português do Brasil.
+- Use linguagem simples, objetiva e prudente.
+- Não dê recomendação de compra ou venda.
+- Não invente fatos específicos se não tiver fonte confiável ou dados fornecidos pelo sistema.
+- Se não houver dados suficientes sobre um ticker, diga o que o investidor deve verificar em fontes oficiais.
+- Cada ticker deve ter uma frase de resumo e 3 pontos de atenção.
+- Preserve todos os tickers recebidos: ${tickers.join(", ")}.
+- Retorne somente JSON válido, sem markdown.
+
+Formato esperado:
+{
+  "insights": [
+    {
+      "ticker": "TGAR11",
+      "title": "Resumo de acompanhamento",
+      "summary": "texto curto",
+      "attentionPoints": ["ponto 1", "ponto 2", "ponto 3"]
+    }
+  ]
+}
+`;
+}
+
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const tickers: string[] = Array.isArray(body?.tickers)
@@ -75,34 +121,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
   }
 
-  const prompt = `
-Você é o assistente editorial do site Dados FII, um site brasileiro de consulta de fundos imobiliários.
-
-Tarefa:
-Gerar um resumo curto e útil para os FIIs mais pesquisados pelo usuário: ${tickers.join(", ")}.
-
-Regras obrigatórias:
-- Responda em português do Brasil.
-- Use linguagem simples, objetiva e prudente.
-- Não dê recomendação de compra ou venda.
-- Não invente fatos específicos se não tiver fonte confiável.
-- Foque no que o investidor deve acompanhar: relatórios gerenciais, dividendos, fatos relevantes, gestão, vacância, inadimplência, segmento e riscos.
-- Cada ticker deve ter uma frase de resumo e 3 pontos de atenção.
-- Preserve todos os tickers recebidos.
-- Retorne somente JSON válido, sem markdown.
-
-Formato esperado:
-{
-  "insights": [
-    {
-      "ticker": "TGAR11",
-      "title": "Resumo de acompanhamento",
-      "summary": "texto curto",
-      "attentionPoints": ["ponto 1", "ponto 2", "ponto 3"]
-    }
-  ]
-}
-`;
+  const prompt = buildPrompt(tickers);
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
