@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Wallet } from "lucide-react";
+import { BookOpen, Loader2, Wallet } from "lucide-react";
 import CookieBanner from "./components/CookieBanner";
 import PersonalizedNews from "./components/PersonalizedNews";
 import FiiTopPanels from "./components/FiiTopPanels";
@@ -351,6 +351,26 @@ export default function Home() {
             )}
 
             <PersonalizedNews />
+
+            <section className="mx-auto mt-8 max-w-4xl rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-700">
+                            <BookOpen size={14} /> Cantinho da leitura
+                        </p>
+                        <h2 className="mt-3 text-xl font-extrabold text-slate-800">Educação financeira também começa cedo</h2>
+                        <p className="mt-1 text-sm text-slate-600">
+                            Conheça livros e materiais sobre dinheiro, escolhas e investimentos, sem atrapalhar sua consulta de FIIs.
+                        </p>
+                    </div>
+                    <Link
+                        href="/livros"
+                        className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+                    >
+                        Ver livros
+                    </Link>
+                </div>
+            </section>
 
             <br />
             <br />
