@@ -384,18 +384,18 @@ export default function Home() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-700">
-                            <BookOpen size={14} /> Cantinho da leitura
+                            <BookOpen size={14} /> Educação financeira
                         </p>
-                        <h2 className="mt-3 text-xl font-extrabold text-slate-800">Educação financeira também começa cedo</h2>
+                        <h2 className="mt-3 text-xl font-extrabold text-slate-800">Aprenda sobre FIIs, dinheiro e bons hábitos</h2>
                         <p className="mt-1 text-sm text-slate-600">
-                            Conheça livros e materiais sobre dinheiro, escolhas e investimentos.
+                            Veja explicações simples, exemplos práticos e livros sobre dinheiro, escolhas e investimentos.
                         </p>
                     </div>
                     <Link
-                        href="/livros"
+                        href="/educacao"
                         className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
                     >
-                        Ver livros
+                        Ver educação
                     </Link>
                 </div>
             </section>
