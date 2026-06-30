@@ -5,7 +5,7 @@ import PageHeader from "../components/PageHeader";
 const books = [
   {
     title: "A Moedinha de Léo",
-    author: "Israel Alves dos Santos Junior",
+    author: "Israel Alves",
     category: "Educação financeira infantil",
     status: "Em análise na Amazon",
     description:
