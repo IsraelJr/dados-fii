@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, CalendarDays, Loader2, Search, Wallet } from "lucide-react";
+import { BookOpen, Loader2, Search } from "lucide-react";
 import CookieBanner from "./components/CookieBanner";
 import PersonalizedNews from "./components/PersonalizedNews";
 import FiiTopPanels from "./components/FiiTopPanels";
@@ -292,18 +292,6 @@ export default function Home() {
                                     <Loader2 className="animate-spin" size={18} /> Carregando dados do FII...
                                 </p>
                             )}
-                        </div>
-
-                        <div className="mt-5 flex flex-wrap gap-2">
-                            <Link href="/carteira" className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-extrabold text-white hover:bg-indigo-700">
-                                <Wallet size={16} /> Minha carteira
-                            </Link>
-                            <Link href="/calendario-dividendos-fiis" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-200">
-                                <CalendarDays size={16} /> Calendário
-                            </Link>
-                            <Link href="/educacao" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-200">
-                                <BookOpen size={16} /> Educação
-                            </Link>
                         </div>
                     </div>
 
