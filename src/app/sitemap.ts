@@ -1,4 +1,8 @@
 import type { MetadataRoute } from "next";
+import { adminDb } from "@/lib/firebaseAdmin";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://dadosfii.com.br";
 const now = new Date();
@@ -10,7 +14,7 @@ const STATIC_ROUTES = [
   "/educacao",
 ];
 
-const FEATURED_TICKERS = [
+const FALLBACK_TICKERS = [
   "TGAR11",
   "VGIA11",
   "MXRF11",
@@ -29,7 +33,28 @@ const FEATURED_TICKERS = [
   "VGHF11",
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
+function normalizeTicker(value: unknown) {
+  const ticker = String(value || "").trim().toUpperCase();
+  return /^[A-Z0-9]{4,8}$/.test(ticker) ? ticker : "";
+}
+
+async function getFiiTickers() {
+  try {
+    const snapshot = await adminDb.collection("Fiis").limit(5000).get();
+    const tickers = snapshot.docs
+      .map((doc) => normalizeTicker(doc.data()?.code || doc.id))
+      .filter(Boolean);
+
+    return Array.from(new Set(tickers)).sort((a, b) => a.localeCompare(b));
+  } catch (err) {
+    console.error("Erro ao gerar sitemap dinâmico de FIIs:", err);
+    return FALLBACK_TICKERS;
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const tickers = await getFiiTickers();
+
   const staticPages = STATIC_ROUTES.map((route) => ({
     url: `${SITE_URL}${route}`,
     lastModified: now,
@@ -37,7 +62,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: route === "" ? 1 : 0.8,
   }));
 
-  const fiiPages = FEATURED_TICKERS.map((ticker) => ({
+  const fiiPages = tickers.map((ticker) => ({
     url: `${SITE_URL}/fii/${ticker}`,
     lastModified: now,
     changeFrequency: "daily" as const,
