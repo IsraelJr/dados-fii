@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { BookOpen, ExternalLink, PiggyBank } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 
@@ -24,22 +23,14 @@ export default function BooksPage() {
       />
 
       <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-200">
-              <PiggyBank size={14} /> Educação financeira
-            </p>
-            <h2 className="mt-3 text-2xl font-extrabold text-white">Leitura para formar bons hábitos</h2>
-            <p className="mt-2 max-w-3xl text-sm font-medium text-gray-300">
-              Este espaço reúne obras autorais e indicações de leitura que combinam com a proposta do Dados FII: entender dinheiro com clareza, sem complicar.
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-          >
-            Voltar para consulta
-          </Link>
+        <div>
+          <p className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-200">
+            <PiggyBank size={14} /> Educação financeira
+          </p>
+          <h2 className="mt-3 text-2xl font-extrabold text-white">Leitura para formar bons hábitos</h2>
+          <p className="mt-2 max-w-3xl text-sm font-medium text-gray-300">
+            Conteúdos para entender melhor como administrar, guardar e usar o dinheiro com mais consciência no dia a dia.
+          </p>
         </div>
       </section>
 
