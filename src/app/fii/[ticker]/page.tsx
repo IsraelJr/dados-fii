@@ -31,11 +31,25 @@ type NewsItem = {
   publishedAt: string;
 };
 
+type MetricTone = "green" | "indigo" | "yellow" | "red" | "gray";
+
 function parseCurrency(value: unknown) {
   if (typeof value === "number") return value;
   return Number(
     String(value || "0")
       .replace("R$", "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .trim()
+  ) || 0;
+}
+
+function parseNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  return Number(
+    String(value || "0")
+      .replace("R$", "")
+      .replace("%", "")
       .replace(/\./g, "")
       .replace(",", ".")
       .trim()
@@ -50,6 +64,32 @@ function formatDividend(value: unknown) {
   const parsed = parseCurrency(value);
   if (!parsed) return "-";
   return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
+}
+
+function formatPercent(value: unknown, decimals = 2) {
+  if (value === null || value === undefined || value === "") return "-";
+  const parsed = parseNumber(value);
+  if (!Number.isFinite(parsed)) return "-";
+  return `${parsed.toFixed(decimals).replace(".", ",")}%`;
+}
+
+function formatPvp(value: unknown) {
+  const parsed = parseNumber(value);
+  if (!parsed || !Number.isFinite(parsed)) return "-";
+  return parsed.toFixed(2).replace(".", ",");
+}
+
+function getVariationTone(value: unknown): MetricTone {
+  const parsed = parseNumber(value);
+  if (parsed > 0) return "green";
+  if (parsed < 0) return "red";
+  return "gray";
+}
+
+function getAgioDiscount(price: number, equityValuePerShare: number) {
+  if (!price || !equityValuePerShare) return null;
+  const result = ((price - equityValuePerShare) / equityValuePerShare) * 100;
+  return Number.isFinite(result) ? result : null;
 }
 
 function newsTimestamp(value: string) {
@@ -185,6 +225,9 @@ export default function FiiPage() {
   const nextPayment = useMemo(() => getNextPayment(data), [data]);
   const lastDividendValue = parseCurrency(lastDividend?.info?.earnings);
   const price = parseCurrency(data?.price);
+  const equityValuePerShare = parseNumber(data?.equityValuePerShare);
+  const pvp = parseNumber(data?.pvp) || (price && equityValuePerShare ? price / equityValuePerShare : 0);
+  const agioDiscount = getAgioDiscount(price, equityValuePerShare);
   const monthlyYield = price > 0 && lastDividendValue > 0 ? (lastDividendValue / price) * 100 : 0;
   const segment = data?.segment_new || data?.segment || "Sem segmento";
   const socialReason = data?.socialReason || data?.name || data?.razao_social || "Dados cadastrais não informados.";
@@ -222,9 +265,27 @@ export default function FiiPage() {
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-4">
             <MetricCard title="Preço atual" value={data.price || "-"} tone="indigo" />
+            <MetricCard title="Abertura" value={data.opening || "-"} tone="gray" />
+            <MetricCard title="Variação do dia" value={formatPercent(data.variation)} tone={getVariationTone(data.variation)} />
+            <MetricCard title="Segmento" value={segment} tone="indigo" />
+          </section>
+
+          <section className="grid gap-4 md:grid-cols-4">
+            <MetricCard title="Mínima" value={data.minimum || data.min || "-"} tone="yellow" />
+            <MetricCard title="Máxima" value={data.maximum || data.max || "-"} tone="green" />
+            <MetricCard title="DY" value={data.dividendYield ? formatPercent(data.dividendYield) : "-"} tone="green" />
+            <MetricCard title="P/VP" value={formatPvp(pvp)} tone="yellow" />
+          </section>
+
+          <section className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              title="Ágio/desconto"
+              value={agioDiscount === null ? "-" : formatPercent(agioDiscount, 3)}
+              description={agioDiscount === null ? "Valor patrimonial por cota não informado." : "Preço atual versus valor patrimonial por cota."}
+              tone={agioDiscount === null ? "gray" : agioDiscount <= 0 ? "green" : "red"}
+            />
             <MetricCard title="Último rendimento" value={formatDividend(lastDividend?.info?.earnings)} description={lastDividend ? MONTHS_PTBR[lastDividend.month] || lastDividend.month : "Sem rendimento no ano."} tone="green" />
             <MetricCard title="Yield mensal" value={monthlyYield ? `${monthlyYield.toFixed(2).replace(".", ",")}%` : "-"} description="Último rendimento dividido pelo preço atual." tone="yellow" />
-            <MetricCard title="Segmento" value={segment} tone="indigo" />
           </section>
 
           <section className="grid gap-4 md:grid-cols-[1fr_1fr]">
@@ -291,11 +352,13 @@ export default function FiiPage() {
   );
 }
 
-function MetricCard({ title, value, description, tone }: { title: string; value: string; description?: string; tone: "green" | "indigo" | "yellow" }) {
+function MetricCard({ title, value, description, tone }: { title: string; value: string; description?: string; tone: MetricTone }) {
   const toneClass = {
     green: "text-green-300",
     indigo: "text-indigo-300",
     yellow: "text-yellow-300",
+    red: "text-red-300",
+    gray: "text-gray-200",
   }[tone];
 
   return (
