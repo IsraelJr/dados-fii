@@ -20,18 +20,17 @@ function fallbackInsights(tickers: string[]): FiiInsight[] {
   return tickers.map((ticker: string) => ({
     ticker,
     title: `Pesquisar ${ticker}`,
-    summary: `Não foi possível gerar um resumo com IA para ${ticker} neste momento. Consulte fontes oficiais, relatórios gerenciais, fatos relevantes e notícias recentes antes de tomar qualquer decisão.`,
-    attentionPoints: [
-      "Abrir a busca por fontes oficiais e relatório gerencial.",
-      "Verificar último dividendo, data-com, pagamento e DY mensal.",
-      "Confirmar aquisições, vendas e riscos diretamente nos comunicados do fundo.",
-    ],
+    summary: "",
+    attentionPoints: [],
     searchUrl: buildGoogleSearchUrl(ticker),
   }));
 }
 
 function extractOutputText(payload: any) {
   if (typeof payload?.output_text === "string") return payload.output_text;
+
+  const responseText = payload?.choices?.[0]?.message?.content;
+  if (typeof responseText === "string") return responseText;
 
   const texts = payload?.output
     ?.flatMap((item: any) => item?.content || [])
@@ -56,7 +55,9 @@ function safeJsonParse(text: string) {
 }
 
 function buildPrompt(tickers: string[]) {
-  const basePrompt = process.env.OPENAI_PROMPT_ABOUT_FII?.trim() || `
+  const basePrompt = process.env.OPENAI_PROMPT_ABOUT_FII?.trim()
+    || process.env.PERPLEXITY_PROMPT_ABOUT_FII?.trim()
+    || `
 Resuma as notícias mais recentes e relevantes sobre o FII {ticker} em 3-4 linhas.
 Destaque o último dividendo, o respectivo DY mensal, possíveis aquisições ou vendas e como está a saúde do fundo.
 `;
@@ -99,24 +100,95 @@ Formato obrigatório:
 `;
 }
 
-function responseBody(prompt: string) {
+async function callPerplexity(prompt: string) {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) return null;
+
+  const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: process.env.PERPLEXITY_MODEL || "sonar-pro",
+      messages: [
+        {
+          role: "system",
+          content: "Você pesquisa informações atuais na web e responde somente no JSON solicitado, sem markdown.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.2,
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    console.error("Perplexity personalized FII news error:", response.status, detail);
+    return null;
+  }
+
+  return response.json();
+}
+
+async function callOpenAI(prompt: string) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+
   const shouldUseWebSearch = process.env.OPENAI_USE_WEB_SEARCH !== "false";
 
-  return {
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    input: prompt,
-    temperature: 0.2,
-    ...(shouldUseWebSearch
-      ? {
-        tools: [
-          {
-            type: "web_search_preview",
-            search_context_size: "medium",
-          },
-        ],
-      }
-      : {}),
-  };
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: process.env.OPENAI_SEARCH_MODEL || process.env.OPENAI_MODEL || "gpt-4o",
+      input: prompt,
+      temperature: 0.2,
+      ...(shouldUseWebSearch
+        ? {
+          tools: [
+            {
+              type: "web_search_preview",
+              search_context_size: "medium",
+            },
+          ],
+        }
+        : {}),
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    console.error("OpenAI personalized FII news error:", response.status, detail);
+    return null;
+  }
+
+  return response.json();
+}
+
+function normalizeInsights(tickers: string[], aiInsights: any[], fallback: FiiInsight[]) {
+  return tickers.map((ticker: string) => {
+    const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
+    const fallbackItem = fallback.find((item) => item.ticker === ticker);
+    if (!found || !fallbackItem) return fallbackItem || fallback[0];
+
+    return {
+      ticker,
+      title: String(found.title || `${ticker} – Resumo das notícias mais recentes`),
+      summary: String(found.summary || fallbackItem.summary || ""),
+      attentionPoints: Array.isArray(found.attentionPoints)
+        ? found.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
+        : fallbackItem.attentionPoints,
+      searchUrl: buildGoogleSearchUrl(ticker),
+    };
+  });
 }
 
 export async function POST(req: Request) {
@@ -133,58 +205,34 @@ export async function POST(req: Request) {
   }
 
   const fallback = fallbackInsights(tickers);
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
-  }
-
   const prompt = buildPrompt(tickers);
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(responseBody(prompt)),
-    });
+    const perplexityPayload = await callPerplexity(prompt);
+    if (perplexityPayload) {
+      const text = extractOutputText(perplexityPayload);
+      const parsed = safeJsonParse(text);
+      const aiInsights = Array.isArray(parsed?.insights) ? parsed.insights : [];
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      console.error("OpenAI personalized FII news error:", response.status, detail);
-      return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
+      if (aiInsights.length) {
+        return NextResponse.json({ ok: true, mode: "perplexity", insights: normalizeInsights(tickers, aiInsights, fallback) });
+      }
     }
 
-    const payload = await response.json();
-    const text = extractOutputText(payload);
-    const parsed = safeJsonParse(text);
-    const aiInsights = Array.isArray(parsed?.insights) ? parsed.insights : [];
+    const openAiPayload = await callOpenAI(prompt);
+    if (openAiPayload) {
+      const text = extractOutputText(openAiPayload);
+      const parsed = safeJsonParse(text);
+      const aiInsights = Array.isArray(parsed?.insights) ? parsed.insights : [];
 
-    if (!aiInsights.length) {
-      return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
+      if (aiInsights.length) {
+        return NextResponse.json({ ok: true, mode: "openai", insights: normalizeInsights(tickers, aiInsights, fallback) });
+      }
     }
 
-    const normalized: FiiInsight[] = tickers.map((ticker: string) => {
-      const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
-      const fallbackItem = fallback.find((item) => item.ticker === ticker);
-      if (!found || !fallbackItem) return fallbackItem || fallback[0];
-
-      return {
-        ticker,
-        title: String(found.title || `${ticker} – Resumo das notícias mais recentes`),
-        summary: String(found.summary || fallbackItem.summary || ""),
-        attentionPoints: Array.isArray(found.attentionPoints)
-          ? found.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
-          : fallbackItem.attentionPoints,
-        searchUrl: buildGoogleSearchUrl(ticker),
-      };
-    });
-
-    return NextResponse.json({ ok: true, mode: "openai", insights: normalized });
+    return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
   } catch (err) {
-    console.error("OpenAI personalized FII news exception:", err);
+    console.error("Personalized FII news exception:", err);
     return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
   }
 }
