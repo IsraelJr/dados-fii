@@ -17,7 +17,7 @@ function buildGoogleSearchUrl(ticker: string) {
 }
 
 function fallbackInsights(tickers: string[]): FiiInsight[] {
-  return tickers.map((ticker) => ({
+  return tickers.map((ticker: string) => ({
     ticker,
     title: `Acompanhe ${ticker}`,
     summary: "Consulte notícias, site oficial, administradora, relatórios gerenciais, fatos relevantes e próximos dividendos antes de tomar qualquer decisão.",
@@ -57,10 +57,10 @@ function safeJsonParse(text: string) {
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const tickers = Array.isArray(body?.tickers)
+  const tickers: string[] = Array.isArray(body?.tickers)
     ? body.tickers
       .map((ticker: unknown) => String(ticker || "").trim().toUpperCase())
-      .filter(Boolean)
+      .filter((ticker: string) => Boolean(ticker))
       .slice(0, 3)
     : [];
 
@@ -133,17 +133,18 @@ Formato esperado:
       return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
     }
 
-    const normalized = tickers.map((ticker) => {
+    const normalized: FiiInsight[] = tickers.map((ticker: string) => {
       const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
-      if (!found) return fallback.find((item) => item.ticker === ticker)!;
+      const fallbackItem = fallback.find((item) => item.ticker === ticker);
+      if (!found || !fallbackItem) return fallbackItem || fallback[0];
 
       return {
         ticker,
         title: String(found.title || `Resumo de ${ticker}`),
-        summary: String(found.summary || fallback.find((item) => item.ticker === ticker)?.summary || ""),
+        summary: String(found.summary || fallbackItem.summary || ""),
         attentionPoints: Array.isArray(found.attentionPoints)
           ? found.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
-          : fallback.find((item) => item.ticker === ticker)?.attentionPoints || [],
+          : fallbackItem.attentionPoints,
         searchUrl: buildGoogleSearchUrl(ticker),
       };
     });
