@@ -256,6 +256,25 @@ export default function FiiPage() {
         ) : null}
       />
 
+      {ticker && (
+        <section className="mb-6 rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
+          <h2 className="text-xl font-extrabold text-slate-800">Dados do {ticker}: preço, dividendos e rendimentos</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            A página do {ticker} reúne informações para acompanhamento do fundo imobiliário, incluindo cotação,
+            abertura, variação do dia, mínima, máxima, dividend yield, P/VP, ágio ou desconto, último rendimento,
+            yield mensal, próximo pagamento, histórico de rendimentos e notícias recentes relacionadas ao FII.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/calendario-dividendos-fiis" className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
+              Calendário de dividendos
+            </Link>
+            <Link href="/carteira" className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
+              Minha carteira
+            </Link>
+          </div>
+        </section>
+      )}
+
       {loading && (
         <p className="flex items-center justify-center gap-2 text-slate-600">
           <Loader2 className="animate-spin" size={20} /> Carregando dados do {ticker}...
