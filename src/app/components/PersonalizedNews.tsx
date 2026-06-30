@@ -1,60 +1,40 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { Loader2, Link as LinkIcon, Newspaper } from "lucide-react";
+import { Bot, Loader2, Link as LinkIcon, Newspaper } from "lucide-react";
 
-interface Source {
-    url: string;
-    metadata?: {
-        source?: string;
-        favicon?: string;
-    };
-}
-
-interface FiiNews {
+type FiiNews = {
     ticker: string;
-    sources?: Source[];
+    title: string;
+    summary: string;
+    attentionPoints: string[];
+    searchUrl: string;
     loading: boolean;
-}
+};
 
 const buildGoogleSearchUrl = (ticker: string) => {
     const query = `${ticker} FII site oficial administradora gestor relatório gerencial fatos relevantes dividendos`;
     return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 };
 
+const buildFallbackInsight = (ticker: string): FiiNews => ({
+    ticker,
+    title: `Acompanhe ${ticker}`,
+    summary: "Consulte notícias, site oficial, administradora, relatórios gerenciais, fatos relevantes e próximos dividendos antes de tomar qualquer decisão.",
+    attentionPoints: [
+        "Verifique comunicados oficiais e relatórios recentes.",
+        "Confira dividendos, vacância, inadimplência e mudanças na gestão.",
+        "Evite decidir apenas por notícias ou variação de preço no curto prazo.",
+    ],
+    searchUrl: buildGoogleSearchUrl(ticker),
+    loading: false,
+});
+
 export default function PersonalizedNews() {
     const [news, setNews] = useState<FiiNews[]>([]);
     const [loadingFII, setLoadingFII] = useState(false);
     const [error, setError] = useState("");
-
-    const prepareSearchLink = async (ticker: string) => {
-        setNews((prev) => [
-            { ticker, sources: [], loading: true },
-            ...prev.filter((f) => f.ticker !== ticker),
-        ]);
-
-        const googleUrl = buildGoogleSearchUrl(ticker);
-
-        setNews((prev) =>
-            prev.map((fii) =>
-                fii.ticker === ticker
-                    ? {
-                        ...fii,
-                        sources: [
-                            {
-                                url: googleUrl,
-                                metadata: {
-                                    source: `Buscar site oficial e administradora de ${ticker}`,
-                                    favicon: "https://www.google.com/favicon.ico",
-                                },
-                            },
-                        ],
-                        loading: false,
-                    }
-                    : fii
-            )
-        );
-    };
+    const [mode, setMode] = useState<"openai" | "fallback" | "empty">("empty");
 
     useEffect(() => {
         const loadTopFiis = async () => {
@@ -65,25 +45,63 @@ export default function PersonalizedNews() {
                 const cookieData = await cookieRes.json();
                 if (!cookieData.hasCookie) {
                     setNews([]);
+                    setMode("empty");
                     return;
                 }
 
                 const res = await fetch("/api/user-top-fiis");
                 if (!res.ok) throw new Error(`Erro ao buscar FIIs mais buscados: ${res.status}`);
                 const data = await res.json();
-                const topFiis: string[] = data.topFiis || [];
+                const topFiis: string[] = (data.topFiis || []).map((ticker: string) => String(ticker).toUpperCase()).slice(0, 3);
                 if (topFiis.length === 0) {
                     setNews([]);
+                    setMode("empty");
                     return;
                 }
 
                 setLoadingFII(true);
-                setNews(topFiis.map((ticker) => ({ ticker, sources: [], loading: true })));
+                setNews(topFiis.map((ticker) => ({ ...buildFallbackInsight(ticker), loading: true })));
 
-                await Promise.all(topFiis.map(prepareSearchLink));
+                const aiResponse = await fetch("/api/personalized-fii-news", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ tickers: topFiis }),
+                });
+
+                if (!aiResponse.ok) throw new Error(`Erro ao gerar resumo: ${aiResponse.status}`);
+
+                const aiData = await aiResponse.json();
+                const insights = Array.isArray(aiData.insights) ? aiData.insights : [];
+
+                if (!insights.length) {
+                    setMode("fallback");
+                    setNews(topFiis.map(buildFallbackInsight));
+                    return;
+                }
+
+                setMode(aiData.mode === "openai" ? "openai" : "fallback");
+                setNews(
+                    topFiis.map((ticker) => {
+                        const insight = insights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
+                        const fallback = buildFallbackInsight(ticker);
+                        if (!insight) return fallback;
+
+                        return {
+                            ticker,
+                            title: String(insight.title || fallback.title),
+                            summary: String(insight.summary || fallback.summary),
+                            attentionPoints: Array.isArray(insight.attentionPoints) && insight.attentionPoints.length
+                                ? insight.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
+                                : fallback.attentionPoints,
+                            searchUrl: String(insight.searchUrl || fallback.searchUrl),
+                            loading: false,
+                        };
+                    })
+                );
             } catch (err: any) {
                 console.error(err);
-                setError("Não foi possível carregar os FIIs mais consultados.");
+                setMode("fallback");
+                setError("Não foi possível gerar o resumo personalizado. Exibindo links de pesquisa.");
             } finally {
                 setLoadingFII(false);
             }
@@ -95,47 +113,64 @@ export default function PersonalizedNews() {
     if (loadingFII)
         return (
             <p className="flex items-center justify-center text-gray-500 italic mt-4">
-                <Loader2 className="animate-spin mr-2" size={20} /> Carregando FIIs mais consultados enquanto você pesquisa...
+                <Loader2 className="animate-spin mr-2" size={20} /> Gerando resumo dos FIIs mais consultados...
             </p>
         );
-    if (error) return <p className="text-red-500">{error}</p>;
 
     return (
         <div className="mt-12">
-            <h2 className="text-xl font-bold mb-4">📰 Resumo das notícias dos FIIs mais buscados por você</h2>
+            <div className="mb-4 flex flex-col items-center gap-2">
+                <h2 className="text-xl font-bold">📰 Resumo dos FIIs mais buscados por você</h2>
+                {mode === "openai" && (
+                    <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                        <Bot size={14} /> Resumo gerado por IA
+                    </p>
+                )}
+                {mode === "fallback" && (
+                    <p className="text-sm text-gray-500">Modo simples: links de pesquisa e pontos de atenção.</p>
+                )}
+            </div>
+
+            {error && <p className="mb-3 text-sm text-yellow-600">{error}</p>}
             {news.length === 0 && <p className="text-gray-500">Nenhuma pesquisa registrada ainda.</p>}
             <br />
-            <div className="grid md:grid-cols-3 gap-6">
-                {news.map(({ ticker, sources, loading }) => (
-                    <div key={ticker} className="bg-white rounded-2xl shadow-md p-5 text-left">
-                        <div className="flex items-center gap-2 mb-3">
+
+            <div className="grid gap-6 md:grid-cols-3">
+                {news.map(({ ticker, title, summary, attentionPoints, searchUrl, loading }) => (
+                    <div key={ticker} className="rounded-2xl bg-white p-5 text-left shadow-md">
+                        <div className="mb-3 flex items-center gap-2">
                             <Newspaper className="text-indigo-600" />
-                            <h3 className="text-lg font-semibold text-gray-400">{ticker}</h3>
+                            <h3 className="text-lg font-semibold text-gray-700">{ticker}</h3>
                         </div>
 
                         {loading ? (
                             <p className="flex items-center gap-2 text-gray-600 italic">
-                                <Loader2 className="animate-spin" size={16} /> Preparando pesquisa...
+                                <Loader2 className="animate-spin" size={16} /> Preparando resumo...
                             </p>
                         ) : (
-                            sources && sources.length > 0 && (
+                            <>
+                                <p className="text-sm font-bold text-gray-800">{title}</p>
+                                <p className="mt-2 text-sm leading-6 text-gray-600">{summary}</p>
+
+                                {!!attentionPoints.length && (
+                                    <ul className="mt-3 space-y-2 text-sm text-gray-600">
+                                        {attentionPoints.map((point) => (
+                                            <li key={`${ticker}-${point}`} className="rounded-lg bg-gray-50 p-2">
+                                                {point}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+
                                 <a
-                                    href={sources[0].url}
+                                    href={searchUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:underline"
+                                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:underline"
                                 >
-                                    {sources[0].metadata?.favicon && (
-                                        <img
-                                            src={sources[0].metadata.favicon}
-                                            alt="Google"
-                                            className="h-5 w-5"
-                                        />
-                                    )}
-                                    <span>{sources[0].metadata?.source || `Pesquisar ${ticker} no Google`}</span>
-                                    <LinkIcon size={14} />
+                                    Pesquisar fontes oficiais <LinkIcon size={14} />
                                 </a>
-                            )
+                            </>
                         )}
                     </div>
                 ))}
