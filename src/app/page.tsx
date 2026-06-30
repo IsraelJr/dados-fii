@@ -19,6 +19,7 @@ type DollarState = {
 };
 
 const DOLLAR_CACHE_KEY = "dados-fii-dollar-cache-v1";
+const FII_RESULT_ANCHOR = "fii-search-result";
 
 function getCachedDollar(): DollarState {
     if (typeof window === "undefined") return { formatted: "..." };
@@ -113,6 +114,13 @@ export default function Home() {
 
             const json = await res.json();
             setData(json);
+
+            window.setTimeout(() => {
+                document.getElementById(FII_RESULT_ANCHOR)?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                });
+            }, 100);
 
             await fetch("/api/search", {
                 method: "POST",
@@ -318,13 +326,15 @@ export default function Home() {
                 {!adsClosed && <GoogleAdsBlock onClose={closeAds} />}
 
                 {data && (
-                    <FiiSummary
-                        data={data}
-                        getCurrentYearDividends={getCurrentYearDividends}
-                        monthsPTBR={monthsPTBR}
-                        lastDividend={lastDividend}
-                        onDividendUpdate={fetchFII}
-                    />
+                    <div id={FII_RESULT_ANCHOR} className="scroll-mt-24">
+                        <FiiSummary
+                            data={data}
+                            getCurrentYearDividends={getCurrentYearDividends}
+                            monthsPTBR={monthsPTBR}
+                            lastDividend={lastDividend}
+                            onDividendUpdate={fetchFII}
+                        />
+                    </div>
                 )}
 
                 <HomeDividendCalendar />
