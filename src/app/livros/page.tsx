@@ -91,13 +91,6 @@ export default function BooksPage() {
           </article>
         ))}
       </section>
-
-      <section className="mt-6 rounded-2xl bg-white p-5 text-slate-700 shadow-sm ring-1 ring-slate-200">
-        <h2 className="text-xl font-extrabold text-slate-800">Por que isso está no Dados FII?</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Investir melhor começa antes da primeira compra: começa com escolhas, paciência e entendimento do valor do dinheiro. Este cantinho fica separado da consulta principal para não atrapalhar a navegação de quem veio pesquisar FIIs.
-        </p>
-      </section>
     </main>
   );
 }
