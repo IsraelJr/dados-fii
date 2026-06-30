@@ -467,7 +467,7 @@ export default function WalletPage() {
             value={ticker}
             onChange={(event) => setTicker(event.target.value.toUpperCase())}
             onKeyDown={(event) => { if (event.key === "Enter") addItem(); }}
-            placeholder="Ticker, ex: TGAR11"
+            placeholder="Ticker, ex: ABCD11"
             className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
           />
           <input
