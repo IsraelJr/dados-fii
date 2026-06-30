@@ -1,12 +1,16 @@
-'use client';
-
+import type { Metadata } from "next";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
-import { ExternalLink, Loader2, Newspaper } from "lucide-react";
+import { ExternalLink, Newspaper } from "lucide-react";
 import PageHeader from "../../components/PageHeader";
 import WalletQuickAddButton from "../../components/WalletQuickAddButton";
 import FiiAlert from "../../components/FiiAlert";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://dadosfii.com.br");
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const MONTHS_PTBR: Record<string, string> = {
@@ -24,6 +28,10 @@ const MONTHS_PTBR: Record<string, string> = {
   December: "Dezembro",
 };
 
+type PageProps = {
+  params: Promise<{ ticker: string }>;
+};
+
 type NewsItem = {
   title: string;
   url: string;
@@ -33,31 +41,36 @@ type NewsItem = {
 
 type MetricTone = "green" | "indigo" | "yellow" | "red" | "gray";
 
+async function fetchJson(path: string) {
+  try {
+    const response = await fetch(`${SITE_URL}${path}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
+}
+
 function parseCurrency(value: unknown) {
   if (typeof value === "number") return value;
-  return Number(
-    String(value || "0")
-      .replace("R$", "")
-      .replace(/\./g, "")
-      .replace(",", ".")
-      .trim()
-  ) || 0;
+
+  const text = String(value || "0").replace("R$", "").replace(/\s/g, "").trim();
+  if (!text) return 0;
+
+  const normalized = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function parseNumber(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  return Number(
-    String(value || "0")
-      .replace("R$", "")
-      .replace("%", "")
-      .replace(/\./g, "")
-      .replace(",", ".")
-      .trim()
-  ) || 0;
-}
 
-function formatCurrency(value: number) {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const text = String(value || "0").replace("R$", "").replace("%", "").replace(/\s/g, "").trim();
+  if (!text) return 0;
+
+  const normalized = text.includes(",") ? text.replace(/\./g, "").replace(",", ".") : text;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatDividend(value: unknown) {
@@ -99,27 +112,6 @@ function getDailyVariation(variation: unknown, price: number, opening: number) {
 
   const calculated = ((price - opening) / opening) * 100;
   return Number.isFinite(calculated) ? calculated : apiVariation;
-}
-
-function newsTimestamp(value: string) {
-  const time = new Date(value).getTime();
-  return Number.isFinite(time) ? time : 0;
-}
-
-function formatNewsDate(value: string) {
-  if (!value) return "";
-
-  try {
-    return new Intl.DateTimeFormat("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(value));
-  } catch {
-    return "";
-  }
 }
 
 function getYearData(data: any) {
@@ -165,73 +157,63 @@ function getNextPayment(data: any) {
     .sort((a: any, b: any) => a.date.getTime() - b.date.getTime())[0] || null;
 }
 
-export default function FiiPage() {
-  const params = useParams<{ ticker: string }>();
-  const ticker = String(params?.ticker || "").toUpperCase();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [loadingNews, setLoadingNews] = useState(false);
+function newsTimestamp(value: string) {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
 
-  useEffect(() => {
-    async function load() {
-      if (!ticker) return;
+function formatNewsDate(value: string) {
+  if (!value) return "";
 
-      setLoading(true);
-      setError("");
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  } catch {
+    return "";
+  }
+}
 
-      try {
-        const response = await fetch(`/api/fii?ticker=${ticker}`, { cache: "no-store" });
-        const json = await response.json();
+async function getTicker(params: PageProps["params"]) {
+  const resolved = await params;
+  return String(resolved?.ticker || "").toUpperCase();
+}
 
-        if (!response.ok) {
-          setError(json.error || "FII não encontrado.");
-          setData(null);
-          return;
-        }
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const ticker = await getTicker(params);
 
-        setData(json);
-      } catch (err: any) {
-        setError(err.message || "Erro ao carregar FII.");
-      } finally {
-        setLoading(false);
-      }
-    }
+  return {
+    title: `${ticker} dividendos, preço, DY e P/VP`,
+    description: `Consulte dados do ${ticker}: preço, abertura, variação, dividendos, DY mensal, P/VP, próximo pagamento, histórico de rendimentos e notícias recentes.`,
+    alternates: {
+      canonical: `/fii/${ticker}`,
+    },
+    openGraph: {
+      title: `${ticker} | Dados FII`,
+      description: `Dados, dividendos e notícias do FII ${ticker}.`,
+      url: `${SITE_URL}/fii/${ticker}`,
+      type: "article",
+    },
+  };
+}
 
-    load();
-  }, [ticker]);
+export default async function FiiPage({ params }: PageProps) {
+  const ticker = await getTicker(params);
+  const data = ticker ? await fetchJson(`/api/fii?ticker=${encodeURIComponent(ticker)}`) : null;
+  const newsData = ticker ? await fetchJson(`/api/fii-news?ticker=${encodeURIComponent(ticker)}`) : null;
+  const news: NewsItem[] = Array.isArray(newsData?.news)
+    ? [...newsData.news]
+      .sort((a: NewsItem, b: NewsItem) => newsTimestamp(b.publishedAt) - newsTimestamp(a.publishedAt))
+      .slice(0, 3)
+    : [];
 
-  useEffect(() => {
-    async function loadNews() {
-      if (!ticker) return;
-
-      setLoadingNews(true);
-      setNews([]);
-
-      try {
-        const response = await fetch(`/api/fii-news?ticker=${ticker}`, { cache: "no-store" });
-        const json = await response.json();
-        const orderedNews = Array.isArray(json.news)
-          ? [...json.news]
-            .sort((a: NewsItem, b: NewsItem) => newsTimestamp(b.publishedAt) - newsTimestamp(a.publishedAt))
-            .slice(0, 3)
-          : [];
-
-        setNews(orderedNews);
-      } catch {
-        setNews([]);
-      } finally {
-        setLoadingNews(false);
-      }
-    }
-
-    loadNews();
-  }, [ticker]);
-
-  const orderedDividends = useMemo(() => getOrderedDividends(data), [data]);
-  const lastDividend = useMemo(() => getLastDividend(data), [data]);
-  const nextPayment = useMemo(() => getNextPayment(data), [data]);
+  const orderedDividends = getOrderedDividends(data);
+  const lastDividend = getLastDividend(data);
+  const nextPayment = getNextPayment(data);
   const lastDividendValue = parseCurrency(lastDividend?.info?.earnings);
   const price = parseCurrency(data?.price);
   const opening = parseCurrency(data?.opening);
@@ -256,42 +238,34 @@ export default function FiiPage() {
         ) : null}
       />
 
-      {ticker && (
-        <section className="mb-6 rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-xl font-extrabold text-slate-800">Dados do {ticker}: preço, dividendos e rendimentos</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            A página do {ticker} reúne informações para acompanhamento do fundo imobiliário, incluindo cotação,
-            abertura, variação do dia, mínima, máxima, dividend yield, P/VP, ágio ou desconto, último rendimento,
-            yield mensal, próximo pagamento, histórico de rendimentos e notícias recentes relacionadas ao FII.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/calendario-dividendos-fiis" className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
-              Calendário de dividendos
-            </Link>
-            <Link href="/carteira" className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
-              Minha carteira
-            </Link>
-          </div>
-        </section>
-      )}
-
-      {loading && (
-        <p className="flex items-center justify-center gap-2 text-slate-600">
-          <Loader2 className="animate-spin" size={20} /> Carregando dados do {ticker}...
+      <section className="mb-6 rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
+        <h1 className="text-2xl font-extrabold text-slate-800">{ticker}: preço, dividendos, DY e P/VP</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          A página do {ticker} reúne informações para acompanhamento do fundo imobiliário, incluindo cotação,
+          abertura, variação do dia, mínima, máxima, dividend yield, P/VP, ágio ou desconto, último rendimento,
+          yield mensal, próximo pagamento, histórico de rendimentos e notícias recentes relacionadas ao FII.
         </p>
-      )}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/calendario-dividendos-fiis" className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
+            Calendário de dividendos
+          </Link>
+          <Link href="/carteira" className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
+            Minha carteira
+          </Link>
+        </div>
+      </section>
 
-      {error && (
+      {!data && (
         <section className="rounded-2xl bg-red-50 p-5 text-red-700 ring-1 ring-red-100">
           <p className="font-bold">Não foi possível carregar este fundo.</p>
-          <p className="mt-1 text-sm">{error}</p>
+          <p className="mt-1 text-sm">O ticker pode não existir na base ou os dados podem estar temporariamente indisponíveis.</p>
           <Link href="/" className="mt-4 inline-flex rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
             Voltar para consulta
           </Link>
         </section>
       )}
 
-      {!loading && !error && data && (
+      {data && (
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-4">
             <MetricCard title="Preço atual" value={data.price || "-"} tone="indigo" />
@@ -341,7 +315,7 @@ export default function FiiPage() {
             </InfoCard>
           </section>
 
-          <RecentNews ticker={ticker} news={news} loading={loadingNews} />
+          <RecentNews ticker={ticker} news={news} />
 
           <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
             <div className="mb-4">
@@ -400,7 +374,7 @@ function MetricCard({ title, value, description, tone }: { title: string; value:
   );
 }
 
-function RecentNews({ ticker, news, loading }: { ticker: string; news: NewsItem[]; loading: boolean }) {
+function RecentNews({ ticker, news }: { ticker: string; news: NewsItem[] }) {
   const [mainNews, ...secondaryNews] = news;
 
   return (
@@ -419,11 +393,7 @@ function RecentNews({ ticker, news, loading }: { ticker: string; news: NewsItem[
         </a>
       </div>
 
-      {loading ? (
-        <p className="flex items-center gap-2 rounded-xl bg-gray-800 p-4 text-sm font-medium text-gray-300">
-          <Loader2 className="animate-spin" size={18} /> Buscando notícias recentes...
-        </p>
-      ) : !news.length ? (
+      {!news.length ? (
         <p className="rounded-xl bg-gray-800 p-4 text-sm font-medium text-gray-300">Nenhuma notícia recente encontrada para este ticker.</p>
       ) : (
         <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
