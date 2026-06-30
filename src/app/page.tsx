@@ -360,7 +360,7 @@ export default function Home() {
                         </p>
                         <h2 className="mt-3 text-xl font-extrabold text-slate-800">Educação financeira também começa cedo</h2>
                         <p className="mt-1 text-sm text-slate-600">
-                            Conheça livros e materiais sobre dinheiro, escolhas e investimentos, sem atrapalhar sua consulta de FIIs.
+                            Conheça livros e materiais sobre dinheiro, escolhas e investimentos.
                         </p>
                     </div>
                     <Link
