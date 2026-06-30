@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookOpen, Loader2, Wallet } from "lucide-react";
+import { BookOpen, CalendarDays, Loader2, Search, Wallet } from "lucide-react";
 import CookieBanner from "./components/CookieBanner";
 import PersonalizedNews from "./components/PersonalizedNews";
 import FiiTopPanels from "./components/FiiTopPanels";
@@ -49,7 +49,6 @@ function formatDollarUpdateTime(value?: string | null) {
         return new Intl.DateTimeFormat("pt-BR", {
             hour: "2-digit",
             minute: "2-digit",
-            second: "2-digit",
         }).format(new Date(value));
     } catch {
         return "";
@@ -72,7 +71,6 @@ function isDollarRefreshWindow(date = new Date()) {
 }
 
 export default function Home() {
-    const [stats, setStats] = useState<{ visit: number; search: number }>({ visit: 0, search: 0 });
     const [ticker, setTicker] = useState("");
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState("");
@@ -126,10 +124,6 @@ export default function Home() {
                 method: "POST",
                 body: JSON.stringify({ type: "search" }),
             });
-
-            const statsRes = await fetch("/api/stats");
-            const statsData = await statsRes.json();
-            setStats(statsData);
         } catch (err: any) {
             setError(err.message || "Erro desconhecido");
         } finally {
@@ -217,16 +211,6 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        const loadStats = async () => {
-            const res = await fetch("/api/stats");
-            const data = await res.json();
-            setStats(data);
-        };
-
-        loadStats();
-    }, []);
-
-    useEffect(() => {
         const checkMarketHours = () => {
             const now = new Date();
             const hours = now.getHours();
@@ -262,160 +246,157 @@ export default function Home() {
     const dollarUpdatedAt = formatDollarUpdateTime(dolar.updatedAt);
 
     return (
-        <div className="font-sans text-center mt-12 px-4">
+        <main className="font-sans">
             {showLogin && (
-                <div className="fixed top-4 right-4">
+                <div className="fixed right-4 top-20 z-50">
                     <Login />
                 </div>
             )}
 
-            <header className="mx-auto max-w-4xl">
-                <h1 className="text-2xl font-bold mb-2">📊 Dados de Fundos Imobiliários</h1>
-                <p className="text-gray-600">Consulte informações resumidas de FIIs</p>
-                <p className="mx-auto mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                    O Dados FII reúne consulta de fundos imobiliários, calendário de dividendos, próximos pagamentos,
-                    carteira de FIIs e notícias para ajudar investidores a acompanhar rendimentos e dados importantes
-                    de fundos imobiliários brasileiros.
-                </p>
-            </header>
-
-            <section className="mx-auto mt-5 grid max-w-4xl gap-3 text-left md:grid-cols-3" aria-label="Principais recursos do Dados FII">
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <h2 className="text-base font-extrabold text-slate-800">Consulta de FIIs</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                        Pesquise tickers de fundos imobiliários e acompanhe preço, dividendos, DY, P/VP e dados do fundo.
-                    </p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <h2 className="text-base font-extrabold text-slate-800">Calendário de dividendos</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                        Veja datas de pagamento, data-com e rendimentos por cota anunciados pelos FIIs da base.
-                    </p>
-                </div>
-                <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                    <h2 className="text-base font-extrabold text-slate-800">Carteira de FIIs</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                        Salve seus fundos no navegador e estime renda mensal, próximos pagamentos e distribuição por segmento.
-                    </p>
-                </div>
-            </section>
-
-            <div className="mx-auto mt-4 max-w-fit rounded-2xl bg-gray-900 px-5 py-3 text-gray-100 shadow-lg ring-1 ring-white/10">
-                <p className="text-sm font-bold text-white">💵 Dólar comercial: {dolar.formatted}</p>
-                <p className="mt-1 text-xs font-medium text-gray-300">
-                    {dolar.source ? `Fonte: ${dolar.source}` : "Fonte indisponível"}
-                    {dollarUpdatedAt ? ` · Atualizado às ${dollarUpdatedAt}` : ""}
-                </p>
-            </div>
-
-            <br />
-
-            <Link
-                href="/carteira"
-                className="mx-auto mb-6 inline-flex max-w-fit items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 font-bold text-white shadow-lg transition-colors hover:bg-indigo-700"
-            >
-                <Wallet size={18} /> Minha Carteira e Dividendos
-            </Link>
-
-            <HomeDividendCalendar />
-
-            <div className="flex top-4 left-4">
-                <MonitoredFiisPanel />
-            </div>
-
-            <div>
-                {isMarketOpen ? (
-                    <FiiTopPanels />
-                ) : (
-                    <p className="text-gray-400 italic text-center mt-4">
-                        {`Painel de maiores altas e baixas disponível de segunda à sexta entre ${Number(process.env.NEXT_PUBLIC_OPENING_TIME)}h e ${Number(process.env.NEXT_PUBLIC_CLOSING_TIME)}h.`}
-                    </p>
-                )}
-            </div>
-
-            {!adsClosed && <GoogleAdsBlock onClose={closeAds} />}
-
-            {adsClosed && (
-                <div className="mt-6 flex justify-center gap-2">
-                    <input
-                        type="text"
-                        placeholder="Digite o ticker (ex: ABCD11)"
-                        value={ticker}
-                        onChange={(e) => setTicker(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") fetchFII();
-                        }}
-                        className="p-2 w-56 rounded-lg border border-gray-400 bg-gray-100 text-black"
-                    />
-                    <button
-                        onClick={fetchFII}
-                        className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold hover:bg-indigo-700"
-                    >
-                        Consultar
-                    </button>
-                </div>
-            )}
-
-            <div className="text-gray-400 text-sm mt-2">
-                👥 {stats.visit} visitantes | 🔎 {stats.search} buscas
-            </div>
-
-            {error && <div className="text-red-400 mt-4">{error}</div>}
-
-            {loadingFII && (
-                <p className="flex items-center justify-center text-gray-500 italic mt-4">
-                    <Loader2 className="animate-spin mr-2" size={20} /> Carregando dados do FII...
-                </p>
-            )}
-
-            {data && (
-                <FiiSummary
-                    data={data}
-                    getCurrentYearDividends={getCurrentYearDividends}
-                    monthsPTBR={monthsPTBR}
-                    lastDividend={lastDividend}
-                    onDividendUpdate={fetchFII}
-                />
-            )}
-
-            <PersonalizedNews />
-
-            <section className="mx-auto mt-8 max-w-4xl rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-700">
-                            <BookOpen size={14} /> Educação financeira
+            <section className="bg-gradient-to-b from-white to-slate-50 px-4 py-8 md:py-12">
+                <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
+                    <div className="rounded-3xl bg-white p-6 text-left shadow-sm ring-1 ring-slate-200 md:p-8">
+                        <p className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">
+                            Fundos imobiliários, dividendos e carteira
                         </p>
-                        <h2 className="mt-3 text-xl font-extrabold text-slate-800">Aprenda sobre FIIs, dinheiro e bons hábitos</h2>
-                        <p className="mt-1 text-sm text-slate-600">
-                            Veja explicações simples, exemplos práticos e livros sobre dinheiro, escolhas e investimentos.
+                        <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
+                            Consulte FIIs com mais clareza.
+                        </h1>
+                        <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+                            O Dados FII reúne consulta de fundos imobiliários, calendário de dividendos, próximos pagamentos,
+                            carteira de FIIs, notícias e educação financeira em uma navegação simples.
                         </p>
+
+                        <div className="mt-6 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <input
+                                    type="text"
+                                    placeholder="Digite o ticker, ex: TGAR11"
+                                    value={ticker}
+                                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") fetchFII();
+                                    }}
+                                    className="min-h-12 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                />
+                                <button
+                                    onClick={fetchFII}
+                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-extrabold text-white shadow-sm hover:bg-indigo-700"
+                                >
+                                    <Search size={18} /> Consultar
+                                </button>
+                            </div>
+                            {error && <p className="mt-3 text-sm font-bold text-red-600">{error}</p>}
+                            {loadingFII && (
+                                <p className="mt-3 flex items-center gap-2 text-sm font-bold text-slate-500">
+                                    <Loader2 className="animate-spin" size={18} /> Carregando dados do FII...
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="mt-5 flex flex-wrap gap-2">
+                            <Link href="/carteira" className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-extrabold text-white hover:bg-indigo-700">
+                                <Wallet size={16} /> Minha carteira
+                            </Link>
+                            <Link href="/calendario-dividendos-fiis" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-200">
+                                <CalendarDays size={16} /> Calendário
+                            </Link>
+                            <Link href="/educacao" className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-extrabold text-slate-700 hover:bg-slate-200">
+                                <BookOpen size={16} /> Educação
+                            </Link>
+                        </div>
                     </div>
-                    <Link
-                        href="/educacao"
-                        className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
-                    >
-                        Ver educação
-                    </Link>
+
+                    <aside className="grid gap-3">
+                        <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+                            <p className="text-sm font-bold text-gray-300">Dólar comercial</p>
+                            <strong className="mt-2 block text-3xl text-indigo-300">{dolar.formatted}</strong>
+                            <p className="mt-2 text-xs font-medium text-gray-300">
+                                {dolar.source ? `Fonte: ${dolar.source}` : "Fonte indisponível"}
+                                {dollarUpdatedAt ? ` · Atualizado às ${dollarUpdatedAt}` : ""}
+                            </p>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                            <FeatureCard title="Consulta rápida" description="Preço, dividendos, DY, P/VP e dados cadastrais." />
+                            <FeatureCard title="Calendário" description="Data-com, pagamento e rendimento por cota." />
+                            <FeatureCard title="Carteira" description="Renda estimada e próximos pagamentos salvos no navegador." />
+                        </div>
+                    </aside>
                 </div>
             </section>
 
-            <section className="mx-auto mt-8 max-w-4xl rounded-2xl bg-slate-50 p-5 text-left ring-1 ring-slate-200">
-                <h2 className="text-xl font-extrabold text-slate-800">Acompanhe FIIs com mais clareza</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Use o Dados FII para consultar fundos imobiliários, acompanhar rendimentos, verificar próximos dividendos
-                    e organizar sua carteira. As informações ajudam no acompanhamento, mas não substituem análise própria,
-                    leitura de relatórios gerenciais e comunicados oficiais dos fundos.
-                </p>
-            </section>
+            <section className="mx-auto max-w-6xl space-y-8 px-4 py-6">
+                {!adsClosed && <GoogleAdsBlock onClose={closeAds} />}
 
-            <br />
-            <br />
-            <div className="fixed bottom-0 left-0 w-full bg-yellow-500 text-black text-center py-2 text-sm font-semibold shadow-md">
-                🚧 Este site está em versão Beta – Algumas funcionalidades podem mudar ou estar em testes.
-            </div>
+                {data && (
+                    <FiiSummary
+                        data={data}
+                        getCurrentYearDividends={getCurrentYearDividends}
+                        monthsPTBR={monthsPTBR}
+                        lastDividend={lastDividend}
+                        onDividendUpdate={fetchFII}
+                    />
+                )}
+
+                <HomeDividendCalendar />
+
+                <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+                    <div className="space-y-6">
+                        <MonitoredFiisPanel />
+
+                        <section className="rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
+                            <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-700">
+                                <BookOpen size={14} /> Educação financeira
+                            </p>
+                            <h2 className="mt-3 text-xl font-extrabold text-slate-800">Aprenda sobre FIIs, dinheiro e bons hábitos</h2>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                                Veja explicações simples, exemplos práticos e livros sobre dinheiro, escolhas e investimentos.
+                            </p>
+                            <Link
+                                href="/educacao"
+                                className="mt-4 inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+                            >
+                                Ver educação financeira
+                            </Link>
+                        </section>
+                    </div>
+
+                    <div>
+                        {isMarketOpen ? (
+                            <FiiTopPanels />
+                        ) : (
+                            <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
+                                <p className="text-sm font-bold text-slate-500">
+                                    {`Painel de maiores altas e baixas disponível de segunda à sexta entre ${Number(process.env.NEXT_PUBLIC_OPENING_TIME)}h e ${Number(process.env.NEXT_PUBLIC_CLOSING_TIME)}h.`}
+                                </p>
+                            </section>
+                        )}
+                    </div>
+                </div>
+
+                <PersonalizedNews />
+
+                <section className="rounded-2xl bg-slate-100 p-5 text-left ring-1 ring-slate-200">
+                    <h2 className="text-xl font-extrabold text-slate-800">Acompanhe FIIs com mais clareza</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Use o Dados FII para consultar fundos imobiliários, acompanhar rendimentos, verificar próximos dividendos
+                        e organizar sua carteira. As informações ajudam no acompanhamento, mas não substituem análise própria,
+                        leitura de relatórios gerenciais e comunicados oficiais dos fundos.
+                    </p>
+                </section>
+            </section>
 
             <CookieBanner />
+        </main>
+    );
+}
+
+function FeatureCard({ title, description }: { title: string; description: string }) {
+    return (
+        <div className="rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm font-extrabold text-slate-800">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
         </div>
     );
 }
