@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 21600;
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const CACHE_SECONDS = 6 * 60 * 60;
 
 function parseDate(value: unknown) {
   const [day, month, year] = String(value || "").split("/").map(Number);
@@ -82,15 +83,22 @@ export async function GET(req: Request) {
     const paidRecently = events.filter((event) => event.paymentDateKey < todayKey).slice(-80).reverse();
     const currentMonth = events.filter((event) => event.isCurrentMonth);
 
-    return NextResponse.json({
-      ok: true,
-      year,
-      total: events.length,
-      nextEvents,
-      paidRecently,
-      currentMonth,
-      updatedAt: new Date().toISOString(),
-    });
+    return NextResponse.json(
+      {
+        ok: true,
+        year,
+        total: events.length,
+        nextEvents,
+        paidRecently,
+        currentMonth,
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        headers: {
+          "Cache-Control": `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS}`,
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Erro ao carregar calendário." }, { status: 500 });
   }
