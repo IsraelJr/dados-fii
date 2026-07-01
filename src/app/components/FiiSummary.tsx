@@ -1,6 +1,7 @@
 'use client';
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
     CalendarDays,
     CheckCircle,
@@ -52,9 +53,9 @@ function GlossaryLink({ href }: { href: string }) {
     );
 }
 
-function SummaryCard({ icon, label, value, glossaryHref }: { icon: React.ReactNode; label: string; value: React.ReactNode; glossaryHref?: string }) {
+function SummaryCard({ icon, label, value, glossaryHref }: { icon: ReactNode; label: string; value: ReactNode; glossaryHref?: string }) {
     return (
-        <div className="min-w-0 overflow-hidden rounded-xl bg-gray-800 p-4">
+        <div className="fii-summary-card min-w-0 overflow-hidden rounded-xl bg-gray-800 p-4">
             <div className="flex min-w-0 items-start gap-3">
                 <span className="mt-1 shrink-0">{icon}</span>
                 <div className="min-w-0 flex-1 overflow-hidden">
@@ -89,9 +90,9 @@ export default function FiiSummary({
     const dividends = getCurrentYearDividends(earningsYearData);
 
     return (
-        <div className="mt-8 mx-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg md:p-6">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <div className="min-w-0 overflow-hidden rounded-xl bg-gray-800 p-4 md:col-span-2 lg:col-span-3">
+        <div className="fii-summary mt-8 mx-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg md:p-6">
+            <div className="fii-summary-grid grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="fii-summary-card fii-summary-card-full min-w-0 overflow-hidden rounded-xl bg-gray-800 p-4 md:col-span-2 lg:col-span-3">
                     <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="flex min-w-0 items-start gap-2">
                             <Building2 className="mt-1 shrink-0 text-pink-400" />
