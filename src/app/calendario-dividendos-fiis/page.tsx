@@ -38,8 +38,16 @@ function formatDividend(value: unknown) {
   return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
 }
 
+function formatDateKey(value?: string) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}/${month}/${year}`;
+}
+
 function EventList({
   title,
+  description,
   events,
   emptyText,
   visibleCount,
@@ -47,6 +55,7 @@ function EventList({
   onShowLess,
 }: {
   title: string;
+  description?: string;
   events: CalendarEvent[];
   emptyText: string;
   visibleCount?: number;
@@ -60,10 +69,13 @@ function EventList({
 
   return (
     <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-      <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-center">
-        <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
-          <CalendarDays className="text-green-300" /> {title}
-        </h2>
+      <div className="mb-4 flex flex-col justify-between gap-2 md:flex-row md:items-start">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
+            <CalendarDays className="text-green-300" /> {title}
+          </h2>
+          {description && <p className="mt-1 text-sm font-medium text-gray-300">{description}</p>}
+        </div>
         {!!events.length && (
           <span className="text-sm font-medium text-gray-300">
             Mostrando {visibleEvents.length} de {events.length}
@@ -178,15 +190,18 @@ export default function DividendCalendarPage() {
     return events.filter((event) => event.ticker.includes(search) || event.socialReason?.toUpperCase().includes(search) || event.segment?.toUpperCase().includes(search));
   };
 
-  const nextEvents = useMemo(() => filterEvents(data?.nextEvents || []), [data, query]);
+  const weekPayments = useMemo(() => filterEvents(data?.weekPayments || data?.nextEvents || []), [data, query]);
   const currentMonth = useMemo(() => filterEvents(data?.currentMonth || []), [data, query]);
   const paidRecently = useMemo(() => filterEvents(data?.paidRecently || []), [data, query]);
+  const weekStart = formatDateKey(data?.windows?.weekStart);
+  const weekEnd = formatDateKey(data?.windows?.weekEnd);
+  const recentStart = formatDateKey(data?.windows?.paidRecentlyStart);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <PageHeader
         title="Calendário de Dividendos"
-        subtitle="Consulte próximos pagamentos, data-com e rendimentos anunciados pelos fundos imobiliários da base Dados FII."
+        subtitle="Consulte pagamentos da semana, rendimentos anunciados no mês e pagamentos recentes dos fundos imobiliários da base Dados FII."
         action={(
           <Link href="/carteira" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
             Minha carteira
@@ -200,8 +215,8 @@ export default function DividendCalendarPage() {
           <Search size={18} className="text-gray-300" />
           <input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Ex: TGAR11, logística, papel..."
+            onChange={(event) => setQuery(event.target.value.toUpperCase())}
+            placeholder="Ex: ABCD11, logística, papel..."
             className="w-full bg-transparent text-gray-100 outline-none placeholder:text-gray-400"
           />
         </div>
@@ -224,30 +239,37 @@ export default function DividendCalendarPage() {
               <p className="mt-2 text-sm font-medium text-gray-300">Total de eventos carregados no calendário.</p>
             </div>
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-              <p className="text-base font-extrabold text-white">Próximos pagamentos</p>
-              <strong className="mt-2 block text-3xl text-green-300">{data?.nextEvents?.length || 0}</strong>
-              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos futuros identificados na base.</p>
+              <p className="text-base font-extrabold text-white">Pagamentos da semana</p>
+              <strong className="mt-2 block text-3xl text-green-300">{data?.weekPayments?.length || data?.nextEvents?.length || 0}</strong>
+              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos com vencimento até domingo desta semana.</p>
             </div>
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-              <p className="text-base font-extrabold text-white">Anunciados no mês</p>
+              <p className="text-base font-extrabold text-white">Calendário do mês</p>
               <strong className="mt-2 block text-3xl text-yellow-300">{data?.currentMonth?.length || 0}</strong>
-              <p className="mt-2 text-sm font-medium text-gray-300">Comunicados do mês atual encontrados.</p>
+              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos anunciados para o mês atual.</p>
             </div>
           </section>
 
-          <EventList title="Próximos pagamentos" events={nextEvents} emptyText="Nenhum pagamento futuro encontrado." />
           <EventList
-            title="Anunciados no mês atual"
+            title="Pagamentos da semana"
+            description={weekStart && weekEnd ? `Pagamentos entre ${weekStart} e ${weekEnd}.` : "Pagamentos que ainda caem nesta semana."}
+            events={weekPayments}
+            emptyText="Nenhum pagamento encontrado para esta semana."
+          />
+          <EventList
+            title="Calendário do mês"
+            description="Visão completa dos pagamentos anunciados para o mês atual."
             events={currentMonth}
-            emptyText="Nenhum comunicado do mês atual encontrado."
+            emptyText="Nenhum pagamento anunciado para o mês atual encontrado."
             visibleCount={currentMonthVisible}
             onShowMore={() => setCurrentMonthVisible((current) => current + ITEMS_STEP)}
             onShowLess={() => setCurrentMonthVisible(INITIAL_VISIBLE_ITEMS)}
           />
           <EventList
-            title="Pagos recentemente"
+            title="Pagos nos últimos 7 dias"
+            description={recentStart ? `Pagamentos realizados desde ${recentStart}.` : "Histórico curto dos pagamentos mais recentes."}
             events={paidRecently}
-            emptyText="Nenhum pagamento recente encontrado."
+            emptyText="Nenhum pagamento identificado nos últimos 7 dias."
             visibleCount={paidRecentlyVisible}
             onShowMore={() => setPaidRecentlyVisible((current) => current + ITEMS_STEP)}
             onShowLess={() => setPaidRecentlyVisible(INITIAL_VISIBLE_ITEMS)}
