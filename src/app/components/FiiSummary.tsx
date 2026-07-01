@@ -54,13 +54,13 @@ function GlossaryLink({ href }: { href: string }) {
 
 function SummaryCard({ icon, label, value, glossaryHref }: { icon: React.ReactNode; label: string; value: React.ReactNode; glossaryHref?: string }) {
     return (
-        <div className="min-w-0 rounded-xl bg-gray-800 p-4">
-            <div className="flex min-w-0 items-start gap-2">
+        <div className="min-w-0 overflow-hidden rounded-xl bg-gray-800 p-4">
+            <div className="flex min-w-0 items-start gap-3">
                 <span className="mt-1 shrink-0">{icon}</span>
-                <div className="min-w-0 flex-1">
-                    <p className="text-sm font-extrabold text-gray-300 sm:text-base">{label}</p>
-                    <div className="mt-1 flex min-w-0 items-start gap-1 text-xl font-bold leading-tight text-white sm:text-2xl">
-                        <span className="min-w-0 break-words">{value}</span>
+                <div className="min-w-0 flex-1 overflow-hidden">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-gray-400">{label}</p>
+                    <div className="mt-1 flex min-w-0 items-start gap-1 text-lg font-bold leading-snug text-white md:text-2xl">
+                        <span className="min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{value}</span>
                         {glossaryHref && <GlossaryLink href={glossaryHref} />}
                     </div>
                 </div>
@@ -89,13 +89,13 @@ export default function FiiSummary({
     const dividends = getCurrentYearDividends(earningsYearData);
 
     return (
-        <div className="mt-8 mx-auto max-w-3xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg sm:p-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                <div className="min-w-0 rounded-xl bg-gray-800 p-4 sm:col-span-2 md:col-span-3">
-                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="mt-8 mx-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg md:p-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="min-w-0 overflow-hidden rounded-xl bg-gray-800 p-4 md:col-span-2 lg:col-span-3">
+                    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="flex min-w-0 items-start gap-2">
                             <Building2 className="mt-1 shrink-0 text-pink-400" />
-                            <span className="min-w-0 break-words text-sm leading-6 sm:text-base">
+                            <span className="min-w-0 break-words text-sm leading-6 [overflow-wrap:anywhere] md:text-base">
                                 <strong>Razão Social:</strong> {data.socialReason || "Não informado"}
                             </span>
                         </div>
@@ -175,7 +175,7 @@ export default function FiiSummary({
                             return (
                                 <li key={month} className="flex items-start gap-2 rounded-lg bg-gray-900/40 p-3">
                                     <CalendarDays className="mt-1 shrink-0 text-indigo-400" />
-                                    <span className="min-w-0 break-words text-sm leading-6 sm:text-base">
+                                    <span className="min-w-0 break-words text-sm leading-6 [overflow-wrap:anywhere] md:text-base">
                                         <strong>{monthPT}:</strong>{" "}
                                         R$ {value.toFixed(3)} | Pago em {info.payment_date}
                                     </span>
