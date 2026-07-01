@@ -207,23 +207,31 @@ export default function WalletPage() {
       setLoading(true);
       setMessage("");
 
-      const result = await Promise.all(items.map(async (item) => {
-        try {
-          const response = await fetch(`/api/fii?ticker=${item.ticker}`);
-          const data = await response.json();
+      try {
+        const response = await fetch("/api/fii/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tickers: items.map((item) => item.ticker) }),
+        });
+        const json = await response.json();
 
-          if (!response.ok) {
-            return { ...item, error: data.error || "FII não encontrado" };
-          }
-
-          return { ...item, data };
-        } catch {
-          return { ...item, error: "Erro ao buscar dados" };
+        if (!response.ok || !json?.ok) {
+          setLoaded(items.map((item) => ({ ...item, error: json?.error || "Erro ao buscar dados" })));
+          return;
         }
-      }));
 
-      setLoaded(result);
-      setLoading(false);
+        const result = items.map((item) => {
+          const data = json.items?.[item.ticker];
+          if (!data) return { ...item, error: json.errors?.[item.ticker] || "FII não encontrado" };
+          return { ...item, data };
+        });
+
+        setLoaded(result);
+      } catch {
+        setLoaded(items.map((item) => ({ ...item, error: "Erro ao buscar dados" })));
+      } finally {
+        setLoading(false);
+      }
     }
 
     loadWallet();
