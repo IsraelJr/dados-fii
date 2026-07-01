@@ -44,11 +44,28 @@ function GlossaryLink({ href }: { href: string }) {
     return (
         <Link
             href={href}
-            className="inline-flex items-center text-indigo-300 hover:text-indigo-100"
+            className="inline-flex shrink-0 items-center text-indigo-300 hover:text-indigo-100"
             title="Entenda este termo no glossário"
         >
             <HelpCircle size={14} aria-label="Glossário" />
         </Link>
+    );
+}
+
+function SummaryCard({ icon, label, value, glossaryHref }: { icon: React.ReactNode; label: string; value: React.ReactNode; glossaryHref?: string }) {
+    return (
+        <div className="min-w-0 rounded-xl bg-gray-800 p-4">
+            <div className="flex min-w-0 items-start gap-2">
+                <span className="mt-1 shrink-0">{icon}</span>
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-extrabold text-gray-300 sm:text-base">{label}</p>
+                    <div className="mt-1 flex min-w-0 items-start gap-1 text-xl font-bold leading-tight text-white sm:text-2xl">
+                        <span className="min-w-0 break-words">{value}</span>
+                        {glossaryHref && <GlossaryLink href={glossaryHref} />}
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -72,79 +89,77 @@ export default function FiiSummary({
     const dividends = getCurrentYearDividends(earningsYearData);
 
     return (
-        <div className="mt-8 mx-auto max-w-3xl p-6 rounded-2xl bg-gray-900 text-gray-100 shadow-lg">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="bg-gray-800 p-4 rounded-xl flex items-center justify-between gap-2 col-span-2 md:col-span-3">
-                    <div className="flex items-center gap-2">
-                        <Building2 className="text-pink-400" />
-                        <span><strong>Razão Social:</strong> {data.socialReason}</span>
+        <div className="mt-8 mx-auto max-w-3xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg sm:p-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                <div className="min-w-0 rounded-xl bg-gray-800 p-4 sm:col-span-2 md:col-span-3">
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-2">
+                            <Building2 className="mt-1 shrink-0 text-pink-400" />
+                            <span className="min-w-0 break-words text-sm leading-6 sm:text-base">
+                                <strong>Razão Social:</strong> {data.socialReason || "Não informado"}
+                            </span>
+                        </div>
+                        <div className="shrink-0">
+                            <FiiAlert fiiCode={data.code} />
+                        </div>
                     </div>
-                    <FiiAlert fiiCode={data.code} />
                 </div>
 
-                <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                    <BarChart3 className="text-blue-400" />
-                    <span>
-                        <strong>Ticker:</strong>{" "}
+                <SummaryCard
+                    icon={<BarChart3 className="text-blue-400" />}
+                    label="Ticker"
+                    value={(
                         <Link href={`/fii/${data.code}`} className="font-bold text-indigo-200 hover:text-indigo-100">
                             {data.code}
                         </Link>
-                    </span>
-                </div>
+                    )}
+                />
 
-                <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                    {data.active
-                        ? <CheckCircle className="text-green-400" />
-                        : <XCircle className="text-red-400" />}
-                    <span><strong>Ativo:</strong> {data.active ? "Sim" : "Não"}</span>
-                </div>
+                <SummaryCard
+                    icon={data.active ? <CheckCircle className="text-green-400" /> : <XCircle className="text-red-400" />}
+                    label="Ativo"
+                    value={data.active ? "Sim" : "Não"}
+                />
 
-                <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                    {data.isIFIX
-                        ? <CheckCircle className="text-green-400" />
-                        : <XCircle className="text-red-400" />}
-                    <span className="flex items-center gap-1">
-                        <strong>IFIX:</strong> {data.isIFIX ? "Sim" : "Não"}
-                        <GlossaryLink href="/glossario#ifix" />
-                    </span>
-                </div>
+                <SummaryCard
+                    icon={data.isIFIX ? <CheckCircle className="text-green-400" /> : <XCircle className="text-red-400" />}
+                    label="IFIX"
+                    value={data.isIFIX ? "Sim" : "Não"}
+                    glossaryHref="/glossario#ifix"
+                />
 
-                <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                    <DollarSign className="text-green-400" />
-                    <span className="flex items-center gap-1">
-                        <strong>Preço:</strong> {data.price || "N/A"}
-                        <GlossaryLink href="/glossario#preco-cota" />
-                    </span>
-                </div>
+                <SummaryCard
+                    icon={<DollarSign className="text-green-400" />}
+                    label="Preço"
+                    value={data.price || "N/A"}
+                    glossaryHref="/glossario#preco-cota"
+                />
 
-                <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                    <Hash className="text-orange-400" />
-                    <span className="flex items-center gap-1">
-                        <strong>Total de Quotas:</strong>{" "}
-                        {data.numberShares?.toLocaleString("pt-BR") || "N/A"}
-                        <GlossaryLink href="/glossario#cotas" />
-                    </span>
-                </div>
+                <SummaryCard
+                    icon={<Hash className="text-orange-400" />}
+                    label="Total de cotas"
+                    value={data.numberShares?.toLocaleString("pt-BR") || "N/A"}
+                    glossaryHref="/glossario#cotas"
+                />
 
-                <div className="bg-gray-800 p-4 rounded-xl flex items-center gap-2">
-                    <Building2 className="text-purple-400" />
-                    <span className="flex items-center gap-1">
-                        <strong>Segmento:</strong> {data.segment_new}
-                        <GlossaryLink href="/glossario#segmentos" />
-                    </span>
-                </div>
+                <SummaryCard
+                    icon={<Building2 className="text-purple-400" />}
+                    label="Segmento"
+                    value={data.segment_new || data.segment || "N/A"}
+                    glossaryHref="/glossario#segmentos"
+                />
             </div>
 
             {data?.code && <AddToWalletButton ticker={data.code} />}
 
-            <h3 className="text-xl font-bold mt-6 mb-2">
+            <h3 className="mt-6 mb-2 flex items-center gap-2 text-xl font-bold">
                 💰 Dividendos ({earningsYearData === data?.[`earnings${currentYear}`]
                     ? currentYear
                     : currentYear - 1}){" "}
                 <GlossaryLink href="/glossario#dividendos-dy" />
             </h3>
 
-            <div className="bg-gray-800 rounded-xl p-4">
+            <div className="rounded-xl bg-gray-800 p-4">
                 {dividends.length === 0 ? (
                     <p className="text-center text-gray-400">
                         Sem dados de dividendos para exibir.
@@ -158,9 +173,9 @@ export default function FiiSummary({
                             );
 
                             return (
-                                <li key={month} className="flex items-center gap-2">
-                                    <CalendarDays className="text-indigo-400" />
-                                    <span>
+                                <li key={month} className="flex items-start gap-2 rounded-lg bg-gray-900/40 p-3">
+                                    <CalendarDays className="mt-1 shrink-0 text-indigo-400" />
+                                    <span className="min-w-0 break-words text-sm leading-6 sm:text-base">
                                         <strong>{monthPT}:</strong>{" "}
                                         R$ {value.toFixed(3)} | Pago em {info.payment_date}
                                     </span>
@@ -175,8 +190,8 @@ export default function FiiSummary({
                 )}
             </div>
 
-            <h3 className="text-xl font-bold mt-6 mb-2">
-                <TrendingUp size={24} className="text-indigo-400 inline-block mr-2" />
+            <h3 className="mt-6 mb-2 text-xl font-bold">
+                <TrendingUp size={24} className="mr-2 inline-block text-indigo-400" />
                 Planejamento Financeiro
             </h3>
 
