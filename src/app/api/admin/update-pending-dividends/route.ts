@@ -139,7 +139,7 @@ function parseDividends(text: string, year: number) {
   return output;
 }
 
-async function updateDocDividends(doc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot, ticker: string): Promise<UpdateResult> {
+async function updateDocDividends(doc: any, ticker: string): Promise<UpdateResult> {
   try {
     const year = currentYear();
     const monthKey = currentMonthKey();
