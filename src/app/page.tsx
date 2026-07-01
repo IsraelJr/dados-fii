@@ -127,11 +127,6 @@ export default function Home() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ fii: normalizedTicker }),
             });
-
-            await fetch("/api/stats", {
-                method: "POST",
-                body: JSON.stringify({ type: "search" }),
-            });
         } catch (err: any) {
             setError(err.message || "Erro desconhecido");
         } finally {
@@ -209,13 +204,6 @@ export default function Home() {
             active = false;
             clearInterval(interval);
         };
-    }, []);
-
-    useEffect(() => {
-        fetch("/api/stats", {
-            method: "POST",
-            body: JSON.stringify({ type: "visit" }),
-        });
     }, []);
 
     useEffect(() => {
