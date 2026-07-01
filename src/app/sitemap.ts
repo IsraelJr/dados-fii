@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { adminDb } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const revalidate = 86400;
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://dadosfii.com.br";
 const now = new Date();
