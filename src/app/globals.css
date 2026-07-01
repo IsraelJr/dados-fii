@@ -24,6 +24,29 @@ body {
   margin: 0;
 }
 
+@media (max-width: 767px) {
+  .fii-summary {
+    max-width: 100% !important;
+  }
+
+  .fii-summary-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .fii-summary-card,
+  .fii-summary-card-full {
+    grid-column: 1 / -1 !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .fii-summary-card * {
+    max-width: 100%;
+  }
+}
+
 @layer utilities {
   .no-scrollbar {
     -ms-overflow-style: none;
