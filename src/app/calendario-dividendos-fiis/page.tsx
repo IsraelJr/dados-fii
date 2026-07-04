@@ -211,13 +211,14 @@ export default function DividendCalendarPage() {
 
       <div className="mb-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <label className="mb-2 block text-base font-extrabold text-white">Filtrar por ticker, nome ou segmento</label>
-        <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2">
-          <Search size={18} className="text-gray-300" />
+        <div className="flex w-full max-w-[22rem] items-center gap-2 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 sm:w-fit">
+          <Search size={18} className="shrink-0 text-gray-300" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value.toUpperCase())}
-            placeholder="Ex: ABCD11, logística, papel..."
-            className="w-full bg-transparent text-gray-100 outline-none placeholder:text-gray-400"
+            placeholder="Ex: ABCD11"
+            maxLength={15}
+            className="w-[15ch] max-w-full bg-transparent text-gray-100 outline-none placeholder:text-gray-400"
           />
         </div>
       </div>
