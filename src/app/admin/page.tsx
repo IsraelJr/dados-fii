@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from "react";
-import { Database, Loader2, Lock, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { Loader2, Lock, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 
 type Result = Record<string, any> | null;
@@ -109,7 +110,6 @@ function AdminDashboard({ session, onLogout }: { session: Session; onLogout: () 
       <div className="grid gap-6 lg:grid-cols-2">
         <CreateFiiCard session={session} />
         <PendingCard session={session} />
-        <RoutineCard session={session} />
         <CleanupCard session={session} />
       </div>
     </main>
@@ -194,36 +194,6 @@ function PendingCard({ session }: { session: Session }) {
   );
 }
 
-function RoutineCard({ session }: { session: Session }) {
-  const [limit, setLimit] = useState("10");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<Result>(null);
-
-  async function run() {
-    setLoading(true);
-    setResult(null);
-
-    try {
-      const response = await fetch(`/api/cron/update-dividends?limit=${encodeURIComponent(limit)}`, {
-        headers: { Authorization: `Bearer ${session.key}`, "x-admin-secret": session.key },
-      });
-      setResult(await parseResponse(response));
-    } catch (err: any) {
-      setResult({ error: err.message });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <AdminCard icon={<Database />} title="Rotina geral de dividendos" description="Executa a rotina controlada por intervalo, a mesma usada no cron principal.">
-      <Field label="Limite" value={limit} onChange={setLimit} placeholder="10" />
-      <ActionButton label="Rodar rotina" loading={loading} onClick={run} />
-      <ResultBox result={result} />
-    </AdminCard>
-  );
-}
-
 function CleanupCard({ session }: { session: Session }) {
   const [limit, setLimit] = useState("50");
   const [cursor, setCursor] = useState("");
@@ -262,7 +232,7 @@ function CleanupCard({ session }: { session: Session }) {
   );
 }
 
-function AdminCard({ icon, title, description, children }: { icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
+function AdminCard({ icon, title, description, children }: { icon: ReactNode; title: string; description: string; children: ReactNode }) {
   return (
     <section className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <div className="mb-5 flex items-start gap-3">
