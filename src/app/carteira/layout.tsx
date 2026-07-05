@@ -1,10 +1,10 @@
-import WalletEmailSync from "../components/WalletEmailSync";
+import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
 
 export default function CarteiraLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <div className="px-4 pt-8">
-        <WalletEmailSync />
+        <WalletEmailVerifiedSync />
       </div>
       {children}
     </>
