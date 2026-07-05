@@ -65,12 +65,12 @@ function describeWeekPayments(windows?: CalendarWindows) {
   const end = formatDateKey(endKey);
   const isNextWeek = windows?.weekMode === "next";
 
-  if (!start || !end) return "Pagamentos da semana atual ou da próxima semana ativa.";
-  if (start === end) return `Pagamentos da semana em ${start}.`;
+  if (!start || !end) return "Semana atual.";
+  if (start === end) return `Semana atual: ${start}.`;
 
   return isNextWeek
-    ? `Pagamentos da semana que começa em ${start} e termina em ${end}.`
-    : `Pagamentos da semana atual (${start} a ${end}).`;
+    ? `Próxima semana: ${start} a ${end}.`
+    : `Semana atual: ${start} a ${end}.`;
 }
 
 function describePaidRecently(windows?: CalendarWindows) {
