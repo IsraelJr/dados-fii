@@ -108,8 +108,14 @@ async function getAllPricesFromSheet(): Promise<FiiData[]> {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const tickers = Array.isArray(body?.tickers)
-      ? Array.from(new Set(body.tickers.map(normalizeTicker).filter(Boolean))).slice(0, 80)
+    const tickers: string[] = Array.isArray(body?.tickers)
+      ? Array.from(
+          new Set<string>(
+            body.tickers
+              .map((value: unknown) => normalizeTicker(value))
+              .filter((ticker: string) => Boolean(ticker))
+          )
+        ).slice(0, 80)
       : [];
 
     if (!tickers.length) {
@@ -120,7 +126,7 @@ export async function POST(req: Request) {
     const sheetByTicker = new Map<string, FiiData>(allFiis.map((fii: FiiData) => [fii.code, fii]));
 
     const docSnapshots = await Promise.all(
-      tickers.map(async (ticker) => {
+      tickers.map(async (ticker: string) => {
         const directDoc = await db.collection("Fiis").doc(ticker).get();
         if (directDoc.exists) return [ticker, normalizeDividendFields(directDoc.data())] as const;
 
@@ -133,7 +139,7 @@ export async function POST(req: Request) {
     const items: Record<string, any> = {};
     const errors: Record<string, string> = {};
 
-    tickers.forEach((ticker) => {
+    tickers.forEach((ticker: string) => {
       const match = sheetByTicker.get(ticker);
       const docData = firestoreByTicker.get(ticker);
 
