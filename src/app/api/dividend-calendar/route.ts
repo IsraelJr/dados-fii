@@ -50,14 +50,24 @@ function addDaysKey(key: string, days: number) {
   return `${mapped.year}-${mapped.month}-${mapped.day}`;
 }
 
-function currentWeekWindow(todayKey: string) {
+function activeWeekWindow(todayKey: string) {
   const day = dateFromKey(todayKey).getUTCDay();
-  const daysFromMonday = day === 0 ? 6 : day - 1;
-  const daysUntilSunday = day === 0 ? 0 : 7 - day;
+
+  if (day === 0) {
+    return {
+      start: addDaysKey(todayKey, 1),
+      end: addDaysKey(todayKey, 7),
+      mode: "next",
+    };
+  }
+
+  const daysFromMonday = day - 1;
+  const daysUntilSunday = 7 - day;
 
   return {
     start: addDaysKey(todayKey, -daysFromMonday),
     end: addDaysKey(todayKey, daysUntilSunday),
+    mode: "current",
   };
 }
 
@@ -86,7 +96,7 @@ export async function GET(req: Request) {
     const currentMonthNumber = Number(todayKey.slice(5, 7));
     const year = Number(url.searchParams.get("year") || todayYear);
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 500), 1), 2000);
-    const currentWeek = currentWeekWindow(todayKey);
+    const activeWeek = activeWeekWindow(todayKey);
     const recentStartKey = addDaysKey(todayKey, -7);
 
     const snapshot = await adminDb.collection("Fiis").limit(limit).get();
@@ -105,7 +115,7 @@ export async function GET(req: Request) {
         const amountText = formatDividend(info?.earnings);
         const paymentMonthNumber = Number(paymentDateKey.slice(5, 7));
         const isFuture = paymentDateKey >= todayKey;
-        const isThisWeek = paymentDateKey >= todayKey && paymentDateKey <= currentWeek.end;
+        const isThisWeek = paymentDateKey >= activeWeek.start && paymentDateKey <= activeWeek.end;
         const isRecentPaid = paymentDateKey >= recentStartKey && paymentDateKey < todayKey;
         const isCurrentMonth = paymentMonthNumber === currentMonthNumber;
 
@@ -146,14 +156,15 @@ export async function GET(req: Request) {
         currentMonth,
         windows: {
           today: todayKey,
-          currentWeekStart: currentWeek.start,
-          currentWeekEnd: currentWeek.end,
-          weekPaymentStart: todayKey,
-          weekPaymentEnd: currentWeek.end,
+          weekMode: activeWeek.mode,
+          currentWeekStart: activeWeek.start,
+          currentWeekEnd: activeWeek.end,
+          weekPaymentStart: activeWeek.start,
+          weekPaymentEnd: activeWeek.end,
           paidRecentlyStart: recentStartKey,
           paidRecentlyEnd: addDaysKey(todayKey, -1),
-          weekStart: todayKey,
-          weekEnd: currentWeek.end,
+          weekStart: activeWeek.start,
+          weekEnd: activeWeek.end,
         },
         updatedAt: new Date().toISOString(),
       },
