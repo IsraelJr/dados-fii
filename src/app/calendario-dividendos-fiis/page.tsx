@@ -20,6 +20,7 @@ type CalendarEvent = {
 
 type CalendarWindows = {
   today?: string;
+  weekMode?: "current" | "next";
   currentWeekStart?: string;
   currentWeekEnd?: string;
   weekPaymentStart?: string;
@@ -58,26 +59,18 @@ function formatDateKey(value?: string) {
 }
 
 function describeWeekPayments(windows?: CalendarWindows) {
-  const todayKey = windows?.today || windows?.weekPaymentStart || windows?.weekStart;
-  const startKey = windows?.weekPaymentStart || windows?.weekStart;
-  const endKey = windows?.weekPaymentEnd || windows?.weekEnd;
-  const currentWeekStart = formatDateKey(windows?.currentWeekStart);
-  const currentWeekEnd = formatDateKey(windows?.currentWeekEnd || endKey);
+  const startKey = windows?.weekPaymentStart || windows?.weekStart || windows?.currentWeekStart;
+  const endKey = windows?.weekPaymentEnd || windows?.weekEnd || windows?.currentWeekEnd;
   const start = formatDateKey(startKey);
   const end = formatDateKey(endKey);
+  const isNextWeek = windows?.weekMode === "next";
 
-  if (!start || !end) return "Pagamentos ainda previstos para a semana atual.";
+  if (!start || !end) return "Pagamentos da semana atual ou da próxima semana ativa.";
+  if (start === end) return `Pagamentos da semana em ${start}.`;
 
-  if (startKey === endKey) {
-    if (startKey === todayKey) return `Pagamentos previstos para hoje (${start}).`;
-    return `Pagamentos previstos para ${start}.`;
-  }
-
-  if (currentWeekStart && currentWeekEnd) {
-    return `Pagamentos ainda previstos até domingo (${start} a ${end}). Semana atual: ${currentWeekStart} a ${currentWeekEnd}.`;
-  }
-
-  return `Pagamentos ainda previstos até domingo (${start} a ${end}).`;
+  return isNextWeek
+    ? `Pagamentos da semana que começa em ${start} e termina em ${end}.`
+    : `Pagamentos da semana atual (${start} a ${end}).`;
 }
 
 function describePaidRecently(windows?: CalendarWindows) {
@@ -285,7 +278,7 @@ export default function DividendCalendarPage() {
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
               <p className="text-base font-extrabold text-white">Pagamentos da semana</p>
               <strong className="mt-2 block text-3xl text-green-300">{data?.weekPayments?.length || data?.nextEvents?.length || 0}</strong>
-              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos ainda previstos dentro da semana atual.</p>
+              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos da semana atual ou, aos domingos, da próxima semana.</p>
             </div>
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
               <p className="text-base font-extrabold text-white">Anunciados no mês</p>
@@ -298,7 +291,7 @@ export default function DividendCalendarPage() {
             title="Pagamentos da semana"
             description={weekDescription}
             events={weekPayments}
-            emptyText="Nenhum pagamento ainda previsto para esta semana."
+            emptyText="Nenhum pagamento encontrado para a semana selecionada."
           />
           <EventList
             title="Anunciados no mês atual"
