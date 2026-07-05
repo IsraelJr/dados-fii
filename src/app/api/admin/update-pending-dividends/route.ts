@@ -15,19 +15,20 @@ type UpdateResult = {
   error?: string;
 };
 
-function adminSecret() {
-  return process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET || "";
+function allowedSecrets() {
+  return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
 }
 
 function isAuthorized(req: NextRequest, body?: any) {
-  const expected = adminSecret();
-  if (!expected) return false;
+  const secrets = allowedSecrets();
+  if (!secrets.length) return false;
 
-  const headerSecret = req.headers.get("x-admin-secret") || req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const authHeader = req.headers.get("authorization") || "";
+  const headerSecret = req.headers.get("x-admin-secret") || authHeader.replace(/^Bearer\s+/i, "");
   const querySecret = req.nextUrl.searchParams.get("secret");
   const bodySecret = body?.secret;
 
-  return [headerSecret, querySecret, bodySecret].some((value) => value === expected);
+  return [headerSecret, querySecret, bodySecret].some((value) => Boolean(value && secrets.includes(value)));
 }
 
 function saoPauloParts() {
