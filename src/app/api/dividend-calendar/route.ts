@@ -5,15 +5,60 @@ export const runtime = "nodejs";
 export const revalidate = 21600;
 
 const CACHE_SECONDS = 6 * 60 * 60;
+const TIME_ZONE = "America/Sao_Paulo";
 
-function parseDate(value: unknown) {
-  const [day, month, year] = String(value || "").split("/").map(Number);
-  if (!day || !month || !year) return null;
-  return new Date(year, month - 1, day);
+function pad(value: number) {
+  return String(value).padStart(2, "0");
 }
 
-function dateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+function dateKeyFromParts(year: number, month: number, day: number) {
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+function parseBrazilianDateKey(value: unknown) {
+  const [day, month, year] = String(value || "").split("/").map(Number);
+  if (!day || !month || !year) return null;
+  return dateKeyFromParts(year, month, day);
+}
+
+function saoPauloTodayKey() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const mapped = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${mapped.year}-${mapped.month}-${mapped.day}`;
+}
+
+function dateFromKey(key: string) {
+  return new Date(`${key}T12:00:00-03:00`);
+}
+
+function addDaysKey(key: string, days: number) {
+  const date = dateFromKey(key);
+  date.setUTCDate(date.getUTCDate() + days);
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const mapped = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${mapped.year}-${mapped.month}-${mapped.day}`;
+}
+
+function currentWeekWindow(todayKey: string) {
+  const day = dateFromKey(todayKey).getUTCDay();
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  const daysUntilSunday = day === 0 ? 0 : 7 - day;
+
+  return {
+    start: addDaysKey(todayKey, -daysFromMonday),
+    end: addDaysKey(todayKey, daysUntilSunday),
+  };
 }
 
 function parseCurrency(value: unknown) {
@@ -33,37 +78,16 @@ function formatDividend(value: unknown) {
   return `R$ ${parsed.toFixed(3).replace(".", ",")}`;
 }
 
-function startOfToday() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
-}
-
-function weekEndFrom(date: Date) {
-  const end = new Date(date);
-  const day = end.getDay();
-  const daysUntilSunday = day === 0 ? 0 : 7 - day;
-  end.setDate(end.getDate() + daysUntilSunday);
-  end.setHours(23, 59, 59, 999);
-  return end;
-}
-
-function sevenDaysAgoFrom(date: Date) {
-  const start = new Date(date);
-  start.setDate(start.getDate() - 7);
-  start.setHours(0, 0, 0, 0);
-  return start;
-}
-
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const year = Number(url.searchParams.get("year") || new Date().getFullYear());
+    const todayKey = saoPauloTodayKey();
+    const todayYear = Number(todayKey.slice(0, 4));
+    const currentMonthNumber = Number(todayKey.slice(5, 7));
+    const year = Number(url.searchParams.get("year") || todayYear);
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 500), 1), 2000);
-    const today = startOfToday();
-    const weekEnd = weekEndFrom(today);
-    const recentStart = sevenDaysAgoFrom(today);
-    const currentMonthNumber = today.getMonth() + 1;
+    const currentWeek = currentWeekWindow(todayKey);
+    const recentStartKey = addDaysKey(todayKey, -7);
 
     const snapshot = await adminDb.collection("Fiis").limit(limit).get();
     const events: any[] = [];
@@ -74,15 +98,15 @@ export async function GET(req: Request) {
       const earnings = data[`earnings${year}`] || {};
 
       Object.entries(earnings).forEach(([month, info]: any) => {
-        const paymentDate = parseDate(info?.payment_date);
-        if (!paymentDate) return;
+        const paymentDateKey = parseBrazilianDateKey(info?.payment_date);
+        if (!paymentDateKey) return;
 
-        const dateWith = parseDate(info?.date_with);
+        const dateWithKey = parseBrazilianDateKey(info?.date_with);
         const amountText = formatDividend(info?.earnings);
-        const paymentMonthNumber = paymentDate.getMonth() + 1;
-        const isFuture = paymentDate >= today;
-        const isThisWeek = paymentDate >= today && paymentDate <= weekEnd;
-        const isRecentPaid = paymentDate >= recentStart && paymentDate < today;
+        const paymentMonthNumber = Number(paymentDateKey.slice(5, 7));
+        const isFuture = paymentDateKey >= todayKey;
+        const isThisWeek = paymentDateKey >= todayKey && paymentDateKey <= currentWeek.end;
+        const isRecentPaid = paymentDateKey >= recentStartKey && paymentDateKey < todayKey;
         const isCurrentMonth = paymentMonthNumber === currentMonthNumber;
 
         events.push({
@@ -92,9 +116,9 @@ export async function GET(req: Request) {
           month,
           monthNumber: paymentMonthNumber,
           paymentDate: info?.payment_date || "",
-          paymentDateKey: dateKey(paymentDate),
+          paymentDateKey,
           dateWith: info?.date_with || "",
-          dateWithKey: dateWith ? dateKey(dateWith) : null,
+          dateWithKey,
           earnings: amountText,
           isFuture,
           isThisWeek,
@@ -121,10 +145,15 @@ export async function GET(req: Request) {
         paidRecently,
         currentMonth,
         windows: {
-          weekStart: dateKey(today),
-          weekEnd: dateKey(weekEnd),
-          paidRecentlyStart: dateKey(recentStart),
-          paidRecentlyEnd: dateKey(today),
+          today: todayKey,
+          currentWeekStart: currentWeek.start,
+          currentWeekEnd: currentWeek.end,
+          weekPaymentStart: todayKey,
+          weekPaymentEnd: currentWeek.end,
+          paidRecentlyStart: recentStartKey,
+          paidRecentlyEnd: addDaysKey(todayKey, -1),
+          weekStart: todayKey,
+          weekEnd: currentWeek.end,
         },
         updatedAt: new Date().toISOString(),
       },
