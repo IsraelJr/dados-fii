@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Mail, Save } from "lucide-react";
 
 type WalletItem = {
@@ -8,34 +8,61 @@ type WalletItem = {
   quotas: number;
 };
 
-type Props = {
-  items: WalletItem[];
-  onLoadWallet: (items: WalletItem[]) => void;
-};
-
+const STORAGE_KEY = "dados-fii-wallet-v1";
 const WALLET_EMAIL_KEY = "dados-fii-wallet-email";
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
-export default function WalletEmailSync({ items, onLoadWallet }: Props) {
-  const [email, setEmail] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
-  });
+function readLocalWallet(): WalletItem[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item: any) => ({ ticker: String(item?.ticker || "").toUpperCase(), quotas: Number(item?.quotas) }))
+      .filter((item) => item.ticker && Number.isFinite(item.quotas) && item.quotas > 0);
+  } catch {
+    return [];
+  }
+}
+
+export default function WalletEmailSync() {
+  const [email, setEmail] = useState("");
+  const [items, setItems] = useState<WalletItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    setEmail(window.localStorage.getItem(WALLET_EMAIL_KEY) || "");
+    setItems(readLocalWallet());
+
+    function refreshFromStorage() {
+      setItems(readLocalWallet());
+    }
+
+    window.addEventListener("storage", refreshFromStorage);
+    const interval = window.setInterval(refreshFromStorage, 1500);
+
+    return () => {
+      window.removeEventListener("storage", refreshFromStorage);
+      window.clearInterval(interval);
+    };
+  }, []);
+
   async function syncWallet(action: "save" | "load") {
     const normalizedEmail = email.trim().toLowerCase();
+    const currentItems = readLocalWallet();
 
     if (!isValidEmail(normalizedEmail)) {
       setMessage("Informe um e-mail válido.");
       return;
     }
 
-    if (action === "save" && !items.length) {
+    if (action === "save" && !currentItems.length) {
       setMessage("Adicione pelo menos um FII antes de salvar sua carteira.");
       return;
     }
@@ -47,7 +74,7 @@ export default function WalletEmailSync({ items, onLoadWallet }: Props) {
       const response = await fetch("/api/wallet-sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, email: normalizedEmail, wallet: items }),
+        body: JSON.stringify({ action, email: normalizedEmail, wallet: currentItems }),
       });
       const json = await response.json();
 
@@ -56,9 +83,13 @@ export default function WalletEmailSync({ items, onLoadWallet }: Props) {
       window.localStorage.setItem(WALLET_EMAIL_KEY, normalizedEmail);
 
       if (action === "load") {
-        onLoadWallet(Array.isArray(json.wallet) ? json.wallet : []);
-        setMessage(`Carteira carregada com sucesso para ${normalizedEmail}.`);
+        const wallet = Array.isArray(json.wallet) ? json.wallet : [];
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(wallet));
+        setItems(wallet);
+        setMessage(`Carteira carregada com sucesso para ${normalizedEmail}. Atualizando a tela...`);
+        window.setTimeout(() => window.location.reload(), 800);
       } else {
+        setItems(currentItems);
         setMessage(`Carteira salva com sucesso para ${normalizedEmail}.`);
       }
     } catch (err: any) {
@@ -69,7 +100,7 @@ export default function WalletEmailSync({ items, onLoadWallet }: Props) {
   }
 
   return (
-    <section className="mb-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+    <section className="mx-auto mb-6 max-w-6xl rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-2xl">
           <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
