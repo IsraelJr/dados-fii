@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const TIME_ZONE = "America/Sao_Paulo";
+const STATE_DOC = "PendingDividendUpdateState";
 
 type UpdateResult = {
   ticker: string;
@@ -139,6 +140,18 @@ function parseDividends(text: string, year: number) {
   return output;
 }
 
+function rotateDocs(docs: any[], limit: number, cursor?: string) {
+  if (!docs.length) return [];
+  const ordered = [...docs].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const startIndex = cursor ? ordered.findIndex((doc) => String(doc.id) > cursor) : 0;
+  const safeStart = startIndex >= 0 ? startIndex : 0;
+  const selected = ordered.slice(safeStart, safeStart + limit);
+
+  if (selected.length >= limit || safeStart === 0) return selected;
+
+  return selected.concat(ordered.slice(0, limit - selected.length));
+}
+
 async function updateDocDividends(doc: any, ticker: string): Promise<UpdateResult> {
   try {
     const year = currentYear();
@@ -182,25 +195,29 @@ async function updateDocDividends(doc: any, ticker: string): Promise<UpdateResul
   }
 }
 
-async function runPendingUpdate(limit: number, tickersFilter?: string[]) {
+async function runPendingUpdate(limit: number, tickersFilter?: string[], cursorOverride?: string) {
   const year = currentYear();
   const monthKey = currentMonthKey();
   const field = `earnings${year}`;
   const normalizedFilter = Array.isArray(tickersFilter)
     ? tickersFilter.map(tickerOf).filter(Boolean)
     : [];
+  const useCursor = normalizedFilter.length === 0;
+  const stateRef = adminDb.collection("Parameters").doc(STATE_DOC);
+  const stateSnap = useCursor ? await stateRef.get() : null;
+  const state = stateSnap?.data() || {};
+  const cursor = useCursor ? String(cursorOverride || state.cursor || "") : "";
 
   const snapshot = await adminDb.collection("Fiis").limit(5000).get();
-  const pending = snapshot.docs
-    .filter((doc) => {
-      const data = doc.data() || {};
-      const ticker = tickerOf(data.code || doc.id);
-      if (!ticker) return false;
-      if (normalizedFilter.length && !normalizedFilter.includes(ticker)) return false;
-      return !data?.[field]?.[monthKey];
-    })
-    .slice(0, limit);
+  const pendingAll = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    const ticker = tickerOf(data.code || doc.id);
+    if (!ticker) return false;
+    if (normalizedFilter.length && !normalizedFilter.includes(ticker)) return false;
+    return !data?.[field]?.[monthKey];
+  });
 
+  const pending = useCursor ? rotateDocs(pendingAll, limit, cursor) : pendingAll.slice(0, limit);
   const results: UpdateResult[] = [];
 
   for (const doc of pending) {
@@ -213,23 +230,43 @@ async function runPendingUpdate(limit: number, tickersFilter?: string[]) {
     acc[item.status] = (acc[item.status] || 0) + 1;
     return acc;
   }, {});
+  const nextCursor = useCursor && pending.length ? String(pending[pending.length - 1].id) : null;
 
   await adminDb.collection("Parameters").doc("PendingDividendUpdateRuns").collection("runs").add({
     year,
     monthKey,
     limit,
+    cursor: cursor || null,
+    nextCursor,
     requestedTickers: normalizedFilter,
-    pendingFound: pending.length,
+    pendingTotal: pendingAll.length,
+    pendingProcessed: pending.length,
     summary,
     createdAt: adminFieldValue.serverTimestamp(),
   });
+
+  if (useCursor) {
+    await stateRef.set({
+      year,
+      monthKey,
+      cursor: nextCursor,
+      previousCursor: cursor || null,
+      pendingTotal: pendingAll.length,
+      lastProcessed: pending.length,
+      summary,
+      updatedAt: adminFieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
 
   return {
     ok: true,
     year,
     monthKey,
     limit,
-    pendingFound: pending.length,
+    cursor: cursor || null,
+    nextCursor,
+    pendingTotal: pendingAll.length,
+    pendingProcessed: pending.length,
     summary,
     results,
     updatedAt: new Date().toISOString(),
@@ -243,7 +280,8 @@ export async function GET(req: NextRequest) {
 
   const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit") || 30), 1), 100);
   const tickers = req.nextUrl.searchParams.get("tickers")?.split(",").map((item) => item.trim()) || [];
-  const result = await runPendingUpdate(limit, tickers);
+  const cursor = req.nextUrl.searchParams.get("cursor") || undefined;
+  const result = await runPendingUpdate(limit, tickers, cursor);
   return NextResponse.json(result);
 }
 
@@ -256,6 +294,7 @@ export async function POST(req: NextRequest) {
 
   const limit = Math.min(Math.max(Number(body?.limit || 30), 1), 100);
   const tickers = Array.isArray(body?.tickers) ? body.tickers : [];
-  const result = await runPendingUpdate(limit, tickers);
+  const cursor = body?.cursor ? String(body.cursor) : undefined;
+  const result = await runPendingUpdate(limit, tickers, cursor);
   return NextResponse.json(result);
 }
