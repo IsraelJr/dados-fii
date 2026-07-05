@@ -69,7 +69,7 @@ function normalizeTicker(value: unknown) {
   return /^[A-Z0-9]{4,8}$/.test(ticker) ? ticker : "";
 }
 
-async function getAllPricesFromSheet() {
+async function getAllPricesFromSheet(): Promise<FiiData[]> {
   try {
     const sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}&t=${Date.now()}`;
     const res = await fetch(sheetUrl, { cache: "no-store" });
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
     }
 
     const allFiis = await getAllPricesFromSheet();
-    const sheetByTicker = new Map(allFiis.map((fii) => [fii.code, fii]));
+    const sheetByTicker = new Map<string, FiiData>(allFiis.map((fii: FiiData) => [fii.code, fii]));
 
     const docSnapshots = await Promise.all(
       tickers.map(async (ticker) => {
