@@ -18,6 +18,18 @@ type CalendarEvent = {
   earnings: string;
 };
 
+type CalendarWindows = {
+  today?: string;
+  currentWeekStart?: string;
+  currentWeekEnd?: string;
+  weekPaymentStart?: string;
+  weekPaymentEnd?: string;
+  paidRecentlyStart?: string;
+  paidRecentlyEnd?: string;
+  weekStart?: string;
+  weekEnd?: string;
+};
+
 const INITIAL_VISIBLE_ITEMS = 10;
 const ITEMS_STEP = 10;
 
@@ -43,6 +55,38 @@ function formatDateKey(value?: string) {
   const [year, month, day] = value.split("-");
   if (!year || !month || !day) return value;
   return `${day}/${month}/${year}`;
+}
+
+function describeWeekPayments(windows?: CalendarWindows) {
+  const todayKey = windows?.today || windows?.weekPaymentStart || windows?.weekStart;
+  const startKey = windows?.weekPaymentStart || windows?.weekStart;
+  const endKey = windows?.weekPaymentEnd || windows?.weekEnd;
+  const currentWeekStart = formatDateKey(windows?.currentWeekStart);
+  const currentWeekEnd = formatDateKey(windows?.currentWeekEnd || endKey);
+  const start = formatDateKey(startKey);
+  const end = formatDateKey(endKey);
+
+  if (!start || !end) return "Pagamentos ainda previstos para a semana atual.";
+
+  if (startKey === endKey) {
+    if (startKey === todayKey) return `Pagamentos previstos para hoje (${start}).`;
+    return `Pagamentos previstos para ${start}.`;
+  }
+
+  if (currentWeekStart && currentWeekEnd) {
+    return `Pagamentos ainda previstos até domingo (${start} a ${end}). Semana atual: ${currentWeekStart} a ${currentWeekEnd}.`;
+  }
+
+  return `Pagamentos ainda previstos até domingo (${start} a ${end}).`;
+}
+
+function describePaidRecently(windows?: CalendarWindows) {
+  const start = formatDateKey(windows?.paidRecentlyStart);
+  const end = formatDateKey(windows?.paidRecentlyEnd);
+
+  if (!start || !end) return "Pagamentos realizados nos últimos 7 dias anteriores a hoje.";
+  if (start === end) return `Pagamentos realizados em ${start}.`;
+  return `Pagamentos realizados de ${start} a ${end}.`;
 }
 
 function EventList({
@@ -193,9 +237,8 @@ export default function DividendCalendarPage() {
   const weekPayments = useMemo(() => filterEvents(data?.weekPayments || data?.nextEvents || []), [data, query]);
   const currentMonth = useMemo(() => filterEvents(data?.currentMonth || []), [data, query]);
   const paidRecently = useMemo(() => filterEvents(data?.paidRecently || []), [data, query]);
-  const weekStart = formatDateKey(data?.windows?.weekStart);
-  const weekEnd = formatDateKey(data?.windows?.weekEnd);
-  const recentStart = formatDateKey(data?.windows?.paidRecentlyStart);
+  const weekDescription = describeWeekPayments(data?.windows);
+  const paidRecentlyDescription = describePaidRecently(data?.windows);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -242,24 +285,24 @@ export default function DividendCalendarPage() {
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
               <p className="text-base font-extrabold text-white">Pagamentos da semana</p>
               <strong className="mt-2 block text-3xl text-green-300">{data?.weekPayments?.length || data?.nextEvents?.length || 0}</strong>
-              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos com vencimento até domingo desta semana.</p>
+              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos ainda previstos dentro da semana atual.</p>
             </div>
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-              <p className="text-base font-extrabold text-white">Calendário do mês</p>
+              <p className="text-base font-extrabold text-white">Anunciados no mês</p>
               <strong className="mt-2 block text-3xl text-yellow-300">{data?.currentMonth?.length || 0}</strong>
-              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos anunciados para o mês atual.</p>
+              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos já anunciados para o mês atual.</p>
             </div>
           </section>
 
           <EventList
             title="Pagamentos da semana"
-            description={weekStart && weekEnd ? `Pagamentos entre ${weekStart} e ${weekEnd}.` : "Pagamentos que ainda caem nesta semana."}
+            description={weekDescription}
             events={weekPayments}
-            emptyText="Nenhum pagamento encontrado para esta semana."
+            emptyText="Nenhum pagamento ainda previsto para esta semana."
           />
           <EventList
-            title="Calendário do mês"
-            description="Visão completa dos pagamentos anunciados para o mês atual."
+            title="Anunciados no mês atual"
+            description="Visão completa dos pagamentos já anunciados para o mês atual, incluindo os que ainda vão cair e os que já foram pagos."
             events={currentMonth}
             emptyText="Nenhum pagamento anunciado para o mês atual encontrado."
             visibleCount={currentMonthVisible}
@@ -268,9 +311,9 @@ export default function DividendCalendarPage() {
           />
           <EventList
             title="Pagos nos últimos 7 dias"
-            description={recentStart ? `Pagamentos realizados desde ${recentStart}.` : "Histórico curto dos pagamentos mais recentes."}
+            description={paidRecentlyDescription}
             events={paidRecently}
-            emptyText="Nenhum pagamento identificado nos últimos 7 dias."
+            emptyText="Nenhum pagamento identificado nos últimos 7 dias anteriores a hoje."
             visibleCount={paidRecentlyVisible}
             onShowMore={() => setPaidRecentlyVisible((current) => current + ITEMS_STEP)}
             onShowLess={() => setPaidRecentlyVisible(INITIAL_VISIBLE_ITEMS)}
