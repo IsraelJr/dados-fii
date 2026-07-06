@@ -38,6 +38,7 @@ export default function WalletEmailVerifiedSync() {
   const [wallet, setWallet] = useState<WalletItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const hasSession = Boolean(token);
 
   useEffect(() => {
     setEmail(window.localStorage.getItem(EMAIL_KEY) || "");
@@ -62,6 +63,11 @@ export default function WalletEmailVerifiedSync() {
 
   async function sendCode() {
     const cleanEmail = email.trim().toLowerCase();
+
+    if (hasSession) {
+      setMessage("Este dispositivo já está confirmado. Use Salvar ou Carregar.");
+      return;
+    }
 
     if (!isEmail(cleanEmail)) {
       setMessage("Informe um e-mail válido.");
@@ -165,7 +171,7 @@ export default function WalletEmailVerifiedSync() {
             Sua carteira fica salva apenas neste navegador. Confirme seu e-mail para acessar seus FIIs em qualquer celular, computador ou navegador.
           </p>
           <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
-            Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira.
+            {hasSession ? "Este dispositivo já está confirmado. Você pode salvar ou carregar sua carteira." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
           </p>
         </div>
 
@@ -184,12 +190,13 @@ export default function WalletEmailVerifiedSync() {
               onChange={(event) => setPin(event.target.value)}
               placeholder="Código recebido"
               inputMode="numeric"
-              className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 sm:text-base"
+              disabled={hasSession}
+              className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
             />
             <button
               type="button"
               onClick={confirmCode}
-              disabled={loading || !pin.trim()}
+              disabled={loading || !pin.trim() || hasSession}
               className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-4 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:w-auto sm:text-base"
             >
               Confirmar
@@ -200,28 +207,28 @@ export default function WalletEmailVerifiedSync() {
             <button
               type="button"
               onClick={sendCode}
-              disabled={loading}
-              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-4 sm:text-base"
+              disabled={loading || hasSession}
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-gray-800 px-2 py-2 text-xs font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-3 sm:text-sm lg:px-4"
             >
               {loading ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Mail className="shrink-0" size={16} />}
-              <span className="truncate">Enviar código</span>
+              <span className="whitespace-nowrap">Enviar código</span>
             </button>
             <button
               type="button"
               onClick={() => sync("save")}
               disabled={loading || !wallet.length || !token}
-              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-4 sm:text-base"
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-2 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-3 sm:text-sm lg:px-4"
             >
               {loading ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Save className="shrink-0" size={16} />}
-              <span className="truncate">Salvar</span>
+              <span className="whitespace-nowrap">Salvar</span>
             </button>
             <button
               type="button"
               onClick={() => sync("load")}
               disabled={loading || !token}
-              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-4 sm:text-base"
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-2 py-2 text-xs font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-3 sm:text-sm lg:px-4"
             >
-              <span className="truncate">Carregar</span>
+              <span className="whitespace-nowrap">Carregar</span>
             </button>
           </div>
 
