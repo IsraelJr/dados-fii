@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const CODE_TTL_MINUTES = 10;
 const SESSION_TTL_DAYS = 30;
+const WEB_WALLET_VERSION = 1;
 
 type WalletItem = {
   ticker: string;
@@ -236,6 +237,10 @@ export async function POST(req: Request) {
       await userRef.set({
         email,
         wallet,
+        source: userData.source || "web",
+        walletSource: "web",
+        version: userData.version || WEB_WALLET_VERSION,
+        walletVersion: WEB_WALLET_VERSION,
         walletUpdatedAt: adminFieldValue.serverTimestamp(),
         updatedAt: adminFieldValue.serverTimestamp(),
         createdAt: userSnap.exists ? userData.createdAt || adminFieldValue.serverTimestamp() : adminFieldValue.serverTimestamp(),
@@ -248,6 +253,7 @@ export async function POST(req: Request) {
         saved: wallet.length,
         existing: existingWallet.length,
         incoming: incomingWallet.length,
+        walletVersion: WEB_WALLET_VERSION,
       });
     }
 
