@@ -119,9 +119,9 @@ export default function PersonalizedNews() {
         );
 
     return (
-        <div className="mt-12">
+        <div className="mt-12 min-w-0">
             <div className="mb-4 flex flex-col items-center gap-2">
-                <h2 className="text-xl font-bold">📰 Resumo dos FIIs mais buscados por você</h2>
+                <h2 className="text-center text-xl font-bold">📰 Resumo dos FIIs mais buscados por você</h2>
                 {(mode === "openai" || mode === "perplexity") && (
                     <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
                         <Bot size={14} /> Resumo gerado por IA
@@ -136,12 +136,12 @@ export default function PersonalizedNews() {
             {news.length === 0 && <p className="text-gray-500">Nenhuma pesquisa registrada ainda.</p>}
             <br />
 
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="grid min-w-0 gap-6 md:grid-cols-3">
                 {news.map(({ ticker, title, summary, attentionPoints, searchUrl, loading }) => (
-                    <div key={ticker} className="rounded-2xl bg-white p-5 text-left shadow-md">
-                        <div className="mb-3 flex items-center gap-2">
-                            <Newspaper className="text-indigo-600" />
-                            <h3 className="text-lg font-semibold text-gray-700">{ticker}</h3>
+                    <div key={ticker} className="min-w-0 overflow-hidden rounded-2xl bg-white p-5 text-left shadow-md ring-1 ring-slate-100">
+                        <div className="mb-3 flex min-w-0 items-center gap-2">
+                            <Newspaper className="shrink-0 text-indigo-600" />
+                            <h3 className="min-w-0 truncate text-lg font-semibold text-gray-700">{ticker}</h3>
                         </div>
 
                         {loading ? (
@@ -150,13 +150,13 @@ export default function PersonalizedNews() {
                             </p>
                         ) : (
                             <>
-                                {title && <p className="text-sm font-bold text-gray-800">{title}</p>}
-                                {summary && <p className="mt-2 text-sm leading-6 text-gray-600">{summary}</p>}
+                                {title && <p className="min-w-0 break-words text-sm font-bold text-gray-800">{title}</p>}
+                                {summary && <p className="mt-2 min-w-0 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">{summary}</p>}
 
                                 {!!attentionPoints.length && (
-                                    <ul className="mt-3 space-y-2 text-sm text-gray-600">
+                                    <ul className="mt-3 min-w-0 space-y-2 text-sm text-gray-600">
                                         {attentionPoints.map((point) => (
-                                            <li key={`${ticker}-${point}`} className="rounded-lg bg-gray-50 p-2">
+                                            <li key={`${ticker}-${point}`} className="min-w-0 overflow-hidden break-words rounded-lg bg-gray-50 p-2">
                                                 {point}
                                             </li>
                                         ))}
@@ -167,9 +167,9 @@ export default function PersonalizedNews() {
                                     href={searchUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:underline"
+                                    className="mt-4 inline-flex max-w-full items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:underline"
                                 >
-                                    Pesquisar fontes oficiais <LinkIcon size={14} />
+                                    <span className="min-w-0 break-words">Pesquisar fontes oficiais</span> <LinkIcon className="shrink-0" size={14} />
                                 </a>
                             </>
                         )}
