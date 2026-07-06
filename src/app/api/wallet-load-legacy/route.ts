@@ -21,7 +21,7 @@ function tickerOf(value: unknown) {
 
 function quotaOf(value: unknown) {
   const parsed = Number(String(value ?? "1").replace(",", "."));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function isEmail(email: string) {
