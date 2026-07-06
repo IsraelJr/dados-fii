@@ -44,13 +44,27 @@ export default function WalletEmailVerifiedSync() {
   const [loading, setLoading] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const emailRef = useRef("");
+  const tokenRef = useRef("");
   const lastSavedSignature = useRef("");
   const hasSession = Boolean(token);
 
   useEffect(() => {
+    emailRef.current = email;
+  }, [email]);
+
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
+  useEffect(() => {
     const initialWallet = readWallet();
-    setEmail(window.localStorage.getItem(EMAIL_KEY) || "");
-    setToken(window.localStorage.getItem(TOKEN_KEY) || "");
+    const storedEmail = window.localStorage.getItem(EMAIL_KEY) || "";
+    const storedToken = window.localStorage.getItem(TOKEN_KEY) || "";
+    setEmail(storedEmail);
+    setToken(storedToken);
+    emailRef.current = storedEmail;
+    tokenRef.current = storedToken;
     setWallet(initialWallet);
     lastSavedSignature.current = walletSignature(initialWallet);
 
@@ -71,10 +85,11 @@ export default function WalletEmailVerifiedSync() {
   }
 
   async function saveCurrentWallet(options?: { silent?: boolean; keepalive?: boolean }) {
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = (emailRef.current || email).trim().toLowerCase();
+    const currentToken = tokenRef.current || token;
     const currentWallet = readWallet();
 
-    if (!isEmail(cleanEmail) || !token || !currentWallet.length) return false;
+    if (!isEmail(cleanEmail) || !currentToken || !currentWallet.length) return false;
 
     const signature = walletSignature(currentWallet);
     if (signature === lastSavedSignature.current) return true;
@@ -87,7 +102,7 @@ export default function WalletEmailVerifiedSync() {
         method: "POST",
         keepalive: Boolean(options?.keepalive),
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cleanEmail, sessionToken: token, wallet: currentWallet }),
+        body: JSON.stringify({ email: cleanEmail, sessionToken: currentToken, wallet: currentWallet }),
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json?.ok) throw new Error(json?.error || "Erro ao salvar carteira.");
@@ -111,10 +126,10 @@ export default function WalletEmailVerifiedSync() {
     const signature = walletSignature(wallet);
     if (signature === lastSavedSignature.current) return;
 
-    setMessage("Alterações pendentes. Vamos salvar automaticamente em instantes...");
+    setMessage("Alterações salvas neste navegador. Vamos sincronizar automaticamente depois de alguns minutos ou ao sair da página.");
     const timeout = window.setTimeout(() => {
       saveCurrentWallet({ silent: true });
-    }, 30000);
+    }, 120000);
 
     return () => window.clearTimeout(timeout);
   }, [email, token, wallet]);
@@ -134,10 +149,11 @@ export default function WalletEmailVerifiedSync() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      saveCurrentWallet({ silent: true, keepalive: true });
       window.removeEventListener("pagehide", handlePageHide);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [email, token]);
+  }, []);
 
   async function sendCode() {
     const cleanEmail = email.trim().toLowerCase();
@@ -161,6 +177,8 @@ export default function WalletEmailVerifiedSync() {
       window.localStorage.removeItem(TOKEN_KEY);
       setEmail(cleanEmail);
       setToken("");
+      emailRef.current = cleanEmail;
+      tokenRef.current = "";
       setMessage(json.message || "Código enviado para seu e-mail.");
     } catch (err: any) {
       setMessage(err.message || "Erro ao enviar código.");
@@ -185,6 +203,8 @@ export default function WalletEmailVerifiedSync() {
       window.localStorage.setItem(EMAIL_KEY, cleanEmail);
       window.localStorage.setItem(TOKEN_KEY, json.sessionToken);
       setToken(json.sessionToken);
+      emailRef.current = cleanEmail;
+      tokenRef.current = json.sessionToken;
       setPin("");
       setMessage("E-mail confirmado. Agora você pode salvar ou carregar a carteira.");
     } catch (err: any) {
@@ -248,7 +268,7 @@ export default function WalletEmailVerifiedSync() {
             Sua carteira fica salva apenas neste navegador. Confirme seu e-mail para acessar seus FIIs em qualquer celular, computador ou navegador.
           </p>
           <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
-            {hasSession ? "Este dispositivo já está confirmado. Alterações serão salvas automaticamente." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
+            {hasSession ? "Este dispositivo já está confirmado. Alterações ficam no navegador e sincronizam automaticamente ao sair ou após alguns minutos." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
           </p>
         </div>
 
