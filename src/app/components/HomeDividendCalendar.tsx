@@ -114,7 +114,7 @@ function readLatestCache(): CalendarItem[] {
         const parsed = JSON.parse(stored) as HomeCalendarCache;
         if (parsed.dateKey !== todayKey()) return [];
 
-        return Array.isArray(parsed.events) ? parsed.events : [];
+        return Array.isArray(parsed.events) ? parsed.events.slice(0, 3) : [];
     } catch {
         return [];
     }
@@ -125,7 +125,7 @@ function saveCache(tickersKey: string, events: CalendarItem[]) {
         const payload: HomeCalendarCache = {
             dateKey: todayKey(),
             tickersKey,
-            events,
+            events: events.slice(0, 3),
         };
         window.localStorage.setItem(CALENDAR_CACHE_KEY, JSON.stringify(payload));
     } catch {
@@ -136,6 +136,51 @@ function saveCache(tickersKey: string, events: CalendarItem[]) {
 function getCurrentYearData(data: any) {
     const year = new Date().getFullYear();
     return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {};
+}
+
+function chooseNextEventByTicker(items: CalendarItem[]) {
+    const byTicker = new Map<string, CalendarItem>();
+
+    items
+        .sort((a, b) => a.paymentKey.localeCompare(b.paymentKey) || a.ticker.localeCompare(b.ticker))
+        .forEach((item) => {
+            if (!byTicker.has(item.ticker)) byTicker.set(item.ticker, item);
+        });
+
+    return Array.from(byTicker.values()).slice(0, 3);
+}
+
+function selectHomeTickers(wallet: WalletItem[], topFiis: string[]) {
+    const walletTickers = wallet.map((item) => item.ticker).filter(Boolean);
+    const fallbackTickers = topFiis.filter((ticker) => !walletTickers.includes(ticker));
+    return Array.from(new Set([...walletTickers, ...fallbackTickers])).slice(0, 3);
+}
+
+function EventCard({ event, featured = false }: { event: CalendarItem; featured?: boolean }) {
+    return (
+        <Link
+            href={`/fii/${event.ticker}`}
+            className={`block rounded-2xl bg-gray-800 ring-1 ring-white/5 transition hover:bg-gray-700 ${featured ? "p-5 md:min-h-full" : "p-4"}`}
+        >
+            <div className="flex items-center justify-between gap-3">
+                <strong className={`${featured ? "text-3xl" : "text-xl"} text-indigo-200`}>{event.ticker}</strong>
+                <span className={`rounded-full px-2 py-1 text-xs font-bold ${event.source === "Carteira" ? "bg-green-500/20 text-green-200" : "bg-yellow-500/20 text-yellow-100"}`}>
+                    {event.source}
+                </span>
+            </div>
+            <p className={`${featured ? "mt-5 text-base" : "mt-3 text-sm"} text-gray-300`}>
+                {MONTHS_PTBR[event.month] || event.month}: <strong className="text-green-300">{formatDividend(event.earnings)}</strong>
+            </p>
+            <p className={`${featured ? "mt-3 text-sm" : "mt-2 text-xs"} text-gray-400`}>
+                Pagamento em {event.paymentDate}
+            </p>
+            {event.estimatedAmount !== undefined && (
+                <p className={`${featured ? "mt-5 text-lg" : "mt-3 text-sm"} font-bold text-green-300`}>
+                    Na sua carteira: {formatCurrency(event.estimatedAmount)}
+                </p>
+            )}
+        </Link>
+    );
 }
 
 export default function HomeDividendCalendar() {
@@ -162,11 +207,7 @@ export default function HomeDividendCalendar() {
         loadTopFiis();
     }, []);
 
-    const tickers = useMemo(() => {
-        const walletTickers = wallet.map((item) => item.ticker);
-        return Array.from(new Set([...walletTickers, ...topFiis])).slice(0, 12);
-    }, [wallet, topFiis]);
-
+    const tickers = useMemo(() => selectHomeTickers(wallet, topFiis), [wallet, topFiis]);
     const tickersKey = useMemo(() => tickers.join("|"), [tickers]);
 
     useEffect(() => {
@@ -178,7 +219,7 @@ export default function HomeDividendCalendar() {
 
             const cached = readCache(tickersKey);
             if (cached) {
-                setEvents(cached);
+                setEvents(cached.slice(0, 3));
                 setLoading(false);
                 return;
             }
@@ -220,8 +261,7 @@ export default function HomeDividendCalendar() {
                 }
             }
 
-            items.sort((a, b) => a.paymentKey.localeCompare(b.paymentKey) || a.ticker.localeCompare(b.ticker));
-            const nextEvents = items.slice(0, 6);
+            const nextEvents = chooseNextEventByTicker(items);
             setEvents(nextEvents);
             saveCache(tickersKey, nextEvents);
             setLoading(false);
@@ -232,6 +272,9 @@ export default function HomeDividendCalendar() {
 
     if (!wallet.length && !topFiis.length && !events.length && !loading) return null;
 
+    const featuredEvent = events[0];
+    const sideEvents = events.slice(1, 3);
+
     return (
         <div className="mx-auto mt-6 max-w-4xl rounded-2xl border border-indigo-500/20 bg-gray-900 p-5 text-left text-gray-100 shadow-lg">
             <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
@@ -240,10 +283,13 @@ export default function HomeDividendCalendar() {
                         <CalendarDays className="text-green-300" /> Seu calendário de dividendos
                     </h2>
                     <p className="mt-1 text-sm text-gray-400">
-                        Próximos pagamentos dos FIIs da sua carteira e dos 3 mais pesquisados por você.
+                        Até 3 FIIs: priorizamos sua carteira e completamos com os mais pesquisados por você.
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <Link href="/carteira" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+                        Minha carteira
+                    </Link>
                     <Link href="/calendario-dividendos-fiis" className="rounded-full bg-gray-800 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-gray-700">
                         Calendário completo
                     </Link>
@@ -260,28 +306,17 @@ export default function HomeDividendCalendar() {
                     <p className="mt-1">Adicione FIIs à carteira para personalizar este bloco.</p>
                 </div>
             ) : (
-                <div className="grid gap-3 md:grid-cols-2">
-                    {events.map((event) => (
-                        <div key={`${event.ticker}-${event.paymentDate}-${event.month}`} className="rounded-xl bg-gray-800 p-4">
-                            <div className="flex items-center justify-between gap-3">
-                                <strong className="text-indigo-200">{event.ticker}</strong>
-                                <span className={`rounded-full px-2 py-1 text-xs font-bold ${event.source === "Carteira" ? "bg-green-500/20 text-green-200" : "bg-yellow-500/20 text-yellow-100"}`}>
-                                    {event.source}
-                                </span>
-                            </div>
-                            <p className="mt-2 text-sm text-gray-300">
-                                {MONTHS_PTBR[event.month] || event.month}: <strong className="text-green-300">{formatDividend(event.earnings)}</strong>
-                            </p>
-                            <p className="mt-1 text-xs text-gray-400">
-                                Data-com {event.dateWith || "-"} · Pagamento {event.paymentDate}
-                            </p>
-                            {event.estimatedAmount !== undefined && (
-                                <p className="mt-2 text-sm font-bold text-green-300">
-                                    Previsto na sua carteira: {formatCurrency(event.estimatedAmount)}
-                                </p>
-                            )}
-                        </div>
-                    ))}
+                <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
+                    {featuredEvent && <EventCard event={featuredEvent} featured />}
+                    <div className="grid gap-3">
+                        {sideEvents.length ? (
+                            sideEvents.map((event) => <EventCard key={`${event.ticker}-${event.paymentDate}-${event.month}`} event={event} />)
+                        ) : (
+                            <Link href="/carteira" className="flex min-h-32 items-center rounded-2xl border border-dashed border-gray-700 p-4 text-sm font-bold text-gray-300 hover:border-indigo-400 hover:text-indigo-200">
+                                Adicione mais FIIs à carteira para completar este resumo.
+                            </Link>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
