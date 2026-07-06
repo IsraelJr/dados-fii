@@ -1,7 +1,7 @@
 'use client';
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarDays, Download, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 
@@ -178,6 +178,7 @@ export default function WalletPage() {
   const [message, setMessage] = useState("");
   const [editingQuotas, setEditingQuotas] = useState<Record<string, string>>({});
   const [updatingMissing, setUpdatingMissing] = useState(false);
+  const quotasInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -454,8 +455,27 @@ export default function WalletPage() {
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <h2 className="mb-4 text-xl font-extrabold text-white">Adicionar FII</h2>
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
-          <input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
-          <input value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+          <input
+            value={ticker}
+            onChange={(event) => setTicker(event.target.value.toUpperCase())}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                quotasInputRef.current?.focus();
+              }
+            }}
+            placeholder="Ticker, ex: ABCD11"
+            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
+          />
+          <input
+            ref={quotasInputRef}
+            value={quotas}
+            onChange={(event) => setQuotas(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") addItem(); }}
+            placeholder="Quantidade de cotas"
+            inputMode="decimal"
+            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
+          />
           <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
           <button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
         </div>
