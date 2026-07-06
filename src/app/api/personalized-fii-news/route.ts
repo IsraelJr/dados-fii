@@ -9,6 +9,8 @@ type FiiInsight = {
   summary: string;
   attentionPoints: string[];
   searchUrl: string;
+  reportTitle?: string;
+  reportUrl?: string;
 };
 
 function buildGoogleSearchUrl(ticker: string) {
@@ -75,6 +77,9 @@ Regras:
 - Não dê recomendação de compra ou venda.
 - Se não encontrar algum dado, diga isso de forma natural, sem inventar.
 - A resposta deve ser específica por ticker, não genérica.
+- Inclua os pontos de atenção dentro do próprio resumo corrido, sem depender de blocos separados.
+- Se encontrar o relatório gerencial mais recente ou página oficial de relatórios, preencha reportTitle e reportUrl com o melhor link encontrado.
+- Se não encontrar relatório gerencial recente ou página oficial de relatórios, deixe reportTitle e reportUrl vazios.
 - Preserve todos os tickers recebidos: ${tickers.join(", ")}.
 - Retorne somente JSON válido, sem markdown.
 
@@ -84,12 +89,10 @@ Formato obrigatório:
     {
       "ticker": "ABCD11",
       "title": "ABCD11 – Resumo das notícias mais recentes",
-      "summary": "Resumo corrido em 3-4 linhas, citando dividendo, DY mensal, aquisições/vendas quando houver e saúde do fundo.",
-      "attentionPoints": [
-        "Ponto específico 1, baseado na pesquisa.",
-        "Ponto específico 2, baseado na pesquisa.",
-        "Ponto específico 3, baseado na pesquisa."
-      ]
+      "summary": "Resumo corrido em 4-6 linhas, integrando dividendos, DY mensal, aquisições/vendas quando houver, saúde do fundo e principais pontos de atenção encontrados.",
+      "attentionPoints": [],
+      "reportTitle": "Relatório gerencial mais recente de ABCD11",
+      "reportUrl": "https://..."
     }
   ]
 }
@@ -129,11 +132,20 @@ async function callOpenAI(prompt: string) {
   return response.json();
 }
 
+function normalizeUrl(value: unknown) {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  return /^https?:\/\//i.test(url) ? url : "";
+}
+
 function normalizeInsights(tickers: string[], aiInsights: any[], fallback: FiiInsight[]) {
   return tickers.map((ticker: string) => {
     const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
     const fallbackItem = fallback.find((item) => item.ticker === ticker);
     if (!found || !fallbackItem) return fallbackItem || fallback[0];
+
+    const reportUrl = normalizeUrl(found.reportUrl);
+    const reportTitle = reportUrl ? String(found.reportTitle || `Relatório gerencial de ${ticker}`) : "";
 
     return {
       ticker,
@@ -143,6 +155,8 @@ function normalizeInsights(tickers: string[], aiInsights: any[], fallback: FiiIn
         ? found.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
         : fallbackItem.attentionPoints,
       searchUrl: buildGoogleSearchUrl(ticker),
+      reportTitle,
+      reportUrl,
     };
   });
 }
