@@ -46,7 +46,6 @@ function diffTickers(previous: WalletItem[], current: WalletItem[]) {
   const currentSet = new Set(current.map((item) => item.ticker));
 
   return {
-    added: current.filter((item) => !previousSet.has(item.ticker)).map((item) => item.ticker),
     removed: previous.filter((item) => !currentSet.has(item.ticker)).map((item) => item.ticker),
   };
 }
@@ -105,17 +104,13 @@ export default function WalletEmailVerifiedSync() {
       const nextSignature = walletSignature(latestWallet);
 
       if (previousSignature !== nextSignature) {
-        const { added, removed } = diffTickers(previousWallet, latestWallet);
+        const { removed } = diffTickers(previousWallet, latestWallet);
 
         walletRef.current = latestWallet;
         setWallet(latestWallet);
 
         if (removed.length) {
           showToast({ title: `Removendo ${removed.slice(0, 2).join(", ")} da carteira.` });
-        } else if (added.length) {
-          showToast({ title: `Adicionando ${added.slice(0, 2).join(", ")} à carteira.` });
-        } else {
-          showToast({ title: "Carteira atualizada." });
         }
       }
     }, 1500);
