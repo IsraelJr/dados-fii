@@ -59,19 +59,28 @@ export default function FiiTopPanels() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let active = true;
+
         const fetchFiis = async () => {
             try {
-                const res = await fetch("/api/fii");
+                const res = await fetch(`/api/fii?ts=${Date.now()}`, { cache: "no-store" });
                 const data: FII[] = await res.json();
-                setFiis(data ?? []);
+                if (active) setFiis(data ?? []);
             } catch (err) {
                 console.error("Erro ao buscar FIIs:", err);
-                setFiis([]);
+                if (active) setFiis([]);
             } finally {
-                setLoading(false);
+                if (active) setLoading(false);
             }
         };
+
         fetchFiis();
+        const interval = window.setInterval(fetchFiis, 5 * 60 * 1000);
+
+        return () => {
+            active = false;
+            window.clearInterval(interval);
+        };
     }, []);
 
     if (loading) return <p>Carregando FIIs...</p>;
@@ -178,7 +187,7 @@ export default function FiiTopPanels() {
                     ))}
                 </div>
             </div>
-            <p className="text-gray-600">Possuí atraso de aproximadamente 15 minutos</p>
+            <p className="text-gray-600">Possui atraso de aproximadamente 15 minutos</p>
         </div>
     );
 }
