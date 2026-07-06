@@ -20,6 +20,8 @@ type DollarState = {
 
 const DOLLAR_CACHE_KEY = "dados-fii-dollar-cache-v1";
 const FII_RESULT_ANCHOR = "fii-search-result";
+const MARKET_OPEN_HOUR = 9;
+const MARKET_CLOSE_HOUR = 19;
 
 function getCachedDollar(): DollarState {
     if (typeof window === "undefined") return { formatted: "..." };
@@ -56,7 +58,7 @@ function formatDollarUpdateTime(value?: string | null) {
     }
 }
 
-function isDollarRefreshWindow(date = new Date()) {
+function getSaoPauloMarketParts(date = new Date()) {
     const parts = new Intl.DateTimeFormat("en-US", {
         timeZone: "America/Sao_Paulo",
         weekday: "short",
@@ -68,7 +70,12 @@ function isDollarRefreshWindow(date = new Date()) {
     const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
     const isWeekday = weekday !== "Sat" && weekday !== "Sun";
 
-    return isWeekday && hour >= 9 && hour < 18;
+    return { hour, isWeekday };
+}
+
+function isMarketRefreshWindow(date = new Date()) {
+    const { hour, isWeekday } = getSaoPauloMarketParts(date);
+    return isWeekday && hour >= MARKET_OPEN_HOUR && hour < MARKET_CLOSE_HOUR;
 }
 
 export default function Home() {
@@ -197,7 +204,7 @@ export default function Home() {
 
         fetchDolar();
         const interval = setInterval(() => {
-            if (isDollarRefreshWindow()) fetchDolar();
+            if (isMarketRefreshWindow()) fetchDolar();
         }, 5 * 60 * 1000);
 
         return () => {
@@ -208,15 +215,7 @@ export default function Home() {
 
     useEffect(() => {
         const checkMarketHours = () => {
-            const now = new Date();
-            const hours = now.getHours();
-            const day = now.getDay();
-            const isWeekday = day >= 1 && day <= 5;
-            const isWithinHours =
-                hours >= Number(process.env.NEXT_PUBLIC_OPENING_TIME) &&
-                hours < Number(process.env.NEXT_PUBLIC_CLOSING_TIME);
-
-            setIsMarketOpen(isWeekday && isWithinHours);
+            setIsMarketOpen(isMarketRefreshWindow());
         };
 
         checkMarketHours();
@@ -354,7 +353,7 @@ export default function Home() {
                         ) : (
                             <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
                                 <p className="text-sm font-bold text-slate-500">
-                                    {`Painel de maiores altas e baixas disponível de segunda à sexta entre ${Number(process.env.NEXT_PUBLIC_OPENING_TIME)}h e ${Number(process.env.NEXT_PUBLIC_CLOSING_TIME)}h.`}
+                                    {`Painel de maiores altas e baixas disponível de segunda à sexta entre ${MARKET_OPEN_HOUR}h e ${MARKET_CLOSE_HOUR}h.`}
                                 </p>
                             </section>
                         )}
