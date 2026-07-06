@@ -65,7 +65,7 @@ export default function WalletEmailVerifiedSync() {
   const tokenRef = useRef("");
   const walletRef = useRef<WalletItem[]>([]);
   const lastSavedSignature = useRef("");
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const autoLoadDoneRef = useRef(false);
   const hasSession = Boolean(token);
 
