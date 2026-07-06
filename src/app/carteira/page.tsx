@@ -57,6 +57,11 @@ function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatPaymentSummary(payment?: Payment) {
+  if (!payment) return "Sem pagamento futuro na base";
+  return `${formatCurrency(payment.amount)} em ${payment.date}`;
+}
+
 function getCurrentMonthName() {
   return MONTHS[new Date().getMonth()];
 }
@@ -309,10 +314,7 @@ export default function WalletPage() {
 
     setItems((current) => {
       const existing = current.find((item) => item.ticker === code);
-      if (existing) {
-        return current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item);
-      }
-
+      if (existing) return current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item);
       return [...current, { ticker: code, quotas: totalQuotas }].sort((a, b) => a.ticker.localeCompare(b.ticker));
     });
 
@@ -368,7 +370,6 @@ export default function WalletPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ticker: item.ticker }),
         });
-
         if (response.ok) updated += 1;
         else failed += 1;
       } catch {
@@ -400,13 +401,11 @@ export default function WalletPage() {
           <strong className="mt-2 block text-3xl text-green-300">{formatCurrency(insights.monthlyIncome)}</strong>
           <p className="mt-2 text-sm font-medium text-gray-300">Baseada no último rendimento disponível.</p>
         </div>
-
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10">
           <p className="text-base font-extrabold text-white">Valor aproximado da carteira</p>
           <strong className="mt-2 block text-3xl text-indigo-300">{formatCurrency(insights.currentValue)}</strong>
           <p className="mt-2 text-sm font-medium text-gray-300">Calculado pelo preço atual retornado pela consulta.</p>
         </div>
-
         <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10">
           <p className="text-base font-extrabold text-white">Segmento principal por cotas</p>
           <strong className="mt-2 block text-3xl text-yellow-300">{insights.mainSegment?.value || "-"}</strong>
@@ -420,22 +419,10 @@ export default function WalletPage() {
           <p className="mt-3 text-sm font-medium text-gray-300">Adicione FIIs para gerar um resumo automático da carteira.</p>
         ) : (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <SummaryItem
-              label="Concentração por cotas"
-              value={insights.mainSegment ? `${insights.mainSegment.ticker} concentra ${insights.mainSegment.value} das cotas cadastradas.` : "Sem segmento calculado."}
-            />
-            <SummaryItem
-              label="Maior fonte de renda estimada"
-              value={topIncome ? `${topIncome.ticker} lidera com ${formatCurrency(topIncome.estimatedIncome)} por mês estimado.` : "Sem renda estimada ainda."}
-            />
-            <SummaryItem
-              label="Comunicados do mês"
-              value={insights.waiting.length ? `${insights.waiting.length} FII(s) ainda aguardam comunicado de ${MONTHS_PTBR[insights.currentMonth]}.` : `Todos os FIIs carregados já têm comunicado de ${MONTHS_PTBR[insights.currentMonth]}.`}
-            />
-            <SummaryItem
-              label="Próximo pagamento"
-              value={firstPayment ? `${firstPayment.ticker} em ${firstPayment.date}, estimado em ${formatCurrency(firstPayment.amount)}.` : "Nenhum pagamento futuro identificado na base."}
-            />
+            <SummaryItem label="Concentração por cotas" value={insights.mainSegment ? `${insights.mainSegment.ticker} concentra ${insights.mainSegment.value} das cotas cadastradas.` : "Sem segmento calculado."} />
+            <SummaryItem label="Maior fonte de renda estimada" value={topIncome ? `${topIncome.ticker} lidera com ${formatCurrency(topIncome.estimatedIncome)} por mês estimado.` : "Sem renda estimada ainda."} />
+            <SummaryItem label="Comunicados do mês" value={insights.waiting.length ? `${insights.waiting.length} FII(s) ainda aguardam comunicado de ${MONTHS_PTBR[insights.currentMonth]}.` : `Todos os FIIs carregados já têm comunicado de ${MONTHS_PTBR[insights.currentMonth]}.`} />
+            <SummaryItem label="Próximo pagamento" value={firstPayment ? `${firstPayment.ticker}: ${formatPaymentSummary(firstPayment)}.` : "Nenhum pagamento futuro identificado na base."} />
           </div>
         )}
       </section>
@@ -451,11 +438,7 @@ export default function WalletPage() {
                 ? `${insights.waiting.length} FII(s) da carteira ainda não têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base. Estimativa pendente: ${formatCurrency(insights.pendingIncome)}.`
                 : `Todos os FIIs carregados já têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base.`}
             </p>
-            {insights.waiting.length > 0 && (
-              <p className="mt-2 text-sm font-medium text-gray-200">
-                {insights.waiting.map((item) => item.ticker).join(", ")}
-              </p>
-            )}
+            {insights.waiting.length > 0 && <p className="mt-2 text-sm font-medium text-gray-200">{insights.waiting.map((item) => item.ticker).join(", ")}</p>}
           </div>
           <button
             type="button"
@@ -471,27 +454,10 @@ export default function WalletPage() {
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <h2 className="mb-4 text-xl font-extrabold text-white">Adicionar FII</h2>
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
-          <input
-            value={ticker}
-            onChange={(event) => setTicker(event.target.value.toUpperCase())}
-            onKeyDown={(event) => { if (event.key === "Enter") addItem(); }}
-            placeholder="Ticker, ex: ABCD11"
-            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
-          />
-          <input
-            value={quotas}
-            onChange={(event) => setQuotas(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") addItem(); }}
-            placeholder="Quantidade de cotas"
-            inputMode="decimal"
-            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
-          />
-          <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700">
-            <Plus size={18} /> Adicionar
-          </button>
-          <button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500">
-            <Download size={18} /> Exportar CSV
-          </button>
+          <input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+          <input value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+          <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
+          <button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
         </div>
         {message && <p className="mt-3 text-sm font-medium text-yellow-200">{message}</p>}
       </section>
@@ -503,9 +469,7 @@ export default function WalletPage() {
         </div>
 
         {!items.length ? (
-          <p className="rounded-xl border border-dashed border-gray-700 p-6 text-center text-sm font-medium text-gray-300">
-            Sua carteira ainda está vazia. Comece adicionando um ticker e a quantidade de cotas.
-          </p>
+          <p className="rounded-xl border border-dashed border-gray-700 p-6 text-center text-sm font-medium text-gray-300">Sua carteira ainda está vazia. Comece adicionando um ticker e a quantidade de cotas.</p>
         ) : (
           <>
             <div className="space-y-3 md:hidden">
@@ -551,42 +515,19 @@ export default function WalletPage() {
 
                     return (
                       <tr key={item.ticker} className="border-b border-gray-800 text-gray-100">
-                        <td className="py-3 font-bold">
-                          <FiiTickerLink ticker={item.ticker} />
-                        </td>
+                        <td className="py-3 font-bold"><FiiTickerLink ticker={item.ticker} /></td>
                         <td>
                           <div className="flex items-center gap-2">
-                            <input
-                              value={draftQuotas}
-                              onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))}
-                              onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }}
-                              inputMode="decimal"
-                              className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400"
-                            />
-                            <button
-                              onClick={() => updateQuotas(item.ticker)}
-                              disabled={!changed}
-                              className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`}
-                              title="Salvar cotas"
-                            >
-                              <Save size={17} />
-                            </button>
+                            <input value={draftQuotas} onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }} inputMode="decimal" className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" />
+                            <button onClick={() => updateQuotas(item.ticker)} disabled={!changed} className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`} title="Salvar cotas"><Save size={17} /></button>
                           </div>
                         </td>
                         <td className="font-medium text-gray-200">{item.data?.price || "-"}</td>
                         <td className="font-medium text-gray-200">{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
                         <td className="font-medium text-gray-200">{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
                         <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
-                        <td className="font-medium text-gray-200">
-                          {nextPayment
-                            ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}${nextPayment.dateWith ? ` · Data-com ${nextPayment.dateWith}` : ""}`
-                            : "Sem pagamento futuro na base"}
-                        </td>
-                        <td className="text-right">
-                          <button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover">
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
+                        <td className="font-medium text-gray-200">{formatPaymentSummary(nextPayment)}</td>
+                        <td className="text-right"><button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button></td>
                       </tr>
                     );
                   })}
@@ -604,10 +545,7 @@ export default function WalletPage() {
       </section>
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-        <h2 className="mb-4 flex items-center gap-2 text-xl font-extrabold text-white">
-          <CalendarDays className="text-green-300" /> Próximos pagamentos
-        </h2>
-
+        <h2 className="mb-4 flex items-center gap-2 text-xl font-extrabold text-white"><CalendarDays className="text-green-300" /> Próximos pagamentos</h2>
         {!displayedUpcomingPayments.length ? (
           <p className="text-sm font-medium text-gray-300">Ainda não há pagamentos futuros identificados para os FIIs da sua carteira.</p>
         ) : (
@@ -616,9 +554,7 @@ export default function WalletPage() {
               <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center">
                 <div>
                   <FiiTickerLink ticker={payment.ticker} />
-                  <span className="ml-2 text-sm font-medium text-gray-300">
-                    {MONTHS_PTBR[payment.month] || payment.month} · Data-com {payment.dateWith || "-"} · Pagamento em {payment.date}
-                  </span>
+                  <span className="ml-2 text-sm font-medium text-gray-300">{MONTHS_PTBR[payment.month] || payment.month} · Pagamento em {payment.date}</span>
                 </div>
                 <strong className="text-green-300">{formatCurrency(payment.amount)}</strong>
               </li>
@@ -640,42 +576,18 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
 }
 
 function FiiTickerLink({ ticker }: { ticker: string }) {
-  return (
-    <Link href={`/fii/${ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">
-      {ticker}
-    </Link>
-  );
+  return <Link href={`/fii/${ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">{ticker}</Link>;
 }
 
-function WalletMobileCard({
-  item,
-  nextPayment,
-  draftQuotas,
-  changed,
-  onQuotaChange,
-  onSave,
-  onRemove,
-}: {
-  item: any;
-  nextPayment?: Payment;
-  draftQuotas: string;
-  changed: boolean;
-  onQuotaChange: (value: string) => void;
-  onSave: () => void;
-  onRemove: () => void;
-}) {
+function WalletMobileCard({ item, nextPayment, draftQuotas, changed, onQuotaChange, onSave, onRemove }: { item: any; nextPayment?: Payment; draftQuotas: string; changed: boolean; onQuotaChange: (value: string) => void; onSave: () => void; onRemove: () => void; }) {
   return (
     <article className="rounded-2xl bg-gray-800 p-4 text-gray-100 ring-1 ring-white/10">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-xl font-extrabold">
-            <FiiTickerLink ticker={item.ticker} />
-          </h3>
+          <h3 className="text-xl font-extrabold"><FiiTickerLink ticker={item.ticker} /></h3>
           <p className="mt-1 text-sm font-medium text-gray-300">{item.quotas} cotas</p>
         </div>
-        <button onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover">
-          <Trash2 size={18} />
-        </button>
+        <button onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button>
       </div>
 
       <div className="grid gap-3">
@@ -683,27 +595,12 @@ function WalletMobileCard({
         <InfoRow label="Último rendimento" value={item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"} />
         <InfoRow label="Anunciado no mês" value={item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"} />
         <InfoRow label="Renda estimada" value={formatCurrency(item.estimatedIncome)} highlight="green" />
-        <InfoRow
-          label="Próximo pagamento"
-          value={nextPayment ? `${nextPayment.date} · ${formatCurrency(nextPayment.amount)}${nextPayment.dateWith ? ` · Data-com ${nextPayment.dateWith}` : ""}` : "Sem pagamento futuro na base"}
-        />
+        <InfoRow label="Próximo pagamento" value={formatPaymentSummary(nextPayment)} />
       </div>
 
       <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
-        <input
-          value={draftQuotas}
-          onChange={(event) => onQuotaChange(event.target.value)}
-          onKeyDown={(event) => { if (event.key === "Enter") onSave(); }}
-          inputMode="decimal"
-          className="rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400"
-        />
-        <button
-          onClick={onSave}
-          disabled={!changed}
-          className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-bold ${changed ? "bg-indigo-600 text-white hover:bg-indigo-700" : "cursor-not-allowed bg-gray-700 text-gray-400"}`}
-        >
-          <Save size={16} /> Salvar
-        </button>
+        <input value={draftQuotas} onChange={(event) => onQuotaChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSave(); }} inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" />
+        <button onClick={onSave} disabled={!changed} className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-bold ${changed ? "bg-indigo-600 text-white hover:bg-indigo-700" : "cursor-not-allowed bg-gray-700 text-gray-400"}`}><Save size={16} /> Salvar</button>
       </div>
     </article>
   );
@@ -734,9 +631,7 @@ function RankingCard({ title, items }: { title: string; items: Array<{ ticker: s
                 <span className="font-medium"><strong className="text-gray-400">#{index + 1}</strong> {item.ticker}</span>
                 <strong className="text-indigo-200">{item.value}</strong>
               </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-gray-700">
-                <div className={`h-full rounded-full bg-indigo-400 ${getBarWidthClass(item.value)}`} />
-              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-gray-700"><div className={`h-full rounded-full bg-indigo-400 ${getBarWidthClass(item.value)}`} /></div>
             </li>
           ))}
         </ol>
