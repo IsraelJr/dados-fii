@@ -83,11 +83,11 @@ export default function WalletEmailVerifiedSync() {
     else setLoading(true);
 
     try {
-      const response = await fetch("/api/wallet-sync", {
+      const response = await fetch("/api/wallet-save-clean", {
         method: "POST",
         keepalive: Boolean(options?.keepalive),
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save", email: cleanEmail, sessionToken: token, wallet: currentWallet }),
+        body: JSON.stringify({ email: cleanEmail, sessionToken: token, wallet: currentWallet }),
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json?.ok) throw new Error(json?.error || "Erro ao salvar carteira.");
@@ -111,10 +111,10 @@ export default function WalletEmailVerifiedSync() {
     const signature = walletSignature(wallet);
     if (signature === lastSavedSignature.current) return;
 
-    setMessage("Alterações detectadas. Salvando automaticamente...");
+    setMessage("Alterações pendentes. Vamos salvar automaticamente em instantes...");
     const timeout = window.setTimeout(() => {
       saveCurrentWallet({ silent: true });
-    }, 3500);
+    }, 30000);
 
     return () => window.clearTimeout(timeout);
   }, [email, token, wallet]);
@@ -124,8 +124,19 @@ export default function WalletEmailVerifiedSync() {
       saveCurrentWallet({ silent: true, keepalive: true });
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        saveCurrentWallet({ silent: true, keepalive: true });
+      }
+    }
+
     window.addEventListener("pagehide", handlePageHide);
-    return () => window.removeEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [email, token]);
 
   async function sendCode() {
