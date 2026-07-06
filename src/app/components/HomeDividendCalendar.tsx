@@ -182,7 +182,7 @@ function EventCard({ event, featured = false }: { event: CalendarItem; featured?
             </p>
             {event.estimatedAmount !== undefined && (
                 <p className={`${featured ? "mt-5 text-lg" : "mt-3 text-sm"} font-bold text-green-300`}>
-                    Na sua carteira: {formatCurrency(event.estimatedAmount)}
+                    Renda estimada: {formatCurrency(event.estimatedAmount)}
                 </p>
             )}
         </Link>
