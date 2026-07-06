@@ -6,7 +6,6 @@ import { CalendarDays, Loader2 } from "lucide-react";
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
 const CALENDAR_CACHE_KEY = "dados-fii-home-calendar-cache-v1";
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const MONTHS_PTBR: Record<string, string> = {
     January: "Janeiro",
     February: "Fevereiro",
@@ -138,7 +137,7 @@ function getCurrentYearData(data: any) {
     return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {};
 }
 
-function chooseNextEventByTicker(items: CalendarItem[]) {
+function chooseNextEventByTicker(items: CalendarItem[], orderedTickers: string[]) {
     const byTicker = new Map<string, CalendarItem>();
 
     items
@@ -147,12 +146,19 @@ function chooseNextEventByTicker(items: CalendarItem[]) {
             if (!byTicker.has(item.ticker)) byTicker.set(item.ticker, item);
         });
 
-    return Array.from(byTicker.values()).slice(0, 3);
+    return orderedTickers
+        .map((ticker) => byTicker.get(ticker))
+        .filter(Boolean)
+        .slice(0, 3) as CalendarItem[];
 }
 
 function selectHomeTickers(wallet: WalletItem[], topFiis: string[]) {
-    const walletTickers = wallet.map((item) => item.ticker).filter(Boolean);
+    const walletTickers = [...wallet]
+        .filter((item) => item.ticker)
+        .sort((a, b) => (Number(b.quotas) || 0) - (Number(a.quotas) || 0) || a.ticker.localeCompare(b.ticker))
+        .map((item) => item.ticker);
     const fallbackTickers = topFiis.filter((ticker) => !walletTickers.includes(ticker));
+
     return Array.from(new Set([...walletTickers, ...fallbackTickers])).slice(0, 3);
 }
 
@@ -261,7 +267,7 @@ export default function HomeDividendCalendar() {
                 }
             }
 
-            const nextEvents = chooseNextEventByTicker(items);
+            const nextEvents = chooseNextEventByTicker(items, tickers);
             setEvents(nextEvents);
             saveCache(tickersKey, nextEvents);
             setLoading(false);
@@ -277,20 +283,20 @@ export default function HomeDividendCalendar() {
 
     return (
         <div className="mx-auto mt-6 max-w-4xl rounded-2xl border border-indigo-500/20 bg-gray-900 p-5 text-left text-gray-100 shadow-lg">
-            <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
+            <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
                 <div>
                     <h2 className="flex items-center gap-2 text-xl font-bold">
                         <CalendarDays className="text-green-300" /> Seu calendário de dividendos
                     </h2>
                     <p className="mt-1 text-sm text-gray-400">
-                        Até 3 FIIs: priorizamos sua carteira e completamos com os mais pesquisados por você.
+                        Um resumo dos seus FIIs. Veja o restante na carteira.
                     </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    <Link href="/carteira" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+                <div className="flex flex-nowrap justify-start gap-2 md:justify-end">
+                    <Link href="/carteira" className="whitespace-nowrap rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
                         Minha carteira
                     </Link>
-                    <Link href="/calendario-dividendos-fiis" className="rounded-full bg-gray-800 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-gray-700">
+                    <Link href="/calendario-dividendos-fiis" className="whitespace-nowrap rounded-full bg-gray-800 px-4 py-2 text-sm font-bold text-indigo-100 hover:bg-gray-700">
                         Calendário completo
                     </Link>
                 </div>
