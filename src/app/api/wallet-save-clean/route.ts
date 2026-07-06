@@ -75,35 +75,6 @@ function cleanWallet(value: unknown): WalletItem[] {
     .sort((a, b) => a.ticker.localeCompare(b.ticker));
 }
 
-function extractWallet(data: any) {
-  const candidates = [
-    data?.wallet,
-    data?.wallet?.items,
-    data?.carteira,
-    data?.carteira?.items,
-    data?.carteira?.fiis,
-    data?.fiis,
-    data?.portfolio,
-    data?.portfolio?.items,
-    data?.portfolio?.fiis,
-    data?.monitored?.fiis,
-  ];
-
-  for (const candidate of candidates) {
-    const wallet = cleanWallet(candidate);
-    if (wallet.length) return wallet;
-  }
-
-  return [];
-}
-
-function mergeWallet(existing: WalletItem[], incoming: WalletItem[]) {
-  const map = new Map<string, WalletItem>();
-  existing.forEach((item) => map.set(item.ticker, item));
-  incoming.forEach((item) => map.set(item.ticker, item));
-  return Array.from(map.values()).sort((a, b) => a.ticker.localeCompare(b.ticker));
-}
-
 async function hasSession(email: string, token: unknown) {
   const sessionToken = String(token || "");
   if (!sessionToken) return false;
@@ -140,14 +111,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Confirme o código antes de salvar a carteira." }, { status: 401 });
     }
 
-    const incoming = cleanWallet(body?.wallet);
-    if (!incoming.length) {
+    const wallet = cleanWallet(body?.wallet);
+    if (!wallet.length) {
       return NextResponse.json({ ok: false, error: "Adicione pelo menos um FII antes de salvar." }, { status: 400 });
     }
 
     const user = await findUser(email);
-    const existing = extractWallet(user.data);
-    const wallet = mergeWallet(existing, incoming);
 
     await user.ref.set({
       email,
@@ -166,9 +135,9 @@ export async function POST(req: Request) {
       email,
       docId: user.docId,
       saved: wallet.length,
-      existing: existing.length,
-      incoming: incoming.length,
+      incoming: wallet.length,
       walletVersion: WEB_WALLET_VERSION,
+      mode: "replace",
     });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao salvar carteira." }, { status: 500 });
