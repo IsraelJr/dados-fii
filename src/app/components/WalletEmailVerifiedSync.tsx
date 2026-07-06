@@ -48,8 +48,8 @@ export default function WalletEmailVerifiedSync() {
     return () => window.clearInterval(interval);
   }, []);
 
-  async function callApi(payload: Record<string, any>) {
-    const response = await fetch("/api/wallet-sync", {
+  async function callApi(payload: Record<string, any>, endpoint = "/api/wallet-sync") {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -133,13 +133,14 @@ export default function WalletEmailVerifiedSync() {
     setMessage("");
 
     try {
-      const json = await callApi({ action, email: cleanEmail, sessionToken: token, wallet: currentWallet });
+      const endpoint = action === "load" ? "/api/wallet-load-legacy" : "/api/wallet-sync";
+      const json = await callApi({ action, email: cleanEmail, sessionToken: token, wallet: currentWallet }, endpoint);
 
       if (action === "load") {
         const loadedWallet = Array.isArray(json.wallet) ? json.wallet : [];
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedWallet));
         setWallet(loadedWallet);
-        setMessage("Carteira carregada com sucesso. Atualizando a tela...");
+        setMessage(`Carteira carregada com sucesso. ${loadedWallet.length} FII(s) encontrados. Atualizando a tela...`);
         window.setTimeout(() => window.location.reload(), 800);
       } else {
         setWallet(currentWallet);
