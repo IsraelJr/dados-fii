@@ -78,6 +78,8 @@ Regras:
 - Se não encontrar algum dado, diga isso de forma natural, sem inventar.
 - A resposta deve ser específica por ticker, não genérica.
 - Inclua os pontos de atenção dentro do próprio resumo corrido, sem depender de blocos separados.
+- Não coloque URLs puras dentro de summary, title ou attentionPoints; cite a fonte pelo nome do site ou instituição.
+- Use URLs somente nos campos reportUrl/searchUrl quando aplicável.
 - Se encontrar o relatório gerencial mais recente ou página oficial de relatórios, preencha reportTitle e reportUrl com o melhor link encontrado.
 - Se não encontrar relatório gerencial recente ou página oficial de relatórios, deixe reportTitle e reportUrl vazios.
 - Preserve todos os tickers recebidos: ${tickers.join(", ")}.
@@ -89,7 +91,7 @@ Formato obrigatório:
     {
       "ticker": "ABCD11",
       "title": "ABCD11 – Resumo das notícias mais recentes",
-      "summary": "Resumo corrido em 4-6 linhas, integrando dividendos, DY mensal, aquisições/vendas quando houver, saúde do fundo e principais pontos de atenção encontrados.",
+      "summary": "Resumo corrido em 4-6 linhas, integrando dividendos, DY mensal, aquisições/vendas quando houver, saúde do fundo e principais pontos de atenção encontrados. Não inclua URL pura aqui; cite apenas o nome da fonte quando necessário.",
       "attentionPoints": [],
       "reportTitle": "Relatório gerencial mais recente de ABCD11",
       "reportUrl": "https://..."
