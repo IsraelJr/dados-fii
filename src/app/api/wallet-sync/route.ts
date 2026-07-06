@@ -136,7 +136,17 @@ async function sendWalletCode(email: string, code: string) {
     }),
   });
 
-  if (!response.ok) throw new Error("Não foi possível enviar o código por e-mail.");
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    console.error("[wallet-sync] Resend error", {
+      status: response.status,
+      from,
+      error: errorText,
+    });
+
+    throw new Error(`Não foi possível enviar o código por e-mail. Resend HTTP ${response.status}. ${errorText}`.trim());
+  }
+
   return { sent: true, provider: "resend" };
 }
 
