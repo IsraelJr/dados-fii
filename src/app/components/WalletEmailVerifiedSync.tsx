@@ -153,75 +153,82 @@ export default function WalletEmailVerifiedSync() {
   }
 
   return (
-    <section className="mx-auto mb-6 max-w-6xl rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-2xl">
-          <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
-            <Mail className="text-indigo-300" size={22} /> Salve sua carteira
+    <section className="mx-auto mb-6 w-full max-w-6xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg ring-1 ring-white/10 sm:p-5">
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 max-w-2xl">
+          <h2 className="flex min-w-0 items-center gap-2 text-lg font-extrabold text-white sm:text-xl">
+            <Mail className="shrink-0 text-indigo-300" size={22} />
+            <span className="min-w-0">Salve sua carteira</span>
           </h2>
           <p className="mt-2 text-sm font-medium leading-6 text-gray-300">
             Sua carteira fica salva apenas neste navegador. Confirme seu e-mail para acessar seus FIIs em qualquer celular, computador ou navegador.
           </p>
-          <p className="mt-1 text-xs font-medium text-gray-400">
+          <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
             Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira.
           </p>
         </div>
 
-        <div className="grid w-full gap-2 lg:max-w-md">
+        <div className="grid min-w-0 w-full max-w-full gap-2 lg:max-w-md">
           <input
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="seu@email.com"
-            className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
+            className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 sm:text-base"
           />
 
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <div className="grid min-w-0 w-full gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
             <input
               value={pin}
               onChange={(event) => setPin(event.target.value)}
               placeholder="Código recebido"
               inputMode="numeric"
-              className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
+              className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 sm:text-base"
             />
             <button
               type="button"
               onClick={confirmCode}
               disabled={loading || !pin.trim()}
-              className="inline-flex items-center justify-center rounded-lg bg-gray-800 px-4 py-2 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-4 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:w-auto sm:text-base"
             >
               Confirmar
             </button>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid min-w-0 w-full gap-2 sm:grid-cols-3">
             <button
               type="button"
               onClick={sendCode}
               disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-4 py-2 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-4 sm:text-base"
             >
-              {loading ? <Loader2 className="animate-spin" size={16} /> : <Mail size={16} />} Enviar código
+              {loading ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Mail className="shrink-0" size={16} />}
+              <span className="truncate">Enviar código</span>
             </button>
             <button
               type="button"
               onClick={() => sync("save")}
               disabled={loading || !wallet.length || !token}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-4 sm:text-base"
             >
-              {loading ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Salvar
+              {loading ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Save className="shrink-0" size={16} />}
+              <span className="truncate">Salvar</span>
             </button>
             <button
               type="button"
               onClick={() => sync("load")}
               disabled={loading || !token}
-              className="inline-flex items-center justify-center rounded-lg bg-gray-800 px-4 py-2 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-4 sm:text-base"
             >
-              Carregar
+              <span className="truncate">Carregar</span>
             </button>
           </div>
 
-          {message && <p className="text-sm font-medium text-yellow-200">{message}</p>}
+          {message && (
+            <p className="min-w-0 max-w-full whitespace-pre-wrap break-words rounded-lg bg-gray-950/60 p-3 text-xs font-medium leading-5 text-yellow-200 sm:text-sm">
+              {message}
+            </p>
+          )}
         </div>
       </div>
     </section>
