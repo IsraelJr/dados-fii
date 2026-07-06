@@ -30,6 +30,63 @@ const buildFallbackInsight = (ticker: string): FiiNews => ({
     loading: false,
 });
 
+function friendlySourceName(url: string, index: number) {
+    try {
+        const hostname = new URL(url).hostname.replace(/^www\./i, "");
+        if (!hostname) return `Ver fonte ${index + 1}`;
+
+        const knownNames: Record<string, string> = {
+            "b3.com.br": "B3",
+            "fundsexplorer.com.br": "Funds Explorer",
+            "fiis.com.br": "FIIs.com.br",
+            "statusinvest.com.br": "Status Invest",
+            "dicionariodoinvestidor.com.br": "Dicionário do Investidor",
+            "clubefii.com.br": "Clube FII",
+            "investidor10.com.br": "Investidor10",
+            "suno.com.br": "Suno",
+            "infomoney.com.br": "InfoMoney",
+            "valor.globo.com": "Valor Econômico",
+        };
+
+        const known = Object.entries(knownNames).find(([domain]) => hostname.endsWith(domain));
+        return known?.[1] || `Ver fonte: ${hostname}`;
+    } catch {
+        return `Ver fonte ${index + 1}`;
+    }
+}
+
+function normalizeTextUrl(rawUrl: string) {
+    return rawUrl.replace(/[\]),.;:]+$/g, "");
+}
+
+function renderTextWithFriendlyLinks(text: string) {
+    const urlRegex = /(https?:\/\/[^\s]+)/gi;
+    const parts = text.split(urlRegex);
+    let linkIndex = 0;
+
+    return parts.map((part, index) => {
+        if (!/^https?:\/\//i.test(part)) return part;
+
+        const url = normalizeTextUrl(part);
+        const trailing = part.slice(url.length);
+        const label = friendlySourceName(url, linkIndex++);
+
+        return (
+            <span key={`${url}-${index}`}>
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold text-indigo-700 underline decoration-indigo-300 underline-offset-2 hover:text-indigo-900"
+                >
+                    {label}
+                </a>
+                {trailing}
+            </span>
+        );
+    });
+}
+
 export default function PersonalizedNews() {
     const [news, setNews] = useState<FiiNews[]>([]);
     const [loadingFII, setLoadingFII] = useState(false);
@@ -162,12 +219,12 @@ export default function PersonalizedNews() {
                                     </p>
                                 ) : (
                                     <>
-                                        {title && <p className="mt-1 break-words text-sm font-bold text-gray-800">{title}</p>}
-                                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">{summary}</p>
+                                        {title && <p className="mt-1 break-words text-sm font-bold text-gray-800">{renderTextWithFriendlyLinks(title)}</p>}
+                                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">{renderTextWithFriendlyLinks(summary)}</p>
 
                                         {!!attentionPoints.length && (
                                             <p className="mt-2 break-words text-sm leading-6 text-gray-600">
-                                                {attentionPoints.join(" ")}
+                                                {renderTextWithFriendlyLinks(attentionPoints.join(" "))}
                                             </p>
                                         )}
                                     </>
