@@ -14,6 +14,13 @@ type WalletItem = {
   quotas: number;
 };
 
+type UserDocResult = {
+  ref: any;
+  snap: any;
+  data: any;
+  docId: string;
+};
+
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
@@ -51,35 +58,66 @@ function normalizeQuotas(value: unknown) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
-function sanitizeWallet(value: unknown): WalletItem[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item: any) => {
-      if (typeof item === "string") return { ticker: normalizeTicker(item), quotas: 1 };
-      return {
-        ticker: normalizeTicker(item?.ticker || item?.code || item?.fii || item?.symbol),
-        quotas: normalizeQuotas(item?.quotas ?? item?.quantity ?? item?.qtd ?? item?.shares),
-      };
+function walletFromObjectMap(value: Record<string, any>): WalletItem[] {
+  return Object.entries(value)
+    .map(([key, item]) => {
+      const ticker = normalizeTicker(item?.ticker || item?.code || item?.fii || item?.symbol || key);
+      const quotas = normalizeQuotas(item?.quotas ?? item?.quantity ?? item?.qtd ?? item?.shares ?? item?.cotas ?? item);
+      return { ticker, quotas };
     })
-    .filter((item) => /^[A-Z0-9]{4,8}$/.test(item.ticker) && Number.isFinite(item.quotas) && item.quotas > 0)
-    .slice(0, 120)
-    .sort((a, b) => a.ticker.localeCompare(b.ticker));
+    .filter((item) => /^[A-Z0-9]{4,8}$/.test(item.ticker) && Number.isFinite(item.quotas) && item.quotas > 0);
+}
+
+function sanitizeWallet(value: unknown): WalletItem[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item: any) => {
+        if (typeof item === "string") return { ticker: normalizeTicker(item), quotas: 1 };
+        return {
+          ticker: normalizeTicker(item?.ticker || item?.code || item?.fii || item?.symbol),
+          quotas: normalizeQuotas(item?.quotas ?? item?.quantity ?? item?.qtd ?? item?.shares ?? item?.cotas),
+        };
+      })
+      .filter((item) => /^[A-Z0-9]{4,8}$/.test(item.ticker) && Number.isFinite(item.quotas) && item.quotas > 0)
+      .slice(0, 120)
+      .sort((a, b) => a.ticker.localeCompare(b.ticker));
+  }
+
+  if (value && typeof value === "object") {
+    return walletFromObjectMap(value as Record<string, any>)
+      .slice(0, 120)
+      .sort((a, b) => a.ticker.localeCompare(b.ticker));
+  }
+
+  return [];
 }
 
 function extractUserWallet(data: any): WalletItem[] {
   const candidates = [
     data?.wallet,
+    data?.wallet?.items,
     data?.carteira,
+    data?.carteira?.items,
+    data?.carteira?.fiis,
     data?.fiis,
     data?.funds,
     data?.portfolio,
+    data?.portfolio?.items,
+    data?.portfolio?.fiis,
     data?.monitored?.fiis,
+    data?.monitoredFiis,
+    data?.selectedFiis,
+    data?.favorites,
   ];
 
   for (const candidate of candidates) {
     const wallet = sanitizeWallet(candidate);
     if (wallet.length) return wallet;
+  }
+
+  const topLevelWallet = walletFromObjectMap(data || {});
+  if (topLevelWallet.length >= 2) {
+    return topLevelWallet.slice(0, 120).sort((a, b) => a.ticker.localeCompare(b.ticker));
   }
 
   return [];
@@ -100,6 +138,12 @@ function isExpired(value: any) {
   if (!value) return true;
   const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
   return !date || Number.isNaN(date.getTime()) || date.getTime() < Date.now();
+}
+
+function legacyEmailCandidates(email: string) {
+  const [name, domain] = email.split("@");
+  const capitalized = name ? `${name.charAt(0).toUpperCase()}${name.slice(1)}@${domain}` : email;
+  return Array.from(new Set([email, capitalized]));
 }
 
 async function requireVerifiedSession(email: string, token: unknown) {
@@ -150,10 +194,24 @@ async function sendWalletCode(email: string, code: string) {
   return { sent: true, provider: "resend" };
 }
 
-async function getUserDoc(email: string) {
-  const ref = adminDb.collection("User").doc(email);
+async function getUserDoc(email: string): Promise<UserDocResult> {
+  const users = adminDb.collection("User");
+
+  for (const docId of legacyEmailCandidates(email)) {
+    const ref = users.doc(docId);
+    const snap = await ref.get();
+    if (snap.exists) return { ref, snap, data: snap.data() || {}, docId };
+  }
+
+  const querySnap = await users.where("email", "==", email).limit(1).get();
+  if (!querySnap.empty) {
+    const doc = querySnap.docs[0];
+    return { ref: doc.ref, snap: doc, data: doc.data() || {}, docId: doc.id };
+  }
+
+  const ref = users.doc(email);
   const snap = await ref.get();
-  return { ref, snap, data: snap.exists ? snap.data() || {} : {} };
+  return { ref, snap, data: {}, docId: email };
 }
 
 export async function POST(req: Request) {
@@ -218,17 +276,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Confirme o código enviado para o e-mail antes de acessar a carteira." }, { status: 401 });
     }
 
-    const { ref: userRef, snap: userSnap, data: userData } = await getUserDoc(email);
+    const { ref: userRef, snap: userSnap, data: userData, docId } = await getUserDoc(email);
 
     if (action === "load") {
       const wallet = extractUserWallet(userData);
       if (!wallet.length) {
-        return NextResponse.json({ ok: false, error: "Nenhuma carteira encontrada para este e-mail." }, { status: 404 });
+        return NextResponse.json({
+          ok: false,
+          error: "Documento encontrado, mas nenhuma carteira compatível foi identificada para este e-mail.",
+          docId,
+          fields: Object.keys(userData || {}).slice(0, 30),
+        }, { status: 404 });
       }
 
       return NextResponse.json({
         ok: true,
         email,
+        docId,
         wallet,
         source: "User",
         updatedAt: userData.walletUpdatedAt || userData.updatedAt || null,
@@ -259,6 +323,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: true,
         email,
+        docId,
         source: "User",
         saved: wallet.length,
         existing: existingWallet.length,
