@@ -111,20 +111,11 @@ export default function WalletEmailVerifiedSync() {
         setWallet(latestWallet);
 
         if (removed.length) {
-          showToast({
-            title: `Removido ${removed.slice(0, 2).join(", ")} da carteira.`,
-            description: "A alteração fica no navegador e será sincronizada ao sair ou após alguns minutos.",
-          });
+          showToast({ title: `Removendo ${removed.slice(0, 2).join(", ")} da carteira.` });
         } else if (added.length) {
-          showToast({
-            title: `Adicionado ${added.slice(0, 2).join(", ")} à carteira.`,
-            description: "A alteração fica no navegador e será sincronizada ao sair ou após alguns minutos.",
-          });
+          showToast({ title: `Adicionando ${added.slice(0, 2).join(", ")} à carteira.` });
         } else {
-          showToast({
-            title: "Carteira atualizada.",
-            description: "A alteração fica no navegador e será sincronizada automaticamente.",
-          });
+          showToast({ title: "Carteira atualizada." });
         }
       }
     }, 1500);
