@@ -21,10 +21,6 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function walletDocId(email: string) {
-  return Buffer.from(email).toString("base64url");
-}
-
 function hash(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -45,17 +41,47 @@ function futureDays(days: number) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
+function normalizeTicker(value: unknown) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function normalizeQuotas(value: unknown) {
+  const parsed = Number(String(value ?? "1").replace(",", "."));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 function sanitizeWallet(value: unknown): WalletItem[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .map((item: any) => ({
-      ticker: String(item?.ticker || "").trim().toUpperCase(),
-      quotas: Number(item?.quotas),
-    }))
+    .map((item: any) => {
+      if (typeof item === "string") return { ticker: normalizeTicker(item), quotas: 1 };
+      return {
+        ticker: normalizeTicker(item?.ticker || item?.code || item?.fii || item?.symbol),
+        quotas: normalizeQuotas(item?.quotas ?? item?.quantity ?? item?.qtd ?? item?.shares),
+      };
+    })
     .filter((item) => /^[A-Z0-9]{4,8}$/.test(item.ticker) && Number.isFinite(item.quotas) && item.quotas > 0)
     .slice(0, 120)
     .sort((a, b) => a.ticker.localeCompare(b.ticker));
+}
+
+function extractUserWallet(data: any): WalletItem[] {
+  const candidates = [
+    data?.wallet,
+    data?.carteira,
+    data?.fiis,
+    data?.funds,
+    data?.portfolio,
+    data?.monitored?.fiis,
+  ];
+
+  for (const candidate of candidates) {
+    const wallet = sanitizeWallet(candidate);
+    if (wallet.length) return wallet;
+  }
+
+  return [];
 }
 
 function mergeWallets(existing: WalletItem[], incoming: WalletItem[]) {
@@ -113,6 +139,12 @@ async function sendWalletCode(email: string, code: string) {
   return { sent: true, provider: "resend" };
 }
 
+async function getUserDoc(email: string) {
+  const ref = adminDb.collection("User").doc(email);
+  const snap = await ref.get();
+  return { ref, snap, data: snap.exists ? snap.data() || {} : {} };
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -122,8 +154,6 @@ export async function POST(req: Request) {
     if (!isValidEmail(email)) {
       return NextResponse.json({ ok: false, error: "Informe um e-mail válido." }, { status: 400 });
     }
-
-    const walletRef = adminDb.collection("Wallets").doc(walletDocId(email));
 
     if (action === "request-code") {
       const code = makeCode();
@@ -177,18 +207,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Confirme o código enviado para o e-mail antes de acessar a carteira." }, { status: 401 });
     }
 
+    const { ref: userRef, snap: userSnap, data: userData } = await getUserDoc(email);
+
     if (action === "load") {
-      const snap = await walletRef.get();
-      if (!snap.exists) {
+      const wallet = extractUserWallet(userData);
+      if (!wallet.length) {
         return NextResponse.json({ ok: false, error: "Nenhuma carteira encontrada para este e-mail." }, { status: 404 });
       }
 
-      const data = snap.data() || {};
       return NextResponse.json({
         ok: true,
         email,
-        wallet: sanitizeWallet(data.wallet || []),
-        updatedAt: data.updatedAt || null,
+        wallet,
+        source: "User",
+        updatedAt: userData.walletUpdatedAt || userData.updatedAt || null,
       });
     }
 
@@ -198,18 +230,25 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: "Adicione pelo menos um FII antes de salvar." }, { status: 400 });
       }
 
-      const existingSnap = await walletRef.get();
-      const existingWallet = existingSnap.exists ? sanitizeWallet((existingSnap.data() || {}).wallet || []) : [];
+      const existingWallet = extractUserWallet(userData);
       const wallet = mergeWallets(existingWallet, incomingWallet);
 
-      await walletRef.set({
+      await userRef.set({
         email,
         wallet,
+        walletUpdatedAt: adminFieldValue.serverTimestamp(),
         updatedAt: adminFieldValue.serverTimestamp(),
-        createdAt: existingSnap.exists ? (existingSnap.data() || {}).createdAt || adminFieldValue.serverTimestamp() : adminFieldValue.serverTimestamp(),
+        createdAt: userSnap.exists ? userData.createdAt || adminFieldValue.serverTimestamp() : adminFieldValue.serverTimestamp(),
       }, { merge: true });
 
-      return NextResponse.json({ ok: true, email, saved: wallet.length, merged: wallet.length - incomingWallet.length });
+      return NextResponse.json({
+        ok: true,
+        email,
+        source: "User",
+        saved: wallet.length,
+        existing: existingWallet.length,
+        incoming: incomingWallet.length,
+      });
     }
 
     return NextResponse.json({ ok: false, error: "Ação inválida." }, { status: 400 });
