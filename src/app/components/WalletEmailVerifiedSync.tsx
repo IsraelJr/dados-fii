@@ -1,11 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Mail, Save } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
 
 type WalletItem = {
   ticker: string;
   quotas: number;
+};
+
+type ToastState = {
+  title: string;
+  description?: string;
 };
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
@@ -36,6 +41,16 @@ function walletSignature(items: WalletItem[]) {
   return JSON.stringify(items.map((item) => ({ ticker: item.ticker, quotas: item.quotas })));
 }
 
+function diffTickers(previous: WalletItem[], current: WalletItem[]) {
+  const previousSet = new Set(previous.map((item) => item.ticker));
+  const currentSet = new Set(current.map((item) => item.ticker));
+
+  return {
+    added: current.filter((item) => !previousSet.has(item.ticker)).map((item) => item.ticker),
+    removed: previous.filter((item) => !currentSet.has(item.ticker)).map((item) => item.ticker),
+  };
+}
+
 export default function WalletEmailVerifiedSync() {
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
@@ -44,10 +59,24 @@ export default function WalletEmailVerifiedSync() {
   const [loading, setLoading] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [toastProgress, setToastProgress] = useState(false);
   const emailRef = useRef("");
   const tokenRef = useRef("");
+  const walletRef = useRef<WalletItem[]>([]);
   const lastSavedSignature = useRef("");
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoLoadDoneRef = useRef(false);
   const hasSession = Boolean(token);
+
+  function showToast(nextToast: ToastState) {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+
+    setToast(nextToast);
+    setToastProgress(false);
+    window.setTimeout(() => setToastProgress(true), 30);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 3000);
+  }
 
   useEffect(() => {
     emailRef.current = email;
@@ -65,11 +94,45 @@ export default function WalletEmailVerifiedSync() {
     setToken(storedToken);
     emailRef.current = storedEmail;
     tokenRef.current = storedToken;
+    walletRef.current = initialWallet;
     setWallet(initialWallet);
     lastSavedSignature.current = walletSignature(initialWallet);
 
-    const interval = window.setInterval(() => setWallet(readWallet()), 1500);
-    return () => window.clearInterval(interval);
+    const interval = window.setInterval(() => {
+      const latestWallet = readWallet();
+      const previousWallet = walletRef.current;
+      const previousSignature = walletSignature(previousWallet);
+      const nextSignature = walletSignature(latestWallet);
+
+      if (previousSignature !== nextSignature) {
+        const { added, removed } = diffTickers(previousWallet, latestWallet);
+
+        walletRef.current = latestWallet;
+        setWallet(latestWallet);
+
+        if (removed.length) {
+          showToast({
+            title: `Removido ${removed.slice(0, 2).join(", ")} da carteira.`,
+            description: "A alteração fica no navegador e será sincronizada ao sair ou após alguns minutos.",
+          });
+        } else if (added.length) {
+          showToast({
+            title: `Adicionado ${added.slice(0, 2).join(", ")} à carteira.`,
+            description: "A alteração fica no navegador e será sincronizada ao sair ou após alguns minutos.",
+          });
+        } else {
+          showToast({
+            title: "Carteira atualizada.",
+            description: "A alteração fica no navegador e será sincronizada automaticamente.",
+          });
+        }
+      }
+    }, 1500);
+
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+      window.clearInterval(interval);
+    };
   }, []);
 
   async function callApi(payload: Record<string, any>, endpoint = "/api/wallet-sync") {
@@ -108,15 +171,53 @@ export default function WalletEmailVerifiedSync() {
       if (!response.ok || !json?.ok) throw new Error(json?.error || "Erro ao salvar carteira.");
 
       lastSavedSignature.current = signature;
+      walletRef.current = currentWallet;
       setWallet(currentWallet);
-      setMessage(options?.silent ? "Carteira salva automaticamente." : `Carteira salva com sucesso. Total salvo: ${Number(json.saved || currentWallet.length)} FII(s).`);
+      setMessage(options?.silent ? "Carteira sincronizada automaticamente." : `Carteira sincronizada com sucesso. Total salvo: ${Number(json.saved || currentWallet.length)} FII(s).`);
       return true;
     } catch (err: any) {
-      setMessage(err.message || "Erro ao salvar carteira automaticamente.");
+      setMessage(err.message || "Erro ao sincronizar carteira automaticamente.");
       return false;
     } finally {
       if (options?.silent) setAutoSaving(false);
       else setLoading(false);
+    }
+  }
+
+  async function loadWalletFromCloud(options?: { auto?: boolean }) {
+    const cleanEmail = (emailRef.current || email).trim().toLowerCase();
+    const currentToken = tokenRef.current || token;
+    const currentWallet = readWallet();
+
+    if (!isEmail(cleanEmail) || !currentToken) return false;
+    if (options?.auto && currentWallet.length) return false;
+
+    if (!options?.auto) {
+      setLoading(true);
+      setMessage("");
+    }
+
+    try {
+      const json = await callApi({ action: "load", email: cleanEmail, sessionToken: currentToken, wallet: currentWallet }, "/api/wallet-load-legacy");
+      const loadedWallet = Array.isArray(json.wallet) ? json.wallet : [];
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedWallet));
+      lastSavedSignature.current = walletSignature(loadedWallet);
+      walletRef.current = loadedWallet;
+      setWallet(loadedWallet);
+
+      if (options?.auto) {
+        setMessage(`Carteira carregada automaticamente. ${loadedWallet.length} FII(s) encontrados.`);
+      } else {
+        setMessage(`Carteira carregada com sucesso. ${loadedWallet.length} FII(s) encontrados. Atualizando a tela...`);
+        window.setTimeout(() => window.location.reload(), 800);
+      }
+
+      return true;
+    } catch (err: any) {
+      if (!options?.auto) setMessage(err.message || "Erro ao carregar carteira.");
+      return false;
+    } finally {
+      if (!options?.auto) setLoading(false);
     }
   }
 
@@ -133,6 +234,13 @@ export default function WalletEmailVerifiedSync() {
 
     return () => window.clearTimeout(timeout);
   }, [email, token, wallet]);
+
+  useEffect(() => {
+    if (!token || !isEmail(email) || autoLoadDoneRef.current) return;
+
+    autoLoadDoneRef.current = true;
+    loadWalletFromCloud({ auto: true });
+  }, [email, token]);
 
   useEffect(() => {
     function handlePageHide() {
@@ -159,7 +267,7 @@ export default function WalletEmailVerifiedSync() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (hasSession) {
-      setMessage("Este dispositivo já está confirmado. Use Salvar ou Carregar.");
+      setMessage("Este dispositivo já está confirmado. Use Carregar ou altere a carteira normalmente.");
       return;
     }
 
@@ -179,6 +287,7 @@ export default function WalletEmailVerifiedSync() {
       setToken("");
       emailRef.current = cleanEmail;
       tokenRef.current = "";
+      autoLoadDoneRef.current = false;
       setMessage(json.message || "Código enviado para seu e-mail.");
     } catch (err: any) {
       setMessage(err.message || "Erro ao enviar código.");
@@ -205,8 +314,9 @@ export default function WalletEmailVerifiedSync() {
       setToken(json.sessionToken);
       emailRef.current = cleanEmail;
       tokenRef.current = json.sessionToken;
+      autoLoadDoneRef.current = false;
       setPin("");
-      setMessage("E-mail confirmado. Agora você pode salvar ou carregar a carteira.");
+      setMessage("E-mail confirmado. Agora sua carteira será carregada automaticamente quando disponível.");
     } catch (err: any) {
       setMessage(err.message || "Código inválido.");
     } finally {
@@ -214,9 +324,8 @@ export default function WalletEmailVerifiedSync() {
     }
   }
 
-  async function sync(action: "save" | "load") {
+  async function syncLoad() {
     const cleanEmail = email.trim().toLowerCase();
-    const currentWallet = readWallet();
 
     if (!isEmail(cleanEmail)) {
       setMessage("Informe um e-mail válido.");
@@ -224,118 +333,101 @@ export default function WalletEmailVerifiedSync() {
     }
 
     if (!token) {
-      setMessage("Confirme o código enviado para o e-mail antes de salvar ou carregar.");
+      setMessage("Confirme o código enviado para o e-mail antes de carregar.");
       return;
     }
 
-    if (action === "save" && !currentWallet.length) {
-      setMessage("Adicione pelo menos um FII antes de salvar sua carteira.");
-      return;
-    }
-
-    if (action === "save") {
-      await saveCurrentWallet();
-      return;
-    }
-
-    setLoading(true);
-    setMessage("");
-
-    try {
-      const json = await callApi({ action, email: cleanEmail, sessionToken: token, wallet: currentWallet }, "/api/wallet-load-legacy");
-      const loadedWallet = Array.isArray(json.wallet) ? json.wallet : [];
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedWallet));
-      lastSavedSignature.current = walletSignature(loadedWallet);
-      setWallet(loadedWallet);
-      setMessage(`Carteira carregada com sucesso. ${loadedWallet.length} FII(s) encontrados. Atualizando a tela...`);
-      window.setTimeout(() => window.location.reload(), 800);
-    } catch (err: any) {
-      setMessage(err.message || "Erro ao sincronizar carteira.");
-    } finally {
-      setLoading(false);
-    }
+    await loadWalletFromCloud();
   }
 
   return (
-    <section className="mx-auto mb-6 w-full max-w-6xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg ring-1 ring-white/10 sm:p-5">
-      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0 max-w-2xl">
-          <h2 className="flex min-w-0 items-center gap-2 text-lg font-extrabold text-white sm:text-xl">
-            <Mail className="shrink-0 text-indigo-300" size={22} />
-            <span className="min-w-0">Salve sua carteira</span>
-          </h2>
-          <p className="mt-2 text-sm font-medium leading-6 text-gray-300">
-            Sua carteira fica salva apenas neste navegador. Confirme seu e-mail para acessar seus FIIs em qualquer celular, computador ou navegador.
-          </p>
-          <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
-            {hasSession ? "Este dispositivo já está confirmado. Alterações ficam no navegador e sincronizam automaticamente ao sair ou após alguns minutos." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
-          </p>
-        </div>
-
-        <div className="grid min-w-0 w-full max-w-full gap-2 lg:max-w-md">
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="seu@email.com"
-            className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 sm:text-base"
-          />
-
-          <div className="grid min-w-0 w-full gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <input
-              value={pin}
-              onChange={(event) => setPin(event.target.value)}
-              placeholder="Código recebido"
-              inputMode="numeric"
-              disabled={hasSession}
-              className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
-            />
-            <button
-              type="button"
-              onClick={confirmCode}
-              disabled={loading || !pin.trim() || hasSession}
-              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-4 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:w-auto sm:text-base"
-            >
-              Confirmar
-            </button>
-          </div>
-
-          <div className="grid min-w-0 w-full gap-2 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={sendCode}
-              disabled={loading || hasSession}
-              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-gray-800 px-2 py-2 text-xs font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-3 sm:text-sm lg:px-4"
-            >
-              {loading ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Mail className="shrink-0" size={16} />}
-              <span className="whitespace-nowrap">Enviar código</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => sync("save")}
-              disabled={loading || autoSaving || !wallet.length || !token}
-              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-2 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-3 sm:text-sm lg:px-4"
-            >
-              {(loading || autoSaving) ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Save className="shrink-0" size={16} />}
-              <span className="whitespace-nowrap">Salvar</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => sync("load")}
-              disabled={loading || autoSaving || !token}
-              className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-2 py-2 text-xs font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:px-3 sm:text-sm lg:px-4"
-            >
-              <span className="whitespace-nowrap">Carregar</span>
-            </button>
-          </div>
-
-          {message && (
-            <p className="min-w-0 max-w-full whitespace-pre-wrap break-words rounded-lg bg-gray-950/60 p-3 text-xs font-medium leading-5 text-yellow-200 sm:text-sm">
-              {message}
+    <>
+      <section className="mx-auto mb-6 w-full max-w-6xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg ring-1 ring-white/10 sm:p-5">
+        <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 max-w-2xl">
+            <h2 className="flex min-w-0 items-center gap-2 text-lg font-extrabold text-white sm:text-xl">
+              <Mail className="shrink-0 text-indigo-300" size={22} />
+              <span className="min-w-0">Salve sua carteira</span>
+            </h2>
+            <p className="mt-2 text-sm font-medium leading-6 text-gray-300">
+              Sua carteira fica salva apenas neste navegador. Confirme seu e-mail para acessar seus FIIs em qualquer celular, computador ou navegador.
             </p>
-          )}
+            <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
+              {hasSession ? "Este dispositivo já está confirmado. Alterações ficam no navegador e sincronizam automaticamente ao sair ou após alguns minutos." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
+            </p>
+          </div>
+
+          <div className="grid min-w-0 w-full max-w-full gap-2 lg:max-w-md">
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="seu@email.com"
+              className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 sm:text-base"
+            />
+
+            <div className="grid min-w-0 w-full gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <input
+                value={pin}
+                onChange={(event) => setPin(event.target.value)}
+                placeholder="Código recebido"
+                inputMode="numeric"
+                disabled={hasSession}
+                className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
+              />
+              <button
+                type="button"
+                onClick={confirmCode}
+                disabled={loading || !pin.trim() || hasSession}
+                className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-4 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:w-auto sm:text-base"
+              >
+                Confirmar
+              </button>
+            </div>
+
+            <div className="grid min-w-0 w-full gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={sendCode}
+                disabled={loading || hasSession}
+                className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              >
+                {loading ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Mail className="shrink-0" size={16} />}
+                <span className="whitespace-nowrap">Enviar código</span>
+              </button>
+              <button
+                type="button"
+                onClick={syncLoad}
+                disabled={loading || autoSaving || !token}
+                className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+              >
+                <span className="whitespace-nowrap">Carregar</span>
+              </button>
+            </div>
+
+            {message && (
+              <p className="min-w-0 max-w-full whitespace-pre-wrap break-words rounded-lg bg-gray-950/60 p-3 text-xs font-medium leading-5 text-yellow-200 sm:text-sm">
+                {message}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      {toast && (
+        <div className="fixed inset-x-3 bottom-4 z-50 mx-auto max-w-sm overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl ring-1 ring-white/10 sm:hidden">
+          <div className="p-4">
+            <p className="text-sm font-extrabold">{toast.title}</p>
+            {toast.description && <p className="mt-1 text-xs font-medium leading-5 text-gray-300">{toast.description}</p>}
+          </div>
+          <div className="h-1 w-full bg-gray-800">
+            <div
+              className="h-full bg-indigo-400 transition-[width] ease-linear"
+              style={{ width: toastProgress ? "0%" : "100%", transitionDuration: "3000ms" }}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
