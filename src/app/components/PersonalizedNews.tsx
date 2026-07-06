@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from "react";
-import { Bot, Loader2, Link as LinkIcon, Newspaper } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bot, FileText, Loader2, Link as LinkIcon } from "lucide-react";
 
 type FiiNews = {
     ticker: string;
@@ -9,6 +9,8 @@ type FiiNews = {
     summary: string;
     attentionPoints: string[];
     searchUrl: string;
+    reportTitle?: string;
+    reportUrl?: string;
     loading: boolean;
 };
 
@@ -95,6 +97,8 @@ export default function PersonalizedNews() {
                                     ? insight.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
                                     : fallback.attentionPoints,
                             searchUrl: String(insight.searchUrl || fallback.searchUrl),
+                            reportTitle: String(insight.reportTitle || ""),
+                            reportUrl: String(insight.reportUrl || ""),
                             loading: false,
                         };
                     })
@@ -110,6 +114,11 @@ export default function PersonalizedNews() {
 
         loadTopFiis();
     }, []);
+
+    const reports = useMemo(
+        () => news.filter((item) => item.reportUrl && /^https?:\/\//i.test(item.reportUrl)),
+        [news]
+    );
 
     if (loadingFII)
         return (
@@ -136,46 +145,73 @@ export default function PersonalizedNews() {
             {news.length === 0 && <p className="text-gray-500">Nenhuma pesquisa registrada ainda.</p>}
             <br />
 
-            <div className="grid min-w-0 gap-6 md:grid-cols-3">
-                {news.map(({ ticker, title, summary, attentionPoints, searchUrl, loading }) => (
-                    <div key={ticker} className="min-w-0 overflow-hidden rounded-2xl bg-white p-5 text-left shadow-md ring-1 ring-slate-100">
-                        <div className="mb-3 flex min-w-0 items-center gap-2">
-                            <Newspaper className="shrink-0 text-indigo-600" />
-                            <h3 className="min-w-0 truncate text-lg font-semibold text-gray-700">{ticker}</h3>
-                        </div>
+            {!!news.length && (
+                <section className="min-w-0 overflow-hidden rounded-2xl bg-white p-5 text-left shadow-md ring-1 ring-slate-100">
+                    <div className="space-y-5">
+                        {news.map(({ ticker, title, summary, attentionPoints, searchUrl, loading }) => (
+                            <article key={ticker} className="min-w-0 border-b border-slate-100 pb-5 last:border-b-0 last:pb-0">
+                                <h3 className="text-base font-extrabold text-gray-800">{ticker}</h3>
 
-                        {loading ? (
-                            <p className="flex items-center gap-2 text-gray-600 italic">
-                                <Loader2 className="animate-spin" size={16} /> Preparando resumo...
-                            </p>
-                        ) : (
-                            <>
-                                {title && <p className="min-w-0 break-words text-sm font-bold text-gray-800">{title}</p>}
-                                {summary && <p className="mt-2 min-w-0 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">{summary}</p>}
+                                {loading ? (
+                                    <p className="mt-2 flex items-center gap-2 text-gray-600 italic">
+                                        <Loader2 className="animate-spin" size={16} /> Preparando resumo...
+                                    </p>
+                                ) : mode === "fallback" || !summary ? (
+                                    <p className="mt-2 text-sm leading-6 text-gray-600">
+                                        Não foi possível montar um resumo confiável agora. Consulte comunicados, relatório gerencial e fontes oficiais do fundo.
+                                    </p>
+                                ) : (
+                                    <>
+                                        {title && <p className="mt-1 break-words text-sm font-bold text-gray-800">{title}</p>}
+                                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">{summary}</p>
 
-                                {!!attentionPoints.length && (
-                                    <ul className="mt-3 min-w-0 space-y-2 text-sm text-gray-600">
-                                        {attentionPoints.map((point) => (
-                                            <li key={`${ticker}-${point}`} className="min-w-0 overflow-hidden break-words rounded-lg bg-gray-50 p-2">
-                                                {point}
-                                            </li>
-                                        ))}
-                                    </ul>
+                                        {!!attentionPoints.length && (
+                                            <p className="mt-2 break-words text-sm leading-6 text-gray-600">
+                                                {attentionPoints.join(" ")}
+                                            </p>
+                                        )}
+                                    </>
                                 )}
 
-                                <a
-                                    href={searchUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="mt-4 inline-flex max-w-full items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:underline"
-                                >
-                                    <span className="min-w-0 break-words">Pesquisar fontes oficiais</span> <LinkIcon className="shrink-0" size={14} />
-                                </a>
-                            </>
-                        )}
+                                {mode === "fallback" && (
+                                    <a
+                                        href={searchUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-4 inline-flex max-w-full items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:underline"
+                                    >
+                                        <span className="min-w-0 break-words">Pesquisar fontes oficiais</span> <LinkIcon className="shrink-0" size={14} />
+                                    </a>
+                                )}
+                            </article>
+                        ))}
                     </div>
-                ))}
-            </div>
+                </section>
+            )}
+
+            {!!reports.length && (
+                <section className="mt-4 grid min-w-0 gap-3 md:grid-cols-3">
+                    {reports.map((item) => (
+                        <a
+                            key={`${item.ticker}-${item.reportUrl}`}
+                            href={item.reportUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="min-w-0 overflow-hidden rounded-2xl bg-white p-4 text-left shadow-md ring-1 ring-slate-100 hover:bg-indigo-50"
+                        >
+                            <div className="flex items-center gap-2 text-indigo-700">
+                                <FileText className="shrink-0" size={18} />
+                                <strong className="truncate text-sm">{item.ticker}</strong>
+                            </div>
+                            <p className="mt-2 break-words text-sm font-bold text-gray-800">
+                                {item.reportTitle || `Relatório gerencial de ${item.ticker}`}
+                            </p>
+                            <p className="mt-1 text-xs font-medium text-gray-500">Abrir relatório gerencial</p>
+                        </a>
+                    ))}
+                </section>
+            )}
+
             <br /><br />
         </div>
     );
