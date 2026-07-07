@@ -140,6 +140,32 @@ function normalizeUrl(value: unknown) {
   return /^https?:\/\//i.test(url) ? url : "";
 }
 
+function readableSourceLabel(value: string) {
+  return value
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/[\])}.,;:]+$/g, "")
+    .trim();
+}
+
+function sanitizeAiText(value: unknown) {
+  return String(value || "")
+    .replace(/\(\s*\[([^\]]+)\]\((?!https?:\/\/)([^)]*)\)\s*\)/gi, (_match, label, target) => {
+      const cleanLabel = readableSourceLabel(String(label || ""));
+      const cleanTarget = readableSourceLabel(String(target || ""));
+      return cleanTarget && /ver fonte/i.test(cleanTarget) ? cleanTarget : cleanLabel || cleanTarget;
+    })
+    .replace(/\[([^\]]+)\]\((?!https?:\/\/)([^)]*)\)/gi, (_match, label, target) => {
+      const cleanLabel = readableSourceLabel(String(label || ""));
+      const cleanTarget = readableSourceLabel(String(target || ""));
+      return cleanTarget && /ver fonte/i.test(cleanTarget) ? cleanTarget : cleanLabel || cleanTarget;
+    })
+    .replace(/\((https?:\/\/[^\s)]+)\)/gi, (_match, url) => `(${readableSourceLabel(url)})`)
+    .replace(/https?:\/\/[^\s)]+/gi, (url) => readableSourceLabel(url))
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function normalizeInsights(tickers: string[], aiInsights: any[], fallback: FiiInsight[]) {
   return tickers.map((ticker: string) => {
     const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
@@ -147,14 +173,14 @@ function normalizeInsights(tickers: string[], aiInsights: any[], fallback: FiiIn
     if (!found || !fallbackItem) return fallbackItem || fallback[0];
 
     const reportUrl = normalizeUrl(found.reportUrl);
-    const reportTitle = reportUrl ? String(found.reportTitle || `Relatório gerencial de ${ticker}`) : "";
+    const reportTitle = reportUrl ? sanitizeAiText(found.reportTitle || `Relatório gerencial de ${ticker}`) : "";
 
     return {
       ticker,
-      title: String(found.title || `${ticker} – Resumo das notícias mais recentes`),
-      summary: String(found.summary || fallbackItem.summary || ""),
+      title: sanitizeAiText(found.title || `${ticker} – Resumo das notícias mais recentes`),
+      summary: sanitizeAiText(found.summary || fallbackItem.summary || ""),
       attentionPoints: Array.isArray(found.attentionPoints)
-        ? found.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
+        ? found.attentionPoints.map((point: unknown) => sanitizeAiText(point)).filter(Boolean).slice(0, 3)
         : fallbackItem.attentionPoints,
       searchUrl: buildGoogleSearchUrl(ticker),
       reportTitle,
