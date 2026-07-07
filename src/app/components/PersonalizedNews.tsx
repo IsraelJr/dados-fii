@@ -15,7 +15,16 @@ type FiiNews = {
     loading: boolean;
 };
 
-type NewsMode = "openai" | "perplexity" | "fallback" | "empty";
+type NewsMode = "openai" | "perplexity" | "fallback" | "empty" | "cache";
+
+type CachedFiiNews = FiiNews & {
+    cachedAt: number;
+    expiresAt: number;
+};
+
+const LOCAL_NEWS_CACHE_KEY = "dados-fii-ai-summary-cache-v1";
+const LOCAL_NEWS_CACHE_TTL_DAYS = 5;
+const LOCAL_NEWS_CACHE_TTL_MS = LOCAL_NEWS_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 const buildGoogleSearchUrl = (ticker: string) => {
     const query = `${ticker} FII site oficial administradora gestor relatório gerencial fatos relevantes dividendos relatório gerencial`;
@@ -30,6 +39,67 @@ const buildFallbackInsight = (ticker: string): FiiNews => ({
     searchUrl: buildGoogleSearchUrl(ticker),
     loading: false,
 });
+
+function readLocalNewsCache(tickers: string[]) {
+    if (typeof window === "undefined" || !tickers.length) return null;
+
+    try {
+        const stored = window.localStorage.getItem(LOCAL_NEWS_CACHE_KEY);
+        if (!stored) return null;
+
+        const parsed = JSON.parse(stored) as { byTicker?: Record<string, CachedFiiNews> };
+        const byTicker = parsed?.byTicker || {};
+        const now = Date.now();
+        const cached = tickers
+            .map((ticker) => byTicker[ticker])
+            .filter((item): item is CachedFiiNews => Boolean(item?.summary && item.expiresAt > now))
+            .map((item) => ({
+                ticker: item.ticker,
+                title: item.title,
+                summary: item.summary,
+                attentionPoints: Array.isArray(item.attentionPoints) ? item.attentionPoints : [],
+                searchUrl: item.searchUrl || buildGoogleSearchUrl(item.ticker),
+                reportTitle: item.reportTitle || "",
+                reportUrl: item.reportUrl || "",
+                loading: false,
+            }));
+
+        return cached.length === tickers.length ? cached : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveLocalNewsCache(insights: FiiNews[], ttlDays?: number) {
+    if (typeof window === "undefined") return;
+
+    try {
+        const stored = window.localStorage.getItem(LOCAL_NEWS_CACHE_KEY);
+        const parsed = stored ? JSON.parse(stored) : {};
+        const byTicker: Record<string, CachedFiiNews> = parsed?.byTicker || {};
+        const now = Date.now();
+        const ttlMs = Number(ttlDays) > 0 ? Number(ttlDays) * 24 * 60 * 60 * 1000 : LOCAL_NEWS_CACHE_TTL_MS;
+
+        Object.entries(byTicker).forEach(([ticker, item]) => {
+            if (!item?.expiresAt || item.expiresAt <= now) delete byTicker[ticker];
+        });
+
+        insights
+            .filter((item) => item.summary)
+            .forEach((item) => {
+                byTicker[item.ticker] = {
+                    ...item,
+                    loading: false,
+                    cachedAt: now,
+                    expiresAt: now + ttlMs,
+                };
+            });
+
+        window.localStorage.setItem(LOCAL_NEWS_CACHE_KEY, JSON.stringify({ byTicker }));
+    } catch {
+        return;
+    }
+}
 
 function friendlySourceName(url: string, index: number, fallbackLabel?: string) {
     const cleanFallback = String(fallbackLabel || "")
@@ -139,6 +209,13 @@ export default function PersonalizedNews() {
                     return;
                 }
 
+                const localCache = readLocalNewsCache(topFiis);
+                if (localCache) {
+                    setMode("cache");
+                    setNews(localCache);
+                    return;
+                }
+
                 setLoadingFII(true);
                 setNews(topFiis.map((ticker) => ({ ...buildFallbackInsight(ticker), loading: true })));
 
@@ -159,30 +236,32 @@ export default function PersonalizedNews() {
                     return;
                 }
 
-                const nextMode: NewsMode = aiData.mode === "perplexity" || aiData.mode === "openai" ? aiData.mode : "fallback";
+                const nextMode: NewsMode = aiData.mode === "perplexity" || aiData.mode === "openai" || aiData.mode === "cache" ? aiData.mode : "fallback";
                 setMode(nextMode);
-                setNews(
-                    topFiis.map((ticker) => {
-                        const insight = insights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
-                        const fallback = buildFallbackInsight(ticker);
-                        if (!insight) return fallback;
 
-                        return {
-                            ticker,
-                            title: String(insight.title || fallback.title),
-                            summary: nextMode === "fallback" ? "" : String(insight.summary || fallback.summary),
-                            attentionPoints: nextMode === "fallback"
-                                ? []
-                                : Array.isArray(insight.attentionPoints) && insight.attentionPoints.length
-                                    ? insight.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
-                                    : fallback.attentionPoints,
-                            searchUrl: String(insight.searchUrl || fallback.searchUrl),
-                            reportTitle: String(insight.reportTitle || ""),
-                            reportUrl: String(insight.reportUrl || ""),
-                            loading: false,
-                        };
-                    })
-                );
+                const nextNews = topFiis.map((ticker) => {
+                    const insight = insights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
+                    const fallback = buildFallbackInsight(ticker);
+                    if (!insight) return fallback;
+
+                    return {
+                        ticker,
+                        title: String(insight.title || fallback.title),
+                        summary: nextMode === "fallback" ? "" : String(insight.summary || fallback.summary),
+                        attentionPoints: nextMode === "fallback"
+                            ? []
+                            : Array.isArray(insight.attentionPoints) && insight.attentionPoints.length
+                                ? insight.attentionPoints.map((point: unknown) => String(point)).filter(Boolean).slice(0, 3)
+                                : fallback.attentionPoints,
+                        searchUrl: String(insight.searchUrl || fallback.searchUrl),
+                        reportTitle: String(insight.reportTitle || ""),
+                        reportUrl: String(insight.reportUrl || ""),
+                        loading: false,
+                    };
+                });
+
+                setNews(nextNews);
+                if (nextMode !== "fallback") saveLocalNewsCache(nextNews, aiData?.cache?.ttlDays);
             } catch (err: any) {
                 console.error(err);
                 setMode("fallback");
@@ -211,7 +290,7 @@ export default function PersonalizedNews() {
         <div className="mt-12 min-w-0">
             <div className="mb-4 flex flex-col items-center gap-2">
                 <h2 className="text-center text-xl font-bold">📰 Resumo dos FIIs mais buscados por você</h2>
-                {(mode === "openai" || mode === "perplexity") && (
+                {(mode === "openai" || mode === "perplexity" || mode === "cache") && (
                     <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
                         <Bot size={14} /> Resumo gerado por IA
                     </p>
