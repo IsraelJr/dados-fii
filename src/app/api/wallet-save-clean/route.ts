@@ -112,10 +112,6 @@ export async function POST(req: Request) {
     }
 
     const wallet = cleanWallet(body?.wallet);
-    if (!wallet.length) {
-      return NextResponse.json({ ok: false, error: "Adicione pelo menos um FII antes de salvar." }, { status: 400 });
-    }
-
     const user = await findUser(email);
 
     await user.ref.set({
