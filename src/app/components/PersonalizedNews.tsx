@@ -31,8 +31,12 @@ const buildFallbackInsight = (ticker: string): FiiNews => ({
 });
 
 function friendlySourceName(url: string, index: number, fallbackLabel?: string) {
-    const cleanFallback = String(fallbackLabel || "").replace(/^\[|\]$/g, "").trim();
-    if (cleanFallback && !/^https?:\/\//i.test(cleanFallback)) return cleanFallback;
+    const cleanFallback = String(fallbackLabel || "")
+        .replace(/^\[|\]$/g, "")
+        .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
+        .trim();
+    if (cleanFallback && cleanFallback.length <= 40) return cleanFallback;
 
     try {
         const hostname = new URL(url).hostname.replace(/^www\./i, "");
@@ -49,6 +53,8 @@ function friendlySourceName(url: string, index: number, fallbackLabel?: string) 
             "suno.com.br": "Suno",
             "infomoney.com.br": "InfoMoney",
             "valor.globo.com": "Valor Econômico",
+            "meusdividendos.com": "Meus Dividendos",
+            "meusdividendos.com.br": "Meus Dividendos",
         };
 
         const known = Object.entries(knownNames).find(([domain]) => hostname.endsWith(domain));
@@ -63,8 +69,8 @@ function normalizeTextUrl(rawUrl: string) {
 }
 
 function renderTextWithFriendlyLinks(text: string) {
-    const markdownOrUrlRegex = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|https?:\/\/[^\s]+)/gi;
-    const nodes: Array<string | JSX.Element> = [];
+    const markdownOrUrlRegex = /(\(?\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)\)?|https?:\/\/[^\s]+)/gi;
+    const nodes: any[] = [];
     let lastIndex = 0;
     let linkIndex = 0;
 
