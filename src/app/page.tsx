@@ -11,6 +11,7 @@ import Login from "./components/Login";
 import MonitoredFiisPanel from "./components/MonitoredFiisPanel";
 import GoogleAdsBlock from "./components/GoogleAdsBlock";
 import HomeDividendCalendar from "./components/HomeDividendCalendar";
+import SiteFeedback from "./components/SiteFeedback";
 
 type DollarState = {
     formatted: string;
@@ -361,6 +362,8 @@ export default function Home() {
                 </div>
 
                 <PersonalizedNews />
+
+                <SiteFeedback />
 
                 <section className="rounded-2xl bg-slate-100 p-5 text-left ring-1 ring-slate-200">
                     <h2 className="text-xl font-extrabold text-slate-800">Acompanhe FIIs com mais clareza</h2>
