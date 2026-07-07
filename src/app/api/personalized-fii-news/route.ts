@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
+import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const AI_SUMMARY_CACHE_COLLECTION = "FiiAiSummaries";
+const AI_SUMMARY_CACHE_TTL_DAYS = 5;
+const AI_SUMMARY_CACHE_TTL_MS = AI_SUMMARY_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 type FiiInsight = {
   ticker: string;
@@ -167,58 +172,144 @@ function sanitizeAiText(value: unknown) {
     .trim();
 }
 
+function normalizeInsight(ticker: string, value: any, fallback: FiiInsight): FiiInsight {
+  const reportUrl = normalizeUrl(value?.reportUrl);
+  const reportTitle = reportUrl ? sanitizeAiText(value?.reportTitle || `Relatório gerencial de ${ticker}`) : "";
+
+  return {
+    ticker,
+    title: sanitizeAiText(value?.title || `${ticker} – Resumo das notícias mais recentes`),
+    summary: sanitizeAiText(value?.summary || fallback.summary || ""),
+    attentionPoints: Array.isArray(value?.attentionPoints)
+      ? value.attentionPoints.map((point: unknown) => sanitizeAiText(point)).filter(Boolean).slice(0, 3)
+      : fallback.attentionPoints,
+    searchUrl: normalizeUrl(value?.searchUrl) || buildGoogleSearchUrl(ticker),
+    reportTitle,
+    reportUrl,
+  };
+}
+
 function normalizeInsights(tickers: string[], aiInsights: any[], fallback: FiiInsight[]) {
   return tickers.map((ticker: string) => {
     const found = aiInsights.find((item: any) => String(item?.ticker || "").toUpperCase() === ticker);
     const fallbackItem = fallback.find((item) => item.ticker === ticker);
     if (!found || !fallbackItem) return fallbackItem || fallback[0];
-
-    const reportUrl = normalizeUrl(found.reportUrl);
-    const reportTitle = reportUrl ? sanitizeAiText(found.reportTitle || `Relatório gerencial de ${ticker}`) : "";
-
-    return {
-      ticker,
-      title: sanitizeAiText(found.title || `${ticker} – Resumo das notícias mais recentes`),
-      summary: sanitizeAiText(found.summary || fallbackItem.summary || ""),
-      attentionPoints: Array.isArray(found.attentionPoints)
-        ? found.attentionPoints.map((point: unknown) => sanitizeAiText(point)).filter(Boolean).slice(0, 3)
-        : fallbackItem.attentionPoints,
-      searchUrl: buildGoogleSearchUrl(ticker),
-      reportTitle,
-      reportUrl,
-    };
+    return normalizeInsight(ticker, found, fallbackItem);
   });
+}
+
+function getTimestampMs(value: any) {
+  if (!value) return 0;
+  if (typeof value.toDate === "function") return value.toDate().getTime();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  return new Date(value).getTime() || 0;
+}
+
+function isCacheFresh(value: any) {
+  const expiresAtMs = getTimestampMs(value?.expiresAt);
+  return expiresAtMs > Date.now();
+}
+
+async function readCachedInsights(tickers: string[], fallback: FiiInsight[]) {
+  const cached = new Map<string, FiiInsight>();
+
+  await Promise.all(
+    tickers.map(async (ticker) => {
+      const snap = await adminDb.collection(AI_SUMMARY_CACHE_COLLECTION).doc(ticker).get();
+      const data = snap.data();
+      const fallbackItem = fallback.find((item) => item.ticker === ticker);
+
+      if (!snap.exists || !data || !fallbackItem || !isCacheFresh(data)) return;
+
+      const insight = normalizeInsight(ticker, data.insight || data, fallbackItem);
+      if (!insight.summary) return;
+
+      cached.set(ticker, insight);
+    })
+  );
+
+  return cached;
+}
+
+async function saveCachedInsights(insights: FiiInsight[]) {
+  await Promise.all(
+    insights
+      .filter((insight) => insight.summary)
+      .map(async (insight) => {
+        const ref = adminDb.collection(AI_SUMMARY_CACHE_COLLECTION).doc(insight.ticker);
+        const snap = await ref.get();
+        const now = Date.now();
+
+        await ref.set({
+          ticker: insight.ticker,
+          insight,
+          source: "openai",
+          ttlDays: AI_SUMMARY_CACHE_TTL_DAYS,
+          expiresAt: new Date(now + AI_SUMMARY_CACHE_TTL_MS),
+          updatedAt: adminFieldValue.serverTimestamp(),
+          ...(snap.exists ? {} : { createdAt: adminFieldValue.serverTimestamp() }),
+        }, { merge: true });
+      })
+  );
+}
+
+function uniqueTickers(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(
+    value
+      .map((ticker: unknown) => String(ticker || "").trim().toUpperCase())
+      .filter((ticker: string) => Boolean(ticker))
+  )).slice(0, 3);
 }
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const tickers: string[] = Array.isArray(body?.tickers)
-    ? body.tickers
-      .map((ticker: unknown) => String(ticker || "").trim().toUpperCase())
-      .filter((ticker: string) => Boolean(ticker))
-      .slice(0, 3)
-    : [];
+  const tickers = uniqueTickers(body?.tickers);
 
   if (!tickers.length) {
     return NextResponse.json({ ok: true, mode: "empty", insights: [] });
   }
 
   const fallback = fallbackInsights(tickers);
-  const prompt = buildPrompt(tickers);
 
   try {
-    const openAiPayload = await callOpenAI(prompt);
-    if (openAiPayload) {
-      const text = extractOutputText(openAiPayload);
-      const parsed = safeJsonParse(text);
-      const aiInsights = Array.isArray(parsed?.insights) ? parsed.insights : [];
+    const cached = await readCachedInsights(tickers, fallback);
+    const missingTickers = tickers.filter((ticker) => !cached.has(ticker));
+    let freshInsights: FiiInsight[] = [];
 
-      if (aiInsights.length) {
-        return NextResponse.json({ ok: true, mode: "openai", insights: normalizeInsights(tickers, aiInsights, fallback) });
+    if (missingTickers.length) {
+      const missingFallback = fallbackInsights(missingTickers);
+      const openAiPayload = await callOpenAI(buildPrompt(missingTickers));
+
+      if (openAiPayload) {
+        const text = extractOutputText(openAiPayload);
+        const parsed = safeJsonParse(text);
+        const aiInsights = Array.isArray(parsed?.insights) ? parsed.insights : [];
+
+        if (aiInsights.length) {
+          freshInsights = normalizeInsights(missingTickers, aiInsights, missingFallback).filter((insight) => insight.summary);
+          await saveCachedInsights(freshInsights).catch((err) => console.error("FII AI summary cache save error:", err));
+        }
       }
     }
 
-    return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
+    const freshByTicker = new Map(freshInsights.map((insight) => [insight.ticker, insight]));
+    const fallbackByTicker = new Map(fallback.map((insight) => [insight.ticker, insight]));
+    const insights = tickers.map((ticker) => cached.get(ticker) || freshByTicker.get(ticker) || fallbackByTicker.get(ticker)).filter(Boolean) as FiiInsight[];
+    const hasSummary = insights.some((insight) => Boolean(insight.summary));
+
+    return NextResponse.json({
+      ok: true,
+      mode: hasSummary ? (freshInsights.length ? "openai" : "cache") : "fallback",
+      insights,
+      cache: {
+        ttlDays: AI_SUMMARY_CACHE_TTL_DAYS,
+        hits: cached.size,
+        misses: missingTickers.length,
+        refreshed: freshInsights.length,
+      },
+    });
   } catch (err) {
     console.error("Personalized FII news exception:", err);
     return NextResponse.json({ ok: true, mode: "fallback", insights: fallback });
