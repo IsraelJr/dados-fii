@@ -30,7 +30,10 @@ const buildFallbackInsight = (ticker: string): FiiNews => ({
     loading: false,
 });
 
-function friendlySourceName(url: string, index: number) {
+function friendlySourceName(url: string, index: number, fallbackLabel?: string) {
+    const cleanFallback = String(fallbackLabel || "").replace(/^\[|\]$/g, "").trim();
+    if (cleanFallback && !/^https?:\/\//i.test(cleanFallback)) return cleanFallback;
+
     try {
         const hostname = new URL(url).hostname.replace(/^www\./i, "");
         if (!hostname) return `Ver fonte ${index + 1}`;
@@ -60,19 +63,25 @@ function normalizeTextUrl(rawUrl: string) {
 }
 
 function renderTextWithFriendlyLinks(text: string) {
-    const urlRegex = /(https?:\/\/[^\s]+)/gi;
-    const parts = text.split(urlRegex);
+    const markdownOrUrlRegex = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|https?:\/\/[^\s]+)/gi;
+    const nodes: Array<string | JSX.Element> = [];
+    let lastIndex = 0;
     let linkIndex = 0;
 
-    return parts.map((part, index) => {
-        if (!/^https?:\/\//i.test(part)) return part;
+    for (const match of text.matchAll(markdownOrUrlRegex)) {
+        const fullMatch = match[0];
+        const start = match.index || 0;
+        const labelFromMarkdown = match[2];
+        const rawUrl = match[3] || fullMatch;
 
-        const url = normalizeTextUrl(part);
-        const trailing = part.slice(url.length);
-        const label = friendlySourceName(url, linkIndex++);
+        if (start > lastIndex) nodes.push(text.slice(lastIndex, start));
 
-        return (
-            <span key={`${url}-${index}`}>
+        const url = normalizeTextUrl(rawUrl);
+        const trailing = rawUrl.slice(url.length);
+        const label = friendlySourceName(url, linkIndex++, labelFromMarkdown);
+
+        nodes.push(
+            <span key={`${url}-${start}`}>
                 <a
                     href={url}
                     target="_blank"
@@ -84,7 +93,13 @@ function renderTextWithFriendlyLinks(text: string) {
                 {trailing}
             </span>
         );
-    });
+
+        lastIndex = start + fullMatch.length;
+    }
+
+    if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+
+    return nodes;
 }
 
 export default function PersonalizedNews() {
