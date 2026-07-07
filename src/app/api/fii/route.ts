@@ -1,6 +1,9 @@
 import admin from "firebase-admin";
+import { NextResponse } from "next/server";
 
-// Inicializa o Firebase Admin apenas uma vez
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(
@@ -14,8 +17,6 @@ const db = admin.firestore();
 const SHEET_ID = process.env.SHEET_ID!;
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY!;
 const RANGE = "A1:F400";
-const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
-const url = `${baseUrl}&t=${Date.now()}`;
 
 interface FiiData {
   code: string;
@@ -63,110 +64,95 @@ function normalizeDividendFields(data: any) {
   return normalized;
 }
 
-async function getPriceFromSheet(ticker: string) {
+function normalizeTicker(value: unknown) {
+  const ticker = String(value || "").trim().toUpperCase();
+  return /^[A-Z0-9]{4,8}$/.test(ticker) ? ticker : "";
+}
+
+async function getFirestoreFii(ticker: string) {
+  const directDoc = await db.collection("Fiis").doc(ticker).get();
+  if (directDoc.exists) return normalizeDividendFields(directDoc.data());
+
+  const querySnapshot = await db
+    .collection("Fiis")
+    .where("code", "==", ticker)
+    .limit(1)
+    .get();
+
+  return querySnapshot.empty ? null : normalizeDividendFields(querySnapshot.docs[0].data());
+}
+
+async function getAllPricesFromSheet(): Promise<FiiData[]> {
   try {
-    const res = await fetch(url);
+    const sheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}&t=${Date.now()}`;
+    const res = await fetch(sheetUrl, { cache: "no-store" });
     const data = await res.json();
 
-    if (!data.values) return null;
+    if (!data.values) return [];
 
-    const [header, ...rows] = data.values;
-    const match = rows.find((row: any) => row[0]?.toString().trim().toUpperCase() === ticker.toUpperCase());
+    const [, ...rows] = data.values;
 
-    if (!match) return null;
-
-    return match[1].toString().trim(); // retorna valor da Sheet, ex: "R$ 85,65"
+    return rows
+      .filter(
+        (row: any) =>
+          row[0] &&
+          row[1] && row[1] !== "#N/A" &&
+          row[2] && row[2] !== "#N/A"
+      )
+      .map((row: any): FiiData => ({
+        code: row[0].toString().trim().toUpperCase(),
+        price: row[1].toString().trim(),
+        opening: row[2]?.toString().trim(),
+        variation: `${row[3]
+          ?.toString()
+          .trim()
+          .replace("R$", "")
+          .replace(/\./g, "")
+          .replace(",", ".")}%`,
+        minimum: row[4]?.toString().trim() || "",
+        maximum: row[5]?.toString().trim() || "",
+      }));
   } catch (err) {
-    console.error("Erro ao buscar preço da Sheet:", err);
-    return null;
+    console.error("Erro ao buscar FIIs da Sheet:", err);
+    return [];
   }
 }
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const ticker = url.searchParams.get("ticker");
+    const ticker = normalizeTicker(url.searchParams.get("ticker"));
+    const allFiis = await getAllPricesFromSheet();
 
     if (ticker) {
-      // Busca todos da Sheet e filtra o ticker solicitado
-      const allFiis = await getAllPricesFromSheet();
-      const match = allFiis.find(
-        (fii: FiiData) => fii.code === ticker.toUpperCase()
-      );
+      const match = allFiis.find((fii: FiiData) => fii.code === ticker) || null;
+      const docData = await getFirestoreFii(ticker);
 
-      if (!match) {
-        return new Response(
-          JSON.stringify({ error: "FII não encontrado" }),
-          { status: 404 }
-        );
+      if (!match && !docData) {
+        return NextResponse.json({ error: "FII não encontrado" }, { status: 404 });
       }
 
-      // Junta com os dados do Firestore
-      const querySnapshot = await db
-        .collection("Fiis")
-        .where("code", "==", ticker.toUpperCase())
-        .limit(1)
-        .get();
-
-      const docData = querySnapshot.empty
-        ? {}
-        : normalizeDividendFields(querySnapshot.docs[0].data());
-
-      return new Response(
-        JSON.stringify({
+      return NextResponse.json(
+        {
+          ...(docData || {}),
+          ...(match || { code: ticker, price: "-", opening: "-", variation: "-", minimum: "-", maximum: "-" }),
+        },
+        {
           headers: {
             "Cache-Control": "no-store, no-cache, must-revalidate",
-            "Pragma": "no-cache",
+            Pragma: "no-cache",
           },
-          ...docData,
-          ...match, // garante que sempre terá code, price, opening, variation, minimum, maximum
-        }),
-        { status: 200 }
+        }
       );
-    } else {
-      const allFiis = await getAllPricesFromSheet();
-      return new Response(JSON.stringify(allFiis), { status: 200 });
     }
+
+    return NextResponse.json(allFiis, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        Pragma: "no-cache",
+      },
+    });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-  }
-}
-
-async function getAllPricesFromSheet() {
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (!data.values) return [];
-
-    const [header, ...rows] = data.values;
-
-    return rows
-      .filter(
-        (row: any) =>
-          row[0] && // ticker
-          row[1] && row[1] !== "#N/A" && // preço válido
-          row[2] && row[2] !== "#N/A" // abertura válida (garante ativo)
-      )
-      .map((row: any): FiiData => {
-        const rawPrice = row[1].toString().trim();
-
-        return {
-          code: row[0].toString().trim().toUpperCase(),
-          price: rawPrice,
-          opening: row[2]?.toString().trim(),
-          variation: `${row[3]
-            ?.toString()
-            .trim()
-            .replace("R$", "")
-            .replace(/\./g, "")
-            .replace(",", ".")}%`,
-          minimum: row[4]?.toString().trim() || "",
-          maximum: row[5]?.toString().trim() || "",
-        };
-      });
-  } catch (err) {
-    console.error("Erro ao buscar todos os FIIs da Sheet:", err);
-    return [];
+    return NextResponse.json({ error: err.message || "Erro ao buscar FII" }, { status: 500 });
   }
 }
