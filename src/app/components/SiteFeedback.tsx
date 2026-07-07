@@ -34,7 +34,7 @@ export default function SiteFeedback() {
                     <p className="text-sm font-bold uppercase tracking-wide text-indigo-300">Ajude a melhorar</p>
                     <h2 className="mt-2 text-xl font-extrabold text-white">O que você achou do Dados FII?</h2>
                     <p className="mt-2 text-sm leading-6 text-gray-300">
-                        Envie uma crítica, elogio ou sugestão. Para evitar custo extra no banco agora, o envio abre seu app de e-mail já preenchido.
+                        Envie uma crítica, elogio ou sugestão.
                     </p>
                 </div>
 
