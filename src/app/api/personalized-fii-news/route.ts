@@ -150,6 +150,7 @@ function readableSourceLabel(value: string) {
 
 function sanitizeAiText(value: unknown) {
   return String(value || "")
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]*)\)/gi, (_match, label) => readableSourceLabel(String(label || "")))
     .replace(/\(\s*\[([^\]]+)\]\((?!https?:\/\/)([^)]*)\)\s*\)/gi, (_match, label, target) => {
       const cleanLabel = readableSourceLabel(String(label || ""));
       const cleanTarget = readableSourceLabel(String(target || ""));
