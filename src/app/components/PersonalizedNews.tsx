@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { Bot, FileText, Loader2, Link as LinkIcon } from "lucide-react";
 
 type FiiNews = {
@@ -32,16 +33,13 @@ const buildFallbackInsight = (ticker: string): FiiNews => ({
 
 function friendlySourceName(url: string, index: number, fallbackLabel?: string) {
     const cleanFallback = String(fallbackLabel || "")
-        .replace(/^\[|\]$/g, "")
         .replace(/^https?:\/\//i, "")
         .replace(/^www\./i, "")
+        .replace(/^\[|\]$/g, "")
         .trim();
-    if (cleanFallback && cleanFallback.length <= 40) return cleanFallback;
 
     try {
         const hostname = new URL(url).hostname.replace(/^www\./i, "");
-        if (!hostname) return `Ver fonte ${index + 1}`;
-
         const knownNames: Record<string, string> = {
             "b3.com.br": "B3",
             "fundsexplorer.com.br": "Funds Explorer",
@@ -58,8 +56,12 @@ function friendlySourceName(url: string, index: number, fallbackLabel?: string) 
         };
 
         const known = Object.entries(knownNames).find(([domain]) => hostname.endsWith(domain));
-        return known?.[1] || `Ver fonte: ${hostname}`;
+        if (known?.[1]) return known[1];
+
+        if (cleanFallback && cleanFallback.length <= 40 && !/^[()\[\]]+$/.test(cleanFallback)) return cleanFallback;
+        return hostname ? `Ver fonte: ${hostname}` : `Ver fonte ${index + 1}`;
     } catch {
+        if (cleanFallback && cleanFallback.length <= 40) return cleanFallback;
         return `Ver fonte ${index + 1}`;
     }
 }
@@ -70,7 +72,7 @@ function normalizeTextUrl(rawUrl: string) {
 
 function renderTextWithFriendlyLinks(text: string) {
     const markdownOrUrlRegex = /(\(?\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)\)?|https?:\/\/[^\s]+)/gi;
-    const nodes: any[] = [];
+    const nodes: ReactNode[] = [];
     let lastIndex = 0;
     let linkIndex = 0;
 
