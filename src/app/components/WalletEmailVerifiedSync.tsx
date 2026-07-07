@@ -138,7 +138,7 @@ export default function WalletEmailVerifiedSync() {
     const currentToken = tokenRef.current || token;
     const currentWallet = readWallet();
 
-    if (!isEmail(cleanEmail) || !currentToken || !currentWallet.length) return false;
+    if (!isEmail(cleanEmail) || !currentToken) return false;
 
     const signature = walletSignature(currentWallet);
     if (signature === lastSavedSignature.current) return true;
@@ -208,7 +208,7 @@ export default function WalletEmailVerifiedSync() {
   }
 
   useEffect(() => {
-    if (!token || !isEmail(email) || !wallet.length) return;
+    if (!token || !isEmail(email)) return;
 
     const signature = walletSignature(wallet);
     if (signature === lastSavedSignature.current) return;
