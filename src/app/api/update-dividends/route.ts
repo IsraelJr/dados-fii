@@ -144,12 +144,8 @@ async function reserveDailyRequest(anonId: string, ticker: string) {
     const doc = await transaction.get(ref);
     const data = doc.data() || {};
 
-    if (doc.exists && data.status === "success") {
+    if (doc.exists) {
       throw new Error("Você já solicitou atualização deste FII hoje.");
-    }
-
-    if (doc.exists && data.status === "reserved") {
-      throw new Error("Já existe uma atualização em andamento para este FII.");
     }
 
     transaction.set(ref, {
@@ -218,7 +214,7 @@ export async function POST(req: NextRequest) {
       await requestRef.set({ status, result, finishedAt: adminFieldValue.serverTimestamp() }, { merge: true });
 
       if (!result.currentMonthIncluded) {
-        return NextResponse.json({ success: false, message: `Atualizei ${result.fetchedMonths.join(", ")}, mas ${result.currentMonth} ainda não apareceu.`, result }, { status: 202 });
+        return NextResponse.json({ success: false, result }, { status: 202 });
       }
 
       return NextResponse.json({ success: true, result });
