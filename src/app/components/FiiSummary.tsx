@@ -191,8 +191,8 @@ export default function FiiSummary({
                 )}
             </div>
 
-            <h3 className="mt-6 mb-2 text-xl font-bold">
-                <TrendingUp size={24} className="mr-2 inline-block text-indigo-400" />
+            <h3 className="mt-6 mb-2 flex items-center justify-center gap-2 text-center text-xl font-bold">
+                <TrendingUp size={24} className="text-indigo-400" />
                 Planejamento Financeiro
             </h3>
 
