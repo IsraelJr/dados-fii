@@ -52,8 +52,8 @@ export default function SiteFeedback() {
 
     return (
         <section className="rounded-2xl bg-gray-900 p-5 text-left text-gray-100 shadow-lg ring-1 ring-white/10">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div className="max-w-2xl">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="max-w-2xl md:self-center">
                     <p className="text-sm font-bold uppercase tracking-wide text-indigo-300">Ajude a melhorar</p>
                     <h2 className="mt-2 text-xl font-extrabold text-white">O que você achou do Dados FII?</h2>
                     <p className="mt-2 text-sm leading-6 text-gray-300">
@@ -94,9 +94,9 @@ export default function SiteFeedback() {
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
                         placeholder="Escreva seu comentário aqui..."
-                        rows={4}
+                        rows={2}
                         maxLength={1200}
-                        className="min-h-28 rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
+                        className="min-h-20 rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
                     />
 
                     <button
