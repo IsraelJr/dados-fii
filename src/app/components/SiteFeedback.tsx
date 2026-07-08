@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from "react";
-import { Loader2, MessageSquare, Send, Star } from "lucide-react";
+import { Loader2, Send, Star } from "lucide-react";
 
 export default function SiteFeedback() {
     const [rating, setRating] = useState(0);
-    const [kind, setKind] = useState("Sugestão");
+    const [kind, setKind] = useState("Elogio");
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState("");
@@ -42,7 +42,7 @@ export default function SiteFeedback() {
             setStatus("Obrigado! Seu feedback foi enviado.");
             setMessage("");
             setRating(0);
-            setKind("Sugestão");
+            setKind("Elogio");
         } catch (err: any) {
             setError(err.message || "Não foi possível enviar o feedback agora.");
         } finally {
@@ -51,75 +51,66 @@ export default function SiteFeedback() {
     }
 
     return (
-        <section className="rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
-            <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-                <div>
-                    <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-700">
-                        <MessageSquare size={14} /> Ajude a melhorar
-                    </p>
-                    <h2 className="mt-3 text-xl font-extrabold text-slate-800">Sua opinião ajuda o Dados FII a evoluir</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                        Envie uma crítica, elogio ou sugestão rápida sobre o site.
+        <section className="rounded-2xl bg-gray-900 p-5 text-left text-gray-100 shadow-lg ring-1 ring-white/10">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="max-w-2xl">
+                    <p className="text-sm font-bold uppercase tracking-wide text-indigo-300">Ajude a melhorar</p>
+                    <h2 className="mt-2 text-xl font-extrabold text-white">O que você achou do Dados FII?</h2>
+                    <p className="mt-2 text-sm leading-6 text-gray-300">
+                        Envie uma crítica, elogio ou sugestão.
                     </p>
                 </div>
 
-                <div className="grid min-w-0 gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {["Sugestão", "Crítica", "Elogio"].map((option) => (
+                <div className="grid w-full gap-3 md:max-w-md">
+                    <div className="flex flex-wrap gap-2">
+                        {["Elogio", "Crítica", "Sugestão"].map((option) => (
                             <button
                                 key={option}
                                 type="button"
                                 onClick={() => setKind(option)}
-                                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${kind === option ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                                className={`rounded-full px-3 py-1.5 text-xs font-bold ${kind === option ? "bg-indigo-600 text-white" : "bg-gray-800 text-gray-200 hover:bg-gray-700"}`}
                             >
                                 {option}
                             </button>
                         ))}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2" aria-label="Nota do site">
-                        <div className="flex items-center gap-1">
-                            {[1, 2, 3, 4, 5].map((value) => (
-                                <button
-                                    key={value}
-                                    type="button"
-                                    onClick={() => setRating(value)}
-                                    className={value <= rating ? "text-yellow-500" : "text-slate-300 hover:text-yellow-400"}
-                                    aria-label={`Dar nota ${value}`}
-                                >
-                                    <Star size={20} fill={value <= rating ? "currentColor" : "none"} />
-                                </button>
-                            ))}
-                        </div>
-                        <span className="text-xs font-bold text-slate-500">{rating ? `${rating}/5` : "Nota opcional"}</span>
+                    <div className="flex items-center gap-1" aria-label="Nota do site">
+                        {[1, 2, 3, 4, 5].map((value) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setRating(value)}
+                                className={value <= rating ? "text-yellow-300" : "text-gray-600 hover:text-yellow-200"}
+                                aria-label={`Dar nota ${value}`}
+                            >
+                                <Star size={24} fill={value <= rating ? "currentColor" : "none"} />
+                            </button>
+                        ))}
+                        <span className="ml-2 text-sm font-medium text-gray-300">{rating ? `${rating}/5` : "Sem nota"}</span>
                     </div>
 
-                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                        <textarea
-                            value={message}
-                            onChange={(event) => setMessage(event.target.value)}
-                            placeholder="Escreva um comentário curto..."
-                            rows={2}
-                            maxLength={700}
-                            className="min-h-20 min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-50"
-                        />
+                    <textarea
+                        value={message}
+                        onChange={(event) => setMessage(event.target.value)}
+                        placeholder="Escreva seu comentário aqui..."
+                        rows={4}
+                        maxLength={1200}
+                        className="min-h-28 rounded-xl border border-gray-700 bg-gray-950 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
+                    />
 
-                        <button
-                            type="button"
-                            onClick={submitFeedback}
-                            disabled={loading}
-                            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 sm:self-end"
-                        >
-                            {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-                            Enviar
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        onClick={submitFeedback}
+                        disabled={loading}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                    >
+                        {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                        Enviar feedback
+                    </button>
 
-                    {(status || error) && (
-                        <p className={`rounded-xl p-3 text-sm font-bold ${status ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                            {status || error}
-                        </p>
-                    )}
+                    {status && <p className="rounded-lg bg-green-950/50 p-3 text-sm font-bold text-green-200">{status}</p>}
+                    {error && <p className="rounded-lg bg-red-950/50 p-3 text-sm font-bold text-red-200">{error}</p>}
                 </div>
             </div>
         </section>
