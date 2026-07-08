@@ -1,21 +1,31 @@
 'use client';
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, BellRing, ArrowDown, ArrowUp } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Bell, BellRing, ArrowDown, ArrowUp, X } from "lucide-react";
 
 interface Props {
     fiiCode: string;
 }
 
+const WALLET_EMAIL_KEY = "dados-fii-wallet-email";
+const WALLET_TOKEN_KEY = "dados-fii-wallet-session";
+
+function isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 export default function FiiAlert({ fiiCode }: Props) {
     const ALERT_VALUE = Number(process.env.NEXT_PUBLIC_DEFAULT_ALERT_VALUE || 3);
     const [email, setEmail] = useState("");
+    const [confirmedEmail, setConfirmedEmail] = useState("");
     const [percentDown, setPercentDown] = useState(-ALERT_VALUE);
     const [percentUp, setPercentUp] = useState(ALERT_VALUE);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [success, setSuccess] = useState(false);
     const [open, setOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const [progress, setProgress] = useState(0);
     const [isPremium, setIsPremium] = useState(false);
     const [alertCreated, setAlertCreated] = useState(false);
@@ -23,12 +33,37 @@ export default function FiiAlert({ fiiCode }: Props) {
     const emailRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    useEffect(() => {
+        try {
+            const storedEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
+            const storedToken = window.localStorage.getItem(WALLET_TOKEN_KEY) || "";
+            const cleanEmail = storedEmail.trim().toLowerCase();
+
+            if (storedToken && isValidEmail(cleanEmail)) {
+                setConfirmedEmail(cleanEmail);
+                setEmail(cleanEmail);
+            }
+        } catch {
+            return;
+        }
+    }, []);
+
+    useEffect(() => {
         const fetchUser = async () => {
             try {
                 const res = await fetch("/api/get-user");
                 if (res.ok) {
                     const data = await res.json();
+                    const cleanEmail = String(data?.email || "").trim().toLowerCase();
                     setIsPremium(data?.isPremium || false);
+
+                    if (isValidEmail(cleanEmail)) {
+                        setConfirmedEmail(cleanEmail);
+                        setEmail((current) => current || cleanEmail);
+                    }
                 }
             } catch (err) {
                 console.error("Erro ao buscar usuário:", err);
@@ -63,7 +98,7 @@ export default function FiiAlert({ fiiCode }: Props) {
                 setOpen(false);
                 setSuccess(false);
                 setProgress(0);
-                setEmail("");
+                setEmail(confirmedEmail || "");
                 setPercentDown(-ALERT_VALUE);
                 setPercentUp(ALERT_VALUE);
                 setMessage("");
@@ -74,12 +109,25 @@ export default function FiiAlert({ fiiCode }: Props) {
             clearTimeout(timer);
             clearInterval(interval);
         };
-    }, [success, ALERT_VALUE]);
+    }, [success, ALERT_VALUE, confirmedEmail]);
+
+    useEffect(() => {
+        if (!open) return;
+        if (confirmedEmail) setEmail(confirmedEmail);
+    }, [open, confirmedEmail]);
+
+    const toggleAlert = () => {
+        if (!open && confirmedEmail) setEmail(confirmedEmail);
+        setOpen((current) => !current);
+    };
+
+    const closeAlert = () => {
+        setOpen(false);
+        setMessage("");
+    };
 
     const handleSubmit = async () => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        if (!email || !emailRegex.test(email)) {
+        if (!email || !isValidEmail(email)) {
             setMessage("Informe um email válido para receber o alerta.");
             if (emailRef.current) {
                 emailRef.current.classList.add("shake");
@@ -140,26 +188,24 @@ export default function FiiAlert({ fiiCode }: Props) {
         }
     };
 
-    return (
-        <div className="relative inline-block">
-            <button
-                onClick={() => setOpen(!open)}
-                className="rounded-full p-2 transition-colors hover:bg-gray-700"
-                aria-label={`Criar alerta para ${fiiCode}`}
-            >
-                {alertCreated ? (
-                    <BellRing className="h-5 w-5 text-green-400" />
-                ) : (
-                    <Bell className="h-5 w-5 text-yellow-400" />
-                )}
-            </button>
-
+    const popup = open && mounted ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 py-6" onClick={closeAlert}>
             <div
-                className={`absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-2xl border border-gray-700 bg-gray-900 p-4 text-white shadow-xl transition-all duration-300 ${open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"}`}
+                className="relative w-full max-w-sm rounded-2xl border-2 border-white/80 bg-gray-950 p-4 text-white shadow-2xl ring-1 ring-white/20"
+                onClick={(event) => event.stopPropagation()}
             >
+                <button
+                    type="button"
+                    onClick={closeAlert}
+                    className="absolute right-3 top-3 rounded-full p-1 text-gray-300 hover:bg-white/10 hover:text-white"
+                    aria-label="Fechar alerta"
+                >
+                    <X size={18} />
+                </button>
+
                 <div className="mb-3 rounded-xl bg-gray-800 p-3 ring-1 ring-white/10">
                     <p className="text-xs font-bold uppercase tracking-wide text-indigo-200">Alerta de preço</p>
-                    <h3 className="mt-1 text-lg font-extrabold text-white">Receba alertas do {fiiCode}</h3>
+                    <h3 className="mt-1 pr-6 text-lg font-extrabold text-white">Receba alertas do {fiiCode}</h3>
                     <p className="mt-2 text-sm font-medium text-gray-300">
                         Plano grátis: avisamos quando o FII subir ou cair {ALERT_VALUE}%.
                     </p>
@@ -245,6 +291,26 @@ export default function FiiAlert({ fiiCode }: Props) {
                     </div>
                 )}
             </div>
+        </div>,
+        document.body
+    ) : null;
+
+    return (
+        <div className="relative inline-block">
+            <button
+                type="button"
+                onClick={toggleAlert}
+                className="rounded-full p-2 transition-colors hover:bg-gray-700"
+                aria-label={`Criar alerta para ${fiiCode}`}
+                aria-expanded={open}
+            >
+                {alertCreated ? (
+                    <BellRing className="h-5 w-5 text-green-400" />
+                ) : (
+                    <Bell className="h-5 w-5 text-yellow-400" />
+                )}
+            </button>
+            {popup}
         </div>
     );
 }
