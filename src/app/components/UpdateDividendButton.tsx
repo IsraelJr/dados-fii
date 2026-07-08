@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 
 interface Props {
@@ -8,11 +8,42 @@ interface Props {
     onSuccess?: () => void | Promise<void>;
 }
 
+const STORAGE_PREFIX = "dados-fii-dividend-update";
+const TIME_ZONE = "America/Sao_Paulo";
+
+function todayKey() {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(new Date());
+    const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
 export default function UpdateDividendButton({ ticker, onSuccess }: Props) {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const [disabled, setDisabled] = useState(false);
-    const [showCard, setShowCard] = useState(true);
+    const storageKey = useMemo(() => `${STORAGE_PREFIX}:${ticker}:${todayKey()}`, [ticker]);
+
+    useEffect(() => {
+        try {
+            setDisabled(window.localStorage.getItem(storageKey) === "done");
+        } catch {
+            setDisabled(false);
+        }
+    }, [storageKey]);
+
+    function markUpdatedToday() {
+        try {
+            window.localStorage.setItem(storageKey, "done");
+        } catch {
+            return;
+        }
+        setDisabled(true);
+    }
 
     const requestUpdate = async () => {
         if (loading || disabled) return;
@@ -27,33 +58,26 @@ export default function UpdateDividendButton({ ticker, onSuccess }: Props) {
                 body: JSON.stringify({ ticker }),
             });
 
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
+
+            if (res.status === 429) {
+                markUpdatedToday();
+                return;
+            }
 
             if (!res.ok) {
-                setDisabled(res.status === 429);
                 setMessage(data.error || "Não foi possível solicitar a atualização.");
                 return;
             }
 
-            if (data.success === false) {
-                setDisabled(false);
-                setMessage(data.message || "Atualizei os meses encontrados, mas o mês atual ainda não apareceu.");
-                return;
-            }
-
-            setDisabled(true);
-            setShowCard(false);
-            setMessage("Atualização concluída com sucesso. Atualizando consulta...");
+            markUpdatedToday();
             await onSuccess?.();
         } catch {
-            setDisabled(false);
             setMessage("Erro ao solicitar atualização. Tente novamente mais tarde.");
         } finally {
             setLoading(false);
         }
     };
-
-    if (!showCard) return null;
 
     return (
         <div className="mt-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-100">
