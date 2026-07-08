@@ -61,7 +61,7 @@ function SummaryCard({ icon, label, value, glossaryHref }: { icon: ReactNode; la
                 <div className="min-w-0 flex-1 overflow-hidden">
                     <p className="text-xs font-extrabold uppercase tracking-wide text-gray-400">{label}</p>
                     <div className="mt-1 flex min-w-0 items-start gap-1 text-lg font-bold leading-snug text-white md:text-2xl">
-                        <span className="min-w-0 max-w-full break-words">{value}</span>
+                        <span className="min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{value}</span>
                         {glossaryHref && <GlossaryLink href={glossaryHref} />}
                     </div>
                 </div>
@@ -90,7 +90,7 @@ export default function FiiSummary({
     const dividends = getCurrentYearDividends(earningsYearData);
 
     return (
-        <div className="fii-summary mt-8 mx-auto w-full max-w-4xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg md:p-6">
+        <div className="fii-summary mt-8 mx-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-gray-900 p-4 text-gray-100 shadow-lg md:p-6">
             <div className="fii-summary-grid grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <div className="fii-summary-card fii-summary-card-full min-w-0 overflow-hidden rounded-xl bg-gray-800 p-4 md:col-span-2 lg:col-span-3">
                     <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
