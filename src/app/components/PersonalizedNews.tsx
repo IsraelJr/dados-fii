@@ -307,7 +307,7 @@ export default function PersonalizedNews() {
             {!!news.length && (
                 <section className="min-w-0 overflow-hidden rounded-2xl bg-white p-5 text-left shadow-md ring-1 ring-slate-100">
                     <div className="space-y-5">
-                        {news.map(({ ticker, title, summary, attentionPoints, searchUrl, loading }) => (
+                        {news.map(({ ticker, summary, attentionPoints, searchUrl, loading }) => (
                             <article key={ticker} className="min-w-0 border-b border-slate-100 pb-5 last:border-b-0 last:pb-0">
                                 <h3 className="text-base font-extrabold text-gray-800">{ticker}</h3>
 
@@ -321,7 +321,6 @@ export default function PersonalizedNews() {
                                     </p>
                                 ) : (
                                     <>
-                                        {title && <p className="mt-1 break-words text-sm font-bold text-gray-800">{renderTextWithFriendlyLinks(title)}</p>}
                                         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">{renderTextWithFriendlyLinks(summary)}</p>
 
                                         {!!attentionPoints.length && (
