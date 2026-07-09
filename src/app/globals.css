@@ -45,6 +45,14 @@ body {
   .fii-summary-card * {
     max-width: 100%;
   }
+
+  .wallet-sync-toast-top-right {
+    inset: 1rem 0.75rem auto auto !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: min(22rem, calc(100vw - 1.5rem)) !important;
+    max-width: calc(100vw - 1.5rem) !important;
+  }
 }
 
 @layer utilities {
