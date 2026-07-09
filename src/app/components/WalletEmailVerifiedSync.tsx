@@ -13,9 +13,17 @@ type ToastState = {
   description?: string;
 };
 
+type CloudLoadCache = {
+  email: string;
+  signature: string;
+  loadedAt: number;
+};
+
 const STORAGE_KEY = "dados-fii-wallet-v1";
 const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
+const CLOUD_LOAD_CACHE_KEY = "dados-fii-wallet-cloud-load-cache-v1";
+const AUTO_CLOUD_LOAD_TTL_MS = 12 * 60 * 60 * 1000;
 
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -44,6 +52,36 @@ function readWallet(): WalletItem[] {
 
 function walletSignature(items: WalletItem[]) {
   return JSON.stringify(items.map((item) => ({ ticker: item.ticker, quotas: item.quotas })));
+}
+
+function readCloudLoadCache(): CloudLoadCache | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const stored = window.localStorage.getItem(CLOUD_LOAD_CACHE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as CloudLoadCache;
+    return parsed?.email && typeof parsed.loadedAt === "number" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCloudLoadCache(email: string, signature: string) {
+  try {
+    window.localStorage.setItem(CLOUD_LOAD_CACHE_KEY, JSON.stringify({ email, signature, loadedAt: Date.now() }));
+  } catch {
+    return;
+  }
+}
+
+function shouldAutoLoadFromCloud(email: string, currentWallet: WalletItem[]) {
+  if (currentWallet.length) return false;
+
+  const cache = readCloudLoadCache();
+  if (!cache || cache.email !== email) return true;
+
+  return Date.now() - cache.loadedAt > AUTO_CLOUD_LOAD_TTL_MS;
 }
 
 function diffTickers(previous: WalletItem[], current: WalletItem[]) {
@@ -164,6 +202,7 @@ export default function WalletEmailVerifiedSync() {
       lastSavedSignature.current = signature;
       walletRef.current = currentWallet;
       setWallet(currentWallet);
+      saveCloudLoadCache(cleanEmail, signature);
       setMessage(options?.silent ? "Carteira sincronizada automaticamente." : `Carteira sincronizada com sucesso. Total salvo: ${Number(json.saved || currentWallet.length)} FII(s).`);
       return true;
     } catch (err: any) {
@@ -179,9 +218,10 @@ export default function WalletEmailVerifiedSync() {
     const cleanEmail = (emailRef.current || email).trim().toLowerCase();
     const currentToken = tokenRef.current || token;
     const currentWallet = readWallet();
+    const beforeSignature = walletSignature(currentWallet);
 
     if (!isEmail(cleanEmail) || !currentToken) return false;
-    if (options?.auto && currentWallet.length) return false;
+    if (options?.auto && !shouldAutoLoadFromCloud(cleanEmail, currentWallet)) return false;
 
     if (!options?.auto) {
       setLoading(true);
@@ -191,17 +231,22 @@ export default function WalletEmailVerifiedSync() {
     try {
       const json = await callApi({ action: "load", email: cleanEmail, sessionToken: currentToken, wallet: currentWallet }, "/api/wallet-load-legacy");
       const loadedWallet = Array.isArray(json.wallet) ? json.wallet : [];
+      const loadedSignature = walletSignature(loadedWallet);
+
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedWallet));
-      lastSavedSignature.current = walletSignature(loadedWallet);
+      saveCloudLoadCache(cleanEmail, loadedSignature);
+      lastSavedSignature.current = loadedSignature;
       walletRef.current = loadedWallet;
       setWallet(loadedWallet);
 
       if (options?.auto) {
-        if (isMobileViewport()) {
-          setMessage("");
-          showToast({ title: "Carteira atualizada." });
-        } else {
-          setMessage("Carteira atualizada.");
+        if (loadedWallet.length && loadedSignature !== beforeSignature) {
+          if (isMobileViewport()) {
+            setMessage("");
+            showToast({ title: "Carteira atualizada." });
+          } else {
+            setMessage("Carteira atualizada.");
+          }
         }
       } else {
         setMessage(`Carteira carregada com sucesso. ${loadedWallet.length} FII(s) encontrados. Atualizando a tela...`);
@@ -279,6 +324,7 @@ export default function WalletEmailVerifiedSync() {
       const json = await callApi({ action: "request-code", email: cleanEmail });
       window.localStorage.setItem(EMAIL_KEY, cleanEmail);
       window.localStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(CLOUD_LOAD_CACHE_KEY);
       setEmail(cleanEmail);
       setToken("");
       emailRef.current = cleanEmail;
@@ -312,7 +358,7 @@ export default function WalletEmailVerifiedSync() {
       tokenRef.current = json.sessionToken;
       autoLoadDoneRef.current = false;
       setPin("");
-      setMessage("E-mail confirmado. Agora sua carteira será carregada automaticamente quando disponível.");
+      setMessage("E-mail confirmado. Use Carregar para trazer a carteira salva neste dispositivo.");
     } catch (err: any) {
       setMessage(err.message || "Código inválido.");
     } finally {
@@ -346,7 +392,7 @@ export default function WalletEmailVerifiedSync() {
               <span className="min-w-0">Salve sua carteira</span>
             </h2>
             <p className="mt-2 text-sm font-medium leading-6 text-gray-300">
-              Sua carteira fica salva apenas neste navegador. Confirme seu e-mail para acessar seus FIIs em qualquer celular, computador ou navegador.
+              Sua carteira fica salva neste navegador e pode ser recuperada pelo e-mail confirmado. Quando já houver dados locais, usamos a versão local para evitar carregamentos repetidos.
             </p>
             <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
               {hasSession ? "Este dispositivo já está confirmado. Alterações ficam no navegador e sincronizam automaticamente ao sair ou após alguns minutos." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
@@ -411,7 +457,7 @@ export default function WalletEmailVerifiedSync() {
       </section>
 
       {toast && (
-        <div className="fixed inset-x-3 bottom-4 z-50 mx-auto max-w-sm overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl ring-1 ring-white/10 sm:hidden">
+        <div className="wallet-sync-toast-top-right fixed right-3 top-4 z-50 max-w-sm overflow-hidden rounded-2xl bg-gray-950 text-white shadow-2xl ring-1 ring-white/10 sm:hidden">
           <div className="p-4">
             <p className="text-sm font-extrabold">{toast.title}</p>
             {toast.description && <p className="mt-1 text-xs font-medium leading-5 text-gray-300">{toast.description}</p>}
