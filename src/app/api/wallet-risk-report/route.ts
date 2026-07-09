@@ -388,7 +388,30 @@ async function callOpenAI(messages: ReturnType<typeof buildFiiRiskReportMessages
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
+    let parsed: any = null;
+
+    try {
+      parsed = detail ? JSON.parse(detail) : null;
+    } catch {
+      parsed = null;
+    }
+
     console.error("OpenAI risk report error:", response.status, detail);
+
+    if (response.status === 429 && parsed?.error?.code === "insufficient_quota") {
+      throw Object.assign(
+        new Error("A geração do relatório está temporariamente indisponível porque a chave da OpenAI está sem créditos/cota. Verifique o billing do projeto na OpenAI ou troque a OPENAI_API_KEY."),
+        { status: 503, code: "OPENAI_INSUFFICIENT_QUOTA" }
+      );
+    }
+
+    if (response.status === 429) {
+      throw Object.assign(
+        new Error("A OpenAI recusou a geração por limite de uso. Tente novamente mais tarde ou verifique os limites do projeto."),
+        { status: 503, code: "OPENAI_RATE_LIMIT" }
+      );
+    }
+
     throw new Error("Não foi possível gerar o relatório agora.");
   }
 
@@ -550,11 +573,12 @@ export async function POST(req: Request) {
       await reportRef.set({
         status: "error",
         error: err.message || "Erro ao gerar relatório.",
+        errorCode: err.code || "UNKNOWN_ERROR",
         updatedAt: adminFieldValue.serverTimestamp(),
         finishedAt: adminFieldValue.serverTimestamp(),
       }, { merge: true }).catch(() => undefined);
     }
 
-    return NextResponse.json({ ok: false, error: err.message || "Erro ao gerar relatório." }, { status: err.status || 500 });
+    return NextResponse.json({ ok: false, error: err.message || "Erro ao gerar relatório.", code: err.code || "UNKNOWN_ERROR" }, { status: err.status || 500 });
   }
 }
