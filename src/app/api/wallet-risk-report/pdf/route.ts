@@ -14,6 +14,7 @@ const MARGIN_X = 54;
 const MARGIN_TOP = 72;
 const MARGIN_BOTTOM = 58;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_X * 2;
+const PAGE_CONTENT_HEIGHT = PAGE_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM;
 
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -58,6 +59,14 @@ function formatDatePtBr() {
 
 function correctPortugueseText(value: string) {
   const replacements: Array<[RegExp, string]> = [
+    [/\bpayload\b/gi, "dados recebidos"],
+    [/\bjson\b/gi, "dados disponíveis"],
+    [/\bbackend\b/gi, "sistema"],
+    [/\bfrontend\b/gi, "tela"],
+    [/\bendpoint\b/gi, "serviço"],
+    [/\bAPI\b/g, "serviço"],
+    [/\bbanco de dados\b/gi, "base de informações"],
+    [/\bcampo\b/gi, "informação"],
     [/\bRelatorio\b/g, "Relatório"], [/\brelatorio\b/g, "relatório"],
     [/\bAnalise\b/g, "Análise"], [/\banalise\b/g, "análise"],
     [/\bDisponiveis\b/g, "Disponíveis"], [/\bdisponiveis\b/g, "disponíveis"],
@@ -321,20 +330,26 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     }
   }
 
+  function drawWatermark(currentPage: any) {
+    const watermarkColor = rgb(0.86, 0.88, 0.96);
+    [250, 380, 510].forEach((positionY) => {
+      drawTextSafe(currentPage, "DADOS FII - RELATÓRIO DO SITE", {
+        x: 54,
+        y: positionY,
+        size: 38,
+        font: bold,
+        color: watermarkColor,
+        rotate: degrees(35),
+        opacity: 0.10,
+      });
+    });
+  }
+
   function drawPageChrome(currentPage: any, currentPageNumber: number) {
+    drawWatermark(currentPage);
     currentPage.drawRectangle({ x: 0, y: PAGE_HEIGHT - 44, width: PAGE_WIDTH, height: 44, color: rgb(0.07, 0.09, 0.16) });
     drawTextSafe(currentPage, "Dados FII", { x: MARGIN_X, y: PAGE_HEIGHT - 29, size: 13, font: bold, color: rgb(1, 1, 1) });
     drawTextSafe(currentPage, "Relatório de risco da carteira", { x: MARGIN_X + 84, y: PAGE_HEIGHT - 29, size: 10, font: regular, color: rgb(0.82, 0.86, 0.95) });
-
-    drawTextSafe(currentPage, "DADOS FII", {
-      x: 145,
-      y: 380,
-      size: 62,
-      font: bold,
-      color: rgb(0.9, 0.92, 0.98),
-      rotate: degrees(35),
-      opacity: 0.12,
-    });
 
     currentPage.drawLine({
       start: { x: MARGIN_X, y: 42 },
@@ -365,8 +380,12 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     y = PAGE_HEIGHT - MARGIN_TOP;
   }
 
+  function remainingHeight() {
+    return y - MARGIN_BOTTOM;
+  }
+
   function ensureSpace(height: number) {
-    if (y - height < MARGIN_BOTTOM) {
+    if (remainingHeight() < height) {
       newPage();
       return true;
     }
@@ -374,7 +393,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   }
 
   function drawHeading(text: string, size = 13) {
-    ensureSpace(size + 18);
+    ensureSpace(Math.max(110, size + 42));
     y -= 6;
     drawTextSafe(page, text, { x: MARGIN_X, y, size, font: bold, color: rgb(0.16, 0.18, 0.34) });
     y -= size + 8;
@@ -387,8 +406,11 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     const indent = options?.bullet ? 12 : 0;
     const color = options?.major ? rgb(0.08, 0.11, 0.22) : options?.heading ? rgb(0.16, 0.18, 0.34) : rgb(0.12, 0.13, 0.16);
     const wrapped = wrapText(text, font, fontSize, CONTENT_WIDTH - indent);
+    const requiredHeight = wrapped.length * lineHeight + (options?.heading ? 46 : 2);
 
-    ensureSpace(wrapped.length * lineHeight + (options?.heading ? 10 : 2));
+    if (options?.heading) ensureSpace(Math.max(110, requiredHeight));
+    else ensureSpace(requiredHeight);
+
     if (options?.heading) y -= 6;
 
     wrapped.forEach((line, index) => {
@@ -424,10 +446,16 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
       return { cellLines, height: Math.max(22, maxLines * lineHeight + padding * 2) };
     }
 
-    function drawRow(row: string[], isHeader = false) {
-      const { cellLines, height } = measureRow(row);
-      ensureSpace(height + 4);
-      const rowY = y - height + 6;
+    const headerMeasure = measureRow(headers);
+    const rowMeasures = rows.map((row) => measureRow(row));
+    const tableHeight = headerMeasure.height + rowMeasures.reduce((sum, row) => sum + row.height, 0) + 14;
+
+    if (tableHeight <= PAGE_CONTENT_HEIGHT && tableHeight > remainingHeight()) {
+      newPage();
+    }
+
+    function drawMeasuredRow(row: string[], measured: { cellLines: string[][]; height: number }, isHeader = false) {
+      const rowY = y - measured.height + 6;
 
       for (let col = 0; col < colCount; col += 1) {
         const x = MARGIN_X + col * colWidth;
@@ -435,7 +463,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
           x,
           y: rowY,
           width: colWidth,
-          height,
+          height: measured.height,
           color: isHeader ? rgb(0.90, 0.92, 0.98) : rgb(1, 1, 1),
           borderColor: rgb(0.80, 0.82, 0.88),
           borderWidth: 0.5,
@@ -443,7 +471,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
 
         const cellFont = isHeader ? bold : regular;
         const cellColor = isHeader ? rgb(0.10, 0.12, 0.22) : rgb(0.12, 0.13, 0.16);
-        cellLines[col].forEach((line, lineIndex) => {
+        measured.cellLines[col].forEach((line, lineIndex) => {
           drawTextSafe(page, line, {
             x: x + padding,
             y: y - padding - fontSize - lineIndex * lineHeight,
@@ -454,69 +482,122 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
         });
       }
 
-      y -= height;
+      y -= measured.height;
     }
 
-    ensureSpace(52);
+    function drawHeader() {
+      if (headerMeasure.height > remainingHeight()) newPage();
+      drawMeasuredRow(headers, headerMeasure, true);
+    }
+
     y -= 4;
-    drawRow(headers, true);
-    rows.forEach((row) => drawRow(row, false));
+    drawHeader();
+
+    rows.forEach((row, index) => {
+      const measured = rowMeasures[index];
+      if (measured.height > remainingHeight()) {
+        newPage();
+        drawHeader();
+      }
+      drawMeasuredRow(row, measured, false);
+    });
+
     y -= 10;
   }
 
-  function drawSegmentPieChart(portfolio: any[]) {
+  function drawHorizontalSegmentBars(data: Array<{ label: string; value: number }>, total: number) {
+    const maxValue = Math.max(...data.map((item) => item.value));
+    const startX = MARGIN_X;
+    const labelWidth = 145;
+    const barMaxWidth = CONTENT_WIDTH - labelWidth - 58;
+    let barY = y - 10;
+
+    data.forEach((item, index) => {
+      const percent = ((item.value / total) * 100).toFixed(1).replace(".", ",");
+      const barWidth = maxValue ? (item.value / maxValue) * barMaxWidth : 0;
+      const wrappedLabel = wrapText(item.label, regular, 8.5, labelWidth - 8).slice(0, 2);
+
+      wrappedLabel.forEach((line, lineIndex) => {
+        drawTextSafe(page, line, { x: startX, y: barY - lineIndex * 10, size: 8.5, font: regular, color: rgb(0.15, 0.16, 0.22) });
+      });
+      page.drawRectangle({ x: startX + labelWidth, y: barY - 2, width: barMaxWidth, height: 9, color: rgb(0.91, 0.93, 0.98) });
+      page.drawRectangle({ x: startX + labelWidth, y: barY - 2, width: Math.max(2, barWidth), height: 9, color: chartColors[index % chartColors.length] });
+      drawTextSafe(page, `${percent}%`, { x: startX + labelWidth + barMaxWidth + 8, y: barY - 2, size: 8.5, font: bold, color: rgb(0.15, 0.16, 0.22) });
+      barY -= Math.max(24, wrappedLabel.length * 10 + 8);
+    });
+
+    y = barY - 8;
+  }
+
+  function drawSegmentChart(portfolio: any[]) {
     const data = buildSegmentChartData(portfolio);
     if (!data.length) return;
 
     const total = data.reduce((sum, item) => sum + item.value, 0);
     if (!total) return;
 
-    ensureSpace(236);
+    ensureSpace(252);
     drawHeading("Concentração por segmento", 14);
 
     const centerX = MARGIN_X + 95;
     const centerY = y - 76;
     const radius = 64;
     let angle = -Math.PI / 2;
+    let pieRendered = true;
 
     if (data.length === 1) {
       page.drawCircle({ x: centerX, y: centerY, size: radius, color: chartColors[0] });
     } else {
-      data.forEach((item, index) => {
+      for (let index = 0; index < data.length; index += 1) {
+        const item = data[index];
         const endAngle = angle + (item.value / total) * Math.PI * 2;
         const path = pieSlicePath(centerX, centerY, radius, angle, endAngle);
         try {
           page.drawSvgPath(path, { color: chartColors[index % chartColors.length] });
         } catch {
-          page.drawCircle({ x: centerX, y: centerY, size: radius, color: chartColors[index % chartColors.length], opacity: 0.18 });
+          pieRendered = false;
+          break;
         }
         angle = endAngle;
-      });
+      }
     }
 
-    const legendX = MARGIN_X + 190;
-    let legendY = y - 20;
+    if (pieRendered) {
+      const legendX = MARGIN_X + 190;
+      let legendY = y - 20;
 
-    data.forEach((item, index) => {
-      const percent = ((item.value / total) * 100).toFixed(1).replace(".", ",");
-      page.drawRectangle({ x: legendX, y: legendY - 2, width: 10, height: 10, color: chartColors[index % chartColors.length] });
-      const legendText = `${item.label}: ${percent}%`;
-      const wrapped = wrapText(legendText, regular, 9, CONTENT_WIDTH - 210);
-      wrapped.forEach((line, lineIndex) => {
-        drawTextSafe(page, line, { x: legendX + 16, y: legendY - lineIndex * 11, size: 9, font: regular, color: rgb(0.15, 0.16, 0.22) });
+      data.forEach((item, index) => {
+        const percent = ((item.value / total) * 100).toFixed(1).replace(".", ",");
+        page.drawRectangle({ x: legendX, y: legendY - 2, width: 10, height: 10, color: chartColors[index % chartColors.length] });
+        const legendText = `${item.label}: ${percent}%`;
+        const wrapped = wrapText(legendText, regular, 9, CONTENT_WIDTH - 210);
+        wrapped.forEach((line, lineIndex) => {
+          drawTextSafe(page, line, { x: legendX + 16, y: legendY - lineIndex * 11, size: 9, font: regular, color: rgb(0.15, 0.16, 0.22) });
+        });
+        legendY -= Math.max(16, wrapped.length * 11 + 4);
       });
-      legendY -= Math.max(16, wrapped.length * 11 + 4);
-    });
 
-    drawTextSafe(page, "Base: quantidade de cotas por segmento disponível na carteira.", {
+      drawTextSafe(page, "Base: quantidade de cotas por segmento disponível na carteira.", {
+        x: MARGIN_X,
+        y: y - 160,
+        size: 8,
+        font: regular,
+        color: rgb(0.42, 0.44, 0.50),
+      });
+
+      y -= 194;
+      return;
+    }
+
+    drawHorizontalSegmentBars(data, total);
+    drawTextSafe(page, "Base: quantidade de cotas por segmento disponível na carteira. Representação em barras usada como alternativa ao gráfico de pizza.", {
       x: MARGIN_X,
-      y: y - 160,
+      y,
       size: 8,
       font: regular,
       color: rgb(0.42, 0.44, 0.50),
     });
-
-    y -= 194;
+    y -= 18;
   }
 
   page.drawRectangle({ x: 0, y: 0, width: PAGE_WIDTH, height: PAGE_HEIGHT, color: rgb(0.96, 0.97, 0.99) });
@@ -536,7 +617,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   pageNumber += 1;
   y = PAGE_HEIGHT - MARGIN_TOP;
 
-  drawSegmentPieChart(report.portfolio || []);
+  drawSegmentChart(report.portfolio || []);
 
   const lines = preprocessReportMarkdown(report.reportMarkdown).split("\n");
 
@@ -562,6 +643,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     const bullet = /^[-*]\s+/.test(trimmed);
     const text = normalizeLine(rawLine);
 
+    if (heading && remainingHeight() < 110) newPage();
     drawParagraph(text, { major, heading, bullet });
     index += 1;
   }
