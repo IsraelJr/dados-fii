@@ -191,11 +191,7 @@ function extractWallet(data: any): WalletItem[] {
 }
 
 function hasVipAccess(data: Record<string, any>) {
-  const rawVip = data?.isVip ?? data?.vip ?? data?.VIP ?? data?.isPremium ?? data?.premium;
-  if (rawVip === true) return true;
-  if (typeof rawVip === "string") return ["true", "sim", "yes", "vip", "premium", "1"].includes(rawVip.trim().toLowerCase());
-  if (typeof rawVip === "number") return rawVip > 0;
-  return false;
+  return data?.isVip === true;
 }
 
 function reportCredits(data: Record<string, any>) {
@@ -409,17 +405,18 @@ async function callOpenAI(messages: ReturnType<typeof buildFiiRiskReportMessages
 
 async function reserveReport(reportRef: any, metadata: Record<string, any>) {
   await adminDb.runTransaction(async (transaction) => {
-    const snap = await transaction.get(reportRef);
-    const data = snap.data() || {};
+    const snap: any = await transaction.get(reportRef);
+    const data = typeof snap?.data === "function" ? snap.data() || {} : {};
+    const exists = Boolean(snap?.exists);
     const status = data.status;
     const updatedAtMs = getTimestampMs(data.updatedAt || data.createdAt);
     const isStale = updatedAtMs > 0 && Date.now() - updatedAtMs > PROCESSING_TIMEOUT_MS;
 
-    if (snap.exists && status === "done") {
+    if (exists && status === "done") {
       throw Object.assign(new Error("REPORT_ALREADY_DONE"), { code: "REPORT_ALREADY_DONE", report: data });
     }
 
-    if (snap.exists && status === "processing" && !isStale) {
+    if (exists && status === "processing" && !isStale) {
       throw Object.assign(new Error("Relatório já está sendo gerado."), { status: 409 });
     }
 
