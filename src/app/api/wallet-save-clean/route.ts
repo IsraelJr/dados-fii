@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { saveMonthlyPortfolioSnapshot } from "@/lib/portfolioSnapshots";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,6 +127,11 @@ export async function POST(req: Request) {
       createdAt: user.snap.exists ? user.data?.createdAt || adminFieldValue.serverTimestamp() : adminFieldValue.serverTimestamp(),
     }, { merge: true });
 
+    const snapshotResult = await saveMonthlyPortfolioSnapshot({ userDocId: user.docId, email, wallet }).catch((err) => {
+      console.error("Wallet monthly snapshot error:", err);
+      return { saved: false, reason: "snapshot_error" };
+    });
+
     return NextResponse.json({
       ok: true,
       email,
@@ -134,6 +140,7 @@ export async function POST(req: Request) {
       incoming: wallet.length,
       walletVersion: WEB_WALLET_VERSION,
       mode: "replace",
+      snapshot: snapshotResult,
     });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao salvar carteira." }, { status: 500 });
