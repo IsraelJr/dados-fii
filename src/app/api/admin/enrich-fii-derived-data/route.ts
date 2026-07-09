@@ -50,8 +50,36 @@ function sortedCounts(map: Map<string, number>) {
     .sort((a, b) => b.count - a.count || a.field.localeCompare(b.field));
 }
 
-async function runEnrichment(limit: number, dryRun = false) {
-  const snapshot = await adminDb.collection(COLLECTION).limit(limit).get();
+function parseLimit(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
+function wantsTextDownload(req: NextRequest, body?: any) {
+  const format = String(req.nextUrl.searchParams.get("format") || body?.format || "").toLowerCase();
+  const download = String(req.nextUrl.searchParams.get("download") || body?.download || "").toLowerCase();
+  return format === "txt" || format === "text" || download === "true" || download === "1";
+}
+
+function textDownloadResponse(filename: string, payload: unknown) {
+  return new NextResponse(JSON.stringify(payload, null, 2), {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function getFiisSnapshot(limit?: number) {
+  let query: any = adminDb.collection(COLLECTION);
+  if (limit) query = query.limit(limit);
+  return query.get();
+}
+
+async function runEnrichment(limit?: number, dryRun = false, resultLimit?: number) {
+  const snapshot = await getFiisSnapshot(limit);
   const results: Array<{ ticker: string; status: string; updatedFields?: string[]; error?: string }> = [];
   const fieldCounts = new Map<string, number>();
   let enriched = 0;
@@ -92,13 +120,14 @@ async function runEnrichment(limit: number, dryRun = false) {
 
   return {
     total: snapshot.docs.length,
+    limitApplied: limit || null,
     enriched,
     skipped,
     errors,
     dryRun,
     version: ENRICHMENT_VERSION,
     fieldCounts: sortedCounts(fieldCounts),
-    results: results.slice(0, 120),
+    results: resultLimit ? results.slice(0, resultLimit) : results,
   };
 }
 
@@ -106,11 +135,14 @@ export async function GET(req: NextRequest) {
   try {
     if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 1000), 3000);
+    const limit = parseLimit(req.nextUrl.searchParams.get("limit"));
     const dryRun = req.nextUrl.searchParams.get("dryRun") === "true";
-    const output = await runEnrichment(limit, dryRun);
+    const asText = wantsTextDownload(req);
+    const output = await runEnrichment(limit, dryRun, asText ? undefined : 120);
+    const payload = { ok: true, ...output };
 
-    return NextResponse.json({ ok: true, ...output });
+    if (asText) return textDownloadResponse(`enrich-fii-derived-data-${new Date().toISOString().slice(0, 10)}.txt`, payload);
+    return NextResponse.json(payload);
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao enriquecer dados dos FIIs." }, { status: 500 });
   }
@@ -121,11 +153,14 @@ export async function POST(req: NextRequest) {
   try {
     if (!isAuthorized(req, body)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const limit = Math.min(Number(body?.limit || 1000), 3000);
+    const limit = parseLimit(body?.limit);
     const dryRun = Boolean(body?.dryRun);
-    const output = await runEnrichment(limit, dryRun);
+    const asText = wantsTextDownload(req, body);
+    const output = await runEnrichment(limit, dryRun, asText ? undefined : 120);
+    const payload = { ok: true, ...output };
 
-    return NextResponse.json({ ok: true, ...output });
+    if (asText) return textDownloadResponse(`enrich-fii-derived-data-${new Date().toISOString().slice(0, 10)}.txt`, payload);
+    return NextResponse.json(payload);
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao enriquecer dados dos FIIs." }, { status: 500 });
   }
