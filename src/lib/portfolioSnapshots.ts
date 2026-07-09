@@ -27,6 +27,55 @@ function numberOf(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function compactNumberOf(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  const raw = String(value || "")
+    .replace("R$", "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+
+  if (!raw) return 0;
+
+  let multiplier = 1;
+  let clean = raw;
+
+  if (/BI$|B$/.test(clean)) {
+    multiplier = 1_000_000_000;
+    clean = clean.replace(/BI$|B$/, "");
+  } else if (/MI$|M$/.test(clean)) {
+    multiplier = 1_000_000;
+    clean = clean.replace(/MI$|M$/, "");
+  } else if (/MIL$|K$/.test(clean)) {
+    multiplier = 1_000;
+    clean = clean.replace(/MIL$|K$/, "");
+  }
+
+  const parsed = numberOf(clean);
+  return parsed ? parsed * multiplier : 0;
+}
+
+function valueAtPath(data: any, path: string) {
+  return path.split(".").reduce((current, key) => current?.[key], data);
+}
+
+function firstNumber(data: any, paths: string[]) {
+  for (const path of paths) {
+    const value = compactNumberOf(valueAtPath(data, path));
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return undefined;
+}
+
+function firstText(data: any, paths: string[]) {
+  for (const path of paths) {
+    const value = String(valueAtPath(data, path) || "").trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
 function quotaOf(value: unknown) {
   const parsed = Number(String(value ?? "0").replace(",", "."));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
@@ -168,6 +217,46 @@ function removeUndefinedFields<T>(value: T): T {
   return value;
 }
 
+function buildMarketMetrics(data: any) {
+  return removeUndefinedFields({
+    dailyLiquidity: firstNumber(data, [
+      "dailyLiquidity",
+      "liquidity",
+      "averageDailyLiquidity",
+      "avgDailyLiquidity",
+      "volumeMedioDiario",
+      "liquidezDiaria",
+      "marketData.dailyLiquidity",
+      "marketData.liquidity",
+    ]),
+    numberShares: firstNumber(data, [
+      "numberShares",
+      "sharesOutstanding",
+      "numberOfShares",
+      "quotasIssued",
+      "issuedQuotas",
+      "cotasEmitidas",
+      "numeroCotas",
+      "marketData.numberShares",
+      "marketData.sharesOutstanding",
+    ]),
+    numberShareholders: firstNumber(data, [
+      "numberCotistas",
+      "numberShareholders",
+      "shareholders",
+      "shareholdersCount",
+      "cotistas",
+      "numeroCotistas",
+      "investorsCount",
+      "marketData.numberCotistas",
+      "marketData.numberShareholders",
+    ]),
+    isIFIX: Boolean(data?.isIFIX || data?.ifix || data?.marketData?.isIFIX) || undefined,
+    marketDataSource: firstText(data, ["marketDataSource", "marketData.source", "source"]),
+    marketDataUpdatedAt: firstText(data, ["marketDataUpdatedAt", "marketData.updatedAt"]),
+  });
+}
+
 export async function buildPortfolioSnapshot(userDocId: string, email: string, wallet: WalletItem[]) {
   const sheetPrices = await getSheetPrices();
   const assets = await Promise.all(wallet.map(async (item) => {
@@ -176,6 +265,7 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
     const averagePrice = item.averagePrice && item.averagePrice > 0 ? item.averagePrice : undefined;
     const currentValue = currentPrice > 0 ? currentPrice * item.quotas : undefined;
     const investedValue = averagePrice ? averagePrice * item.quotas : undefined;
+    const marketMetrics = buildMarketMetrics(data);
 
     return removeUndefinedFields({
       ticker: item.ticker,
@@ -193,6 +283,7 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
       administrator: String(data?.administrator || data?.administrador || "").trim() || undefined,
       dividendYield: numberOf(data?.dividendYield || data?.dy || data?.DY || data?.dy12m) || undefined,
       pvp: numberOf(data?.pvp || data?.p_vp || data?.pvpa || data?.priceToBook) || undefined,
+      ...marketMetrics,
     });
   }));
 
