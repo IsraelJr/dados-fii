@@ -333,10 +333,10 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   function drawWatermark(currentPage: any) {
     const watermarkColor = rgb(0.86, 0.88, 0.96);
     [250, 380, 510].forEach((positionY) => {
-      drawTextSafe(currentPage, "DADOS FII - RELATÓRIO DO SITE", {
+      drawTextSafe(currentPage, "Dados FII", {
         x: 54,
         y: positionY,
-        size: 38,
+        size: 44,
         font: bold,
         color: watermarkColor,
         rotate: degrees(35),
