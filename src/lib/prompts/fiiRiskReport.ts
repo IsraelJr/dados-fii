@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v1.3.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v1.4.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -16,6 +16,12 @@ export type RiskReportPortfolioItem = {
   dividendYield?: number;
   pvp?: number;
   liquidity?: number;
+  dailyLiquidity?: number;
+  numberShares?: number;
+  numberShareholders?: number;
+  isIFIX?: boolean;
+  marketDataSource?: string;
+  marketDataUpdatedAt?: string;
   lastDividends?: Array<{
     month?: string;
     value?: number;
@@ -58,6 +64,10 @@ Regras obrigatórias:
 - Considere todos os usuários do site como pessoa física por padrão. Não escreva que o tipo de investidor está desconhecido e não compare PF versus PJ, salvo se os dados trouxerem explicitamente uma necessidade de análise PJ.
 - Não use termos técnicos de desenvolvimento ou sistemas no relatório final, como "payload", "JSON", "backend", "frontend", "endpoint", "API", "banco de dados" ou "campo". Troque por expressões naturais, como "dados disponíveis", "base do relatório" ou "informações analisadas".
 - Não invente dados de vacância, rating, LTV, P/VP, gestor, liquidez, dividend yield ou localização se eles não estiverem disponíveis.
+- Antes de escrever "dados insuficientes" para liquidez, cotas emitidas ou cotistas, verifique se o ativo possui dailyLiquidity, liquidity, numberShares, numberShareholders, isIFIX ou essas informações em extraData.
+- Se dailyLiquidity ou liquidity estiver disponível, use esse dado para avaliar liquidez e risco de saída. Não escreva que a liquidez diária é insuficiente nesse caso.
+- Se numberShares estiver disponível, use como quantidade de cotas emitidas. Não confunda com a quantidade de cotas que o usuário possui.
+- Se numberShareholders estiver disponível, use como número de cotistas. Se apenas esse dado estiver ausente, diga que faltam dados de cotistas, e não que faltam todos os dados de liquidez.
 - Quando faltar dado relevante, escreva claramente: "dados insuficientes".
 - Não inclua seção de exposição geográfica se os dados recebidos não trouxerem dados confiáveis de localização dos imóveis, devedores ou garantias.
 - Não faça recomendação genérica. Toda recomendação precisa ter motivo objetivo.
@@ -78,7 +88,7 @@ export const FII_RISK_REPORT_STRUCTURE = [
   "6. Valuation e margem de segurança: P/VP, DY versus histórico e pares, preço versus valor patrimonial, prêmio/desconto e remuneração do risco, quando houver dados.",
   "7. Sensibilidade macroeconômica: Selic, juros longos, inflação, recessão, desemprego, crédito, inadimplência, risco fiscal e apetite por risco.",
   "8. Stress test e cenários: otimista, base, adverso, recessão, juros altos por mais tempo, queda rápida da Selic, crise de crédito e tail risk.",
-  "9. Liquidez e risco de saída: liquidez diária, número de cotistas, spread, dias para zerar posição e risco de venda em estresse, quando houver dados.",
+  "9. Liquidez e risco de saída: liquidez diária, número de cotistas, quantidade de cotas emitidas, participação no IFIX, spread, dias para zerar posição e risco de venda em estresse, quando houver dados.",
   "10. Governança e qualidade da gestão: histórico do gestor, comunicação, taxas, emissões, conflitos, partes relacionadas e criação/destruição de valor, quando houver dados.",
   "11. Riscos específicos por ativo: tese principal, riscos, risco de dividendo, preço, liquidez, gestão, crédito/vacância, nota de risco e ação sugerida.",
   "12. Hedges e proteção patrimonial: caixa/CDI, Tesouro Selic, Tesouro IPCA+, diversificação internacional, setores defensivos e redução de concentração.",
@@ -109,6 +119,9 @@ Use tabela em Markdown sempre que apresentar percentuais por ativo, segmento, ti
 
 ## Concentração por segmento
 Use tabela em Markdown com segmento, valor ou quantidade, percentual e leitura de risco. O PDF representará esses dados em gráfico de pizza; se isso não for possível, usará gráfico de barras horizontal.
+
+## Liquidez e risco de saída
+Inclua tabela em Markdown com ativo, liquidez diária, cotas emitidas, cotistas, participação no IFIX, leitura de risco e observação. Use "dados insuficientes" somente na célula do dado que realmente estiver ausente.
 
 ## Stress test
 Inclua uma tabela em Markdown com cenário, probabilidade estimada, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação recomendada.
