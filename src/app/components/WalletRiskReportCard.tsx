@@ -198,7 +198,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
 
           {isVip && hasCurrentReport && (
             <p className="mt-3 rounded-xl bg-emerald-500/10 p-3 text-sm font-bold text-emerald-100 ring-1 ring-emerald-400/20">
-              Seu relatório deste mês já está disponível. Você pode reabrir o histórico sem gerar custo novo de IA.
+              Seu relatório deste mês já está disponível.
             </p>
           )}
         </div>
