@@ -52,7 +52,10 @@ function noAccent(value: string) {
 function numberOf(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const raw = String(value || "").replace("R$", "").replace("%", "").trim();
-  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  const numeric = raw.replace(/[^0-9.,-]/g, "");
+  const normalized = numeric.includes(",")
+    ? numeric.replace(/\./g, "").replace(",", ".")
+    : numeric.replace(/\.(?=\d{3}(\D|$))/g, "");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
