@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v1.6.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v1.7.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -76,6 +76,10 @@ Regras obrigatórias:
 - Se numberShares estiver disponível, use como quantidade de cotas emitidas. Não confunda com a quantidade de cotas do investidor.
 - Se numberShareholders estiver ausente, diga apenas que faltam dados de cotistas, e não que faltam todos os dados de liquidez.
 - Se pvp ou vpCota estiverem zerados, negativos ou incoerentes, ignore-os e trate como dado não confiável. Não exiba P/VP ou VP por cota igual a zero.
+- Use CDI, IPCA, Selic e IFIX quando benchmarkData trouxer monthReturn, yearReturn ou twelveMonthsReturn. Não escreva que CDI ou IFIX são "não confiáveis" se comparisonReady for verdadeiro; nesse caso, explique a fonte e o método de cálculo em linguagem de cliente.
+- Para CDI vindo da série oficial do Banco Central, trate os retornos acumulados como utilizáveis quando comparisonReady for verdadeiro.
+- Para IFIX vindo de fonte secundária, trate como benchmark de mercado utilizável para teste interno quando comparisonReady for verdadeiro, mas mencione com discrição que a fonte do fechamento é secundária. Não transforme isso em falha do relatório.
+- Se benchmarkData indicar comparisonReady falso ou retornos ausentes, escreva que o benchmark está indisponível para comparação de performance no período, sem desqualificar o indicador.
 - Quando uma informação de perfil não estiver disponível, como reserva de emergência ou dependência dos dividendos, escreva "não informado". Não converta ausência de informação em "não possui" ou "não depende".
 - Não crie tabelas longas repetindo "dados insuficientes". Resuma ausências relevantes na seção de qualidade dos dados e nas limitações.
 - Evite repetição: cada seção deve acrescentar uma leitura nova. Não repita a mesma frase sobre TGAR11 + VGIA11 em todas as seções; cite a concentração no diagnóstico, use números nas tabelas e retome no plano de ação de forma resumida.
@@ -93,10 +97,10 @@ export const FII_RISK_REPORT_STRUCTURE = [
   "5. Liquidez e risco de saída: liquidez diária, cotas emitidas, cotistas, IFIX, dias para zerar posição e risco em estresse.",
   "6. Valuation e margem de segurança: P/VP, VP por cota, valor de mercado, patrimônio líquido e limites da análise, quando houver dados confiáveis.",
   "7. Riscos por tipo de fundo: tijolo, papel/crédito, Fiagro, FI-Infra e FoF, com foco no que os dados permitem concluir.",
-  "8. Sensibilidade macroeconômica e stress test: juros, inflação, recessão, crise de crédito, queda da Selic e tail risks.",
+  "8. Sensibilidade macroeconômica, benchmarks e stress test: juros, CDI, IFIX, inflação, recessão, crise de crédito, queda da Selic e tail risks.",
   "9. Riscos específicos por ativo: tese, risco principal, nota de risco e ação sugerida.",
   "10. Rebalanceamento e plano de ação: percentual atual, percentual sugerido, plano sem venda, plano 30/90/180 dias e proteções fora de FIIs.",
-  "11. Heat map final e conclusão: tabela consolidada, o que comprar mais, manter, parar de comprar e monitorar.",
+  "11. Heat map final e conclusão: tabela consolidada, prioridade de novos aportes, manter, parar de aportar e monitorar.",
 ] as const;
 
 export const FII_RISK_REPORT_OUTPUT_RULES = `
@@ -121,6 +125,9 @@ Inclua tabela em Markdown com ativo, liquidez diária, cotas emitidas, cotistas,
 
 ## Valuation
 Não exiba P/VP, VP por cota ou valor patrimonial igual a zero. Se o dado estiver zerado, negativo, ausente ou incoerente, escreva "dados não confiáveis" e explique uma única vez.
+
+## Benchmarks
+Quando benchmarkData trouxer retornos acumulados, inclua tabela com IFIX, CDI, IPCA e Selic, usando mês, ano e 12 meses quando disponíveis. Informe a fonte de forma simples e sem termos técnicos. Só escreva "indisponível" quando o retorno realmente estiver ausente.
 
 ## Stress test
 Inclua tabela em Markdown com cenário, probabilidade estimada, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação recomendada.
@@ -177,7 +184,7 @@ ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
+Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks apenas quando os retornos estiverem disponíveis no benchmarkData; quando comparisonReady for verdadeiro, trate o benchmark como utilizável para comparação. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
 `.trim();
 }
 
