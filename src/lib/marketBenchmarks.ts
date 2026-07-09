@@ -66,6 +66,12 @@ function sumPercent(values: number[]) {
   return Number(values.reduce((sum, value) => sum + value, 0).toFixed(2));
 }
 
+function cleanBenchmarkData(data: any) {
+  if (!data || typeof data !== "object") return data;
+  const { updatedAt, createdAt, ...clean } = data;
+  return clean;
+}
+
 async function fetchBcbSerie(code: number, start: Date, end = new Date()) {
   const url = `${BCB_BASE_URL}.${code}/dados?formato=json&dataInicial=${encodeURIComponent(ddmmyyyy(start))}&dataFinal=${encodeURIComponent(ddmmyyyy(end))}`;
   const res = await fetch(url, { cache: "no-store" });
@@ -228,7 +234,7 @@ export async function getMarketBenchmarks(options?: { forceRefresh?: boolean }) 
   if (!options?.forceRefresh) {
     const latest = await adminDb.collection(COLLECTION).doc(LATEST_DOC).get();
     const data = latest.data();
-    if (latest.exists && data && isFresh(data)) return data;
+    if (latest.exists && data && isFresh(data)) return cleanBenchmarkData(data);
   }
 
   try {
@@ -236,7 +242,7 @@ export async function getMarketBenchmarks(options?: { forceRefresh?: boolean }) 
   } catch (err) {
     const latest = await adminDb.collection(COLLECTION).doc(LATEST_DOC).get();
     const data = latest.data();
-    if (latest.exists && data) return { ...data, stale: true };
+    if (latest.exists && data) return { ...cleanBenchmarkData(data), stale: true };
     throw err;
   }
 }
