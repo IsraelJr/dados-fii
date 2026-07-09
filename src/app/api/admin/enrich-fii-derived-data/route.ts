@@ -28,9 +28,32 @@ function hasObjectData(value: unknown) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length);
 }
 
+function increment(map: Map<string, number>, field: string) {
+  map.set(field, (map.get(field) || 0) + 1);
+}
+
+function countDerivedFields(value: any, prefix = "", output = new Map<string, number>(), depth = 0) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || depth > 4) return output;
+
+  Object.entries(value).forEach(([key, child]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    increment(output, path);
+    countDerivedFields(child, path, output, depth + 1);
+  });
+
+  return output;
+}
+
+function sortedCounts(map: Map<string, number>) {
+  return Array.from(map.entries())
+    .map(([field, count]) => ({ field, count }))
+    .sort((a, b) => b.count - a.count || a.field.localeCompare(b.field));
+}
+
 async function runEnrichment(limit: number, dryRun = false) {
   const snapshot = await adminDb.collection(COLLECTION).limit(limit).get();
   const results: Array<{ ticker: string; status: string; updatedFields?: string[]; error?: string }> = [];
+  const fieldCounts = new Map<string, number>();
   let enriched = 0;
   let skipped = 0;
   let errors = 0;
@@ -47,6 +70,7 @@ async function runEnrichment(limit: number, dryRun = false) {
         continue;
       }
 
+      countDerivedFields(derived, "", fieldCounts);
       const updatedFields = Object.keys(derived);
 
       if (!dryRun) {
@@ -73,6 +97,7 @@ async function runEnrichment(limit: number, dryRun = false) {
     errors,
     dryRun,
     version: ENRICHMENT_VERSION,
+    fieldCounts: sortedCounts(fieldCounts),
     results: results.slice(0, 120),
   };
 }
