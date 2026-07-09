@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarDays, Download, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
+import WalletRiskReportCard from "../components/WalletRiskReportCard";
 
 type WalletItem = {
   ticker: string;
@@ -413,6 +414,8 @@ export default function WalletPage() {
           <p className="mt-2 text-sm font-medium text-gray-300">{insights.mainSegment?.ticker || "Adicione FIIs para calcular."}</p>
         </div>
       </section>
+
+      <WalletRiskReportCard walletCount={items.length} />
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <h2 className="text-xl font-extrabold text-white">Resumo da carteira</h2>
