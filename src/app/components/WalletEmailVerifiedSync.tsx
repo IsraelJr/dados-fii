@@ -21,6 +21,11 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function isMobileViewport() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 639px)").matches;
+}
+
 function readWallet(): WalletItem[] {
   if (typeof window === "undefined") return [];
 
@@ -192,7 +197,12 @@ export default function WalletEmailVerifiedSync() {
       setWallet(loadedWallet);
 
       if (options?.auto) {
-        setMessage(`Carteira carregada automaticamente. ${loadedWallet.length} FII(s) encontrados.`);
+        if (isMobileViewport()) {
+          setMessage("");
+          showToast({ title: "Carteira atualizada." });
+        } else {
+          setMessage("Carteira atualizada.");
+        }
       } else {
         setMessage(`Carteira carregada com sucesso. ${loadedWallet.length} FII(s) encontrados. Atualizando a tela...`);
         window.setTimeout(() => window.location.reload(), 800);
