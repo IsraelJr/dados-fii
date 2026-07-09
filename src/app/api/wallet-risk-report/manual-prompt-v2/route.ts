@@ -72,6 +72,87 @@ function removeUndefinedFields<T>(value: T): T {
   return value;
 }
 
+function hasValue(value: unknown) {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value) && value !== 0;
+  if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value as Record<string, unknown>).length > 0;
+  return Boolean(value);
+}
+
+function percent(value: number, total: number) {
+  return total ? Number(((value / total) * 100).toFixed(1)) : 0;
+}
+
+function buildPortfolioDataQuality(portfolio: RiskReportPortfolioItem[]) {
+  const fields = [
+    { key: "currentPrice", label: "preço atual", impact: "valuation e valor de mercado" },
+    { key: "currentValue", label: "valor financeiro da posição", impact: "concentração por ativo e segmento" },
+    { key: "segment", label: "segmento", impact: "concentração setorial" },
+    { key: "fundType", label: "tipo de fundo", impact: "análise por crédito, agro, infraestrutura, tijolo ou FoF" },
+    { key: "dailyLiquidity", label: "liquidez diária", impact: "risco de saída" },
+    { key: "numberShares", label: "cotas emitidas", impact: "tamanho do fundo e liquidez estrutural" },
+    { key: "numberShareholders", label: "cotistas", impact: "institucionalização e pulverização" },
+    { key: "pvp", label: "P/VP", impact: "valuation e margem de segurança" },
+    { key: "vpCota", label: "valor patrimonial por cota", impact: "valuation e prêmio/desconto" },
+    { key: "netWorth", label: "patrimônio líquido", impact: "porte do fundo" },
+    { key: "marketCap", label: "valor de mercado", impact: "porte em mercado" },
+    { key: "dividendYield", label: "DY 12m informado", impact: "renda e comparação" },
+    { key: "lastDividend", label: "último dividendo", impact: "renda recente" },
+    { key: "averageDividend12m", label: "média de dividendos em 12 meses", impact: "sustentabilidade da renda" },
+    { key: "monthsPaidLast12", label: "meses pagos em 12 meses", impact: "recorrência dos dividendos" },
+    { key: "manager", label: "gestor", impact: "governança" },
+    { key: "administrator", label: "administrador", impact: "estrutura operacional" },
+  ];
+
+  const fieldCoverage = fields.map((field) => {
+    const present = portfolio.filter((asset) => hasValue((asset as any)[field.key])).length;
+    return {
+      field: field.label,
+      present,
+      missing: portfolio.length - present,
+      coverage: percent(present, portfolio.length),
+      impact: field.impact,
+    };
+  });
+
+  const criticalFields = ["currentPrice", "currentValue", "segment", "fundType", "dailyLiquidity", "pvp", "vpCota", "dividendYield", "lastDividend", "averageDividend12m"];
+  const criticalScore = percent(
+    criticalFields.reduce((sum, key) => sum + portfolio.filter((asset) => hasValue((asset as any)[key])).length, 0),
+    Math.max(portfolio.length * criticalFields.length, 1)
+  );
+
+  const missingByAsset = portfolio.map((asset) => {
+    const missing = fields
+      .filter((field) => !hasValue((asset as any)[field.key]))
+      .map((field) => field.label);
+
+    return {
+      ticker: asset.ticker,
+      missingCount: missing.length,
+      missing: missing.slice(0, 8),
+    };
+  }).filter((asset) => asset.missingCount > 0)
+    .sort((a, b) => b.missingCount - a.missingCount || a.ticker.localeCompare(b.ticker));
+
+  return {
+    totalAssets: portfolio.length,
+    criticalCoverageScore: criticalScore,
+    fieldCoverage,
+    mainDataGaps: fieldCoverage
+      .filter((field) => field.coverage < 70)
+      .sort((a, b) => a.coverage - b.coverage),
+    assetsWithMoreMissingData: missingByAsset.slice(0, 8),
+    interpretation: criticalScore >= 75
+      ? "Base suficiente para relatório de risco v1, com limitações pontuais."
+      : criticalScore >= 55
+        ? "Base utilizável para relatório de risco v1, mas as conclusões devem destacar limitações relevantes."
+        : "Base ainda limitada; o relatório deve priorizar diagnóstico de qualidade dos dados antes de recomendações fortes.",
+  };
+}
+
 async function hasSession(email: string, token: unknown) {
   const sessionToken = String(token || "");
   if (!sessionToken) return false;
@@ -114,6 +195,17 @@ function toRiskPortfolio(snapshot: any): RiskReportPortfolioItem[] {
     administrator: asset.administrator,
     dividendYield: asset.dividendYield,
     pvp: asset.pvp,
+    vpCota: asset.vpCota,
+    netWorth: asset.netWorth,
+    marketCap: asset.marketCap,
+    lastDividend: asset.lastDividend,
+    lastDividendDate: asset.lastDividendDate,
+    averageDividend12m: asset.averageDividend12m,
+    monthsPaidLast12: asset.monthsPaidLast12,
+    dividendVolatility12m: asset.dividendVolatility12m,
+    dividendCuts12m: asset.dividendCuts12m,
+    dy6m: asset.dy6m,
+    dy12mCalculated: asset.dy12mCalculated,
     liquidity: asset.dailyLiquidity,
     dailyLiquidity: asset.dailyLiquidity,
     numberShares: asset.numberShares,
@@ -219,6 +311,7 @@ export async function POST(req: Request) {
       totalValue: snapshot.totalValue,
       generatedAt: new Date().toISOString(),
       benchmarkData,
+      dataQualitySummary: buildPortfolioDataQuality(portfolio),
       clientProfile: {
         investorType: "PF",
         objective: user.data?.objective || user.data?.profile?.objective || "renda passiva com FIIs",
@@ -230,13 +323,15 @@ export async function POST(req: Request) {
       },
       dataSources: [
         "Carteira salva do usuário no Dados FII",
-        "Base de FIIs do Dados FII",
+        "Base de FIIs do Dados FII enriquecida com indicadores derivados",
         "Benchmarks de mercado em cache: IFIX, CDI, IPCA e Selic, quando disponíveis",
       ],
       limitations: [
+        "Esta é uma versão de teste do relatório, disponível para validação interna antes da liberação comercial.",
         "A análise de performance fica mais precisa conforme o histórico mensal da carteira aumenta.",
         "Quando algum benchmark não estiver disponível no cache, o relatório deve informar dados insuficientes.",
-        "Para liquidez, cotas emitidas e cotistas, use os dados enviados por ativo antes de classificar a informação como insuficiente.",
+        "Dados avançados como gestor, administrador, cotistas, vacância, inquilinos, LTV, duration e inadimplência podem estar ausentes para alguns fundos e devem ser tratados como limitação da base.",
+        "Para liquidez, cotas emitidas, valuation e dividendos, use os dados enviados por ativo antes de classificar a informação como insuficiente.",
       ],
     });
 
@@ -250,6 +345,7 @@ export async function POST(req: Request) {
       portfolio,
       portfolioSnapshot: snapshot,
       benchmarkData,
+      dataQualitySummary: reportInput.dataQualitySummary,
       portfolioHash: sha256(JSON.stringify(wallet)),
       promptVersion: FII_RISK_REPORT_PROMPT_VERSION,
       model: "manual-prompt",
