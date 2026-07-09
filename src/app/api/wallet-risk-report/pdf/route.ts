@@ -69,14 +69,12 @@ function correctPortugueseText(value: string) {
     [/\bcampo\b/gi, "informação"],
     [/\bRelatorio\b/g, "Relatório"], [/\brelatorio\b/g, "relatório"],
     [/\bAnalise\b/g, "Análise"], [/\banalise\b/g, "análise"],
-    [/\bDisponiveis\b/g, "Disponíveis"], [/\bdisponiveis\b/g, "disponíveis"],
     [/\bNao\b/g, "Não"], [/\bnao\b/g, "não"],
     [/\bPagina\b/g, "Página"], [/\bpagina\b/g, "página"],
     [/\bCompetencia\b/g, "Competência"], [/\bcompetencia\b/g, "competência"],
     [/\bCorrelacao\b/g, "Correlação"], [/\bcorrelacao\b/g, "correlação"],
     [/\bConcentracao\b/g, "Concentração"], [/\bconcentracao\b/g, "concentração"],
     [/\bExposicao\b/g, "Exposição"], [/\bexposicao\b/g, "exposição"],
-    [/\bGeografica\b/g, "Geográfica"], [/\bgeografica\b/g, "geográfica"],
     [/\bGestao\b/g, "Gestão"], [/\bgestao\b/g, "gestão"],
     [/\bCredito\b/g, "Crédito"], [/\bcredito\b/g, "crédito"],
     [/\bInadimplencia\b/g, "Inadimplência"], [/\binadimplencia\b/g, "inadimplência"],
@@ -85,11 +83,7 @@ function correctPortugueseText(value: string) {
     [/\bRecomendacao\b/g, "Recomendação"], [/\brecomendacao\b/g, "recomendação"],
     [/\bEstrategia\b/g, "Estratégia"], [/\bestrategia\b/g, "estratégia"],
     [/\bGeracao\b/g, "Geração"], [/\bgeracao\b/g, "geração"],
-    [/\bVariacao\b/g, "Variação"], [/\bvariacao\b/g, "variação"],
-    [/\bCotacao\b/g, "Cotação"], [/\bcotacao\b/g, "cotação"],
     [/\bLiquidez diaria\b/g, "Liquidez diária"], [/\bliquidez diaria\b/g, "liquidez diária"],
-    [/\bAcao\b/g, "Ação"], [/\bacao\b/g, "ação"],
-    [/\bAcoes\b/g, "Ações"], [/\bacoes\b/g, "ações"],
   ];
 
   return replacements.reduce((text, [regex, replacement]) => text.replace(regex, replacement), value);
@@ -110,7 +104,6 @@ function normalizeLine(line: string) {
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/^#{1,6}\s+/, "")
     .replace(/^[-*]\s+/, "- ")
-    .replace(/^\d+\.\s+/, (match) => match)
     .replace(/\*\*/g, "")
     .replace(/`/g, "")
     .trimEnd();
@@ -141,10 +134,7 @@ function preprocessReportMarkdown(reportMarkdown: string) {
       continue;
     }
 
-    if (skippingGeography && isHeading(line)) {
-      skippingGeography = false;
-    }
-
+    if (skippingGeography && isHeading(line)) skippingGeography = false;
     if (!skippingGeography) output.push(correctPortugueseText(line));
   }
 
@@ -174,9 +164,8 @@ function wrapText(text: string, font: any, fontSize: number, maxWidth: number) {
     let chunk = "";
     for (const char of word) {
       const next = `${chunk}${char}`;
-      if (font.widthOfTextAtSize(next, fontSize) <= maxWidth) {
-        chunk = next;
-      } else {
+      if (font.widthOfTextAtSize(next, fontSize) <= maxWidth) chunk = next;
+      else {
         if (chunk) lines.push(chunk);
         chunk = char;
       }
@@ -189,12 +178,7 @@ function wrapText(text: string, font: any, fontSize: number, maxWidth: number) {
 }
 
 function splitTableLine(line: string) {
-  return line
-    .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((cell) => normalizeLine(cell.trim()));
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => normalizeLine(cell.trim()));
 }
 
 function isTableSeparator(line: string) {
@@ -225,15 +209,19 @@ function segmentNameOf(item: any) {
   return String(item?.segment || item?.sector || item?.fundType || "Sem segmento").trim() || "Sem segmento";
 }
 
+function numberOf(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(String(value || "").replace("R$", "").replace(/\./g, "").replace(",", ".").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function buildSegmentChartData(portfolio: any[]) {
   const totals = new Map<string, number>();
-
   if (!Array.isArray(portfolio)) return [];
 
   portfolio.forEach((item) => {
     const label = segmentNameOf(item);
-    const value = Number(item?.quantity || item?.quotas || 0) || Number(item?.currentValue || 0);
-    if (!Number.isFinite(value) || value <= 0) return;
+    const value = numberOf(item?.currentValue) || numberOf(item?.investedValue) || 0;
+    if (!value) return;
     totals.set(label, (totals.get(label) || 0) + value);
   });
 
@@ -242,7 +230,6 @@ function buildSegmentChartData(portfolio: any[]) {
     .sort((a, b) => b.value - a.value);
 
   if (sorted.length <= 6) return sorted;
-
   const main = sorted.slice(0, 5);
   const others = sorted.slice(5).reduce((sum, item) => sum + item.value, 0);
   return [...main, { label: "Outros", value: others }];
@@ -308,14 +295,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const titleFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
-  const chartColors = [
-    rgb(0.31, 0.36, 0.96),
-    rgb(0.06, 0.66, 0.45),
-    rgb(0.96, 0.62, 0.16),
-    rgb(0.88, 0.28, 0.35),
-    rgb(0.48, 0.35, 0.88),
-    rgb(0.25, 0.58, 0.78),
-  ];
+  const chartColors = [rgb(0.31, 0.36, 0.96), rgb(0.06, 0.66, 0.45), rgb(0.96, 0.62, 0.16), rgb(0.88, 0.28, 0.35), rgb(0.48, 0.35, 0.88), rgb(0.25, 0.58, 0.78)];
 
   let page: any = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - MARGIN_TOP;
@@ -350,27 +330,9 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     currentPage.drawRectangle({ x: 0, y: PAGE_HEIGHT - 44, width: PAGE_WIDTH, height: 44, color: rgb(0.07, 0.09, 0.16) });
     drawTextSafe(currentPage, "Dados FII", { x: MARGIN_X, y: PAGE_HEIGHT - 29, size: 13, font: bold, color: rgb(1, 1, 1) });
     drawTextSafe(currentPage, "Relatório de risco da carteira", { x: MARGIN_X + 84, y: PAGE_HEIGHT - 29, size: 10, font: regular, color: rgb(0.82, 0.86, 0.95) });
-
-    currentPage.drawLine({
-      start: { x: MARGIN_X, y: 42 },
-      end: { x: PAGE_WIDTH - MARGIN_X, y: 42 },
-      thickness: 0.5,
-      color: rgb(0.82, 0.84, 0.88),
-    });
-    drawTextSafe(currentPage, `Gerado em ${formatDatePtBr()} - ${metadata.email}`, {
-      x: MARGIN_X,
-      y: 26,
-      size: 8,
-      font: regular,
-      color: rgb(0.45, 0.47, 0.52),
-    });
-    drawTextSafe(currentPage, `Página ${currentPageNumber}`, {
-      x: PAGE_WIDTH - MARGIN_X - 46,
-      y: 26,
-      size: 8,
-      font: regular,
-      color: rgb(0.45, 0.47, 0.52),
-    });
+    currentPage.drawLine({ start: { x: MARGIN_X, y: 42 }, end: { x: PAGE_WIDTH - MARGIN_X, y: 42 }, thickness: 0.5, color: rgb(0.82, 0.84, 0.88) });
+    drawTextSafe(currentPage, `Gerado em ${formatDatePtBr()} - ${metadata.email}`, { x: MARGIN_X, y: 26, size: 8, font: regular, color: rgb(0.45, 0.47, 0.52) });
+    drawTextSafe(currentPage, `Página ${currentPageNumber}`, { x: PAGE_WIDTH - MARGIN_X - 46, y: 26, size: 8, font: regular, color: rgb(0.45, 0.47, 0.52) });
   }
 
   function newPage() {
@@ -385,11 +347,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   }
 
   function ensureSpace(height: number) {
-    if (remainingHeight() < height) {
-      newPage();
-      return true;
-    }
-    return false;
+    if (remainingHeight() < height) newPage();
   }
 
   function drawHeading(text: string, size = 13) {
@@ -408,19 +366,11 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     const wrapped = wrapText(text, font, fontSize, CONTENT_WIDTH - indent);
     const requiredHeight = wrapped.length * lineHeight + (options?.heading ? 46 : 2);
 
-    if (options?.heading) ensureSpace(Math.max(110, requiredHeight));
-    else ensureSpace(requiredHeight);
-
+    ensureSpace(options?.heading ? Math.max(110, requiredHeight) : requiredHeight);
     if (options?.heading) y -= 6;
 
     wrapped.forEach((line, index) => {
-      drawTextSafe(page, index > 0 && options?.bullet ? `  ${line}` : line, {
-        x: MARGIN_X + indent,
-        y,
-        size: fontSize,
-        font,
-        color,
-      });
+      drawTextSafe(page, index > 0 && options?.bullet ? `  ${line}` : line, { x: MARGIN_X + indent, y, size: fontSize, font, color });
       y -= lineHeight;
     });
 
@@ -449,39 +399,19 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     const headerMeasure = measureRow(headers);
     const rowMeasures = rows.map((row) => measureRow(row));
     const tableHeight = headerMeasure.height + rowMeasures.reduce((sum, row) => sum + row.height, 0) + 14;
-
-    if (tableHeight <= PAGE_CONTENT_HEIGHT && tableHeight > remainingHeight()) {
-      newPage();
-    }
+    if (tableHeight <= PAGE_CONTENT_HEIGHT && tableHeight > remainingHeight()) newPage();
 
     function drawMeasuredRow(row: string[], measured: { cellLines: string[][]; height: number }, isHeader = false) {
       const rowY = y - measured.height + 6;
-
       for (let col = 0; col < colCount; col += 1) {
         const x = MARGIN_X + col * colWidth;
-        page.drawRectangle({
-          x,
-          y: rowY,
-          width: colWidth,
-          height: measured.height,
-          color: isHeader ? rgb(0.90, 0.92, 0.98) : rgb(1, 1, 1),
-          borderColor: rgb(0.80, 0.82, 0.88),
-          borderWidth: 0.5,
-        });
-
+        page.drawRectangle({ x, y: rowY, width: colWidth, height: measured.height, color: isHeader ? rgb(0.90, 0.92, 0.98) : rgb(1, 1, 1), borderColor: rgb(0.80, 0.82, 0.88), borderWidth: 0.5 });
         const cellFont = isHeader ? bold : regular;
         const cellColor = isHeader ? rgb(0.10, 0.12, 0.22) : rgb(0.12, 0.13, 0.16);
         measured.cellLines[col].forEach((line, lineIndex) => {
-          drawTextSafe(page, line, {
-            x: x + padding,
-            y: y - padding - fontSize - lineIndex * lineHeight,
-            size: fontSize,
-            font: cellFont,
-            color: cellColor,
-          });
+          drawTextSafe(page, line, { x: x + padding, y: y - padding - fontSize - lineIndex * lineHeight, size: fontSize, font: cellFont, color: cellColor });
         });
       }
-
       y -= measured.height;
     }
 
@@ -492,7 +422,6 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
 
     y -= 4;
     drawHeader();
-
     rows.forEach((row, index) => {
       const measured = rowMeasures[index];
       if (measured.height > remainingHeight()) {
@@ -501,7 +430,6 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
       }
       drawMeasuredRow(row, measured, false);
     });
-
     y -= 10;
   }
 
@@ -516,29 +444,23 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
       const percent = ((item.value / total) * 100).toFixed(1).replace(".", ",");
       const barWidth = maxValue ? (item.value / maxValue) * barMaxWidth : 0;
       const wrappedLabel = wrapText(item.label, regular, 8.5, labelWidth - 8).slice(0, 2);
-
-      wrappedLabel.forEach((line, lineIndex) => {
-        drawTextSafe(page, line, { x: startX, y: barY - lineIndex * 10, size: 8.5, font: regular, color: rgb(0.15, 0.16, 0.22) });
-      });
+      wrappedLabel.forEach((line, lineIndex) => drawTextSafe(page, line, { x: startX, y: barY - lineIndex * 10, size: 8.5, font: regular, color: rgb(0.15, 0.16, 0.22) }));
       page.drawRectangle({ x: startX + labelWidth, y: barY - 2, width: barMaxWidth, height: 9, color: rgb(0.91, 0.93, 0.98) });
       page.drawRectangle({ x: startX + labelWidth, y: barY - 2, width: Math.max(2, barWidth), height: 9, color: chartColors[index % chartColors.length] });
       drawTextSafe(page, `${percent}%`, { x: startX + labelWidth + barMaxWidth + 8, y: barY - 2, size: 8.5, font: bold, color: rgb(0.15, 0.16, 0.22) });
       barY -= Math.max(24, wrappedLabel.length * 10 + 8);
     });
-
     y = barY - 8;
   }
 
   function drawSegmentChart(portfolio: any[]) {
     const data = buildSegmentChartData(portfolio);
     if (!data.length) return;
-
     const total = data.reduce((sum, item) => sum + item.value, 0);
     if (!total) return;
 
     ensureSpace(252);
     drawHeading("Concentração por segmento", 14);
-
     const centerX = MARGIN_X + 95;
     const centerY = y - 76;
     const radius = 64;
@@ -565,38 +487,20 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     if (pieRendered) {
       const legendX = MARGIN_X + 190;
       let legendY = y - 20;
-
       data.forEach((item, index) => {
         const percent = ((item.value / total) * 100).toFixed(1).replace(".", ",");
         page.drawRectangle({ x: legendX, y: legendY - 2, width: 10, height: 10, color: chartColors[index % chartColors.length] });
-        const legendText = `${item.label}: ${percent}%`;
-        const wrapped = wrapText(legendText, regular, 9, CONTENT_WIDTH - 210);
-        wrapped.forEach((line, lineIndex) => {
-          drawTextSafe(page, line, { x: legendX + 16, y: legendY - lineIndex * 11, size: 9, font: regular, color: rgb(0.15, 0.16, 0.22) });
-        });
+        const wrapped = wrapText(`${item.label}: ${percent}%`, regular, 9, CONTENT_WIDTH - 210);
+        wrapped.forEach((line, lineIndex) => drawTextSafe(page, line, { x: legendX + 16, y: legendY - lineIndex * 11, size: 9, font: regular, color: rgb(0.15, 0.16, 0.22) }));
         legendY -= Math.max(16, wrapped.length * 11 + 4);
       });
-
-      drawTextSafe(page, "Base: quantidade de cotas por segmento disponível na carteira.", {
-        x: MARGIN_X,
-        y: y - 160,
-        size: 8,
-        font: regular,
-        color: rgb(0.42, 0.44, 0.50),
-      });
-
+      drawTextSafe(page, "Base: valor financeiro da posição por segmento.", { x: MARGIN_X, y: y - 160, size: 8, font: regular, color: rgb(0.42, 0.44, 0.50) });
       y -= 194;
       return;
     }
 
     drawHorizontalSegmentBars(data, total);
-    drawTextSafe(page, "Base: quantidade de cotas por segmento disponível na carteira. Representação em barras usada como alternativa ao gráfico de pizza.", {
-      x: MARGIN_X,
-      y,
-      size: 8,
-      font: regular,
-      color: rgb(0.42, 0.44, 0.50),
-    });
+    drawTextSafe(page, "Base: valor financeiro da posição por segmento. Representação em barras usada como alternativa ao gráfico de pizza.", { x: MARGIN_X, y, size: 8, font: regular, color: rgb(0.42, 0.44, 0.50) });
     y -= 18;
   }
 
@@ -605,20 +509,13 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   drawTextSafe(page, "Relatório de risco da carteira", { x: MARGIN_X, y: PAGE_HEIGHT - 150, size: 28, font: titleFont, color: rgb(0.05, 0.07, 0.14) });
   drawTextSafe(page, `Competência: ${metadata.month}`, { x: MARGIN_X, y: PAGE_HEIGHT - 178, size: 12, font: regular, color: rgb(0.35, 0.38, 0.45) });
   drawTextSafe(page, `Gerado em ${formatDatePtBr()}`, { x: MARGIN_X, y: PAGE_HEIGHT - 198, size: 12, font: regular, color: rgb(0.35, 0.38, 0.45) });
-  drawTextSafe(page, "Análise educacional baseada nos dados disponíveis. Não constitui recomendação individual definitiva.", {
-    x: MARGIN_X,
-    y: PAGE_HEIGHT - 236,
-    size: 10,
-    font: regular,
-    color: rgb(0.38, 0.40, 0.46),
-  });
+  drawTextSafe(page, "Análise educacional baseada nos dados disponíveis. Não constitui recomendação individual definitiva.", { x: MARGIN_X, y: PAGE_HEIGHT - 236, size: 10, font: regular, color: rgb(0.38, 0.40, 0.46) });
   drawPageChrome(page, pageNumber);
   page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   pageNumber += 1;
   y = PAGE_HEIGHT - MARGIN_TOP;
 
   drawSegmentChart(report.portfolio || []);
-
   const lines = preprocessReportMarkdown(report.reportMarkdown).split("\n");
 
   for (let index = 0; index < lines.length;) {
@@ -649,7 +546,6 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   }
 
   drawPageChrome(page, pageNumber);
-
   return pdfDoc.save();
 }
 
@@ -662,7 +558,7 @@ export async function POST(req: Request) {
     const pdfBytes = await createReportPdf(report, { email, month });
     const fileName = `relatorio-risco-carteira-${month}.pdf`;
 
-    return new Response(pdfBytes as BodyInit, {
+    return new Response(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
