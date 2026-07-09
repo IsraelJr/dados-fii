@@ -224,7 +224,9 @@ function parseMarketIndicators(text: string, sourceUrl: string) {
     "Cotistas",
   ]);
 
-  const payload = removeUndefinedFields({
+  if (!dailyLiquidity && !numberShares && !numberShareholders) return {};
+
+  return removeUndefinedFields({
     dailyLiquidity,
     liquidity: dailyLiquidity,
     numberShares,
@@ -242,8 +244,6 @@ function parseMarketIndicators(text: string, sourceUrl: string) {
     marketDataSource: "StatusInvest",
     marketDataUpdatedAt: todayKey(),
   });
-
-  return Object.keys(payload).length ? payload : {};
 }
 
 async function reserveDailyRequest(anonId: string, ticker: string) {
