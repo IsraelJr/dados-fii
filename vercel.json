@@ -7,6 +7,14 @@
     {
       "path": "/api/admin/clean-wallet-sessions?limit=200",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/admin/update-market-benchmarks",
+      "schedule": "30 10 * * *"
+    },
+    {
+      "path": "/api/admin/create-portfolio-snapshots?limit=300",
+      "schedule": "30 12 1 * *"
     }
   ]
 }
