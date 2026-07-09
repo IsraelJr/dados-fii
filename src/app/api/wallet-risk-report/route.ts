@@ -5,6 +5,7 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import {
   buildFiiRiskReportMessages,
   FII_RISK_REPORT_PROMPT_VERSION,
+  type RiskReportClientProfile,
   type RiskReportInput,
   type RiskReportPortfolioItem,
 } from "@/lib/prompts/fiiRiskReport";
@@ -25,7 +26,7 @@ type WalletItem = {
 };
 
 type LoadedUser = {
-  ref: FirebaseFirestore.DocumentReference;
+  ref: any;
   docId: string;
   data: Record<string, any>;
   email: string;
@@ -99,6 +100,21 @@ function currentMonthKey() {
 function currentDateKey() {
   const parts = saoPauloParts();
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function normalizeInvestorType(value: unknown): RiskReportClientProfile["investorType"] {
+  const raw = String(value || "").trim().toUpperCase();
+  if (raw === "PF" || raw === "PESSOA FÍSICA" || raw === "PESSOA FISICA") return "PF";
+  if (raw === "PJ" || raw === "PESSOA JURÍDICA" || raw === "PESSOA JURIDICA") return "PJ";
+  return "unknown";
+}
+
+function normalizeRiskTolerance(value: unknown): RiskReportClientProfile["riskTolerance"] {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw.includes("conserv")) return "conservador";
+  if (raw.includes("moder")) return "moderado";
+  if (raw.includes("agress") || raw.includes("arroj")) return "agressivo";
+  return "unknown";
 }
 
 function parseWalletEntry(value: any): WalletItem {
@@ -388,7 +404,7 @@ async function callOpenAI(messages: ReturnType<typeof buildFiiRiskReportMessages
   return Array.isArray(texts) ? texts.join("\n").trim() : "";
 }
 
-async function reserveReport(reportRef: FirebaseFirestore.DocumentReference, metadata: Record<string, any>) {
+async function reserveReport(reportRef: any, metadata: Record<string, any>) {
   await adminDb.runTransaction(async (transaction) => {
     const snap = await transaction.get(reportRef);
     const data = snap.data() || {};
@@ -415,7 +431,7 @@ async function reserveReport(reportRef: FirebaseFirestore.DocumentReference, met
 }
 
 export async function POST(req: Request) {
-  let reportRef: FirebaseFirestore.DocumentReference | null = null;
+  let reportRef: any = null;
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -466,10 +482,10 @@ export async function POST(req: Request) {
       totalValue,
       generatedAt: new Date().toISOString(),
       clientProfile: {
-        investorType: user.data?.investorType || user.data?.profile?.investorType || "unknown",
+        investorType: normalizeInvestorType(user.data?.investorType || user.data?.profile?.investorType),
         objective: user.data?.objective || user.data?.profile?.objective || "renda passiva com FIIs",
         horizon: user.data?.horizon || user.data?.profile?.horizon || "longo prazo",
-        riskTolerance: user.data?.riskTolerance || user.data?.profile?.riskTolerance || "unknown",
+        riskTolerance: normalizeRiskTolerance(user.data?.riskTolerance || user.data?.profile?.riskTolerance),
         dependsOnDividends: Boolean(user.data?.dependsOnDividends || user.data?.profile?.dependsOnDividends),
         hasEmergencyReserve: Boolean(user.data?.hasEmergencyReserve || user.data?.profile?.hasEmergencyReserve),
         monthlyContribution: numberOf(user.data?.monthlyContribution || user.data?.profile?.monthlyContribution) || undefined,
