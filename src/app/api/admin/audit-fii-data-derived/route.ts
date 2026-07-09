@@ -158,7 +158,7 @@ function textDownloadResponse(filename: string, payload: unknown) {
   });
 }
 
-async function getFiisSnapshot(limit?: number) {
+async function getFiisSnapshot(limit?: number): Promise<{ docs: any[] }> {
   let query: any = adminDb.collection(COLLECTION);
   if (limit) query = query.limit(limit);
   return query.get();
@@ -229,7 +229,7 @@ function auditDocs(docs: Array<{ id: string; data: any }>) {
 
 async function runAudit(limit?: number) {
   const snapshot = await getFiisSnapshot(limit);
-  const docs = snapshot.docs.map((doc) => {
+  const docs = snapshot.docs.map((doc: any) => {
     const raw = doc.data() || {};
     return { id: doc.id, data: { ...raw, ...deriveFiiRiskData(raw) } };
   });
