@@ -38,6 +38,22 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function removeUndefinedFields<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => removeUndefinedFields(item)) as T;
+  }
+
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, fieldValue]) => fieldValue !== undefined)
+        .map(([key, fieldValue]) => [key, removeUndefinedFields(fieldValue)])
+    ) as T;
+  }
+
+  return value;
+}
+
 function numberOf(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const raw = String(value || "").replace("R$", "").replace("%", "").trim();
@@ -315,8 +331,9 @@ export async function POST(req: Request) {
     }
 
     const { totalValue, portfolio } = await buildPortfolioInput(wallet);
-    const reportInput: RiskReportInput = {
-      portfolio,
+    const cleanPortfolio = removeUndefinedFields(portfolio);
+    const reportInput: RiskReportInput = removeUndefinedFields({
+      portfolio: cleanPortfolio,
       totalValue,
       generatedAt: new Date().toISOString(),
       clientProfile: {
@@ -338,16 +355,16 @@ export async function POST(req: Request) {
         "Este documento contém o prompt para geração manual do relatório.",
         "Após gerar o relatório no ChatGPT, substitua o conteúdo deste campo reportMarkdown pelo relatório final.",
       ],
-    };
+    });
 
     const reportMarkdown = buildManualPromptReport(reportInput);
 
-    await reportRef.set({
+    await reportRef.set(removeUndefinedFields({
       status: "done",
       source: "manual_prompt",
       reportMarkdown,
       totalValue,
-      portfolio,
+      portfolio: cleanPortfolio,
       portfolioHash: walletHash,
       promptVersion: FII_RISK_REPORT_PROMPT_VERSION,
       model: "manual-prompt",
@@ -359,7 +376,7 @@ export async function POST(req: Request) {
       finishedAt: adminFieldValue.serverTimestamp(),
       updatedAt: adminFieldValue.serverTimestamp(),
       createdAt: currentData.createdAt || adminFieldValue.serverTimestamp(),
-    }, { merge: true });
+    }), { merge: true });
 
     return NextResponse.json({
       ok: true,
