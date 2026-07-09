@@ -94,14 +94,14 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
     setMessage("");
 
     try {
-      const response = await fetch("/api/wallet-risk-report", {
+      const response = await fetch("/api/wallet-risk-report/manual-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, sessionToken, forceNew }),
       });
       const json = await response.json().catch(() => ({}));
 
-      if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível gerar o relatório.");
+      if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível gerar o prompt do relatório.");
 
       setReportMarkdown(json.reportMarkdown || json.report?.reportMarkdown || "");
       setStatus((current) => ({
@@ -112,9 +112,9 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
         currentReportStatus: "done",
         reportMarkdown: json.reportMarkdown || json.report?.reportMarkdown || current?.reportMarkdown || "",
       }));
-      setMessage(json.mode === "cached" ? "Relatório mensal carregado do histórico." : "Relatório gerado e salvo com sucesso.");
+      setMessage(json.mode === "cached" ? "Prompt manual carregado do histórico." : "Prompt manual gerado e salvo com sucesso.");
     } catch (err: any) {
-      setMessage(err.message || "Não foi possível gerar o relatório.");
+      setMessage(err.message || "Não foi possível gerar o prompt do relatório.");
     } finally {
       setGenerating(false);
     }
@@ -175,7 +175,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
                   }`}
               >
                 {generating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
-                {hasCurrentReport ? "Abrir relatório do mês" : "Gerar relatório mensal"}
+                {hasCurrentReport ? "Abrir relatório do mês" : "Gerar prompt do relatório"}
               </button>
 
               {!isVip && (
