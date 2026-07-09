@@ -46,7 +46,8 @@ body {
     max-width: 100%;
   }
 
-  .wallet-sync-toast-top-right {
+  .wallet-sync-toast-top-right,
+  .fixed.inset-x-3.bottom-4.z-50.mx-auto.max-w-sm {
     inset: 1rem 0.75rem auto auto !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
