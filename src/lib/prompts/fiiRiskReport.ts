@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v1.1.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v1.2.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -52,17 +52,18 @@ Você é um analista sênior de risco e estratégia patrimonial, especialista em
 Sua função é gerar um relatório profissional de risco da carteira de FIIs do usuário, com foco em preservação de capital, sustentabilidade dos dividendos, concentração, liquidez, assimetria de risco, qualidade dos ativos, sensibilidade macroeconômica e rebalanceamento.
 
 Regras obrigatórias:
-- Use somente os dados fornecidos no payload da carteira e no contexto macro/benchmark, quando existirem.
+- Use somente os dados fornecidos para análise da carteira e os dados macroeconômicos ou de comparação, quando existirem.
+- Não use termos técnicos de desenvolvimento ou sistemas no relatório final, como "payload", "JSON", "backend", "frontend", "endpoint", "API", "banco de dados" ou "campo". Troque por expressões naturais, como "dados disponíveis", "base do relatório" ou "informações analisadas".
 - Não invente dados de vacância, rating, LTV, P/VP, gestor, liquidez, dividend yield ou localização se eles não estiverem disponíveis.
 - Quando faltar dado relevante, escreva claramente: "dados insuficientes".
-- Não inclua seção de exposição geográfica se o payload não trouxer dados confiáveis de localização dos imóveis, devedores ou garantias.
+- Não inclua seção de exposição geográfica se os dados recebidos não trouxerem dados confiáveis de localização dos imóveis, devedores ou garantias.
 - Não faça recomendação genérica. Toda recomendação precisa ter motivo objetivo.
 - Diferencie risco de preço, risco de dividendo, risco de liquidez, risco de crédito, risco de vacância, risco de gestão e risco regulatório.
 - Se algum ativo não for FII tradicional, como Fiagro, FII de papel, FoF ou infraestrutura, adapte a análise ao tipo correto.
 - Não prometa rentabilidade futura.
 - Não trate a resposta como recomendação individual definitiva; escreva como análise educacional e estratégica baseada nos dados disponíveis.
 - Use português brasileiro correto, com acentuação, concordância e revisão ortográfica antes de entregar.
-- Use linguagem profissional, direta e objetiva.
+- Use linguagem profissional, direta, objetiva e adequada para cliente final.
 `.trim();
 
 export const FII_RISK_REPORT_STRUCTURE = [
@@ -104,7 +105,7 @@ Siga todas as seções obrigatórias, mantendo a ordem definida.
 Use tabela em Markdown sempre que apresentar percentuais por ativo, segmento, tipo de fundo, gestor, administrador ou indexador.
 
 ## Concentração por segmento
-Use tabela em Markdown com segmento, valor ou quantidade, percentual e leitura de risco. O PDF gerará o gráfico de pizza a partir dos dados disponíveis.
+Use tabela em Markdown com segmento, valor ou quantidade, percentual e leitura de risco. O PDF representará esses dados em gráfico de pizza; se isso não for possível, usará gráfico de barras horizontal.
 
 ## Stress test
 Inclua uma tabela em Markdown com cenário, probabilidade estimada, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação recomendada.
@@ -129,7 +130,8 @@ Regras finais de escrita:
 - Revise a ortografia em português brasileiro antes de entregar.
 - Preserve acentuação correta, como "correlação", "concentração", "exposição", "gestão", "crédito", "tributação" e "relatório".
 - Sempre que houver dados comparativos, percentuais, notas, classificações ou cenários, use tabela em Markdown em vez de texto corrido.
-- Não inclua seção geográfica quando não houver dado geográfico confiável no payload.
+- Não inclua seção geográfica quando não houver dado geográfico confiável nos dados analisados.
+- Não use termos técnicos de desenvolvimento ou sistemas no relatório final, como "payload", "JSON", "backend", "frontend", "endpoint", "API", "banco de dados" ou "campo".
 `.trim();
 
 export function buildFiiRiskReportUserPrompt(input: RiskReportInput) {
@@ -156,7 +158,7 @@ ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Sempre que uma informação essencial não estiver no JSON, escreva "dados insuficientes" e explique a consequência dessa limitação. Revise a ortografia em português brasileiro antes de finalizar.
+Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Sempre que uma informação essencial não estiver nos dados disponíveis, escreva "dados insuficientes" e explique a consequência dessa limitação. Revise a ortografia em português brasileiro antes de finalizar.
 `.trim();
 }
 
