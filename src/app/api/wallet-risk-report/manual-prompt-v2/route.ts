@@ -114,9 +114,22 @@ function toRiskPortfolio(snapshot: any): RiskReportPortfolioItem[] {
     administrator: asset.administrator,
     dividendYield: asset.dividendYield,
     pvp: asset.pvp,
+    liquidity: asset.dailyLiquidity,
+    dailyLiquidity: asset.dailyLiquidity,
+    numberShares: asset.numberShares,
+    numberShareholders: asset.numberShareholders,
+    isIFIX: asset.isIFIX,
+    marketDataSource: asset.marketDataSource,
+    marketDataUpdatedAt: asset.marketDataUpdatedAt,
     extraData: {
       unrealizedResult: asset.unrealizedResult,
       unrealizedReturn: asset.unrealizedReturn,
+      dailyLiquidity: asset.dailyLiquidity,
+      numberShares: asset.numberShares,
+      numberShareholders: asset.numberShareholders,
+      isIFIX: asset.isIFIX,
+      marketDataSource: asset.marketDataSource,
+      marketDataUpdatedAt: asset.marketDataUpdatedAt,
     },
   }));
 }
@@ -211,6 +224,7 @@ export async function POST(req: Request) {
       limitations: [
         "A análise de performance fica mais precisa conforme o histórico mensal da carteira aumenta.",
         "Quando algum benchmark não estiver disponível no cache, o relatório deve informar dados insuficientes.",
+        "Para liquidez, cotas emitidas e cotistas, use os dados enviados por ativo antes de classificar a informação como insuficiente.",
       ],
     });
 
