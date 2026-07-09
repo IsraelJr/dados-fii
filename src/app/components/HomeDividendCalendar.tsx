@@ -6,6 +6,7 @@ import { CalendarDays, Loader2 } from "lucide-react";
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
 const CALENDAR_CACHE_KEY = "dados-fii-home-calendar-cache-v1";
+const TOP_FIIS_CACHE_KEY = "dados-fii-home-top-fiis-cache-v1";
 const MONTHS_PTBR: Record<string, string> = {
     January: "Janeiro",
     February: "Fevereiro",
@@ -42,6 +43,11 @@ type HomeCalendarCache = {
     dateKey: string;
     tickersKey: string;
     events: CalendarItem[];
+};
+
+type TopFiisCache = {
+    dateKey: string;
+    topFiis: string[];
 };
 
 function parseCurrency(value: unknown) {
@@ -87,6 +93,32 @@ function readWallet(): WalletItem[] {
             .filter((item: WalletItem) => item.ticker);
     } catch {
         return [];
+    }
+}
+
+function readTopFiisCache(): string[] | null {
+    if (typeof window === "undefined") return null;
+
+    try {
+        const stored = window.localStorage.getItem(TOP_FIIS_CACHE_KEY);
+        if (!stored) return null;
+        const parsed = JSON.parse(stored) as TopFiisCache;
+        if (parsed.dateKey !== todayKey()) return null;
+        return Array.isArray(parsed.topFiis) ? parsed.topFiis.slice(0, 3) : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveTopFiisCache(topFiis: string[]) {
+    try {
+        const payload: TopFiisCache = {
+            dateKey: todayKey(),
+            topFiis: topFiis.slice(0, 3),
+        };
+        window.localStorage.setItem(TOP_FIIS_CACHE_KEY, JSON.stringify(payload));
+    } catch {
+        return;
     }
 }
 
@@ -191,7 +223,7 @@ function EventCard({ event, featured = false }: { event: CalendarItem; featured?
 
 export default function HomeDividendCalendar() {
     const [wallet, setWallet] = useState<WalletItem[]>([]);
-    const [topFiis, setTopFiis] = useState<string[]>([]);
+    const [topFiis, setTopFiis] = useState<string[]>(() => readTopFiisCache() || []);
     const [events, setEvents] = useState<CalendarItem[]>(() => readLatestCache());
     const [loading, setLoading] = useState(false);
 
@@ -199,11 +231,19 @@ export default function HomeDividendCalendar() {
         setWallet(readWallet());
 
         async function loadTopFiis() {
+            const cached = readTopFiisCache();
+            if (cached) {
+                setTopFiis(cached);
+                return;
+            }
+
             try {
                 const response = await fetch("/api/user-top-fiis");
                 const data = await response.json();
                 if (Array.isArray(data.topFiis)) {
-                    setTopFiis(data.topFiis.map((ticker: string) => String(ticker).toUpperCase()).slice(0, 3));
+                    const nextTopFiis = data.topFiis.map((ticker: string) => String(ticker).toUpperCase()).slice(0, 3);
+                    setTopFiis(nextTopFiis);
+                    saveTopFiisCache(nextTopFiis);
                 }
             } catch {
                 setTopFiis([]);
@@ -217,6 +257,8 @@ export default function HomeDividendCalendar() {
     const tickersKey = useMemo(() => tickers.join("|"), [tickers]);
 
     useEffect(() => {
+        let active = true;
+
         async function loadEvents() {
             if (!tickers.length) {
                 if (!events.length) setEvents([]);
@@ -267,6 +309,8 @@ export default function HomeDividendCalendar() {
                 }
             }
 
+            if (!active) return;
+
             const nextEvents = chooseNextEventByTicker(items, tickers);
             setEvents(nextEvents);
             saveCache(tickersKey, nextEvents);
@@ -274,7 +318,11 @@ export default function HomeDividendCalendar() {
         }
 
         loadEvents();
-    }, [tickers, tickersKey, wallet, events.length]);
+
+        return () => {
+            active = false;
+        };
+    }, [tickersKey]);
 
     if (!wallet.length && !topFiis.length && !events.length && !loading) return null;
 
