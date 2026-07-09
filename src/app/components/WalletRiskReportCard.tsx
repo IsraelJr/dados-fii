@@ -138,7 +138,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
           </p>
 
           <h2 className={`mt-3 text-2xl font-extrabold ${isVip ? "text-white" : "text-slate-900"}`}>
-            Relatório profissional de risco da carteira
+            Relatório de risco da carteira
           </h2>
 
           <p className={`mt-2 text-sm font-medium leading-6 ${isVip ? "text-gray-300" : "text-slate-700"}`}>
