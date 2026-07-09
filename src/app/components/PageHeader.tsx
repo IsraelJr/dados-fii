@@ -9,6 +9,10 @@ type PageHeaderProps = {
   action?: ReactNode;
 };
 
+function cleanSubtitle(value: string) {
+  return value.replace(/^Salva neste navegador\.\s*/i, "");
+}
+
 export default function PageHeader({
   title,
   subtitle,
@@ -16,6 +20,8 @@ export default function PageHeader({
   backLabel = "← Voltar para consulta",
   action,
 }: PageHeaderProps) {
+  const displaySubtitle = cleanSubtitle(subtitle);
+
   return (
     <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div>
@@ -23,7 +29,7 @@ export default function PageHeader({
           {backLabel}
         </Link>
         <h1 className="mt-4 text-3xl font-extrabold text-slate-800">{title}</h1>
-        <p className="mt-2 max-w-3xl text-slate-600">{subtitle}</p>
+        <p className="mt-2 max-w-3xl text-slate-600">{displaySubtitle}</p>
       </div>
       {action}
     </div>
