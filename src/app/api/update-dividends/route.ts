@@ -49,6 +49,59 @@ function noAccent(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+function numberOf(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const raw = String(value || "").replace("R$", "").replace("%", "").trim();
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function compactNumberOf(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  const raw = String(value || "")
+    .replace("R$", "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+
+  if (!raw) return 0;
+
+  let multiplier = 1;
+  let cleanValue = raw;
+
+  if (/BI$|B$/.test(cleanValue)) {
+    multiplier = 1_000_000_000;
+    cleanValue = cleanValue.replace(/BI$|B$/, "");
+  } else if (/MI$|M$/.test(cleanValue)) {
+    multiplier = 1_000_000;
+    cleanValue = cleanValue.replace(/MI$|M$/, "");
+  } else if (/MIL$|K$/.test(cleanValue)) {
+    multiplier = 1_000;
+    cleanValue = cleanValue.replace(/MIL$|K$/, "");
+  }
+
+  const parsed = numberOf(cleanValue);
+  return parsed ? parsed * multiplier : 0;
+}
+
+function removeUndefinedFields<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => removeUndefinedFields(item)) as T;
+
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    if (typeof (value as any).isEqual === "function") return value;
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, fieldValue]) => fieldValue !== undefined)
+        .map(([key, fieldValue]) => [key, removeUndefinedFields(fieldValue)])
+    ) as T;
+  }
+
+  return value;
+}
+
 async function getFiiDoc(ticker: string) {
   const direct = await adminDb.collection("Fiis").doc(ticker).get();
   if (direct.exists) return direct;
@@ -133,6 +186,66 @@ function parseDividends(text: string, year: number) {
   return output;
 }
 
+function findMetric(text: string, labels: string[]) {
+  const normalizedText = noAccent(text.toUpperCase());
+
+  for (const label of labels) {
+    const normalizedLabel = noAccent(label.toUpperCase());
+    const index = normalizedText.indexOf(normalizedLabel);
+    if (index < 0) continue;
+
+    const slice = normalizedText.slice(index + normalizedLabel.length, index + normalizedLabel.length + 180);
+    const match = slice.match(/R?\$?\s*([0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]+)?|[0-9]+(?:,[0-9]+)?)(?:\s*(BI|MI|MIL|B|M|K))?/i);
+    if (!match) continue;
+
+    const value = compactNumberOf(`${match[1]}${match[2] || ""}`);
+    if (value > 0) return value;
+  }
+
+  return undefined;
+}
+
+function parseMarketIndicators(text: string, sourceUrl: string) {
+  const dailyLiquidity = findMetric(text, [
+    "Liquidez Diária",
+    "Liquidez média diária",
+    "Volume médio diário",
+    "Volume diário médio",
+  ]);
+  const numberShares = findMetric(text, [
+    "Cotas emitidas",
+    "Número de cotas",
+    "Nº de cotas",
+    "Total de cotas",
+  ]);
+  const numberShareholders = findMetric(text, [
+    "Número de cotistas",
+    "Nº de cotistas",
+    "Cotistas",
+  ]);
+
+  const payload = removeUndefinedFields({
+    dailyLiquidity,
+    liquidity: dailyLiquidity,
+    numberShares,
+    numberCotistas: numberShareholders,
+    numberShareholders,
+    marketData: {
+      dailyLiquidity,
+      numberShares,
+      numberCotistas: numberShareholders,
+      numberShareholders,
+      source: "StatusInvest",
+      sourceUrl,
+      updatedAt: todayKey(),
+    },
+    marketDataSource: "StatusInvest",
+    marketDataUpdatedAt: todayKey(),
+  });
+
+  return Object.keys(payload).length ? payload : {};
+}
+
 async function reserveDailyRequest(anonId: string, ticker: string) {
   const ref = adminDb
     .collection("Parameters")
@@ -169,6 +282,7 @@ async function updateTickerDividends(ticker: string) {
   const page = await getStatusInvestPage(ticker);
   const fetched = parseDividends(page.text, year);
   const fetchedMonths = Object.keys(fetched).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+  const marketIndicators = parseMarketIndicators(page.text, page.url);
 
   if (!fetchedMonths.length) throw new Error(`Nenhum dividendo de ${year} encontrado no StatusInvest.`);
 
@@ -184,6 +298,7 @@ async function updateTickerDividends(ticker: string) {
 
   await doc.ref.set({
     [field]: merged,
+    ...marketIndicators,
     modified_in: adminFieldValue.serverTimestamp(),
   }, { merge: true });
 
@@ -193,6 +308,8 @@ async function updateTickerDividends(ticker: string) {
     fetchedMonths,
     currentMonth: currentMonthKey(),
     currentMonthIncluded: Boolean(merged[currentMonthKey()]),
+    indicatorsUpdated: Object.keys(marketIndicators).length > 0,
+    indicators: marketIndicators,
   };
 }
 
