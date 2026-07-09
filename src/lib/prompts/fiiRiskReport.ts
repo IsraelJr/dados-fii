@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v1.2.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v1.3.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -53,6 +53,9 @@ Sua função é gerar um relatório profissional de risco da carteira de FIIs do
 
 Regras obrigatórias:
 - Use somente os dados fornecidos para análise da carteira e os dados macroeconômicos ou de comparação, quando existirem.
+- Nunca use histórico de conversas, preferências pessoais, informações lembradas ou qualquer contexto externo ao que está nos dados recebidos para este relatório.
+- Não escreva frases como "o usuário já demonstrou", "o usuário informou anteriormente", "como você já comentou", "como histórico do usuário" ou equivalentes.
+- Considere todos os usuários do site como pessoa física por padrão. Não escreva que o tipo de investidor está desconhecido e não compare PF versus PJ, salvo se os dados trouxerem explicitamente uma necessidade de análise PJ.
 - Não use termos técnicos de desenvolvimento ou sistemas no relatório final, como "payload", "JSON", "backend", "frontend", "endpoint", "API", "banco de dados" ou "campo". Troque por expressões naturais, como "dados disponíveis", "base do relatório" ou "informações analisadas".
 - Não invente dados de vacância, rating, LTV, P/VP, gestor, liquidez, dividend yield ou localização se eles não estiverem disponíveis.
 - Quando faltar dado relevante, escreva claramente: "dados insuficientes".
@@ -80,8 +83,8 @@ export const FII_RISK_REPORT_STRUCTURE = [
   "11. Riscos específicos por ativo: tese principal, riscos, risco de dividendo, preço, liquidez, gestão, crédito/vacância, nota de risco e ação sugerida.",
   "12. Hedges e proteção patrimonial: caixa/CDI, Tesouro Selic, Tesouro IPCA+, diversificação internacional, setores defensivos e redução de concentração.",
   "13. Rebalanceamento: percentual atual, percentual sugerido, ativos sem novos aportes, ativos com novos aportes, redução por venda parcial se fizer sentido e plano sem venda usando novos aportes.",
-  "14. Adequação ao perfil do cliente: PF/PJ, renda passiva, horizonte, liquidez, dependência dos dividendos, reserva de emergência e capacidade de aportar em crise.",
-  "15. Risco fiscal e regulatório: tributação PF/PJ, ganho de capital, risco de mudança tributária, FIIs, Fiagros, CRIs, CRAs e impacto de rebalanceamento.",
+  "14. Adequação ao perfil do cliente: PF, renda passiva, horizonte, liquidez, dependência dos dividendos, reserva de emergência e capacidade de aportar em crise.",
+  "15. Risco fiscal e regulatório: tributação de pessoa física, ganho de capital, risco de mudança tributária, FIIs, Fiagros, CRIs, CRAs e impacto de rebalanceamento.",
   "16. Benchmark e performance: compare com IFIX, CDI, IPCA, Tesouro IPCA+ e carteira diversificada, quando houver dados suficientes.",
   "17. Tabela resumo e heat map: tabela final com riscos por ativo e escala 🟢 baixo, 🟡 moderado, 🟠 alto, 🔴 muito alto.",
   "18. Conclusão executiva: 3 maiores riscos, 3 melhores ativos, 3 ativos que exigem atenção, o que parar de comprar, comprar mais, manter, plano de 30/90/180 dias e decisão final.",
@@ -132,12 +135,20 @@ Regras finais de escrita:
 - Sempre que houver dados comparativos, percentuais, notas, classificações ou cenários, use tabela em Markdown em vez de texto corrido.
 - Não inclua seção geográfica quando não houver dado geográfico confiável nos dados analisados.
 - Não use termos técnicos de desenvolvimento ou sistemas no relatório final, como "payload", "JSON", "backend", "frontend", "endpoint", "API", "banco de dados" ou "campo".
+- Não mencione histórico de conversas, preferências anteriores ou informações que não estejam nos dados disponíveis para o relatório.
+- Trate o investidor como pessoa física por padrão e não escreva que o tipo de investidor está desconhecido.
 `.trim();
 
 export function buildFiiRiskReportUserPrompt(input: RiskReportInput) {
+  const inputProfile = input.clientProfile || {};
+  const safeClientProfile: RiskReportClientProfile = {
+    ...inputProfile,
+    investorType: inputProfile.investorType && inputProfile.investorType !== "unknown" ? inputProfile.investorType : "PF",
+  };
   const safeInput = {
     ...input,
     portfolio: Array.isArray(input.portfolio) ? input.portfolio : [],
+    clientProfile: safeClientProfile,
     generatedAt: input.generatedAt || new Date().toISOString(),
   };
 
@@ -158,7 +169,7 @@ ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Sempre que uma informação essencial não estiver nos dados disponíveis, escreva "dados insuficientes" e explique a consequência dessa limitação. Revise a ortografia em português brasileiro antes de finalizar.
+Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Sempre que uma informação essencial não estiver nos dados disponíveis, escreva "dados insuficientes" e explique a consequência dessa limitação. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
 `.trim();
 }
 
