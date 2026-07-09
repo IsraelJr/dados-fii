@@ -156,6 +156,8 @@ function removeUndefinedFields<T>(value: T): T {
   if (Array.isArray(value)) return value.map((item) => removeUndefinedFields(item)) as T;
 
   if (value && typeof value === "object" && !(value instanceof Date)) {
+    if (typeof (value as any).isEqual === "function") return value;
+
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
         .filter(([, fieldValue]) => fieldValue !== undefined)
@@ -218,7 +220,7 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
     weight: totalValue > 0 ? Number(((value / totalValue) * 100).toFixed(2)) : 0,
   })).sort((a, b) => b.weight - a.weight);
 
-  return removeUndefinedFields({
+  const cleanSnapshot = removeUndefinedFields({
     userDocId,
     email,
     date: dateKey(),
@@ -237,9 +239,13 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
       bySegment: segmentAllocation,
       byAsset: assetAllocation,
     },
+  });
+
+  return {
+    ...cleanSnapshot,
     createdAt: adminFieldValue.serverTimestamp(),
     updatedAt: adminFieldValue.serverTimestamp(),
-  });
+  };
 }
 
 export async function saveMonthlyPortfolioSnapshot(args: { userDocId: string; email: string; wallet: unknown; force?: boolean }) {
