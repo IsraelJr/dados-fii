@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { deriveFiiRiskData } from "@/lib/fiiDerivedData";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const SHEET_RANGE = "A1:F400";
@@ -30,42 +31,13 @@ function numberOf(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function compactNumberOf(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  const raw = String(value || "")
-    .replace("R$", "")
-    .replace(/\s+/g, "")
-    .trim()
-    .toUpperCase();
-
-  if (!raw) return 0;
-
-  let multiplier = 1;
-  let clean = raw;
-
-  if (/BI$|B$/.test(clean)) {
-    multiplier = 1_000_000_000;
-    clean = clean.replace(/BI$|B$/, "");
-  } else if (/MI$|M$/.test(clean)) {
-    multiplier = 1_000_000;
-    clean = clean.replace(/MI$|M$/, "");
-  } else if (/MIL$|K$/.test(clean)) {
-    multiplier = 1_000;
-    clean = clean.replace(/MIL$|K$/, "");
-  }
-
-  const parsed = numberOf(clean);
-  return parsed ? parsed * multiplier : 0;
-}
-
 function valueAtPath(data: any, path: string) {
   return path.split(".").reduce((current, key) => current?.[key], data);
 }
 
 function firstNumber(data: any, paths: string[]) {
   for (const path of paths) {
-    const value = compactNumberOf(valueAtPath(data, path));
+    const value = numberOf(valueAtPath(data, path));
     if (Number.isFinite(value) && value > 0) return value;
   }
   return undefined;
@@ -222,38 +194,9 @@ function removeUndefinedFields<T>(value: T): T {
 
 function buildMarketMetrics(data: any) {
   return removeUndefinedFields({
-    dailyLiquidity: firstNumber(data, [
-      "dailyLiquidity",
-      "liquidity",
-      "averageDailyLiquidity",
-      "avgDailyLiquidity",
-      "volumeMedioDiario",
-      "liquidezDiaria",
-      "marketData.dailyLiquidity",
-      "marketData.liquidity",
-    ]),
-    numberShares: firstNumber(data, [
-      "numberShares",
-      "sharesOutstanding",
-      "numberOfShares",
-      "quotasIssued",
-      "issuedQuotas",
-      "cotasEmitidas",
-      "numeroCotas",
-      "marketData.numberShares",
-      "marketData.sharesOutstanding",
-    ]),
-    numberShareholders: firstNumber(data, [
-      "numberCotistas",
-      "numberShareholders",
-      "shareholders",
-      "shareholdersCount",
-      "cotistas",
-      "numeroCotistas",
-      "investorsCount",
-      "marketData.numberCotistas",
-      "marketData.numberShareholders",
-    ]),
+    dailyLiquidity: firstNumber(data, ["dailyLiquidity", "liquidity", "averageDailyLiquidity", "avgDailyLiquidity", "volumeMedioDiario", "liquidezDiaria", "marketData.dailyLiquidity", "marketData.liquidity"]),
+    numberShares: firstNumber(data, ["numberShares", "sharesOutstanding", "numberOfShares", "quotasIssued", "issuedQuotas", "cotasEmitidas", "numeroCotas", "marketData.numberShares", "marketData.sharesOutstanding"]),
+    numberShareholders: firstNumber(data, ["numberCotistas", "numberShareholders", "shareholders", "shareholdersCount", "cotistas", "numeroCotistas", "investorsCount", "marketData.numberCotistas", "marketData.numberShareholders"]),
     isIFIX: Boolean(data?.isIFIX || data?.ifix || data?.marketData?.isIFIX) || undefined,
     marketDataSource: firstText(data, ["marketDataSource", "marketData.source", "source"]),
     marketDataUpdatedAt: firstText(data, ["marketDataUpdatedAt", "marketData.updatedAt"]),
@@ -264,9 +207,10 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
   const sheetPrices = await getSheetPrices();
   const assets = await Promise.all(wallet.map(async (item) => {
     const data = await getFiiDoc(item.ticker);
-    const currentPrice = sheetPrices.get(item.ticker) || numberOf(data?.price || data?.currentPrice || data?.cotacao);
+    const derived = deriveFiiRiskData(data) as any;
+    const currentPrice = sheetPrices.get(item.ticker) || firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
     const averagePrice = item.averagePrice && item.averagePrice > 0 ? item.averagePrice : undefined;
-    const currentValue = currentPrice > 0 ? currentPrice * item.quotas : undefined;
+    const currentValue = currentPrice && currentPrice > 0 ? currentPrice * item.quotas : undefined;
     const investedValue = averagePrice ? averagePrice * item.quotas : undefined;
     const marketMetrics = buildMarketMetrics(data);
 
@@ -279,13 +223,25 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
       currentValue,
       unrealizedResult: investedValue && currentValue ? Number((currentValue - investedValue).toFixed(2)) : undefined,
       unrealizedReturn: investedValue && currentValue ? Number((((currentValue / investedValue) - 1) * 100).toFixed(2)) : undefined,
-      sector: String(data?.sector || data?.setor || "").trim() || undefined,
-      segment: String(data?.segment_new || data?.segment || data?.segmento || "").trim() || undefined,
-      fundType: String(data?.fundType || data?.type || data?.tipo || "").trim() || undefined,
-      manager: String(data?.manager || data?.gestor || data?.management || "").trim() || undefined,
-      administrator: String(data?.administrator || data?.administrador || "").trim() || undefined,
-      dividendYield: numberOf(data?.dividendYield || data?.dy || data?.DY || data?.dy12m) || undefined,
-      pvp: numberOf(data?.pvp || data?.p_vp || data?.pvpa || data?.priceToBook) || undefined,
+      sector: firstText(data, ["sector", "setor"]) || derived.sector,
+      segment: firstText(data, ["segment_new", "segment", "segmento"]),
+      fundType: firstText(data, ["fundType", "type", "tipo", "tipoFundo"]) || derived.fundType,
+      manager: firstText(data, ["manager", "gestor", "management"]),
+      administrator: firstText(data, ["administrator", "administrador"]),
+      dividendYield: firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]) || derived.valuation?.dy12m,
+      pvp: firstNumber(data, ["pvp", "p_vp", "pvpa", "priceToBook", "valuation.pvp"]) || derived.valuation?.pvp,
+      vpCota: firstNumber(data, ["valorPatrimonialPorCota", "vpCota", "vpa", "bookValuePerShare", "valuation.vpCota"]) || derived.valuation?.vpCota,
+      netWorth: firstNumber(data, ["patrimonioLiquido", "patrimony", "netWorth", "equityValue", "equity", "patrimonio", "valuation.netWorth"]) || derived.valuation?.netWorth,
+      marketCap: firstNumber(data, ["marketCap", "valorMercado", "marketData.marketCap"]) || derived.marketCap,
+      lastDividend: firstNumber(data, ["lastDividend", "ultimoRendimento", "dividends.lastDividend"]) || derived.lastDividend,
+      lastDividendDate: firstText(data, ["lastDividendDate", "ultimaDataPagamento", "dividends.lastDividendDate"]) || derived.lastDividendDate,
+      averageDividend12m: firstNumber(data, ["averageDividend12m", "mediaDividendos12m", "dividends.average12m"]) || derived.averageDividend12m,
+      monthsPaidLast12: firstNumber(data, ["monthsPaidLast12", "mesesPagos12m", "dividends.monthsPaidLast12"]) || derived.monthsPaidLast12,
+      dividendVolatility12m: firstNumber(data, ["dividendVolatility12m", "volatilidadeDividendos12m", "dividends.volatility12m"]) || derived.dividendVolatility12m,
+      dividendCuts12m: firstNumber(data, ["dividendCuts12m", "cortesDividendos12m", "dividends.cuts12m"]) || derived.dividendCuts12m,
+      dy6m: firstNumber(data, ["dy6m", "dividendYield6m", "valuation.dy6m", "valuation.dy6mAnnualized"]) || derived.dy6m,
+      dy12mCalculated: derived.dy12mCalculated,
+      dividendsLast12Months: derived.dividends?.dividendsLast12Months,
       ...marketMetrics,
     });
   }));
