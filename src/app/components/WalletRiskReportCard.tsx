@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { Crown, FileText, Loader2, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import { Crown, Download, FileText, Loader2, Lock, ShieldCheck, Sparkles } from "lucide-react";
 
 type ReportStatus = {
   ok: boolean;
@@ -32,6 +32,11 @@ function isAllowedPilotEmail(email: string) {
   return Boolean(email) && list.includes(email.trim().toLowerCase());
 }
 
+function filenameFromDisposition(value: string | null) {
+  const match = value?.match(/filename="?([^";]+)"?/i);
+  return match?.[1] || "relatorio-risco-carteira.pdf";
+}
+
 export default function WalletRiskReportCard({ walletCount }: { walletCount: number }) {
   const [visible, setVisible] = useState(false);
   const [email, setEmail] = useState("");
@@ -39,6 +44,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
   const [status, setStatus] = useState<ReportStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [message, setMessage] = useState("");
   const [reportMarkdown, setReportMarkdown] = useState("");
 
@@ -120,6 +126,44 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
     }
   }
 
+  async function downloadPdf() {
+    if (!email || !sessionToken) {
+      setMessage("Confirme seu e-mail na carteira antes de baixar o PDF.");
+      return;
+    }
+
+    setDownloadingPdf(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/wallet-risk-report/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, sessionToken }),
+      });
+
+      if (!response.ok) {
+        const json = await response.json().catch(() => ({}));
+        throw new Error(json?.error || "Não foi possível gerar o PDF.");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filenameFromDisposition(response.headers.get("Content-Disposition"));
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setMessage("PDF gerado com sucesso.");
+    } catch (err: any) {
+      setMessage(err.message || "Não foi possível gerar o PDF.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
   if (!visible) return null;
 
   const isVip = status?.isVip === true;
@@ -127,6 +171,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
   const hasCurrentReport = status?.hasCurrentReport === true;
   const canGenerate = isVip || credits > 0;
   const hasWallet = walletCount > 0 || Number(status?.walletCount || 0) > 0;
+  const canDownloadPdf = hasCurrentReport || Boolean(reportMarkdown);
 
   return (
     <section className={`mt-6 overflow-hidden rounded-2xl p-5 shadow-lg ring-1 ${isVip ? "bg-gray-900 text-gray-100 ring-emerald-400/30" : "bg-gradient-to-br from-amber-100 via-white to-indigo-50 text-slate-900 ring-amber-300"}`}>
@@ -177,6 +222,21 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
                 {generating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
                 {hasCurrentReport ? "Abrir relatório do mês" : "Gerar prompt do relatório"}
               </button>
+
+              {canDownloadPdf && (
+                <button
+                  type="button"
+                  onClick={downloadPdf}
+                  disabled={downloadingPdf}
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold shadow-sm transition ${isVip
+                    ? "bg-gray-800 text-gray-100 hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                    : "bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                    }`}
+                >
+                  {downloadingPdf ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                  Baixar PDF
+                </button>
+              )}
 
               {!isVip && (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
