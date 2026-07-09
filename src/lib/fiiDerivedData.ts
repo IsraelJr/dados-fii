@@ -24,6 +24,11 @@ function numberOf(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function positiveNumberOf(value: unknown) {
+  const parsed = numberOf(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function cleanText(value: unknown) {
   return String(value || "").trim();
 }
@@ -53,8 +58,8 @@ function firstValue(data: any, paths: string[]) {
 
 function firstNumber(data: any, paths: string[]) {
   for (const path of paths) {
-    const value = numberOf(valueAtPath(data, path));
-    if (Number.isFinite(value) && value > 0) return value;
+    const value = positiveNumberOf(valueAtPath(data, path));
+    if (value !== undefined) return value;
   }
   return undefined;
 }
@@ -81,7 +86,7 @@ function removeUndefinedFields<T>(value: T): T {
 
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .filter(([, fieldValue]) => fieldValue !== undefined)
+        .filter(([, fieldValue]) => fieldValue !== undefined && fieldValue !== null)
         .map(([key, fieldValue]) => [key, removeUndefinedFields(fieldValue)])
     ) as T;
   }
@@ -124,7 +129,7 @@ function getEarningsEntries(data: any) {
 
     const year = Number(yearMatch[1]);
     Object.entries(yearData as Record<string, any>).forEach(([month, info]) => {
-      const value = numberOf(info?.earnings);
+      const value = positiveNumberOf(info?.earnings);
       const paymentDate = cleanText(info?.payment_date);
       const date = parseDateBR(paymentDate);
 
@@ -199,14 +204,29 @@ function buildDividendSummary(data: any, price?: number) {
   });
 }
 
-export function deriveFiiRiskData(data: any) {
-  const price = firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
+function buildValuation(data: any, price?: number) {
   const netWorth = firstNumber(data, ["netWorth", "equityValue", "patrimonioLiquido", "patrimony", "equity", "patrimonio", "valuation.netWorth"]);
   const numberShares = firstNumber(data, ["numberShares", "sharesOutstanding", "numberOfShares", "quotasIssued", "issuedQuotas", "cotasEmitidas", "numeroCotas", "marketData.numberShares"]);
-  const dividendYield = firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]);
-  const vpCota = netWorth && numberShares ? netWorth / numberShares : undefined;
-  const pvp = price && vpCota ? price / vpCota : undefined;
+  const directVpCota = firstNumber(data, ["valorPatrimonialPorCota", "vpCota", "vpa", "bookValuePerShare", "valuation.vpCota"]);
+  const directPvp = firstNumber(data, ["pvp", "p_vp", "pvpa", "priceToBook", "valuation.pvp"]);
+
+  const vpCota = directVpCota || (netWorth && numberShares ? netWorth / numberShares : undefined) || (price && directPvp ? price / directPvp : undefined);
+  const pvp = directPvp || (price && vpCota ? price / vpCota : undefined);
   const marketCap = price && numberShares ? price * numberShares : undefined;
+
+  return removeUndefinedFields({
+    netWorth,
+    numberShares,
+    vpCota: vpCota && vpCota > 0 ? round(vpCota, 4) : undefined,
+    pvp: pvp && pvp > 0 ? round(pvp, 4) : undefined,
+    marketCap: marketCap && marketCap > 0 ? round(marketCap, 2) : undefined,
+  });
+}
+
+export function deriveFiiRiskData(data: any) {
+  const price = firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
+  const dividendYield = firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]);
+  const valuation = buildValuation(data, price);
   const dividendSummary = buildDividendSummary(data, price);
   const sector = cleanText(firstValue(data, ["sector", "setor"])) || classifySector(data);
   const fundType = cleanText(firstValue(data, ["fundType", "type", "tipo", "tipoFundo"])) || classifyFundType(data);
@@ -214,7 +234,10 @@ export function deriveFiiRiskData(data: any) {
   return removeUndefinedFields({
     sector,
     fundType,
-    marketCap: marketCap ? round(marketCap, 2) : undefined,
+    marketCap: valuation.marketCap,
+    vpCota: valuation.vpCota,
+    pvp: valuation.pvp,
+    netWorth: valuation.netWorth,
     lastDividend: dividendSummary.lastDividend,
     lastDividendDate: dividendSummary.lastDividendDate,
     averageDividend12m: dividendSummary.averageDividend12m,
@@ -224,9 +247,10 @@ export function deriveFiiRiskData(data: any) {
     dy6m: dividendSummary.dy6mAnnualized,
     dy12mCalculated: dividendSummary.dy12mCalculated,
     valuation: {
-      netWorth,
-      vpCota: vpCota ? round(vpCota, 4) : undefined,
-      pvp: pvp ? round(pvp, 4) : undefined,
+      netWorth: valuation.netWorth,
+      vpCota: valuation.vpCota,
+      pvp: valuation.pvp,
+      marketCap: valuation.marketCap,
       dy12m: dividendYield || dividendSummary.dy12mCalculated,
       dy12mCalculated: dividendSummary.dy12mCalculated,
       dy6mAnnualized: dividendSummary.dy6mAnnualized,
