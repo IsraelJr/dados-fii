@@ -31,6 +31,20 @@ function ddmmyyyy(date: Date) {
   }).format(date);
 }
 
+function parseBcbDate(value: string) {
+  const match = String(value || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isoDateFromBcbDate(value?: string | null) {
+  if (!value) return null;
+  const parsed = parseBcbDate(value);
+  return parsed ? dateKey(parsed) : null;
+}
+
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -43,9 +57,24 @@ function addMonths(date: Date, months: number) {
   return next;
 }
 
+function startOfMonth(date = new Date()) {
+  const parts = dateParts(date);
+  return new Date(Number(parts.year), Number(parts.month) - 1, 1, 12, 0, 0);
+}
+
+function startOfYear(date = new Date()) {
+  const parts = dateParts(date);
+  return new Date(Number(parts.year), 0, 1, 12, 0, 0);
+}
+
 function numberOf(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  const normalized = String(value || "").trim().replace("%", "").replace(/\./g, "").replace(",", ".");
+  const normalized = String(value || "")
+    .trim()
+    .replace("%", "")
+    .replace(/\s/g, "")
+    .replace(/\.(?=\d{3}(\D|$))/g, "")
+    .replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -72,6 +101,13 @@ function cleanBenchmarkData(data: any) {
   return clean;
 }
 
+function recentEnough(isoDate?: string | null, maxCalendarDays = 7) {
+  if (!isoDate) return false;
+  const date = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return false;
+  return Date.now() - date.getTime() <= maxCalendarDays * 24 * 60 * 60 * 1000;
+}
+
 async function fetchBcbSerie(code: number, start: Date, end = new Date()) {
   const url = `${BCB_BASE_URL}.${code}/dados?formato=json&dataInicial=${encodeURIComponent(ddmmyyyy(start))}&dataFinal=${encodeURIComponent(ddmmyyyy(end))}`;
   const res = await fetch(url, { cache: "no-store" });
@@ -79,44 +115,105 @@ async function fetchBcbSerie(code: number, start: Date, end = new Date()) {
 
   const json = await res.json();
   return Array.isArray(json)
-    ? json.map((item) => ({ date: String(item?.data || ""), value: numberOf(item?.valor) })).filter((item) => item.date && Number.isFinite(item.value))
+    ? json
+        .map((item) => {
+          const date = String(item?.data || "");
+          const parsedDate = parseBcbDate(date);
+          return {
+            date,
+            isoDate: parsedDate ? dateKey(parsedDate) : null,
+            timestamp: parsedDate ? parsedDate.getTime() : 0,
+            value: numberOf(item?.valor),
+          };
+        })
+        .filter((item) => item.date && item.timestamp && Number.isFinite(item.value))
+        .sort((a, b) => a.timestamp - b.timestamp)
     : [];
 }
 
 async function fetchSelicTarget() {
-  const rows = await fetchBcbSerie(432, addMonths(new Date(), -2));
+  const rows = await fetchBcbSerie(432, addMonths(new Date(), -6));
   const last = rows.at(-1);
-  return last ? { rate: last.value, date: last.date } : null;
+  return last ? {
+    rate: last.value,
+    date: last.date,
+    isoDate: last.isoDate,
+    source: "Banco Central do Brasil - SGS 432",
+    comparisonReady: Boolean(last.value),
+  } : {
+    rate: null,
+    date: null,
+    isoDate: null,
+    source: "Banco Central do Brasil - SGS 432",
+    comparisonReady: false,
+    error: "sem dados recentes",
+  };
 }
 
 async function fetchCdiReturns() {
   const now = new Date();
+  const twelveMonthsStart = addMonths(now, -12);
   const rows = await fetchBcbSerie(12, addMonths(now, -13), now);
-  const monthRows = rows.filter((row) => row.date.slice(3, 10) === ddmmyyyy(now).slice(3, 10));
-  const currentYear = ddmmyyyy(now).slice(6, 10);
-  const yearRows = rows.filter((row) => row.date.slice(6, 10) === currentYear);
+  const monthStart = startOfMonth(now).getTime();
+  const yearStart = startOfYear(now).getTime();
+  const twelveStart = twelveMonthsStart.getTime();
+  const monthRows = rows.filter((row) => row.timestamp >= monthStart);
+  const yearRows = rows.filter((row) => row.timestamp >= yearStart);
+  const twelveMonthRows = rows.filter((row) => row.timestamp >= twelveStart);
+  const last = rows.at(-1);
+  const monthReturn = compoundDailyPercent(monthRows.map((row) => row.value));
+  const yearReturn = compoundDailyPercent(yearRows.map((row) => row.value));
+  const twelveMonthsReturn = compoundDailyPercent(twelveMonthRows.map((row) => row.value));
+  const comparisonReady = Boolean(
+    last?.isoDate
+    && recentEnough(last.isoDate, 7)
+    && monthReturn !== null
+    && yearReturn !== null
+    && twelveMonthsReturn !== null
+  );
 
   return {
-    monthReturn: compoundDailyPercent(monthRows.map((row) => row.value)),
-    yearReturn: compoundDailyPercent(yearRows.map((row) => row.value)),
-    twelveMonthsReturn: compoundDailyPercent(rows.map((row) => row.value)),
-    lastDailyRate: rows.at(-1)?.value ?? null,
-    lastDate: rows.at(-1)?.date || null,
+    source: "Banco Central do Brasil - SGS 12",
+    method: "CDI acumulado por composição geométrica das taxas diárias da série SGS 12.",
+    unit: "percent",
+    monthReturn,
+    yearReturn,
+    twelveMonthsReturn,
+    lastDailyRate: last?.value ?? null,
+    lastDate: last?.date || null,
+    lastIsoDate: last?.isoDate || null,
+    observations: {
+      month: monthRows.length,
+      year: yearRows.length,
+      twelveMonths: twelveMonthRows.length,
+    },
+    comparisonReady,
+    quality: comparisonReady ? "official_calculated" : "incomplete",
   };
 }
 
 async function fetchIpcaReturns() {
   const now = new Date();
-  const rows = await fetchBcbSerie(433, addMonths(now, -13), now);
-  const currentYear = ddmmyyyy(now).slice(6, 10);
-  const yearRows = rows.filter((row) => row.date.slice(6, 10) === currentYear);
+  const rows = await fetchBcbSerie(433, addMonths(now, -14), now);
+  const yearStart = startOfYear(now).getTime();
+  const yearRows = rows.filter((row) => row.timestamp >= yearStart);
+  const last12Rows = rows.slice(-12);
   const last = rows.at(-1);
 
   return {
+    source: "Banco Central do Brasil - SGS 433",
+    method: "IPCA acumulado por soma das variações mensais da série SGS 433.",
+    unit: "percent",
     monthReturn: last?.value ?? null,
     yearReturn: sumPercent(yearRows.map((row) => row.value)),
-    twelveMonthsReturn: sumPercent(rows.slice(-12).map((row) => row.value)),
+    twelveMonthsReturn: sumPercent(last12Rows.map((row) => row.value)),
     lastDate: last?.date || null,
+    lastIsoDate: last?.isoDate || null,
+    observations: {
+      year: yearRows.length,
+      twelveMonths: last12Rows.length,
+    },
+    comparisonReady: Boolean(last && last12Rows.length >= 12),
   };
 }
 
@@ -134,11 +231,18 @@ async function fetchYahooChart(symbol: string, range = "1y") {
   const result = json?.chart?.result?.[0];
   const timestamps: number[] = result?.timestamp || [];
   const closes: Array<number | null> = result?.indicators?.quote?.[0]?.close || [];
-  const values = timestamps
+  return timestamps
     .map((timestamp, index) => ({ date: new Date(timestamp * 1000), close: closes[index] }))
-    .filter((item) => Number.isFinite(item.close) && Number(item.close) > 0) as Array<{ date: Date; close: number }>;
+    .filter((item) => Number.isFinite(item.close) && Number(item.close) > 0)
+    .map((item) => ({ date: item.date, isoDate: dateKey(item.date), close: Number(item.close) }));
+}
 
-  return values;
+function firstOnOrAfter(values: Array<{ date: Date; close: number; isoDate: string }>, target: Date) {
+  return values.find((item) => item.date.getTime() >= target.getTime()) || values[0];
+}
+
+function firstOnOrBefore(values: Array<{ date: Date; close: number; isoDate: string }>, target: Date) {
+  return [...values].reverse().find((item) => item.date.getTime() <= target.getTime()) || values[0];
 }
 
 async function fetchIfixReturns() {
@@ -151,22 +255,44 @@ async function fetchIfixReturns() {
 
   for (const symbol of symbols) {
     try {
-      const values = await fetchYahooChart(symbol, "1y");
-      if (values.length < 2) throw new Error("sem histórico suficiente");
+      const values = await fetchYahooChart(symbol, "13mo");
+      if (values.length < 40) throw new Error("sem histórico suficiente");
 
       const now = new Date();
       const latest = values.at(-1)!;
-      const monthStart = values.find((item) => item.date >= addDays(new Date(now.getFullYear(), now.getMonth(), 1), -3)) || values[0];
-      const yearStart = values.find((item) => item.date >= addDays(new Date(now.getFullYear(), 0, 1), -3)) || values[0];
-      const twelveMonthsStart = values[0];
+      const monthStart = firstOnOrAfter(values, startOfMonth(now));
+      const yearStart = firstOnOrAfter(values, startOfYear(now));
+      const twelveMonthsStart = firstOnOrBefore(values, addMonths(latest.date, -12));
+      const monthReturn = percentReturn(monthStart?.close, latest.close);
+      const yearReturn = percentReturn(yearStart?.close, latest.close);
+      const twelveMonthsReturn = percentReturn(twelveMonthsStart?.close, latest.close);
+      const comparisonReady = Boolean(
+        recentEnough(latest.isoDate, 10)
+        && monthReturn !== null
+        && yearReturn !== null
+        && twelveMonthsReturn !== null
+      );
 
       return {
         symbol,
+        source: "Yahoo Finance",
+        sourceType: "secondary_market_data_provider",
+        method: "Retorno calculado pela variação do fechamento do IFIX entre as datas-base e o último fechamento disponível.",
+        unit: "percent",
         close: Number(latest.close.toFixed(2)),
-        monthReturn: percentReturn(monthStart.close, latest.close),
-        yearReturn: percentReturn(yearStart.close, latest.close),
-        twelveMonthsReturn: percentReturn(twelveMonthsStart.close, latest.close),
-        lastDate: dateKey(latest.date),
+        monthReturn,
+        yearReturn,
+        twelveMonthsReturn,
+        lastDate: latest.isoDate,
+        anchors: {
+          monthStart: monthStart ? { date: monthStart.isoDate, close: Number(monthStart.close.toFixed(2)) } : null,
+          yearStart: yearStart ? { date: yearStart.isoDate, close: Number(yearStart.close.toFixed(2)) } : null,
+          twelveMonthsStart: twelveMonthsStart ? { date: twelveMonthsStart.isoDate, close: Number(twelveMonthsStart.close.toFixed(2)) } : null,
+        },
+        observations: values.length,
+        comparisonReady,
+        quality: comparisonReady ? "secondary_calculated" : "incomplete",
+        note: "Fonte secundária. Para auditoria institucional, substituir por fonte oficial/licenciada da B3 quando disponível no projeto.",
       };
     } catch (err: any) {
       errors.push(`${symbol}: ${err.message || "erro"}`);
@@ -175,11 +301,15 @@ async function fetchIfixReturns() {
 
   return {
     symbol: symbols[0] || "IFIX",
+    source: "Yahoo Finance",
+    sourceType: "secondary_market_data_provider",
     close: null,
     monthReturn: null,
     yearReturn: null,
     twelveMonthsReturn: null,
     lastDate: null,
+    comparisonReady: false,
+    quality: "unavailable",
     errors,
   };
 }
@@ -189,9 +319,16 @@ function generatedMetadata() {
     date: dateKey(),
     generatedAt: new Date().toISOString(),
     sources: [
-      "Banco Central do Brasil - SGS: CDI, IPCA e Selic",
+      "Banco Central do Brasil - SGS 12: CDI diário",
+      "Banco Central do Brasil - SGS 433: IPCA mensal",
+      "Banco Central do Brasil - SGS 432: Selic meta",
       "Yahoo Finance, quando disponível: IFIX",
     ],
+    methodology: {
+      cdi: "Retornos acumulados calculados por composição geométrica das taxas diárias oficiais da série SGS 12.",
+      ipca: "Retornos acumulados calculados pela soma das variações mensais oficiais da série SGS 433.",
+      ifix: "Retornos calculados por variação de fechamento do índice. A fonte atual é secundária; use fonte B3/licenciada para auditoria institucional.",
+    },
   };
 }
 
@@ -205,10 +342,10 @@ async function fetchFreshBenchmarks() {
 
   const benchmarkData = {
     ...generatedMetadata(),
-    ifix: ifix.status === "fulfilled" ? ifix.value : { close: null, monthReturn: null, yearReturn: null, twelveMonthsReturn: null, error: ifix.reason?.message || "erro" },
-    cdi: cdi.status === "fulfilled" ? cdi.value : { monthReturn: null, yearReturn: null, twelveMonthsReturn: null, error: cdi.reason?.message || "erro" },
-    ipca: ipca.status === "fulfilled" ? ipca.value : { monthReturn: null, yearReturn: null, twelveMonthsReturn: null, error: ipca.reason?.message || "erro" },
-    selic: selic.status === "fulfilled" ? selic.value : { rate: null, error: selic.reason?.message || "erro" },
+    ifix: ifix.status === "fulfilled" ? ifix.value : { close: null, monthReturn: null, yearReturn: null, twelveMonthsReturn: null, comparisonReady: false, error: ifix.reason?.message || "erro" },
+    cdi: cdi.status === "fulfilled" ? cdi.value : { monthReturn: null, yearReturn: null, twelveMonthsReturn: null, comparisonReady: false, error: cdi.reason?.message || "erro" },
+    ipca: ipca.status === "fulfilled" ? ipca.value : { monthReturn: null, yearReturn: null, twelveMonthsReturn: null, comparisonReady: false, error: ipca.reason?.message || "erro" },
+    selic: selic.status === "fulfilled" ? selic.value : { rate: null, comparisonReady: false, error: selic.reason?.message || "erro" },
   };
 
   await adminDb.collection(COLLECTION).doc(LATEST_DOC).set({
