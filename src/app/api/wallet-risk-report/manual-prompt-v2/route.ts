@@ -141,6 +141,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const email = emailOf(body?.email);
     const sessionToken = body?.sessionToken;
+    const forceNew = Boolean(body?.forceNew);
 
     if (!isEmail(email)) return NextResponse.json({ ok: false, error: "Informe um e-mail válido." }, { status: 400 });
     if (!(await hasSession(email, sessionToken))) {
@@ -158,8 +159,14 @@ export async function POST(req: Request) {
     const reportRef = adminDb.collection(REPORT_COLLECTION).doc(reportId);
     const current = await reportRef.get();
     const currentData = current.data() || {};
+    const canUseCachedPrompt = current.exists
+      && currentData.status === "done"
+      && currentData.source === "manual_prompt"
+      && currentData.promptVersion === FII_RISK_REPORT_PROMPT_VERSION
+      && currentData.benchmarkData
+      && !forceNew;
 
-    if (current.exists && currentData.status === "done" && currentData.source === "manual_prompt") {
+    if (canUseCachedPrompt) {
       return NextResponse.json({
         ok: true,
         mode: "cached",
