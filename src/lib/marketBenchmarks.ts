@@ -39,18 +39,6 @@ function parseBcbDate(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function isoDateFromBcbDate(value?: string | null) {
-  if (!value) return null;
-  const parsed = parseBcbDate(value);
-  return parsed ? dateKey(parsed) : null;
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
   next.setMonth(next.getMonth() + months);
@@ -217,7 +205,7 @@ async function fetchIpcaReturns() {
   };
 }
 
-async function fetchYahooChart(symbol: string, range = "1y") {
+async function fetchYahooChart(symbol: string, range = "2y") {
   const encoded = encodeURIComponent(symbol);
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encoded}?range=${range}&interval=1d`;
   const res = await fetch(url, {
@@ -231,10 +219,12 @@ async function fetchYahooChart(symbol: string, range = "1y") {
   const result = json?.chart?.result?.[0];
   const timestamps: number[] = result?.timestamp || [];
   const closes: Array<number | null> = result?.indicators?.quote?.[0]?.close || [];
-  return timestamps
+  const values = timestamps
     .map((timestamp, index) => ({ date: new Date(timestamp * 1000), close: closes[index] }))
     .filter((item) => Number.isFinite(item.close) && Number(item.close) > 0)
     .map((item) => ({ date: item.date, isoDate: dateKey(item.date), close: Number(item.close) }));
+
+  return { url, values };
 }
 
 function firstOnOrAfter(values: Array<{ date: Date; close: number; isoDate: string }>, target: Date) {
@@ -252,10 +242,20 @@ async function fetchIfixReturns() {
     .filter(Boolean);
 
   const errors: string[] = [];
+  const attempts: Array<{ symbol: string; status: string; url?: string; observations?: number; firstDate?: string; lastDate?: string; error?: string }> = [];
 
   for (const symbol of symbols) {
     try {
-      const values = await fetchYahooChart(symbol, "13mo");
+      const { url, values } = await fetchYahooChart(symbol, "2y");
+      attempts.push({
+        symbol,
+        status: "fetched",
+        url,
+        observations: values.length,
+        firstDate: values[0]?.isoDate || null as any,
+        lastDate: values.at(-1)?.isoDate || null as any,
+      });
+
       if (values.length < 40) throw new Error("sem histórico suficiente");
 
       const now = new Date();
@@ -292,10 +292,13 @@ async function fetchIfixReturns() {
         observations: values.length,
         comparisonReady,
         quality: comparisonReady ? "secondary_calculated" : "incomplete",
+        attempts,
         note: "Fonte secundária. Para auditoria institucional, substituir por fonte oficial/licenciada da B3 quando disponível no projeto.",
       };
     } catch (err: any) {
-      errors.push(`${symbol}: ${err.message || "erro"}`);
+      const message = err.message || "erro";
+      errors.push(`${symbol}: ${message}`);
+      attempts.push({ symbol, status: "error", error: message });
     }
   }
 
@@ -310,6 +313,7 @@ async function fetchIfixReturns() {
     lastDate: null,
     comparisonReady: false,
     quality: "unavailable",
+    attempts,
     errors,
   };
 }
@@ -365,6 +369,72 @@ function isFresh(data: any) {
   const updatedAt = data?.updatedAt;
   const date = typeof updatedAt?.toDate === "function" ? updatedAt.toDate() : updatedAt ? new Date(updatedAt) : null;
   return Boolean(date && !Number.isNaN(date.getTime()) && Date.now() - date.getTime() < CACHE_TTL_MS);
+}
+
+function summarizeBenchmarks(data: any) {
+  return {
+    generatedAt: data?.generatedAt || null,
+    date: data?.date || null,
+    ifix: {
+      ok: Boolean(data?.ifix?.comparisonReady),
+      symbol: data?.ifix?.symbol || null,
+      close: data?.ifix?.close ?? null,
+      monthReturn: data?.ifix?.monthReturn ?? null,
+      yearReturn: data?.ifix?.yearReturn ?? null,
+      twelveMonthsReturn: data?.ifix?.twelveMonthsReturn ?? null,
+      lastDate: data?.ifix?.lastDate || null,
+      quality: data?.ifix?.quality || null,
+      attempts: data?.ifix?.attempts || [],
+      errors: data?.ifix?.errors || [],
+    },
+    cdi: {
+      ok: Boolean(data?.cdi?.comparisonReady),
+      monthReturn: data?.cdi?.monthReturn ?? null,
+      yearReturn: data?.cdi?.yearReturn ?? null,
+      twelveMonthsReturn: data?.cdi?.twelveMonthsReturn ?? null,
+      lastDate: data?.cdi?.lastDate || null,
+      observations: data?.cdi?.observations || null,
+      quality: data?.cdi?.quality || null,
+    },
+    ipca: {
+      ok: Boolean(data?.ipca?.comparisonReady),
+      monthReturn: data?.ipca?.monthReturn ?? null,
+      yearReturn: data?.ipca?.yearReturn ?? null,
+      twelveMonthsReturn: data?.ipca?.twelveMonthsReturn ?? null,
+      lastDate: data?.ipca?.lastDate || null,
+    },
+    selic: {
+      ok: Boolean(data?.selic?.comparisonReady),
+      rate: data?.selic?.rate ?? null,
+      date: data?.selic?.date || null,
+    },
+  };
+}
+
+export async function diagnoseMarketBenchmarks() {
+  const latestBefore = await adminDb.collection(COLLECTION).doc(LATEST_DOC).get();
+  const cachedBefore = latestBefore.exists ? cleanBenchmarkData(latestBefore.data()) : null;
+  let fresh: any = null;
+  let error: string | null = null;
+
+  try {
+    fresh = await fetchFreshBenchmarks();
+  } catch (err: any) {
+    error = err.message || "Erro ao atualizar benchmarks.";
+  }
+
+  const latestAfter = await adminDb.collection(COLLECTION).doc(LATEST_DOC).get();
+  const cachedAfter = latestAfter.exists ? cleanBenchmarkData(latestAfter.data()) : null;
+  const current = fresh || cachedAfter || cachedBefore;
+
+  return {
+    ok: Boolean(fresh),
+    error,
+    summary: summarizeBenchmarks(current),
+    fresh,
+    cachedBefore,
+    cachedAfter,
+  };
 }
 
 export async function getMarketBenchmarks(options?: { forceRefresh?: boolean }) {
