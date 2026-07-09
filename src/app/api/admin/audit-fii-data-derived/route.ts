@@ -136,6 +136,34 @@ function sortedFieldPaths(paths: Map<string, number>, total: number) {
     .slice(0, 250);
 }
 
+function parseLimit(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
+function wantsTextDownload(req: NextRequest, body?: any) {
+  const format = String(req.nextUrl.searchParams.get("format") || body?.format || "").toLowerCase();
+  const download = String(req.nextUrl.searchParams.get("download") || body?.download || "").toLowerCase();
+  return format === "txt" || format === "text" || download === "true" || download === "1";
+}
+
+function textDownloadResponse(filename: string, payload: unknown) {
+  return new NextResponse(JSON.stringify(payload, null, 2), {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function getFiisSnapshot(limit?: number) {
+  let query: any = adminDb.collection(COLLECTION);
+  if (limit) query = query.limit(limit);
+  return query.get();
+}
+
 function auditDocs(docs: Array<{ id: string; data: any }>) {
   const total = docs.length;
   const allFieldPaths = new Map<string, number>();
@@ -199,13 +227,16 @@ function auditDocs(docs: Array<{ id: string; data: any }>) {
   };
 }
 
-async function runAudit(limit: number) {
-  const snapshot = await adminDb.collection(COLLECTION).limit(limit).get();
+async function runAudit(limit?: number) {
+  const snapshot = await getFiisSnapshot(limit);
   const docs = snapshot.docs.map((doc) => {
     const raw = doc.data() || {};
     return { id: doc.id, data: { ...raw, ...deriveFiiRiskData(raw) } };
   });
-  const audit = auditDocs(docs);
+  const audit = {
+    ...auditDocs(docs),
+    limitApplied: limit || null,
+  };
 
   await adminDb.collection(AUDIT_COLLECTION).doc("latestDerivedPreview").set({
     ...audit,
@@ -219,9 +250,12 @@ export async function GET(req: NextRequest) {
   try {
     if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 1000), 3000);
+    const limit = parseLimit(req.nextUrl.searchParams.get("limit"));
     const audit = await runAudit(limit);
-    return NextResponse.json({ ok: true, audit });
+    const payload = { ok: true, audit };
+
+    if (wantsTextDownload(req)) return textDownloadResponse(`audit-fii-data-derived-${audit.date}.txt`, payload);
+    return NextResponse.json(payload);
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao auditar dados derivados dos FIIs." }, { status: 500 });
   }
@@ -232,9 +266,12 @@ export async function POST(req: NextRequest) {
   try {
     if (!isAuthorized(req, body)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const limit = Math.min(Number(body?.limit || 1000), 3000);
+    const limit = parseLimit(body?.limit);
     const audit = await runAudit(limit);
-    return NextResponse.json({ ok: true, audit });
+    const payload = { ok: true, audit };
+
+    if (wantsTextDownload(req, body)) return textDownloadResponse(`audit-fii-data-derived-${audit.date}.txt`, payload);
+    return NextResponse.json(payload);
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao auditar dados derivados dos FIIs." }, { status: 500 });
   }
