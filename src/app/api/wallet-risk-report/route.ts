@@ -56,14 +56,17 @@ function quotaOf(value: unknown) {
 
 function numberOf(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  const parsed = Number(
-    String(value || "")
-      .replace("R$", "")
-      .replace(/\./g, "")
-      .replace(",", ".")
-      .replace("%", "")
-      .trim()
-  );
+
+  const raw = String(value || "")
+    .replace("R$", "")
+    .replace("%", "")
+    .trim();
+
+  const normalized = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
