@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const COLLECTION = "Fiis";
-const ENRICHMENT_VERSION = "derived-risk-v1";
+const ENRICHMENT_VERSION = "derived-risk-v2";
 
 function allowedSecrets() {
   return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
