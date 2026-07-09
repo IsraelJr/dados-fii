@@ -96,6 +96,14 @@ function readWallet(): WalletItem[] {
     }
 }
 
+function walletCachePart(wallet: WalletItem[]) {
+    return [...wallet]
+        .filter((item) => item.ticker)
+        .sort((a, b) => a.ticker.localeCompare(b.ticker))
+        .map((item) => `${item.ticker}:${Number(item.quotas || 0)}`)
+        .join("|");
+}
+
 function readTopFiisCache(): string[] | null {
     if (typeof window === "undefined") return null;
 
@@ -254,7 +262,7 @@ export default function HomeDividendCalendar() {
     }, []);
 
     const tickers = useMemo(() => selectHomeTickers(wallet, topFiis), [wallet, topFiis]);
-    const tickersKey = useMemo(() => tickers.join("|"), [tickers]);
+    const tickersKey = useMemo(() => `${tickers.join("|")}::${walletCachePart(wallet)}`, [tickers, wallet]);
 
     useEffect(() => {
         let active = true;
