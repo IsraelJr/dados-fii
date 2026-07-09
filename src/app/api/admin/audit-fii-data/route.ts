@@ -27,7 +27,7 @@ const GROUPS: GroupDefinition[] = [
     description: "Dados básicos para classificar o FII e agrupar a carteira.",
     fields: [
       { label: "ticker", paths: ["code", "ticker", "symbol"], critical: true },
-      { label: "nome", paths: ["name", "nome", "shortName", "razaoSocial", "razao_social", "socialReason" ] },
+      { label: "nome", paths: ["name", "nome", "shortName", "razaoSocial", "razao_social", "socialReason"] },
       { label: "segmento", paths: ["segment", "segment_new", "segmento"], critical: true },
       { label: "setor", paths: ["sector", "setor"], critical: true },
       { label: "tipo de fundo", paths: ["fundType", "type", "tipo", "tipoFundo"], critical: true },
@@ -198,6 +198,34 @@ function toSortedFieldList(paths: Map<string, number>, total: number) {
     .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path));
 }
 
+function parseLimit(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined;
+}
+
+function wantsTextDownload(req: NextRequest, body?: any) {
+  const format = String(req.nextUrl.searchParams.get("format") || body?.format || "").toLowerCase();
+  const download = String(req.nextUrl.searchParams.get("download") || body?.download || "").toLowerCase();
+  return format === "txt" || format === "text" || download === "true" || download === "1";
+}
+
+function textDownloadResponse(filename: string, payload: unknown) {
+  return new NextResponse(JSON.stringify(payload, null, 2), {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+async function getFiisSnapshot(limit?: number) {
+  let query: any = adminDb.collection(COLLECTION);
+  if (limit) query = query.limit(limit);
+  return query.get();
+}
+
 function calculateTickerScores(docs: Array<{ id: string; data: any }>, onlyCore = false) {
   return docs.map((doc) => {
     const ticker = tickerOf(doc.id, doc.data);
@@ -303,10 +331,13 @@ function auditDocs(docs: Array<{ id: string; data: any }>) {
   };
 }
 
-async function runAudit(limit: number) {
-  const snapshot = await adminDb.collection(COLLECTION).limit(limit).get();
+async function runAudit(limit?: number) {
+  const snapshot = await getFiisSnapshot(limit);
   const docs = snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() || {} }));
-  const audit = auditDocs(docs);
+  const audit = {
+    ...auditDocs(docs),
+    limitApplied: limit || null,
+  };
 
   await adminDb.collection(AUDIT_COLLECTION).doc("latest").set({
     ...audit,
@@ -325,9 +356,12 @@ export async function GET(req: NextRequest) {
   try {
     if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 1000), 3000);
+    const limit = parseLimit(req.nextUrl.searchParams.get("limit"));
     const audit = await runAudit(limit);
-    return NextResponse.json({ ok: true, audit });
+    const payload = { ok: true, audit };
+
+    if (wantsTextDownload(req)) return textDownloadResponse(`audit-fii-data-${audit.date}.txt`, payload);
+    return NextResponse.json(payload);
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao auditar base de FIIs." }, { status: 500 });
   }
@@ -338,9 +372,12 @@ export async function POST(req: NextRequest) {
   try {
     if (!isAuthorized(req, body)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const limit = Math.min(Number(body?.limit || 1000), 3000);
+    const limit = parseLimit(body?.limit);
     const audit = await runAudit(limit);
-    return NextResponse.json({ ok: true, audit });
+    const payload = { ok: true, audit };
+
+    if (wantsTextDownload(req, body)) return textDownloadResponse(`audit-fii-data-${audit.date}.txt`, payload);
+    return NextResponse.json(payload);
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || "Erro ao auditar base de FIIs." }, { status: 500 });
   }
