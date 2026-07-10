@@ -46,8 +46,7 @@ export async function GET(req: NextRequest) {
   try {
     if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const output = await diagnoseMarketBenchmarks();
-    const payload = { ok: true, ...output };
+    const payload = await diagnoseMarketBenchmarks();
 
     if (wantsTextOutput(req)) {
       return textOutputResponse(`diagnose-market-benchmarks-${new Date().toISOString().slice(0, 10)}.txt`, payload, wantsAttachment(req));
@@ -65,8 +64,7 @@ export async function POST(req: NextRequest) {
   try {
     if (!isAuthorized(req, body)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
 
-    const output = await diagnoseMarketBenchmarks();
-    const payload = { ok: true, ...output };
+    const payload = await diagnoseMarketBenchmarks();
 
     if (wantsTextOutput(req, body)) {
       return textOutputResponse(`diagnose-market-benchmarks-${new Date().toISOString().slice(0, 10)}.txt`, payload, wantsAttachment(req, body));
