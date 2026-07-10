@@ -264,7 +264,11 @@ async function fetchBrapiHistorical(symbol: string) {
     },
   });
 
-  if (!res.ok) throw new Error(`brapi ${symbol} HTTP ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    const detail = body ? ` - ${body.slice(0, 500)}` : "";
+    throw new Error(`brapi ${symbol} HTTP ${res.status}${detail}`);
+  }
 
   const json = await res.json();
   const result = Array.isArray(json?.results) ? json.results[0] : null;
@@ -349,8 +353,8 @@ function buildIndexReturnResult(params: {
 async function fetchIfixReturns() {
   const attempts: BenchmarkAttempt[] = [];
   const errors: string[] = [];
-  const brapiSymbols = envList("BENCHMARK_IFIX_BRAPI_SYMBOLS", "^IFIX,IFIX");
-  const yahooSymbols = envList("BENCHMARK_IFIX_SYMBOLS", "^IFIX,IFIX.SA");
+  const brapiSymbols = envList("BENCHMARK_IFIX_BRAPI_SYMBOLS", "IFIX.SA,^IFIX,IFIX");
+  const yahooSymbols = envList("BENCHMARK_IFIX_SYMBOLS", "IFIX.SA,^IFIX");
 
   for (const symbol of brapiSymbols) {
     try {
