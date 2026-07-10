@@ -621,7 +621,7 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
         <div>
           <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução patrimonial</p>
           <h2 className="mt-3 text-xl font-black text-slate-900">Histórico por ano</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Ao abrir, exibimos o ano corrente. Use os botões para consultar anos anteriores, limitado aos últimos 5 anos.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Use os botões para consultar anos anteriores, limitado aos últimos 5 anos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {years.map((year) => {
@@ -780,9 +780,17 @@ function LineHistoryChart({ snapshots, year }: { snapshots: WalletSnapshot[]; ye
 }
 
 function DividendSnapshotChart({ snapshots, year }: { snapshots: WalletSnapshot[]; year: number }) {
-  const max = Math.max(...snapshots.map((item) => item.estimatedMonthlyIncome), 1);
+  const points = snapshots.map((item) => item.estimatedMonthlyIncome);
   if (!snapshots.length) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Nenhum pagamento registrado em {year} ainda.</div>;
-  return <div className="grid min-h-56 grid-flow-col auto-cols-fr items-end gap-2 overflow-x-auto rounded-2xl bg-white p-4 ring-1 ring-slate-200">{snapshots.map((item) => { const height = Math.max((item.estimatedMonthlyIncome / max) * 100, 28); return <div key={item.monthKey} className="flex h-48 min-w-[76px] flex-col justify-end"><div className="relative flex min-h-[3.5rem] items-start justify-center rounded-t-2xl bg-emerald-500 px-1 pt-2 text-center shadow-sm" style={{ height: `${height}%` }}><span className="text-[10px] font-black leading-3 text-white drop-shadow-sm">{getSnapshotMonthLabel(item)}<br />{formatCurrencyCompact(item.estimatedMonthlyIncome)}</span></div></div>; })}</div>;
+  const min = Math.min(...points, 0);
+  const max = Math.max(...points, 1);
+  const range = max - min || 1;
+  const coords = snapshots.map((item, index) => {
+    const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20;
+    const y = 120 - ((item.estimatedMonthlyIncome - min) / range) * 82 + 24;
+    return `${x},${y}`;
+  }).join(" ");
+  return <svg viewBox="0 0 360 170" className="h-52 w-full rounded-2xl bg-white ring-1 ring-slate-200">{snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}{snapshots.map((item, index) => { const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20; const y = 120 - ((item.estimatedMonthlyIncome - min) / range) * 82 + 24; const labelBelow = index % 2 === 1 || y < 42; const labelY = labelBelow ? y + 18 : y - 26; return <g key={item.monthKey}><circle cx={x} cy={y} r="4.5" className="fill-indigo-700" /><text x={x} y={labelY} textAnchor="middle" className="fill-slate-600 text-[9px] font-bold">{getSnapshotMonthLabel(item)}</text><text x={x} y={labelY + 11} textAnchor="middle" className="fill-slate-800 text-[9px] font-black">{formatCurrencyCompact(item.estimatedMonthlyIncome)}</text></g>; })}</svg>;
 }
 
 function FiiTickerLink({ ticker }: { ticker: string }) {
