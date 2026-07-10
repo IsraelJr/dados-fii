@@ -17,6 +17,8 @@ const db = admin.firestore();
 const SHEET_ID = process.env.SHEET_ID!;
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY!;
 const RANGE = "A1:F400";
+const PRICE_SOURCE_LABEL = "Planilha de cotações Dados FII";
+const FUND_SOURCE_LABEL = "Base interna Dados FII";
 
 interface FiiData {
   code: string;
@@ -67,6 +69,19 @@ function normalizeDividendFields(data: any) {
 function normalizeTicker(value: unknown) {
   const ticker = String(value || "").trim().toUpperCase();
   return /^[A-Z0-9]{4,8}$/.test(ticker) ? ticker : "";
+}
+
+function withSourceMetadata(data: any, options: { hasPrice: boolean; hasFundData: boolean }) {
+  return {
+    ...(data || {}),
+    dataSources: {
+      price: options.hasPrice ? PRICE_SOURCE_LABEL : "Preço indisponível",
+      fund: options.hasFundData ? FUND_SOURCE_LABEL : "Dados cadastrais/dividendos indisponíveis",
+    },
+    marketDataSource: options.hasPrice ? PRICE_SOURCE_LABEL : null,
+    fundDataSource: options.hasFundData ? FUND_SOURCE_LABEL : null,
+    marketDataUpdatedAt: new Date().toISOString(),
+  };
 }
 
 async function getAllPricesFromSheet(): Promise<FiiData[]> {
@@ -148,10 +163,13 @@ export async function POST(req: Request) {
         return;
       }
 
-      items[ticker] = {
-        ...(docData || {}),
-        ...(match || { code: ticker, price: "-", opening: "-", variation: "-", minimum: "-", maximum: "-" }),
-      };
+      items[ticker] = withSourceMetadata(
+        {
+          ...(docData || {}),
+          ...(match || { code: ticker, price: "-", opening: "-", variation: "-", minimum: "-", maximum: "-" }),
+        },
+        { hasPrice: Boolean(match), hasFundData: Boolean(docData) }
+      );
     });
 
     return NextResponse.json(
