@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Crown, Download, FileText, Loader2, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import LottieAnimation from "./LottieAnimation";
 
 type ReportStatus = {
   ok: boolean;
@@ -35,6 +36,29 @@ function isAllowedPilotEmail(email: string) {
 function filenameFromDisposition(value: string | null) {
   const match = value?.match(/filename="?([^";]+)"?/i);
   return match?.[1] || "relatorio-risco-carteira.pdf";
+}
+
+function ReportLoadingState({ mode, isVip }: { mode: "generating" | "pdf" | "status"; isVip: boolean }) {
+  const text = mode === "pdf"
+    ? "Preparando o PDF do relatório..."
+    : mode === "status"
+      ? "Consultando seu relatório..."
+      : "Analisando riscos da carteira...";
+  const detail = mode === "pdf"
+    ? "Isso normalmente é rápido, mas pode variar conforme a conexão."
+    : mode === "status"
+      ? "Verificando se já existe relatório disponível para este mês."
+      : "Concentração, dividendos, liquidez, valuation e cenário macro em processamento.";
+
+  return (
+    <div className={`rounded-2xl p-4 text-center ring-1 ${isVip ? "bg-gray-950/70 ring-white/10" : "bg-white/80 ring-indigo-100"}`}>
+      <div className="mx-auto flex justify-center">
+        <LottieAnimation src="/lottie/risk-report.json" label={text} className="h-28 w-28" />
+      </div>
+      <p className={`mt-2 text-sm font-extrabold ${isVip ? "text-emerald-100" : "text-slate-900"}`}>{text}</p>
+      <p className={`mt-1 text-xs font-medium leading-5 ${isVip ? "text-gray-400" : "text-slate-600"}`}>{detail}</p>
+    </div>
+  );
 }
 
 export default function WalletRiskReportCard({ walletCount }: { walletCount: number }) {
@@ -172,6 +196,8 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
   const canGenerate = isVip || credits > 0;
   const hasWallet = walletCount > 0 || Number(status?.walletCount || 0) > 0;
   const canDownloadPdf = hasCurrentReport || Boolean(reportMarkdown);
+  const loadingReportAction = loadingStatus || generating || downloadingPdf;
+  const loadingMode = downloadingPdf ? "pdf" : loadingStatus ? "status" : "generating";
 
   return (
     <section className={`mt-6 overflow-hidden rounded-2xl p-5 shadow-lg ring-1 ${isVip ? "bg-gray-900 text-gray-100 ring-emerald-400/30" : "bg-gradient-to-br from-amber-100 via-white to-indigo-50 text-slate-900 ring-amber-300"}`}>
@@ -204,10 +230,8 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
         </div>
 
         <div className="grid w-full gap-3 lg:max-w-xs">
-          {loadingStatus ? (
-            <div className={`flex items-center justify-center gap-2 rounded-xl p-3 text-sm font-bold ${isVip ? "bg-gray-800 text-gray-200" : "bg-white text-slate-700"}`}>
-              <Loader2 className="animate-spin" size={18} /> Consultando status...
-            </div>
+          {loadingReportAction ? (
+            <ReportLoadingState mode={loadingMode as "generating" | "pdf" | "status"} isVip={isVip} />
           ) : (
             <>
               <button
@@ -219,7 +243,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
                   : "cursor-not-allowed bg-slate-300 text-slate-600"
                   }`}
               >
-                {generating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+                <FileText size={18} />
                 {hasCurrentReport ? "Abrir relatório do mês" : "Gerar prompt do relatório"}
               </button>
 
@@ -233,7 +257,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
                     : "bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
                     }`}
                 >
-                  {downloadingPdf ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                  <Download size={18} />
                   Baixar PDF
                 </button>
               )}
