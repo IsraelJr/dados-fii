@@ -756,7 +756,7 @@ function UpcomingPaymentsSection({ payments, shouldScroll }: { payments: Payment
         <p className="text-sm font-medium text-gray-300">Ainda não há pagamentos futuros identificados para os FIIs da sua carteira.</p>
       ) : (
         <ul className={`${shouldScroll ? "max-h-[520px] overflow-y-auto pr-2" : ""} space-y-3`}>
-          {payments.map((payment) => <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center"><div><FiiTickerLink ticker={payment.ticker} /><span className="ml-2 text-sm font-medium text-gray-300">{MONTHS_PTBR[payment.month] || payment.month} · Pagamento em {payment.date}</span></div><strong className="text-green-300">{formatCurrency(payment.amount)}</strong></li>)}
+          {payments.map((payment) => <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center"><div><FiiTickerLink ticker={payment.ticker} /><span className="ml-2 text-sm font-medium text-gray-300">Pagamento em {payment.date}</span></div><strong className="text-green-300">{formatCurrency(payment.amount)}</strong></li>)}
         </ul>
       )}
     </section>
@@ -787,28 +787,6 @@ function BarList({ items, emptyText = "Sem dados suficientes para exibir." }: { 
   return <div className="space-y-3">{filtered.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold"><span className="truncate text-slate-700">{item.label}</span><span className="shrink-0 text-slate-500">{item.detail || formatCurrency(item.value)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((item.value / max) * 100, 3)}%` }} /></div></div>)}</div>;
 }
 
-function MobileHistoryList({ snapshots, getValue }: { snapshots: WalletSnapshot[]; getValue: (item: WalletSnapshot) => number }) {
-  const max = Math.max(...snapshots.map(getValue), 1);
-  return (
-    <div className="space-y-2 md:hidden">
-      {snapshots.map((item) => {
-        const value = getValue(item);
-        return (
-          <div key={`mobile-${item.monthKey}`} className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
-            <div className="flex items-center justify-between gap-3 text-xs font-extrabold text-slate-700">
-              <span>{getSnapshotMonthLabel(item)}</span>
-              <span>{formatCurrencyCompact(value)}</span>
-            </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((value / max) * 100, 6)}%` }} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function HistoryLineChart({ snapshots, getValue, emptyText }: { snapshots: WalletSnapshot[]; getValue: (item: WalletSnapshot) => number; emptyText: string }) {
   const points = snapshots.map(getValue).filter((value) => value > 0);
   if (!snapshots.length || !points.length) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">{emptyText}</div>;
@@ -823,8 +801,7 @@ function HistoryLineChart({ snapshots, getValue, emptyText }: { snapshots: Walle
   }).join(" ");
   return (
     <>
-      <MobileHistoryList snapshots={snapshots} getValue={getValue} />
-      <div className="hidden max-w-full overflow-x-auto md:block">
+      <div className="max-w-full overflow-x-auto">
         <svg viewBox={`0 0 ${width} 180`} className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200" style={{ width }}>
           {snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}
           {snapshots.map((item, index) => {
