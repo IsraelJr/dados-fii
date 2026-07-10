@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v1.8.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v1.9.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -18,6 +18,7 @@ export type RiskReportPortfolioItem = {
   vpCota?: number;
   netWorth?: number;
   marketCap?: number;
+  valuationDataQuality?: Record<string, unknown>;
   lastDividend?: number;
   lastDividendDate?: string;
   averageDividend12m?: number;
@@ -76,6 +77,9 @@ Regras obrigatórias:
 - Se numberShares estiver disponível, use como quantidade de cotas emitidas. Não confunda com a quantidade de cotas do investidor.
 - Se numberShareholders estiver ausente, diga apenas que faltam dados de cotistas, e não que faltam todos os dados de liquidez.
 - Se pvp ou vpCota estiverem zerados, negativos ou incoerentes, ignore-os e trate como dado não confiável. Não exiba P/VP ou VP por cota igual a zero.
+- Nunca chame patrimônio líquido de valor de mercado. Valor de mercado deve ser tratado como preço atual multiplicado por cotas emitidas quando marketCapSource indicar cálculo ou quando marketCap vier validado.
+- Se valuationDataQuality trouxer notas de unidade ausente ou incompatível, explique que o dado patrimonial bruto foi desconsiderado por prudência. Não exiba valores como "1,5", "821,1" ou semelhantes sem unidade explícita.
+- Se marketCap estiver disponível, escreva "valor de mercado calculado" quando marketCapSource indicar "preço atual x cotas emitidas". Não escreva "valor de mercado informado" nesses casos.
 - Use CDI, IPCA, Selic e IFIX quando benchmarkData trouxer retornos, fechamento ou taxa atual.
 - Para CDI vindo da série oficial do Banco Central, trate os retornos acumulados como utilizáveis quando comparisonReady for verdadeiro.
 - Para IFIX com currentReady verdadeiro, informe o fechamento atual, a data e a fonte. Não escreva que o IFIX é não confiável; diga apenas que os retornos acumulados do IFIX ainda não estão disponíveis quando monthReturn, yearReturn ou twelveMonthsReturn estiverem ausentes.
@@ -125,7 +129,7 @@ Use tabela em Markdown com segmento, valor financeiro, percentual da carteira e 
 Inclua tabela em Markdown com ativo, liquidez diária, cotas emitidas, cotistas, participação no IFIX, dias para zerar, leitura de risco e observação curta.
 
 ## Valuation
-Não exiba P/VP, VP por cota ou valor patrimonial igual a zero. Se o dado estiver zerado, negativo, ausente ou incoerente, escreva "dados não confiáveis" e explique uma única vez.
+Não exiba P/VP, VP por cota, patrimônio líquido ou valor de mercado igual a zero. Separe claramente: valor de mercado calculado, patrimônio líquido, VP por cota e P/VP. Se o dado patrimonial tiver unidade ausente ou incompatível, escreva "dado patrimonial desconsiderado por prudência". Não use a expressão "valor de mercado informado" quando o valor vier de preço atual x cotas emitidas.
 
 ## Benchmarks
 Inclua uma tabela curta com IFIX, CDI, IPCA e Selic quando disponíveis. Para IFIX, se houver apenas fechamento atual, mostre pontos, data e fonte; nos retornos, escreva "não disponível". Para CDI, IPCA e Selic, use os retornos/taxas disponíveis. Não diga que o IFIX é não confiável quando houver fechamento atual válido.
@@ -185,7 +189,7 @@ ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
+Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Em valuation, separe patrimônio líquido de valor de mercado e não exiba dados patrimoniais com unidade duvidosa. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
 `.trim();
 }
 
