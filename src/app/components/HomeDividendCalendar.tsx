@@ -177,19 +177,17 @@ function getCurrentYearData(data: any) {
     return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {};
 }
 
-function chooseNextEventByTicker(items: CalendarItem[], orderedTickers: string[]) {
-    const byTicker = new Map<string, CalendarItem>();
+function chooseUpcomingEvents(items: CalendarItem[]) {
+    const seenTickers = new Set<string>();
 
-    items
+    return [...items]
         .sort((a, b) => a.paymentKey.localeCompare(b.paymentKey) || a.ticker.localeCompare(b.ticker))
-        .forEach((item) => {
-            if (!byTicker.has(item.ticker)) byTicker.set(item.ticker, item);
-        });
-
-    return orderedTickers
-        .map((ticker) => byTicker.get(ticker))
-        .filter(Boolean)
-        .slice(0, 3) as CalendarItem[];
+        .filter((item) => {
+            if (seenTickers.has(item.ticker)) return false;
+            seenTickers.add(item.ticker);
+            return true;
+        })
+        .slice(0, 3);
 }
 
 function selectHomeTickers(wallet: WalletItem[], topFiis: string[]) {
@@ -197,9 +195,11 @@ function selectHomeTickers(wallet: WalletItem[], topFiis: string[]) {
         .filter((item) => item.ticker)
         .sort((a, b) => (Number(b.quotas) || 0) - (Number(a.quotas) || 0) || a.ticker.localeCompare(b.ticker))
         .map((item) => item.ticker);
-    const fallbackTickers = topFiis.filter((ticker) => !walletTickers.includes(ticker));
+    const uniqueWalletTickers = Array.from(new Set(walletTickers));
 
-    return Array.from(new Set([...walletTickers, ...fallbackTickers])).slice(0, 3);
+    if (uniqueWalletTickers.length) return uniqueWalletTickers;
+
+    return Array.from(new Set(topFiis.filter(Boolean))).slice(0, 3);
 }
 
 function EventCard({ event, featured = false }: { event: CalendarItem; featured?: boolean }) {
@@ -319,7 +319,7 @@ export default function HomeDividendCalendar() {
 
             if (!active) return;
 
-            const nextEvents = chooseNextEventByTicker(items, tickers);
+            const nextEvents = chooseUpcomingEvents(items);
             setEvents(nextEvents);
             saveCache(tickersKey, nextEvents);
             setLoading(false);
@@ -336,6 +336,7 @@ export default function HomeDividendCalendar() {
 
     const featuredEvent = events[0];
     const sideEvents = events.slice(1, 3);
+    const hasWallet = wallet.length > 0;
 
     return (
         <div className="mx-auto mt-6 max-w-4xl rounded-2xl border border-indigo-500/20 bg-gray-900 p-5 text-left text-gray-100 shadow-lg">
@@ -364,8 +365,8 @@ export default function HomeDividendCalendar() {
                 </p>
             ) : !events.length ? (
                 <div className="rounded-xl bg-gray-800 p-4 text-sm text-gray-400">
-                    <p>Nenhum pagamento futuro encontrado para esses FIIs no momento.</p>
-                    <p className="mt-1">Adicione FIIs à carteira para personalizar este bloco.</p>
+                    <p>{hasWallet ? "Nenhum pagamento futuro identificado para os FIIs da sua carteira no momento." : "Nenhum pagamento futuro encontrado para esses FIIs no momento."}</p>
+                    <p className="mt-1">{hasWallet ? "Veja o calendário completo ou aguarde novas divulgações de dividendos." : "Adicione FIIs à carteira para personalizar este bloco."}</p>
                 </div>
             ) : (
                 <div className="grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
@@ -374,8 +375,8 @@ export default function HomeDividendCalendar() {
                         {sideEvents.length ? (
                             sideEvents.map((event) => <EventCard key={`${event.ticker}-${event.paymentDate}-${event.month}`} event={event} />)
                         ) : (
-                            <Link href="/carteira" className="flex min-h-32 items-center rounded-2xl border border-dashed border-gray-700 p-4 text-sm font-bold text-gray-300 hover:border-indigo-400 hover:text-indigo-200">
-                                Adicione mais FIIs à carteira para completar este resumo.
+                            <Link href="/calendario-dividendos-fiis" className="flex min-h-32 items-center rounded-2xl border border-dashed border-gray-700 p-4 text-sm font-bold text-gray-300 hover:border-indigo-400 hover:text-indigo-200">
+                                {hasWallet ? "Os demais FIIs da sua carteira ainda não têm pagamento futuro identificado neste período." : "Veja o calendário completo para encontrar mais pagamentos."}
                             </Link>
                         )}
                     </div>
