@@ -7,17 +7,10 @@ import { useEffect, useState } from "react";
 const EMAIL_KEY = "dados-fii-wallet-email";
 
 function allowedAdminEmails() {
-  const explicit = String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+  return String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
-
-  const pilot = String(process.env.NEXT_PUBLIC_RISK_REPORT_ALLOWED_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-
-  return Array.from(new Set([...explicit, ...pilot]));
 }
 
 export default function AdminEntryLink() {
