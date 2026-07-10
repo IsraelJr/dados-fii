@@ -278,7 +278,7 @@ export default function DividendCalendarPage() {
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
               <p className="text-base font-extrabold text-white">Pagamentos da semana</p>
               <strong className="mt-2 block text-3xl text-green-300">{data?.weekPayments?.length || data?.nextEvents?.length || 0}</strong>
-              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos da semana atual ou, aos domingos, da próxima semana.</p>
+              <p className="mt-2 text-sm font-medium text-gray-300">Pagamentos da semana atual ou da próxima semana.</p>
             </div>
             <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
               <p className="text-base font-extrabold text-white">Anunciados no mês</p>
