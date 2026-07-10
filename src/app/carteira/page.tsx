@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarDays, Download, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import WalletRiskReportCard from "../components/WalletRiskReportCard";
+import AppToast from "../components/AppToast";
 
 type WalletItem = {
   ticker: string;
@@ -170,6 +171,15 @@ function buildCsv(items: LoadedFii[]) {
     .join("\n");
 }
 
+function toastVariant(message: string): "success" | "error" | "warning" | "info" {
+  if (!message) return "info";
+  const normalized = message.toLowerCase();
+  if (normalized.includes("informe") || normalized.includes("erro")) return "warning";
+  if (normalized.includes("falha") || normalized.includes("falhas")) return "warning";
+  if (normalized.includes("removido") || normalized.includes("atualizado") || normalized.includes("adicionado") || normalized.includes("sucesso")) return "success";
+  return "info";
+}
+
 export default function WalletPage() {
   const [ticker, setTicker] = useState("");
   const [quotas, setQuotas] = useState("");
@@ -212,7 +222,6 @@ export default function WalletPage() {
       }
 
       setLoading(true);
-      setMessage("");
 
       try {
         const response = await fetch("/api/fii/batch", {
@@ -314,15 +323,17 @@ export default function WalletPage() {
       return;
     }
 
+    let existed = false;
     setItems((current) => {
       const existing = current.find((item) => item.ticker === code);
+      existed = Boolean(existing);
       if (existing) return current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item);
       return [...current, { ticker: code, quotas: totalQuotas }].sort((a, b) => a.ticker.localeCompare(b.ticker));
     });
 
     setTicker("");
     setQuotas("");
-    setMessage("");
+    setMessage(existed ? `${code} atualizado para ${totalQuotas} cotas.` : `${code} adicionado à carteira.`);
   }
 
   function updateQuotas(code: string) {
@@ -344,6 +355,7 @@ export default function WalletPage() {
       delete next[code];
       return next;
     });
+    setMessage(`${code} removido da carteira.`);
   }
 
   function exportCsv() {
@@ -355,12 +367,12 @@ export default function WalletPage() {
     link.download = "minha-carteira-fiis.csv";
     link.click();
     URL.revokeObjectURL(url);
+    setMessage("Carteira exportada em CSV.");
   }
 
   async function updateMissingDividends() {
     if (!insights.waiting.length) return;
     setUpdatingMissing(true);
-    setMessage("");
 
     let updated = 0;
     let failed = 0;
@@ -387,6 +399,8 @@ export default function WalletPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
+      <AppToast message={message} variant={toastVariant(message)} onClose={() => setMessage("")} />
+
       <PageHeader
         title="Minha Carteira"
         subtitle="Salva neste navegador. Adicione seus FIIs e veja renda estimada e próximos pagamentos."
@@ -482,7 +496,6 @@ export default function WalletPage() {
           <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
           <button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
         </div>
-        {message && <p className="mt-3 text-sm font-medium text-yellow-200">{message}</p>}
       </section>
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
