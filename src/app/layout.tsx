@@ -19,7 +19,7 @@ const ADSENSE_CLIENT =
   process.env.NEXT_PUBLIC_ADS_OPEN ||
   "ca-pub-3245357129779122";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://dadosfii.com.br";
+const SITE_URL = "https://dadosfii.com.br";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
