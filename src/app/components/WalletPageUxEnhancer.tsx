@@ -120,6 +120,31 @@ export default function WalletPageUxEnhancer() {
         main svg.h-56 {
           height: 9rem !important;
         }
+
+        main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 0.5rem !important;
+        }
+
+        main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 > div {
+          min-width: 0 !important;
+          padding: 0.7rem !important;
+        }
+
+        main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 > div:nth-child(5) {
+          grid-column: 1 / -1 !important;
+        }
+
+        main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 p:first-child {
+          font-size: 0.66rem !important;
+          line-height: 1rem !important;
+        }
+
+        main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 p:last-child {
+          font-size: 0.8rem !important;
+          line-height: 1.15rem !important;
+          overflow-wrap: anywhere !important;
+        }
       }
     `}</style>
   );
