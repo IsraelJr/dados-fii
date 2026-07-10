@@ -424,9 +424,9 @@ export default function Home() {
             )}
 
             <section className="bg-gradient-to-b from-white to-slate-50 px-4 py-8 md:py-12">
-                <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
-                    <div className="space-y-4 lg:max-w-[640px]">
-                        <div className="rounded-3xl bg-white p-6 text-left shadow-sm ring-1 ring-slate-200 md:p-8">
+                <div className="mx-auto max-w-6xl">
+                    <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-stretch">
+                        <div className="rounded-3xl bg-white p-6 text-left shadow-sm ring-1 ring-slate-200 md:p-8 lg:flex lg:h-full lg:flex-col lg:justify-center">
                             <p className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">
                                 Fundos imobiliários, dividendos e carteira
                             </p>
@@ -466,21 +466,23 @@ export default function Home() {
                             </div>
                         </div>
 
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <aside className="grid h-full gap-3 lg:content-stretch">
+                            <MacroContextStrip macro={macroContext} />
+
+                            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                                <FeatureCard title="Consulta rápida" description="Preço, dividendos, DY, P/VP e dados cadastrais." />
+                                <FeatureCard title="Calendário" description="Data-com, pagamento e rendimento por cota." />
+                                <FeatureCard title="Carteira" description="Renda estimada e próximos pagamentos salvos no navegador." />
+                            </div>
+                        </aside>
+                    </div>
+
+                    <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                        <div className="mx-auto grid w-full max-w-md gap-3">
                             <MarketInfoCard title="Dólar comercial" value={dolar} />
                             <MarketInfoCard title="IFIX" value={ifix} />
                         </div>
                     </div>
-
-                    <aside className="grid gap-3 lg:pt-1">
-                        <MacroContextStrip macro={macroContext} />
-
-                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                            <FeatureCard title="Consulta rápida" description="Preço, dividendos, DY, P/VP e dados cadastrais." />
-                            <FeatureCard title="Calendário" description="Data-com, pagamento e rendimento por cota." />
-                            <FeatureCard title="Carteira" description="Renda estimada e próximos pagamentos salvos no navegador." />
-                        </div>
-                    </aside>
                 </div>
             </section>
 
