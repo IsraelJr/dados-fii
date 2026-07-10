@@ -82,23 +82,41 @@ async function getReports() {
 function summarizeLookups(events: any[]) {
   const lookupEvents = events.filter((event) => event.type === "fii_lookup");
   const success = lookupEvents.filter((event) => event.ok === true && Number(event.statusCode) < 400).length;
-  const notFound = lookupEvents.filter((event) => Number(event.statusCode) === 404).length;
   const errors = lookupEvents.filter((event) => Number(event.statusCode) >= 400).length;
   const total = lookupEvents.length;
   const byTicker = new Map<string, any>();
+  const errorByStatus = new Map<number, { statusCode: number; count: number }>();
 
   lookupEvents.forEach((event) => {
+    const statusCode = Number(event.statusCode || 0);
     const ticker = String(event.ticker || "SEM TICKER").toUpperCase();
-    const current = byTicker.get(ticker) || { ticker, total: 0, success: 0, errors: 0, lastStatusCode: Number(event.statusCode || 0), lastAt: event.createdAt || null };
+    const current = byTicker.get(ticker) || { ticker, total: 0, success: 0, errors: 0, lastStatusCode: statusCode, lastAt: event.createdAt || null };
     current.total += 1;
-    if (event.ok && Number(event.statusCode) < 400) current.success += 1;
-    else current.errors += 1;
-    current.lastStatusCode = Number(event.statusCode || current.lastStatusCode || 0);
+    if (event.ok && statusCode < 400) current.success += 1;
+    else {
+      current.errors += 1;
+      const currentStatus = errorByStatus.get(statusCode) || { statusCode, count: 0 };
+      currentStatus.count += 1;
+      errorByStatus.set(statusCode, currentStatus);
+    }
+    current.lastStatusCode = statusCode || current.lastStatusCode || 0;
     current.lastAt = current.lastAt || event.createdAt || null;
     byTicker.set(ticker, current);
   });
 
-  return { total, success, errors, notFound, successRate: total ? Math.round((success / total) * 100) : 0, recent: lookupEvents.slice(0, 10), byTicker: Array.from(byTicker.values()).sort((a, b) => b.total - a.total).slice(0, 12) };
+  const errorBreakdown = Array.from(errorByStatus.values()).sort((a, b) => b.count - a.count || a.statusCode - b.statusCode);
+  const errorSummary = errorBreakdown.length ? errorBreakdown.map((item) => `${item.count} erro(s) ${item.statusCode}`).join(" · ") : "Nenhum erro nas consultas recentes";
+
+  return {
+    total,
+    success,
+    errors,
+    errorBreakdown,
+    errorSummary,
+    successRate: total ? Math.round((success / total) * 100) : 0,
+    recent: lookupEvents.slice(0, 10),
+    byTicker: Array.from(byTicker.values()).sort((a, b) => b.total - a.total).slice(0, 12),
+  };
 }
 
 async function getEvents() {
