@@ -89,13 +89,31 @@ function correctPortugueseText(value: string) {
   return replacements.reduce((text, [regex, replacement]) => text.replace(regex, replacement), value);
 }
 
+function volatilityRiskText(rawValue: string) {
+  const parsed = Number(String(rawValue).replace("%", "").replace(",", "."));
+  if (!Number.isFinite(parsed)) return "Volatilidade não classificada";
+  const value = Math.abs(parsed);
+  if (value < 0.005) return "Baixa volatilidade";
+  if (value < 0.02) return "Volatilidade moderada";
+  return "Alta volatilidade";
+}
+
+function transformReportText(value: string) {
+  return String(value || "")
+    .replace(/\bGovernança\b/g, "Visibilidade de governança")
+    .replace(/\bGovernanca\b/g, "Visibilidade de governança")
+    .replace(/Volatilidade\s+([0-9]+[,.][0-9]{3,})/gi, (_match, raw) => volatilityRiskText(raw))
+    .replace(/volatilidade\s+([0-9]+[,.][0-9]{3,})/gi, (_match, raw) => volatilityRiskText(raw).toLowerCase());
+}
+
 function sanitizePdfText(value: string) {
-  return correctPortugueseText(String(value || "")
+  return correctPortugueseText(transformReportText(String(value || ""))
     .replace(/[–—]/g, "-")
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
     .replace(/\t/g, "  ")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
     .replace(/[^\u0009\u000A\u000D\u0020-\u007E\u00A0-\u00FF]/g, ""));
 }
 
@@ -135,7 +153,7 @@ function preprocessReportMarkdown(reportMarkdown: string) {
     }
 
     if (skippingGeography && isHeading(line)) skippingGeography = false;
-    if (!skippingGeography) output.push(correctPortugueseText(line));
+    if (!skippingGeography) output.push(correctPortugueseText(transformReportText(line)));
   }
 
   return output.join("\n");
@@ -290,6 +308,29 @@ async function loadReport(email: string, sessionToken: unknown) {
   return { report, month };
 }
 
+function riskLevelOf(value: string) {
+  const text = stripAccents(String(value || "").toLowerCase()).trim();
+  if (/muito\s+alto|critico|vermelh/.test(text)) return "very_high";
+  if (/alto|laranja/.test(text)) return "high";
+  if (/moderado|medio|amarelo/.test(text)) return "moderate";
+  if (/baixo|verde/.test(text)) return "low";
+  return null;
+}
+
+function riskStyle(level: string | null, fallback: any) {
+  if (level === "very_high") return { background: rgb(0.55, 0.08, 0.12), text: rgb(1, 1, 1) };
+  if (level === "high") return { background: rgb(0.99, 0.72, 0.36), text: rgb(0.18, 0.11, 0.04) };
+  if (level === "moderate") return { background: rgb(1, 0.92, 0.48), text: rgb(0.17, 0.13, 0.02) };
+  if (level === "low") return { background: rgb(0.70, 0.90, 0.78), text: rgb(0.04, 0.22, 0.11) };
+  return fallback;
+}
+
+function isHeatMapTable(headers: string[], currentHeading: string) {
+  const heading = stripAccents(currentHeading).toLowerCase();
+  const joined = stripAccents(headers.join(" ")).toLowerCase();
+  return heading.includes("heat map") || (joined.includes("risco final") && joined.includes("concentracao"));
+}
+
 async function createReportPdf(report: any, metadata: { email: string; month: string }) {
   const pdfDoc = await PDFDocument.create();
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -377,14 +418,15 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     if (options?.heading) y -= 4;
   }
 
-  function renderTable(headers: string[], rows: string[][]) {
+  function renderTable(headers: string[], rows: string[][], currentHeading: string) {
     const colCount = Math.max(headers.length, ...rows.map((row) => row.length));
     if (colCount < 2) return;
 
-    const fontSize = colCount >= 7 ? 6.2 : colCount >= 5 ? 7.2 : 8.2;
+    const heatMap = isHeatMapTable(headers, currentHeading);
+    const fontSize = colCount >= 8 ? 5.6 : colCount >= 7 ? 6.0 : colCount >= 5 ? 7.0 : 8.2;
     const lineHeight = fontSize + 2.8;
     const colWidth = CONTENT_WIDTH / colCount;
-    const padding = 4;
+    const padding = colCount >= 8 ? 3 : 4;
 
     function normalizeRow(row: string[]) {
       return Array.from({ length: colCount }, (_, index) => sanitizePdfText(row[index] || ""));
@@ -403,13 +445,15 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
 
     function drawMeasuredRow(row: string[], measured: { cellLines: string[][]; height: number }, isHeader = false) {
       const rowY = y - measured.height + 6;
+      const normalizedRow = normalizeRow(row);
       for (let col = 0; col < colCount; col += 1) {
         const x = MARGIN_X + col * colWidth;
-        page.drawRectangle({ x, y: rowY, width: colWidth, height: measured.height, color: isHeader ? rgb(0.90, 0.92, 0.98) : rgb(1, 1, 1), borderColor: rgb(0.80, 0.82, 0.88), borderWidth: 0.5 });
-        const cellFont = isHeader ? bold : regular;
-        const cellColor = isHeader ? rgb(0.10, 0.12, 0.22) : rgb(0.12, 0.13, 0.16);
+        const defaultStyle = { background: isHeader ? rgb(0.90, 0.92, 0.98) : rgb(1, 1, 1), text: isHeader ? rgb(0.10, 0.12, 0.22) : rgb(0.12, 0.13, 0.16) };
+        const style = !isHeader && heatMap ? riskStyle(riskLevelOf(normalizedRow[col]), defaultStyle) : defaultStyle;
+        page.drawRectangle({ x, y: rowY, width: colWidth, height: measured.height, color: style.background, borderColor: rgb(0.80, 0.82, 0.88), borderWidth: 0.5 });
+        const cellFont = isHeader ? bold : heatMap && riskLevelOf(normalizedRow[col]) ? bold : regular;
         measured.cellLines[col].forEach((line, lineIndex) => {
-          drawTextSafe(page, line, { x: x + padding, y: y - padding - fontSize - lineIndex * lineHeight, size: fontSize, font: cellFont, color: cellColor });
+          drawTextSafe(page, line, { x: x + padding, y: y - padding - fontSize - lineIndex * lineHeight, size: fontSize, font: cellFont, color: style.text });
         });
       }
       y -= measured.height;
@@ -515,8 +559,9 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
   pageNumber += 1;
   y = PAGE_HEIGHT - MARGIN_TOP;
 
-  drawSegmentChart(report.portfolio || []);
   const lines = preprocessReportMarkdown(report.reportMarkdown).split("\n");
+  let currentHeading = "";
+  let segmentChartRendered = false;
 
   for (let index = 0; index < lines.length;) {
     const rawLine = lines[index];
@@ -530,7 +575,7 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
 
     if (isTableStart(lines, index)) {
       const table = parseMarkdownTable(lines, index);
-      renderTable(table.headers, table.rows);
+      renderTable(table.headers, table.rows, currentHeading);
       index = table.nextIndex;
       continue;
     }
@@ -540,8 +585,15 @@ async function createReportPdf(report: any, metadata: { email: string; month: st
     const bullet = /^[-*]\s+/.test(trimmed);
     const text = normalizeLine(rawLine);
 
+    if (heading) currentHeading = text;
     if (heading && remainingHeight() < 110) newPage();
     drawParagraph(text, { major, heading, bullet });
+
+    if (!segmentChartRendered && heading && stripAccents(text).toLowerCase().includes("concentracao e correlacao")) {
+      drawSegmentChart(report.portfolio || []);
+      segmentChartRendered = true;
+    }
+
     index += 1;
   }
 
