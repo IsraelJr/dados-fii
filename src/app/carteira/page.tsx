@@ -516,7 +516,7 @@ export default function WalletPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <main className="mx-auto w-full max-w-6xl overflow-x-hidden px-4 py-8">
       <AppToast message={message} variant={toastVariant(message)} onClose={() => setMessage("")} />
       <PageHeader
         title="Minha Carteira"
@@ -543,23 +543,20 @@ export default function WalletPage() {
 }
 
 function DailyWalletPanel({ insights, firstPayment }: { insights: WalletInsights; firstPayment?: Payment }) {
-  const strongestMoves = insights.enriched
-    .filter((item) => Math.abs(item.dailyVariation) >= 0.005)
-    .sort((a, b) => Math.abs(b.dailyVariation) - Math.abs(a.dailyVariation))
-    .slice(0, 3);
+  const strongestMoves = insights.enriched.filter((item) => Math.abs(item.dailyVariation) >= 0.005).sort((a, b) => Math.abs(b.dailyVariation) - Math.abs(a.dailyVariation)).slice(0, 3);
 
   return (
-    <section className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
-        <div>
+    <section className="overflow-hidden rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+      <div className="flex min-w-0 flex-col justify-between gap-3 md:flex-row md:items-end">
+        <div className="min-w-0">
           <p className="inline-flex rounded-full bg-indigo-500/15 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-200">Hoje na sua carteira</p>
           <h2 className="mt-3 text-2xl font-black text-white">Painel diário dos seus FIIs</h2>
-          <p className="mt-2 text-sm leading-6 text-gray-300">Resumo rápido para saber valor, renda, pagamentos e pendências sem precisar procurar pela tela.</p>
+          <p className="mt-2 text-sm leading-6 text-gray-300">Resumo rápido para saber valor, renda, pagamentos e pendências.</p>
         </div>
         {strongestMoves.length > 0 && (
-          <div className="rounded-2xl bg-gray-800 p-3 ring-1 ring-white/10">
+          <div className="min-w-0 rounded-2xl bg-gray-800 p-3 ring-1 ring-white/10">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Maiores movimentos hoje</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex min-w-0 flex-wrap gap-2">
               {strongestMoves.map((item) => <DailyVariationBadge key={item.ticker} value={item.dailyVariation} labelPrefix={item.ticker} />)}
             </div>
           </div>
@@ -625,14 +622,14 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
   const dividendSnapshots = yearSnapshots.filter((item) => item.estimatedMonthlyIncome > 0);
 
   return (
-    <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-        <div>
+    <section className="mt-6 min-w-0 overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <div className="flex min-w-0 flex-col justify-between gap-4 md:flex-row md:items-start">
+        <div className="min-w-0">
           <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução</p>
           <h2 className="mt-3 text-xl font-black text-slate-900">Patrimônio e dividendos por ano</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">Use os botões para consultar anos anteriores, limitado aos últimos 5 anos.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           {years.map((year) => {
             const hasData = snapshots.some((item) => getSnapshotYear(item) === year && (item.totalValue > 0 || item.estimatedMonthlyIncome > 0));
             return (
@@ -642,12 +639,12 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-2">
+      <div className="mt-5 grid min-w-0 gap-6 lg:grid-cols-2">
         <HistoryChartCard title={`Patrimônio estimado em ${selectedYear}`} subtitle="Valor total da carteira nos meses com histórico salvo.">
-          <HistoryLineChart snapshots={patrimonySnapshots} year={selectedYear} getValue={(item) => item.totalValue} emptyText={`Nenhum patrimônio registrado em ${selectedYear} ainda.`} />
+          <HistoryLineChart snapshots={patrimonySnapshots} getValue={(item) => item.totalValue} emptyText={`Nenhum patrimônio registrado em ${selectedYear} ainda.`} />
         </HistoryChartCard>
         <HistoryChartCard title={`Dividendos pagos em ${selectedYear}`} subtitle="Meses do ano selecionado em que houve pagamento registrado.">
-          <HistoryLineChart snapshots={dividendSnapshots} year={selectedYear} getValue={(item) => item.estimatedMonthlyIncome} emptyText={`Nenhum pagamento registrado em ${selectedYear} ainda.`} />
+          <HistoryLineChart snapshots={dividendSnapshots} getValue={(item) => item.estimatedMonthlyIncome} emptyText={`Nenhum pagamento registrado em ${selectedYear} ainda.`} />
         </HistoryChartCard>
       </div>
     </section>
@@ -656,10 +653,10 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
 
 function PortfolioCharts({ assetWeights, incomeByFii, segmentWeights }: { assetWeights: ChartItem[]; incomeByFii: ChartItem[]; segmentWeights: ChartItem[] }) {
   return (
-    <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <section className="mt-6 min-w-0 overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
       <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><PieChart size={14} /> Composição</p>
       <h2 className="mt-3 text-xl font-black text-slate-900">Como a carteira está distribuída</h2>
-      <div className="mt-5 grid gap-6 lg:grid-cols-3">
+      <div className="mt-5 grid min-w-0 gap-6 lg:grid-cols-3">
         <ChartCard title="Peso por ativo" subtitle="Valor financeiro estimado por FII."><BarList items={assetWeights} /></ChartCard>
         <ChartCard title="Renda por FII" subtitle="Renda mensal estimada por ativo."><BarList items={incomeByFii} /></ChartCard>
         <ChartCard title="Peso por segmento" subtitle="Distribuição financeira estimada."><BarList items={segmentWeights} /></ChartCard>
@@ -776,11 +773,11 @@ function LightMetric({ label, value }: { label: string; value: string }) {
 }
 
 function HistoryChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
-  return <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="text-base font-black text-slate-900">{title}</h3><p className="mt-1 text-xs font-medium leading-5 text-slate-500">{subtitle}</p><div className="mt-4">{children}</div></article>;
+  return <article className="min-w-0 overflow-hidden rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="text-base font-black text-slate-900">{title}</h3><p className="mt-1 text-xs font-medium leading-5 text-slate-500">{subtitle}</p><div className="mt-4 min-w-0">{children}</div></article>;
 }
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
-  return <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="text-base font-black text-slate-900">{title}</h3><p className="mt-1 text-xs font-medium leading-5 text-slate-500">{subtitle}</p><div className="mt-4">{children}</div></article>;
+  return <article className="min-w-0 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="text-base font-black text-slate-900">{title}</h3><p className="mt-1 text-xs font-medium leading-5 text-slate-500">{subtitle}</p><div className="mt-4">{children}</div></article>;
 }
 
 function BarList({ items, emptyText = "Sem dados suficientes para exibir." }: { items: ChartItem[]; emptyText?: string }) {
@@ -790,7 +787,29 @@ function BarList({ items, emptyText = "Sem dados suficientes para exibir." }: { 
   return <div className="space-y-3">{filtered.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold"><span className="truncate text-slate-700">{item.label}</span><span className="shrink-0 text-slate-500">{item.detail || formatCurrency(item.value)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((item.value / max) * 100, 3)}%` }} /></div></div>)}</div>;
 }
 
-function HistoryLineChart({ snapshots, year, getValue, emptyText }: { snapshots: WalletSnapshot[]; year: number; getValue: (item: WalletSnapshot) => number; emptyText: string }) {
+function MobileHistoryList({ snapshots, getValue }: { snapshots: WalletSnapshot[]; getValue: (item: WalletSnapshot) => number }) {
+  const max = Math.max(...snapshots.map(getValue), 1);
+  return (
+    <div className="space-y-2 md:hidden">
+      {snapshots.map((item) => {
+        const value = getValue(item);
+        return (
+          <div key={`mobile-${item.monthKey}`} className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+            <div className="flex items-center justify-between gap-3 text-xs font-extrabold text-slate-700">
+              <span>{getSnapshotMonthLabel(item)}</span>
+              <span>{formatCurrencyCompact(value)}</span>
+            </div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((value / max) * 100, 6)}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function HistoryLineChart({ snapshots, getValue, emptyText }: { snapshots: WalletSnapshot[]; getValue: (item: WalletSnapshot) => number; emptyText: string }) {
   const points = snapshots.map(getValue).filter((value) => value > 0);
   if (!snapshots.length || !points.length) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">{emptyText}</div>;
   const min = Math.min(...points, 0);
@@ -802,7 +821,23 @@ function HistoryLineChart({ snapshots, year, getValue, emptyText }: { snapshots:
     const y = 124 - ((getValue(item) - min) / range) * 86 + 24;
     return `${x},${y}`;
   }).join(" ");
-  return <div className="overflow-x-auto"><svg viewBox={`0 0 ${width} 180`} className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200">{snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}{snapshots.map((item, index) => { const x = snapshots.length === 1 ? width / 2 : (index / (snapshots.length - 1)) * (width - 48) + 24; const y = 124 - ((getValue(item) - min) / range) * 86 + 24; const labelBelow = index % 2 === 1 || y < 44; const labelY = labelBelow ? y + 18 : y - 26; return <g key={item.monthKey}><circle cx={x} cy={y} r="4.5" className="fill-indigo-700" /><text x={x} y={labelY} textAnchor="middle" className="fill-slate-600 text-[9px] font-bold">{getSnapshotMonthLabel(item)}</text><text x={x} y={labelY + 11} textAnchor="middle" className="fill-slate-800 text-[9px] font-black">{formatCurrencyCompact(getValue(item))}</text></g>; })}</svg></div>;
+  return (
+    <>
+      <MobileHistoryList snapshots={snapshots} getValue={getValue} />
+      <div className="hidden max-w-full overflow-x-auto md:block">
+        <svg viewBox={`0 0 ${width} 180`} className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200" style={{ width }}>
+          {snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}
+          {snapshots.map((item, index) => {
+            const x = snapshots.length === 1 ? width / 2 : (index / (snapshots.length - 1)) * (width - 48) + 24;
+            const y = 124 - ((getValue(item) - min) / range) * 86 + 24;
+            const labelBelow = index % 2 === 1 || y < 44;
+            const labelY = labelBelow ? y + 18 : y - 26;
+            return <g key={item.monthKey}><circle cx={x} cy={y} r="4.5" className="fill-indigo-700" /><text x={x} y={labelY} textAnchor="middle" className="fill-slate-600 text-[9px] font-bold">{getSnapshotMonthLabel(item)}</text><text x={x} y={labelY + 11} textAnchor="middle" className="fill-slate-800 text-[9px] font-black">{formatCurrencyCompact(getValue(item))}</text></g>;
+          })}
+        </svg>
+      </div>
+    </>
+  );
 }
 
 function FiiTickerLink({ ticker }: { ticker: string }) {
@@ -815,7 +850,7 @@ function DailyVariationBadge({ value, labelPrefix }: { value?: number; labelPref
   const isUp = variation > 0;
   const Icon = isUp ? TrendingUp : TrendingDown;
   const label = `${Math.abs(variation).toFixed(2).replace(".", ",")}% ${isUp ? "alta" : "baixa"}`;
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold ring-1 ${isUp ? "bg-green-950/40 text-green-300 ring-green-900/60" : "bg-red-950/40 text-red-300 ring-red-900/60"}`} title={`Movimento do dia: ${label}`}><Icon size={12} /> {labelPrefix ? `${labelPrefix} ` : ""}{label}</span>;
+  return <span className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold ring-1 ${isUp ? "bg-green-950/40 text-green-300 ring-green-900/60" : "bg-red-950/40 text-red-300 ring-red-900/60"}`} title={`Movimento do dia: ${label}`}><Icon size={12} /> <span className="truncate">{labelPrefix ? `${labelPrefix} ` : ""}{label}</span></span>;
 }
 
 function WalletMobileCard({ item, nextPayment, draftQuotas, changed, onQuotaChange, onSave, onRemove }: { item: EnrichedFii; nextPayment?: Payment; draftQuotas: string; changed: boolean; onQuotaChange: (value: string) => void; onSave: () => void; onRemove: () => void }) {
