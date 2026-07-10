@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookMarked, Database, FileText, ShieldCheck } from "lucide-react";
+import { BookOpen, Database, FileText, ShieldCheck } from "lucide-react";
 
 const trustLinks = [
   {
@@ -18,7 +18,7 @@ const trustLinks = [
     href: "/glossario",
     title: "Glossário",
     description: "Traduza termos como DY, IFIX, liquidez, stress test e tail risk.",
-    icon: BookMarked,
+    icon: BookOpen,
   },
   {
     href: "/termos-de-uso",
