@@ -19,10 +19,25 @@ type CloudLoadCache = {
   loadedAt: number;
 };
 
+type WalletSnapshot = {
+  monthKey: string;
+  label: string;
+  totalValue: number;
+  estimatedMonthlyIncome: number;
+  announcedMonthlyIncome: number;
+  walletCount: number;
+  topWeightTicker?: string;
+  topIncomeTicker?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const STORAGE_KEY = "dados-fii-wallet-v1";
+const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";
 const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
 const CLOUD_LOAD_CACHE_KEY = "dados-fii-wallet-cloud-load-cache-v1";
+const SNAPSHOT_HYDRATION_KEY = "dados-fii-wallet-snapshots-hydrated-v1";
 const AUTO_CLOUD_LOAD_TTL_MS = 12 * 60 * 60 * 1000;
 
 function isEmail(value: string) {
@@ -52,6 +67,39 @@ function readWallet(): WalletItem[] {
 
 function walletSignature(items: WalletItem[]) {
   return JSON.stringify(items.map((item) => ({ ticker: item.ticker, quotas: item.quotas })));
+}
+
+function snapshotSignature(items: WalletSnapshot[]) {
+  return JSON.stringify(items.map((item) => ({ monthKey: item.monthKey, totalValue: item.totalValue, estimatedMonthlyIncome: item.estimatedMonthlyIncome })));
+}
+
+function normalizeSnapshots(value: unknown): WalletSnapshot[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item: any) => {
+      const monthKey = String(item?.monthKey || item?.id || "").trim();
+      if (!/^\d{4}-\d{2}$/.test(monthKey)) return null;
+
+      const totalValue = Number(item?.totalValue || 0);
+      const estimatedMonthlyIncome = Number(item?.estimatedDividendIncome ?? item?.estimatedMonthlyIncome ?? item?.announcedMonthlyIncome ?? 0);
+      const closedAt = String(item?.closedAt || item?.updatedAt || item?.createdAt || new Date().toISOString());
+
+      return {
+        monthKey,
+        label: String(item?.label || monthKey),
+        totalValue: Number.isFinite(totalValue) ? totalValue : 0,
+        estimatedMonthlyIncome: Number.isFinite(estimatedMonthlyIncome) ? estimatedMonthlyIncome : 0,
+        announcedMonthlyIncome: Number.isFinite(estimatedMonthlyIncome) ? estimatedMonthlyIncome : 0,
+        walletCount: Number(item?.walletCount || 0),
+        topWeightTicker: String(item?.topWeightTicker || ""),
+        topIncomeTicker: String(item?.topIncomeTicker || ""),
+        createdAt: closedAt,
+        updatedAt: closedAt,
+      } satisfies WalletSnapshot;
+    })
+    .filter((item): item is WalletSnapshot => Boolean(item && (item.totalValue > 0 || item.estimatedMonthlyIncome > 0)))
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 }
 
 function readCloudLoadCache(): CloudLoadCache | null {
@@ -108,6 +156,7 @@ export default function WalletEmailVerifiedSync() {
   const lastSavedSignature = useRef("");
   const toastTimerRef = useRef<number | null>(null);
   const autoLoadDoneRef = useRef(false);
+  const snapshotLoadDoneRef = useRef(false);
   const hasSession = Boolean(token);
 
   function showToast(nextToast: ToastState) {
@@ -175,6 +224,45 @@ export default function WalletEmailVerifiedSync() {
     return json;
   }
 
+  async function hydrateSnapshotsFromCloud(options?: { auto?: boolean }) {
+    const cleanEmail = (emailRef.current || email).trim().toLowerCase();
+    const currentToken = tokenRef.current || token;
+
+    if (!isEmail(cleanEmail) || !currentToken) return false;
+
+    try {
+      const json = await callApi({ email: cleanEmail, sessionToken: currentToken }, "/api/wallet/snapshots");
+      const snapshots = normalizeSnapshots(json?.snapshots);
+      if (!snapshots.length) return false;
+
+      const nextSignature = snapshotSignature(snapshots);
+      const currentStored = normalizeSnapshots(JSON.parse(window.localStorage.getItem(SNAPSHOT_KEY) || "[]"));
+      const currentSignature = snapshotSignature(currentStored);
+
+      window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshots));
+
+      if (!options?.auto) {
+        setMessage(`Histórico patrimonial carregado. ${snapshots.length} mês(es) encontrado(s). Atualizando a tela...`);
+        window.setTimeout(() => window.location.reload(), 700);
+        return true;
+      }
+
+      const reloadKey = `${SNAPSHOT_HYDRATION_KEY}:${cleanEmail}`;
+      const lastHydratedSignature = window.sessionStorage.getItem(reloadKey) || "";
+      const shouldReload = currentSignature !== nextSignature && lastHydratedSignature !== nextSignature && window.location.pathname.includes("/carteira");
+
+      if (shouldReload) {
+        window.sessionStorage.setItem(reloadKey, nextSignature);
+        window.setTimeout(() => window.location.reload(), 400);
+      }
+
+      return true;
+    } catch (err: any) {
+      if (!options?.auto) setMessage(err.message || "Erro ao carregar histórico patrimonial.");
+      return false;
+    }
+  }
+
   async function saveCurrentWallet(options?: { silent?: boolean; keepalive?: boolean }) {
     const cleanEmail = (emailRef.current || email).trim().toLowerCase();
     const currentToken = tokenRef.current || token;
@@ -202,6 +290,7 @@ export default function WalletEmailVerifiedSync() {
       walletRef.current = currentWallet;
       setWallet(currentWallet);
       saveCloudLoadCache(cleanEmail, signature);
+      await hydrateSnapshotsFromCloud({ auto: true });
       setMessage(options?.silent ? "Carteira sincronizada automaticamente." : `Carteira sincronizada com sucesso. Total salvo: ${Number(json.saved || currentWallet.length)} FII(s).`);
       return true;
     } catch (err: any) {
@@ -237,6 +326,7 @@ export default function WalletEmailVerifiedSync() {
       lastSavedSignature.current = loadedSignature;
       walletRef.current = loadedWallet;
       setWallet(loadedWallet);
+      await hydrateSnapshotsFromCloud({ auto: Boolean(options?.auto) });
 
       if (options?.auto) {
         if (loadedWallet.length && loadedSignature !== beforeSignature) {
@@ -248,7 +338,7 @@ export default function WalletEmailVerifiedSync() {
           }
         }
       } else {
-        setMessage(`Carteira carregada com sucesso. ${loadedWallet.length} FII(s) encontrados. Atualizando a tela...`);
+        setMessage(`Carteira e histórico carregados com sucesso. ${loadedWallet.length} FII(s) encontrados. Atualizando a tela...`);
         window.setTimeout(() => window.location.reload(), 800);
       }
 
@@ -274,6 +364,13 @@ export default function WalletEmailVerifiedSync() {
 
     return () => window.clearTimeout(timeout);
   }, [email, token, wallet]);
+
+  useEffect(() => {
+    if (!token || !isEmail(email) || snapshotLoadDoneRef.current) return;
+
+    snapshotLoadDoneRef.current = true;
+    hydrateSnapshotsFromCloud({ auto: true });
+  }, [email, token]);
 
   useEffect(() => {
     if (!token || !isEmail(email) || autoLoadDoneRef.current) return;
@@ -324,11 +421,13 @@ export default function WalletEmailVerifiedSync() {
       window.localStorage.setItem(EMAIL_KEY, cleanEmail);
       window.localStorage.removeItem(TOKEN_KEY);
       window.localStorage.removeItem(CLOUD_LOAD_CACHE_KEY);
+      window.localStorage.removeItem(`${SNAPSHOT_HYDRATION_KEY}:${cleanEmail}`);
       setEmail(cleanEmail);
       setToken("");
       emailRef.current = cleanEmail;
       tokenRef.current = "";
       autoLoadDoneRef.current = false;
+      snapshotLoadDoneRef.current = false;
       setMessage(json.message || "Código enviado para seu e-mail.");
     } catch (err: any) {
       setMessage(err.message || "Erro ao enviar código.");
@@ -356,8 +455,9 @@ export default function WalletEmailVerifiedSync() {
       emailRef.current = cleanEmail;
       tokenRef.current = json.sessionToken;
       autoLoadDoneRef.current = false;
+      snapshotLoadDoneRef.current = false;
       setPin("");
-      setMessage("E-mail confirmado. Use Carregar para trazer a carteira salva neste dispositivo.");
+      setMessage("E-mail confirmado. Use Carregar para trazer a carteira e o histórico salvos neste dispositivo.");
     } catch (err: any) {
       setMessage(err.message || "Código inválido.");
     } finally {
