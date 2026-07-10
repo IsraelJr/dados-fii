@@ -24,6 +24,11 @@ type IfixState = {
     source?: string | null;
     updatedAt?: string | null;
     lastDate?: string | null;
+    openFormatted?: string | null;
+    previousCloseFormatted?: string | null;
+    changeFormatted?: string | null;
+    changePercentFormatted?: string | null;
+    trend?: "up" | "down" | "flat";
 };
 
 const DOLLAR_CACHE_KEY = "dados-fii-dollar-cache-v1";
@@ -107,6 +112,12 @@ function getSaoPauloMarketParts(date = new Date()) {
 function isMarketRefreshWindow(date = new Date()) {
     const { hour, isWeekday } = getSaoPauloMarketParts(date);
     return isWeekday && hour >= MARKET_OPEN_HOUR && hour < MARKET_CLOSE_HOUR;
+}
+
+function trendClass(trend?: "up" | "down" | "flat") {
+    if (trend === "up") return "text-green-300";
+    if (trend === "down") return "text-red-300";
+    return "text-gray-300";
 }
 
 export default function Home() {
@@ -246,6 +257,11 @@ export default function Home() {
                     source: json.source,
                     updatedAt: json.updatedAt,
                     lastDate: json.lastDate,
+                    openFormatted: json.openFormatted,
+                    previousCloseFormatted: json.previousCloseFormatted,
+                    changeFormatted: json.changeFormatted,
+                    changePercentFormatted: json.changePercentFormatted,
+                    trend: json.trend || "flat",
                 };
 
                 setIfix(nextIfix);
@@ -361,12 +377,31 @@ export default function Home() {
 
                             <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
                                 <p className="text-sm font-bold text-gray-300">IFIX</p>
-                                <strong className="mt-2 block text-3xl text-indigo-300">{ifix.formatted}</strong>
+                                <div className="mt-2 flex flex-wrap items-end gap-2">
+                                    <strong className="block text-3xl text-indigo-300">{ifix.formatted}</strong>
+                                    {ifix.changePercentFormatted && (
+                                        <span className={`text-sm font-extrabold ${trendClass(ifix.trend)}`}>
+                                            {ifix.changePercentFormatted}
+                                        </span>
+                                    )}
+                                </div>
+                                {ifix.changeFormatted && (
+                                    <p className={`mt-1 text-xs font-bold ${trendClass(ifix.trend)}`}>
+                                        {ifix.changeFormatted} no dia
+                                    </p>
+                                )}
                                 <p className="mt-2 text-xs font-medium text-gray-300">
                                     {ifix.source ? `Fonte: ${ifix.source}` : "Fonte indisponível"}
                                     {ifix.lastDate ? ` · Ref. ${ifix.lastDate}` : ""}
                                     {ifixUpdatedAt ? ` · Atualizado às ${ifixUpdatedAt}` : ""}
                                 </p>
+                                {(ifix.openFormatted || ifix.previousCloseFormatted) && (
+                                    <p className="mt-1 text-xs text-gray-400">
+                                        {ifix.openFormatted ? `Abertura: ${ifix.openFormatted}` : ""}
+                                        {ifix.openFormatted && ifix.previousCloseFormatted ? " · " : ""}
+                                        {ifix.previousCloseFormatted ? `Fech. ant.: ${ifix.previousCloseFormatted}` : ""}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -449,11 +484,10 @@ export default function Home() {
     );
 }
 
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function FeatureCard({ title, description }: { title: string }) {
     return (
         <div className="rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-extrabold text-slate-800">{title}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
         </div>
     );
 }
