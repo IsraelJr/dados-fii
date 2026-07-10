@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { BarChart3, BookOpen, CalendarDays, Home, LibraryBig, Wallet } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, Home, Wallet } from "lucide-react";
 
 const links = [
   { href: "/", label: "Início", icon: Home },
   { href: "/carteira", label: "Carteira", icon: Wallet },
   { href: "/calendario-dividendos-fiis", label: "Calendário", icon: CalendarDays },
   { href: "/educacao", label: "Educação", icon: BookOpen },
-  { href: "/glossario", label: "Glossário", icon: LibraryBig },
+  { href: "/glossario", label: "Glossário", icon: BookOpen },
 ];
 
 export default function SiteNav() {
