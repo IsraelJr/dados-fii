@@ -76,30 +76,32 @@ function snapshotSignature(items: WalletSnapshot[]) {
 function normalizeSnapshots(value: unknown): WalletSnapshot[] {
   if (!Array.isArray(value)) return [];
 
-  return value
-    .map((item: any) => {
-      const monthKey = String(item?.monthKey || item?.id || "").trim();
-      if (!/^\d{4}-\d{2}$/.test(monthKey)) return null;
+  const snapshots = value.reduce<WalletSnapshot[]>((acc, item: any) => {
+    const monthKey = String(item?.monthKey || item?.id || "").trim();
+    if (!/^\d{4}-\d{2}$/.test(monthKey)) return acc;
 
-      const totalValue = Number(item?.totalValue || 0);
-      const estimatedMonthlyIncome = Number(item?.estimatedDividendIncome ?? item?.estimatedMonthlyIncome ?? item?.announcedMonthlyIncome ?? 0);
-      const closedAt = String(item?.closedAt || item?.updatedAt || item?.createdAt || new Date().toISOString());
+    const totalValue = Number(item?.totalValue || 0);
+    const estimatedMonthlyIncome = Number(item?.estimatedDividendIncome ?? item?.estimatedMonthlyIncome ?? item?.announcedMonthlyIncome ?? 0);
+    const closedAt = String(item?.closedAt || item?.updatedAt || item?.createdAt || new Date().toISOString());
 
-      return {
-        monthKey,
-        label: String(item?.label || monthKey),
-        totalValue: Number.isFinite(totalValue) ? totalValue : 0,
-        estimatedMonthlyIncome: Number.isFinite(estimatedMonthlyIncome) ? estimatedMonthlyIncome : 0,
-        announcedMonthlyIncome: Number.isFinite(estimatedMonthlyIncome) ? estimatedMonthlyIncome : 0,
-        walletCount: Number(item?.walletCount || 0),
-        topWeightTicker: String(item?.topWeightTicker || ""),
-        topIncomeTicker: String(item?.topIncomeTicker || ""),
-        createdAt: closedAt,
-        updatedAt: closedAt,
-      } satisfies WalletSnapshot;
-    })
-    .filter((item): item is WalletSnapshot => Boolean(item && (item.totalValue > 0 || item.estimatedMonthlyIncome > 0)))
-    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+    const snapshot: WalletSnapshot = {
+      monthKey,
+      label: String(item?.label || monthKey),
+      totalValue: Number.isFinite(totalValue) ? totalValue : 0,
+      estimatedMonthlyIncome: Number.isFinite(estimatedMonthlyIncome) ? estimatedMonthlyIncome : 0,
+      announcedMonthlyIncome: Number.isFinite(estimatedMonthlyIncome) ? estimatedMonthlyIncome : 0,
+      walletCount: Number(item?.walletCount || 0),
+      topWeightTicker: String(item?.topWeightTicker || ""),
+      topIncomeTicker: String(item?.topIncomeTicker || ""),
+      createdAt: closedAt,
+      updatedAt: closedAt,
+    };
+
+    if (snapshot.totalValue > 0 || snapshot.estimatedMonthlyIncome > 0) acc.push(snapshot);
+    return acc;
+  }, []);
+
+  return snapshots.sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 }
 
 function readCloudLoadCache(): CloudLoadCache | null {
