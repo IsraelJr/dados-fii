@@ -4,14 +4,19 @@ import { adminDb } from "@/lib/firebaseAdmin";
 export const runtime = "nodejs";
 export const revalidate = 86400;
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://dadosfii.com.br";
+const SITE_URL = "https://dadosfii.com.br";
 const now = new Date();
 
 const STATIC_ROUTES = [
-  "",
-  "/carteira",
-  "/calendario-dividendos-fiis",
-  "/educacao",
+  { path: "", changeFrequency: "daily" as const, priority: 1 },
+  { path: "/carteira", changeFrequency: "weekly" as const, priority: 0.8 },
+  { path: "/calendario-dividendos-fiis", changeFrequency: "daily" as const, priority: 0.8 },
+  { path: "/educacao", changeFrequency: "weekly" as const, priority: 0.75 },
+  { path: "/glossario", changeFrequency: "weekly" as const, priority: 0.75 },
+  { path: "/fontes-dos-dados", changeFrequency: "monthly" as const, priority: 0.6 },
+  { path: "/metodologia", changeFrequency: "monthly" as const, priority: 0.6 },
+  { path: "/termos-de-uso", changeFrequency: "monthly" as const, priority: 0.4 },
+  { path: "/politica-de-privacidade", changeFrequency: "monthly" as const, priority: 0.4 },
 ];
 
 const FALLBACK_TICKERS = [
@@ -47,7 +52,7 @@ async function getFiiTickers() {
 
     return Array.from(new Set(tickers)).sort((a, b) => a.localeCompare(b));
   } catch (err) {
-    console.error("Erro ao gerar sitemap dinâmico de FIIs:", err);
+    console.error("Erro ao gerar sitemap dinamico de FIIs:", err);
     return FALLBACK_TICKERS;
   }
 }
@@ -56,10 +61,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tickers = await getFiiTickers();
 
   const staticPages = STATIC_ROUTES.map((route) => ({
-    url: `${SITE_URL}${route}`,
+    url: `${SITE_URL}${route.path}`,
     lastModified: now,
-    changeFrequency: route === "" ? "daily" as const : "weekly" as const,
-    priority: route === "" ? 1 : 0.8,
+    changeFrequency: route.changeFrequency,
+    priority: route.priority,
   }));
 
   const fiiPages = tickers.map((ticker) => ({
