@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Eye, FileText, RefreshCw, Search, ShieldCheck, XCircle } from "lucide-react";
 
 type Service = { key: string; label: string; ok: boolean; detail?: string };
-type LookupEvent = { id: string; ok: boolean; statusCode: number; ticker?: string | null; error?: string | null; source?: string | null; createdAt?: string | null };
+type LookupEvent = { id: string; type?: string; ok: boolean; statusCode: number; ticker?: string | null; error?: string | null; source?: string | null; createdAt?: string | null };
 type ObservabilityPayload = {
   ok: boolean;
   generatedAt: string;
@@ -326,7 +326,7 @@ export default function AdminObservabilityPage() {
               {(data.recentEvents || []).map((event) => (
                 <div key={event.id} className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <strong className="text-slate-900">{event.type}</strong>
+                    <strong className="text-slate-900">{event.type || "evento"}</strong>
                     <span className="ml-2 text-slate-500">{event.ticker || event.source || "sistema"}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
