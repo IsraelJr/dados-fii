@@ -13,13 +13,7 @@ import GoogleAdsBlock from "./components/GoogleAdsBlock";
 import HomeDividendCalendar from "./components/HomeDividendCalendar";
 import SiteFeedback from "./components/SiteFeedback";
 
-type DollarState = {
-    formatted: string;
-    source?: string | null;
-    updatedAt?: string | null;
-};
-
-type IfixState = {
+type MarketCardState = {
     formatted: string;
     source?: string | null;
     updatedAt?: string | null;
@@ -37,45 +31,23 @@ const FII_RESULT_ANCHOR = "fii-search-result";
 const MARKET_OPEN_HOUR = 9;
 const MARKET_CLOSE_HOUR = 19;
 
-function getCachedDollar(): DollarState {
+function getCachedMarketCard(key: string): MarketCardState {
     if (typeof window === "undefined") return { formatted: "..." };
 
     try {
-        const stored = window.localStorage.getItem(DOLLAR_CACHE_KEY);
+        const stored = window.localStorage.getItem(key);
         if (!stored) return { formatted: "..." };
 
-        const parsed = JSON.parse(stored) as DollarState;
+        const parsed = JSON.parse(stored) as MarketCardState;
         return parsed?.formatted ? parsed : { formatted: "..." };
     } catch {
         return { formatted: "..." };
     }
 }
 
-function saveCachedDollar(value: DollarState) {
+function saveCachedMarketCard(key: string, value: MarketCardState) {
     try {
-        window.localStorage.setItem(DOLLAR_CACHE_KEY, JSON.stringify(value));
-    } catch {
-        return;
-    }
-}
-
-function getCachedIfix(): IfixState {
-    if (typeof window === "undefined") return { formatted: "..." };
-
-    try {
-        const stored = window.localStorage.getItem(IFIX_CACHE_KEY);
-        if (!stored) return { formatted: "..." };
-
-        const parsed = JSON.parse(stored) as IfixState;
-        return parsed?.formatted ? parsed : { formatted: "..." };
-    } catch {
-        return { formatted: "..." };
-    }
-}
-
-function saveCachedIfix(value: IfixState) {
-    try {
-        window.localStorage.setItem(IFIX_CACHE_KEY, JSON.stringify(value));
+        window.localStorage.setItem(key, JSON.stringify(value));
     } catch {
         return;
     }
@@ -120,12 +92,52 @@ function trendClass(trend?: "up" | "down" | "flat") {
     return "text-gray-300";
 }
 
+function MarketInfoCard({ title, value }: { title: string; value: MarketCardState }) {
+    const updatedAt = formatUpdateTime(value.updatedAt);
+
+    return (
+        <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+            <p className="text-sm font-bold text-gray-300">{title}</p>
+            <div className="mt-2 flex flex-wrap items-end gap-2">
+                <strong className="block text-3xl text-indigo-300">{value.formatted}</strong>
+                {value.changePercentFormatted && (
+                    <span className={`text-sm font-extrabold ${trendClass(value.trend)}`}>
+                        {value.changePercentFormatted}
+                    </span>
+                )}
+            </div>
+            {value.changeFormatted && (
+                <p className={`mt-1 text-xs font-bold ${trendClass(value.trend)}`}>
+                    {value.changeFormatted} no dia
+                </p>
+            )}
+            <p className="mt-2 text-xs font-medium text-gray-300">
+                {value.source ? `Fonte: ${value.source}` : "Fonte indisponível"}
+            </p>
+            {(value.lastDate || updatedAt) && (
+                <p className="mt-1 text-xs font-medium text-gray-300">
+                    {value.lastDate ? `Ref. ${value.lastDate}` : ""}
+                    {value.lastDate && updatedAt ? " · " : ""}
+                    {updatedAt ? `Atualizado às ${updatedAt}` : ""}
+                </p>
+            )}
+            {(value.openFormatted || value.previousCloseFormatted) && (
+                <p className="mt-1 text-xs text-gray-400">
+                    {value.openFormatted ? `Abertura: ${value.openFormatted}` : ""}
+                    {value.openFormatted && value.previousCloseFormatted ? " · " : ""}
+                    {value.previousCloseFormatted ? `Fech. ant.: ${value.previousCloseFormatted}` : ""}
+                </p>
+            )}
+        </div>
+    );
+}
+
 export default function Home() {
     const [ticker, setTicker] = useState("");
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState("");
-    const [dolar, setDolar] = useState<DollarState>(() => getCachedDollar());
-    const [ifix, setIfix] = useState<IfixState>(() => getCachedIfix());
+    const [dolar, setDolar] = useState<MarketCardState>(() => getCachedMarketCard(DOLLAR_CACHE_KEY));
+    const [ifix, setIfix] = useState<MarketCardState>(() => getCachedMarketCard(IFIX_CACHE_KEY));
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
@@ -232,14 +244,19 @@ export default function Home() {
 
                 if (!active) return;
 
-                const nextDollar = {
+                const nextDollar: MarketCardState = {
                     formatted: json.formatted || "Indisponível",
                     source: json.source,
                     updatedAt: json.updatedAt,
+                    openFormatted: json.openFormatted,
+                    previousCloseFormatted: json.previousCloseFormatted,
+                    changeFormatted: json.changeFormatted,
+                    changePercentFormatted: json.changePercentFormatted,
+                    trend: json.trend || "flat",
                 };
 
                 setDolar(nextDollar);
-                saveCachedDollar(nextDollar);
+                saveCachedMarketCard(DOLLAR_CACHE_KEY, nextDollar);
             } catch {
                 if (active && !dolar.formatted) setDolar({ formatted: "Erro" });
             }
@@ -252,7 +269,7 @@ export default function Home() {
 
                 if (!active) return;
 
-                const nextIfix = {
+                const nextIfix: MarketCardState = {
                     formatted: json.formatted || "Indisponível",
                     source: json.source,
                     updatedAt: json.updatedAt,
@@ -265,7 +282,7 @@ export default function Home() {
                 };
 
                 setIfix(nextIfix);
-                saveCachedIfix(nextIfix);
+                saveCachedMarketCard(IFIX_CACHE_KEY, nextIfix);
             } catch {
                 if (active && !ifix.formatted) setIfix({ formatted: "Erro" });
             }
@@ -310,9 +327,6 @@ export default function Home() {
         const [, info]: any = dividends[dividends.length - 1];
         return parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
     }, [data, currentYear]);
-
-    const dollarUpdatedAt = formatUpdateTime(dolar.updatedAt);
-    const ifixUpdatedAt = formatUpdateTime(ifix.updatedAt);
 
     return (
         <main className="font-sans">
@@ -366,43 +380,8 @@ export default function Home() {
 
                     <aside className="grid gap-3">
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                            <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-                                <p className="text-sm font-bold text-gray-300">Dólar comercial</p>
-                                <strong className="mt-2 block text-3xl text-indigo-300">{dolar.formatted}</strong>
-                                <p className="mt-2 text-xs font-medium text-gray-300">
-                                    {dolar.source ? `Fonte: ${dolar.source}` : "Fonte indisponível"}
-                                    {dollarUpdatedAt ? ` · Atualizado às ${dollarUpdatedAt}` : ""}
-                                </p>
-                            </div>
-
-                            <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-                                <p className="text-sm font-bold text-gray-300">IFIX</p>
-                                <div className="mt-2 flex flex-wrap items-end gap-2">
-                                    <strong className="block text-3xl text-indigo-300">{ifix.formatted}</strong>
-                                    {ifix.changePercentFormatted && (
-                                        <span className={`text-sm font-extrabold ${trendClass(ifix.trend)}`}>
-                                            {ifix.changePercentFormatted}
-                                        </span>
-                                    )}
-                                </div>
-                                {ifix.changeFormatted && (
-                                    <p className={`mt-1 text-xs font-bold ${trendClass(ifix.trend)}`}>
-                                        {ifix.changeFormatted} no dia
-                                    </p>
-                                )}
-                                <p className="mt-2 text-xs font-medium text-gray-300">
-                                    {ifix.source ? `Fonte: ${ifix.source}` : "Fonte indisponível"}
-                                    {ifix.lastDate ? ` · Ref. ${ifix.lastDate}` : ""}
-                                    {ifixUpdatedAt ? ` · Atualizado às ${ifixUpdatedAt}` : ""}
-                                </p>
-                                {(ifix.openFormatted || ifix.previousCloseFormatted) && (
-                                    <p className="mt-1 text-xs text-gray-400">
-                                        {ifix.openFormatted ? `Abertura: ${ifix.openFormatted}` : ""}
-                                        {ifix.openFormatted && ifix.previousCloseFormatted ? " · " : ""}
-                                        {ifix.previousCloseFormatted ? `Fech. ant.: ${ifix.previousCloseFormatted}` : ""}
-                                    </p>
-                                )}
-                            </div>
+                            <MarketInfoCard title="Dólar comercial" value={dolar} />
+                            <MarketInfoCard title="IFIX" value={ifix} />
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
