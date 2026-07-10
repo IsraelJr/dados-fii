@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v1.9.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v2.0.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -88,6 +88,8 @@ Regras obrigatórias:
 - Quando uma informação de perfil não estiver disponível, como reserva de emergência ou dependência dos dividendos, escreva "não informado". Não converta ausência de informação em "não possui" ou "não depende".
 - Não crie tabelas longas repetindo "dados insuficientes". Resuma ausências relevantes na seção de qualidade dos dados e nas limitações.
 - Evite repetição: cada seção deve acrescentar uma leitura nova. Não repita a mesma frase sobre TGAR11 + VGIA11 em todas as seções; cite a concentração no diagnóstico, use números nas tabelas e retome no plano de ação de forma resumida.
+- Não use linguagem de recomendação direta de compra, como "comprar mais", "aumentar" ou "adicionar posição". Use linguagem de alocação e gestão de risco: "priorizar novos aportes para diluição", "manter sem ampliar", "pausar novos aportes" ou "monitorar".
+- Quando houver sugestão de aumentar peso relativo, escreva sempre como prioridade de novos aportes dentro dos ativos informados, condicionada à diluição da concentração e aos limites de risco. Não escreva como recomendação individual definitiva de compra.
 - Não inclua seção de exposição geográfica se os dados recebidos não trouxerem localização confiável.
 - Não prometa rentabilidade futura.
 - Não trate a resposta como recomendação individual definitiva; escreva como análise educacional e estratégica baseada nos dados disponíveis.
@@ -99,13 +101,13 @@ export const FII_RISK_REPORT_STRUCTURE = [
   "2. Qualidade dos dados analisados: nível de confiança, dados fortes, dados fracos, limitações e impacto nas conclusões.",
   "3. Concentração e correlação econômica: peso financeiro por ativo, concentração por segmento/tipo de fundo e fatores de risco comuns.",
   "4. Renda e dividendos: DY, último dividendo, média 12m, recorrência, concentração da renda e risco de corte.",
-  "5. Liquidez e risco de saída: liquidez diária, cotas emitidas, cotistas, IFIX, dias para zerar posição e risco em estresse.",
+  "5. Liquidez e risco de saída: liquidez diária, cotas emitidas, cotistas, IFIX, dias para zerar, leitura de risco e observação curta.",
   "6. Valuation e margem de segurança: P/VP, VP por cota, valor de mercado, patrimônio líquido e limites da análise, quando houver dados confiáveis.",
   "7. Riscos por tipo de fundo: tijolo, papel/crédito, Fiagro, FI-Infra e FoF, com foco no que os dados permitem concluir.",
   "8. Sensibilidade macroeconômica, benchmarks e stress test: juros, CDI, IFIX, inflação, recessão, crise de crédito, queda da Selic e tail risks.",
-  "9. Riscos específicos por ativo: tese, risco principal, nota de risco e ação sugerida.",
+  "9. Riscos específicos por ativo: tese, risco principal, nota de risco e ação de gestão de risco.",
   "10. Rebalanceamento e plano de ação: percentual atual, percentual sugerido, plano sem venda, plano 30/90/180 dias e proteções fora de FIIs.",
-  "11. Heat map final e conclusão: tabela consolidada, prioridade de novos aportes, manter, parar de aportar e monitorar.",
+  "11. Heat map final e conclusão: tabela consolidada, prioridade de novos aportes para diluição, manter, pausar aportes e monitorar.",
 ] as const;
 
 export const FII_RISK_REPORT_OUTPUT_RULES = `
@@ -138,7 +140,7 @@ Inclua uma tabela curta com IFIX, CDI, IPCA e Selic quando disponíveis. Para IF
 Inclua tabela em Markdown com cenário, probabilidade estimada, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação recomendada.
 
 ## Riscos por ativo
-Inclua uma tabela em Markdown por ativo com nota de risco de 0 a 10 e ação sugerida: aumentar, manter, monitorar, reduzir ou não aportar.
+Inclua uma tabela em Markdown por ativo com nota de risco de 0 a 10 e ação de gestão de risco. Use apenas termos como: priorizar em novos aportes para diluição, manter sem ampliar, pausar novos aportes, monitorar ou reduzir exposição se houver deterioração. Não use "aumentar" nem "comprar mais".
 
 ## Heat map final
 Use tabela em Markdown. A escala é: 🟢 baixo, 🟡 moderado, 🟠 alto, 🔴 muito alto.
@@ -189,7 +191,7 @@ ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Em valuation, separe patrimônio líquido de valor de mercado e não exiba dados patrimoniais com unidade duvidosa. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
+Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Em valuation, separe patrimônio líquido de valor de mercado e não exiba dados patrimoniais com unidade duvidosa. Em rebalanceamento, substitua linguagem de compra por prioridade de novos aportes para diluição e gestão de concentração. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
 `.trim();
 }
 
