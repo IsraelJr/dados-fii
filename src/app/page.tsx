@@ -19,7 +19,15 @@ type DollarState = {
     updatedAt?: string | null;
 };
 
+type IfixState = {
+    formatted: string;
+    source?: string | null;
+    updatedAt?: string | null;
+    lastDate?: string | null;
+};
+
 const DOLLAR_CACHE_KEY = "dados-fii-dollar-cache-v1";
+const IFIX_CACHE_KEY = "dados-fii-ifix-cache-v1";
 const FII_RESULT_ANCHOR = "fii-search-result";
 const MARKET_OPEN_HOUR = 9;
 const MARKET_CLOSE_HOUR = 19;
@@ -46,7 +54,29 @@ function saveCachedDollar(value: DollarState) {
     }
 }
 
-function formatDollarUpdateTime(value?: string | null) {
+function getCachedIfix(): IfixState {
+    if (typeof window === "undefined") return { formatted: "..." };
+
+    try {
+        const stored = window.localStorage.getItem(IFIX_CACHE_KEY);
+        if (!stored) return { formatted: "..." };
+
+        const parsed = JSON.parse(stored) as IfixState;
+        return parsed?.formatted ? parsed : { formatted: "..." };
+    } catch {
+        return { formatted: "..." };
+    }
+}
+
+function saveCachedIfix(value: IfixState) {
+    try {
+        window.localStorage.setItem(IFIX_CACHE_KEY, JSON.stringify(value));
+    } catch {
+        return;
+    }
+}
+
+function formatUpdateTime(value?: string | null) {
     if (!value) return "";
 
     try {
@@ -84,6 +114,7 @@ export default function Home() {
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState("");
     const [dolar, setDolar] = useState<DollarState>(() => getCachedDollar());
+    const [ifix, setIfix] = useState<IfixState>(() => getCachedIfix());
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
@@ -203,9 +234,34 @@ export default function Home() {
             }
         };
 
+        const fetchIfix = async () => {
+            try {
+                const res = await fetch(`/api/ifix?ts=${Date.now()}`, { cache: "no-store" });
+                const json = await res.json();
+
+                if (!active) return;
+
+                const nextIfix = {
+                    formatted: json.formatted || "Indisponível",
+                    source: json.source,
+                    updatedAt: json.updatedAt,
+                    lastDate: json.lastDate,
+                };
+
+                setIfix(nextIfix);
+                saveCachedIfix(nextIfix);
+            } catch {
+                if (active && !ifix.formatted) setIfix({ formatted: "Erro" });
+            }
+        };
+
         fetchDolar();
+        fetchIfix();
         const interval = setInterval(() => {
-            if (isMarketRefreshWindow()) fetchDolar();
+            if (isMarketRefreshWindow()) {
+                fetchDolar();
+                fetchIfix();
+            }
         }, 5 * 60 * 1000);
 
         return () => {
@@ -239,7 +295,8 @@ export default function Home() {
         return parseFloat(info.earnings.replace("R$ ", "").replace(",", "."));
     }, [data, currentYear]);
 
-    const dollarUpdatedAt = formatDollarUpdateTime(dolar.updatedAt);
+    const dollarUpdatedAt = formatUpdateTime(dolar.updatedAt);
+    const ifixUpdatedAt = formatUpdateTime(ifix.updatedAt);
 
     return (
         <main className="font-sans">
@@ -292,13 +349,25 @@ export default function Home() {
                     </div>
 
                     <aside className="grid gap-3">
-                        <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-                            <p className="text-sm font-bold text-gray-300">Dólar comercial</p>
-                            <strong className="mt-2 block text-3xl text-indigo-300">{dolar.formatted}</strong>
-                            <p className="mt-2 text-xs font-medium text-gray-300">
-                                {dolar.source ? `Fonte: ${dolar.source}` : "Fonte indisponível"}
-                                {dollarUpdatedAt ? ` · Atualizado às ${dollarUpdatedAt}` : ""}
-                            </p>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                            <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+                                <p className="text-sm font-bold text-gray-300">Dólar comercial</p>
+                                <strong className="mt-2 block text-3xl text-indigo-300">{dolar.formatted}</strong>
+                                <p className="mt-2 text-xs font-medium text-gray-300">
+                                    {dolar.source ? `Fonte: ${dolar.source}` : "Fonte indisponível"}
+                                    {dollarUpdatedAt ? ` · Atualizado às ${dollarUpdatedAt}` : ""}
+                                </p>
+                            </div>
+
+                            <div className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+                                <p className="text-sm font-bold text-gray-300">IFIX</p>
+                                <strong className="mt-2 block text-3xl text-indigo-300">{ifix.formatted}</strong>
+                                <p className="mt-2 text-xs font-medium text-gray-300">
+                                    {ifix.source ? `Fonte: ${ifix.source}` : "Fonte indisponível"}
+                                    {ifix.lastDate ? ` · Ref. ${ifix.lastDate}` : ""}
+                                    {ifixUpdatedAt ? ` · Atualizado às ${ifixUpdatedAt}` : ""}
+                                </p>
+                            </div>
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
