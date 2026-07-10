@@ -477,8 +477,8 @@ export default function Home() {
                         </aside>
                     </div>
 
-                    <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                        <div className="mx-auto grid w-full max-w-md gap-3">
+                    <div className="mt-4 flex justify-center">
+                        <div className="grid w-full max-w-[56rem] gap-3 sm:grid-cols-2">
                             <MarketInfoCard title="Dólar comercial" value={dolar} />
                             <MarketInfoCard title="IFIX" value={ifix} />
                         </div>
