@@ -22,13 +22,13 @@ const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
 
 function allowedEmails() {
-  return String(process.env.NEXT_PUBLIC_RISK_REPORT_ALLOWED_EMAILS || "")
+  return String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
 }
 
-function isAllowedPilotEmail(email: string) {
+function isAllowedPrivateEmail(email: string) {
   const list = allowedEmails();
   return Boolean(email) && list.includes(email.trim().toLowerCase());
 }
@@ -77,7 +77,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
     const storedToken = window.localStorage.getItem(TOKEN_KEY) || "";
     const cleanEmail = storedEmail.trim().toLowerCase();
 
-    if (!isAllowedPilotEmail(cleanEmail)) {
+    if (!isAllowedPrivateEmail(cleanEmail)) {
       setVisible(false);
       return;
     }
