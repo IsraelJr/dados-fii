@@ -1,0 +1,166 @@
+name: Wallet UX Compact Hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/wallet-ux-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply wallet UX compact fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('src/app/carteira/page.tsx')
+          text = path.read_text()
+
+          if 'const LAST_VISIT_KEY = "dados-fii-wallet-last-visit-v1";' not in text:
+              text = text.replace(
+                  'const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";\n',
+                  'const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";\nconst LAST_VISIT_KEY = "dados-fii-wallet-last-visit-v1";\n'
+              )
+
+          last_visit_type = '''
+type LastVisitSnapshot = {
+  currentValue: number;
+  monthlyIncome: number;
+  announcedIncome: number;
+  waitingCount: number;
+  visitedAt: string;
+};
+'''
+          if 'type LastVisitSnapshot = {' not in text:
+              text = text.replace('type WalletInsights = {', last_visit_type + '\ntype WalletInsights = {')
+
+          # Compact top panel classes and keep shorter copy.
+          text = text.replace(
+              '<section className="overflow-hidden rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">',
+              '<section className="overflow-hidden rounded-3xl bg-gray-900 p-4 text-gray-100 shadow-lg ring-1 ring-white/10 sm:p-5">',
+              1
+          )
+          text = text.replace(
+              '<h2 className="mt-3 text-2xl font-black text-white">Painel diário dos seus FIIs</h2>',
+              '<h2 className="mt-3 text-xl font-black text-white sm:text-2xl">Painel diário dos seus FIIs</h2>'
+          )
+          text = text.replace(
+              '<p className="mt-2 text-sm leading-6 text-gray-300">Resumo rápido para saber valor, renda, pagamentos e pendências.</p>',
+              '<p className="mt-2 text-sm leading-6 text-gray-300 sm:max-w-xl">Resumo rápido para saber valor, renda, pagamentos e pendências.</p>'
+          )
+          text = text.replace(
+              '<div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">',
+              '<LastVisitChange insights={insights} />\n      <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 xl:grid-cols-5">',
+              1
+          )
+
+          # Make metric values more compact on mobile.
+          text = text.replace(
+              'return <div className="rounded-2xl bg-gray-800 p-4 ring-1 ring-white/10"><p className="text-xs font-extrabold uppercase tracking-wide text-gray-400">{label}</p><strong className={`mt-2 block text-2xl ${valueClass}`}>{value}</strong><p className="mt-2 text-xs font-medium leading-5 text-gray-300">{detail}</p></div>;',
+              'return <div className="rounded-2xl bg-gray-800 p-3 ring-1 ring-white/10 sm:p-4"><p className="text-[11px] font-extrabold uppercase tracking-wide text-gray-400 sm:text-xs">{label}</p><strong className={`mt-2 block text-xl ${valueClass} sm:text-2xl`}>{value}</strong><p className="mt-2 text-xs font-medium leading-5 text-gray-300">{detail}</p></div>;'
+          )
+
+          last_visit_component = '''
+function LastVisitChange({ insights }: { insights: WalletInsights }) {
+  const [previous, setPrevious] = useState<LastVisitSnapshot | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const stored = window.localStorage.getItem(LAST_VISIT_KEY);
+      if (stored) setPrevious(JSON.parse(stored));
+    } catch {
+      setPrevious(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!insights.enriched.length && insights.currentValue <= 0) return;
+
+    const timeout = window.setTimeout(() => {
+      const snapshot: LastVisitSnapshot = {
+        currentValue: insights.currentValue,
+        monthlyIncome: insights.monthlyIncome,
+        announcedIncome: insights.announcedIncome,
+        waitingCount: insights.waiting.length,
+        visitedAt: new Date().toISOString(),
+      };
+      try {
+        window.localStorage.setItem(LAST_VISIT_KEY, JSON.stringify(snapshot));
+      } catch {
+        return;
+      }
+    }, 1200);
+
+    return () => window.clearTimeout(timeout);
+  }, [insights.currentValue, insights.monthlyIncome, insights.announcedIncome, insights.waiting.length, insights.enriched.length]);
+
+  if (!previous || (!previous.currentValue && !previous.monthlyIncome && !previous.announcedIncome)) return null;
+
+  const valueDiff = insights.currentValue - previous.currentValue;
+  const incomeDiff = insights.monthlyIncome - previous.monthlyIncome;
+  const announcedDiff = insights.announcedIncome - previous.announcedIncome;
+  const waitingDiff = insights.waiting.length - previous.waitingCount;
+  const hasChange = Math.abs(valueDiff) >= 0.01 || Math.abs(incomeDiff) >= 0.01 || Math.abs(announcedDiff) >= 0.01 || waitingDiff !== 0;
+
+  if (!hasChange) {
+    return (
+      <div className="mt-4 rounded-2xl bg-gray-800/70 p-3 text-xs font-bold text-gray-300 ring-1 ring-white/10">
+        Desde sua última visita, não identificamos mudanças relevantes na carteira.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl bg-gray-800/70 p-3 ring-1 ring-white/10">
+      <p className="text-xs font-extrabold uppercase tracking-wide text-gray-400">Desde sua última visita</p>
+      <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold">
+        {Math.abs(valueDiff) >= 0.01 && <span className={valueDiff >= 0 ? "text-green-300" : "text-red-300"}>Carteira {valueDiff >= 0 ? "+" : ""}{formatCurrency(valueDiff)}</span>}
+        {Math.abs(incomeDiff) >= 0.01 && <span className={incomeDiff >= 0 ? "text-green-300" : "text-red-300"}>Renda prevista {incomeDiff >= 0 ? "+" : ""}{formatCurrency(incomeDiff)}</span>}
+        {Math.abs(announcedDiff) >= 0.01 && <span className={announcedDiff >= 0 ? "text-green-300" : "text-red-300"}>Renda anunciada {announcedDiff >= 0 ? "+" : ""}{formatCurrency(announcedDiff)}</span>}
+        {waitingDiff !== 0 && <span className={waitingDiff <= 0 ? "text-green-300" : "text-yellow-300"}>Pendências {waitingDiff > 0 ? "+" : ""}{waitingDiff}</span>}
+      </div>
+    </div>
+  );
+}
+
+'''
+          if 'function LastVisitChange({ insights }' not in text:
+              text = text.replace('function AttentionSection({ insights, updatingMissing, updateMissingDividends }', last_visit_component + 'function AttentionSection({ insights, updatingMissing, updateMissingDividends }')
+
+          # Compact line chart dimensions.
+          text = text.replace('const width = Math.max(360, snapshots.length * 72);', 'const width = Math.max(320, snapshots.length * 52);')
+          text = text.replace('const y = 124 - ((getValue(item) - min) / range) * 86 + 24;', 'const y = 82 - ((getValue(item) - min) / range) * 48 + 22;')
+          text = text.replace('return `${x},${y}`;', 'return `${x},${y}`;', 1)
+          text = text.replace('const y = 124 - ((getValue(item) - min) / range) * 86 + 24;', 'const y = 82 - ((getValue(item) - min) / range) * 48 + 22;')
+          text = text.replace('viewBox={`0 0 ${width} 180`}', 'viewBox={`0 0 ${width} 116`}')
+          text = text.replace('className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200"', 'className="h-36 min-w-full rounded-2xl bg-white ring-1 ring-slate-200 sm:h-44"')
+          text = text.replace('const labelY = labelBelow ? y + 18 : y - 26;', 'const labelY = labelBelow ? y + 15 : y - 20;')
+          text = text.replace('y={labelY + 11}', 'y={labelY + 10}')
+          text = text.replace('text-[9px]', 'text-[8px]')
+
+          path.write_text(text)
+          PY
+
+      - name: Commit hotfix and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/wallet-ux-hotfix.yml
+          git add src/app/carteira/page.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Compact wallet daily panel and history chart"
+          git push
