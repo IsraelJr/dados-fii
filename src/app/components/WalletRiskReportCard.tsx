@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { Crown, Download, FileText, Loader2, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import { Crown, Download, FileText, Lock, ShieldCheck, Sparkles } from "lucide-react";
 import LottieAnimation from "./LottieAnimation";
 
 type ReportStatus = {
@@ -131,7 +131,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
       });
       const json = await response.json().catch(() => ({}));
 
-      if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível gerar o prompt do relatório.");
+      if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível gerar o relatório.");
 
       setReportMarkdown(json.reportMarkdown || json.report?.reportMarkdown || "");
       setStatus((current) => ({
@@ -142,9 +142,9 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
         currentReportStatus: "done",
         reportMarkdown: json.reportMarkdown || json.report?.reportMarkdown || current?.reportMarkdown || "",
       }));
-      setMessage(json.mode === "cached" ? "Prompt manual carregado do histórico." : "Prompt manual gerado e salvo com sucesso.");
+      setMessage(json.mode === "cached" ? "Relatório carregado do histórico." : "Relatório gerado e salvo com sucesso.");
     } catch (err: any) {
-      setMessage(err.message || "Não foi possível gerar o prompt do relatório.");
+      setMessage(err.message || "Não foi possível gerar o relatório.");
     } finally {
       setGenerating(false);
     }
@@ -213,7 +213,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
           </h2>
 
           <p className={`mt-2 text-sm font-medium leading-6 ${isVip ? "text-gray-300" : "text-slate-700"}`}>
-            Uma análise completa dos seus FIIs com concentração, sustentabilidade dos dividendos, sensibilidade a juros, stress test, riscos por ativo e plano de rebalanceamento.
+            Uma análise completa dos seus FIIs com concentração, sustentabilidade dos dividendos, sensibilidade a juros, stress test, riscos por ativo e plano de ação.
           </p>
 
           {!isVip && (
@@ -244,7 +244,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
                   }`}
               >
                 <FileText size={18} />
-                {hasCurrentReport ? "Abrir relatório do mês" : "Gerar prompt do relatório"}
+                {hasCurrentReport ? "Abrir relatório do mês" : "Gerar relatório"}
               </button>
 
               {canDownloadPdf && (
