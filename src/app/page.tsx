@@ -12,6 +12,7 @@ import MonitoredFiisPanel from "./components/MonitoredFiisPanel";
 import GoogleAdsBlock from "./components/GoogleAdsBlock";
 import HomeDividendCalendar from "./components/HomeDividendCalendar";
 import SiteFeedback from "./components/SiteFeedback";
+import TrustLinksPanel from "./components/TrustLinksPanel";
 
 type MarketCardState = {
     formatted: string;
@@ -510,12 +511,20 @@ export default function Home() {
                             <p className="mt-2 text-sm leading-6 text-slate-600">
                                 Veja explicações simples, exemplos práticos e livros sobre dinheiro, escolhas e investimentos.
                             </p>
-                            <Link
-                                href="/educacao"
-                                className="mt-4 inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
-                            >
-                                Ver educação financeira
-                            </Link>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <Link
+                                    href="/educacao"
+                                    className="inline-flex items-center justify-center rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+                                >
+                                    Ver educação financeira
+                                </Link>
+                                <Link
+                                    href="/glossario"
+                                    className="inline-flex items-center justify-center rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
+                                >
+                                    Ver glossário
+                                </Link>
+                            </div>
                         </section>
                     </div>
 
@@ -535,6 +544,8 @@ export default function Home() {
                 <PersonalizedNews />
 
                 <SiteFeedback />
+
+                <TrustLinksPanel />
 
                 <section className="rounded-2xl bg-slate-100 p-5 text-left ring-1 ring-slate-200">
                     <h2 className="text-xl font-extrabold text-slate-800">Acompanhe FIIs com mais clareza</h2>
