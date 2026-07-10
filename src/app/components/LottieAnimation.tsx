@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 type LottieAnimationProps = {
   src: string;
@@ -10,14 +10,6 @@ type LottieAnimationProps = {
 
 const SCRIPT_ID = "dados-fii-lottie-player-script";
 const SCRIPT_SRC = "https://unpkg.com/@lottiefiles/lottie-player@2.0.8/dist/lottie-player.js";
-
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      "lottie-player": any;
-    }
-  }
-}
 
 export default function LottieAnimation({ src, label = "Animação", className = "h-28 w-28" }: LottieAnimationProps) {
   const [ready, setReady] = useState(false);
@@ -54,15 +46,13 @@ export default function LottieAnimation({ src, label = "Animação", className =
     );
   }
 
-  return (
-    <lottie-player
-      src={src}
-      background="transparent"
-      speed="1"
-      loop
-      autoplay
-      aria-label={label}
-      class={className}
-    />
-  );
+  return React.createElement("lottie-player", {
+    src,
+    background: "transparent",
+    speed: "1",
+    loop: true,
+    autoplay: true,
+    "aria-label": label,
+    class: className,
+  });
 }
