@@ -119,7 +119,7 @@ export function parseMonthKey(monthKey: string) {
   };
 }
 
-export async function getAllPricesFromSheet() {
+export async function getAllPricesFromSheet(): Promise<Map<string, any>> {
   const sheetId = process.env.SHEET_ID;
   const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
   if (!sheetId || !apiKey) return new Map<string, any>();
@@ -131,22 +131,22 @@ export async function getAllPricesFromSheet() {
     const data = await response.json();
     const rows = Array.isArray(data?.values) ? data.values.slice(1) : [];
 
-    return new Map(
-      rows
-        .filter((row: any[]) => row?.[0])
-        .map((row: any[]) => [
-          normalizeTicker(row[0]),
-          {
-            code: normalizeTicker(row[0]),
-            price: row[1]?.toString().trim() || "",
-            opening: row[2]?.toString().trim() || "",
-            variation: row[3]?.toString().trim() || "",
-            minimum: row[4]?.toString().trim() || "",
-            maximum: row[5]?.toString().trim() || "",
-          },
-        ])
-        .filter(([ticker]: [string, any]) => Boolean(ticker))
-    );
+    const entries: Array<[string, any]> = rows
+      .filter((row: any[]) => row?.[0])
+      .map((row: any[]) => [
+        normalizeTicker(row[0]),
+        {
+          code: normalizeTicker(row[0]),
+          price: row[1]?.toString().trim() || "",
+          opening: row[2]?.toString().trim() || "",
+          variation: row[3]?.toString().trim() || "",
+          minimum: row[4]?.toString().trim() || "",
+          maximum: row[5]?.toString().trim() || "",
+        },
+      ])
+      .filter(([ticker]) => Boolean(ticker));
+
+    return new Map<string, any>(entries);
   } catch (error) {
     console.error("Erro ao carregar preços para snapshots:", error);
     return new Map<string, any>();
