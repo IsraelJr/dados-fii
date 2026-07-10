@@ -277,7 +277,7 @@ export default function PersonalizedNews() {
             <div className="mb-4 flex flex-col items-center gap-2">
                 <h2 className="text-center text-xl font-bold">📰 FIIs pesquisados por você fora da carteira</h2>
                 <p className="max-w-2xl text-center text-sm text-gray-500">
-                    Mostramos apenas fundos que você pesquisou e que ainda não estão na sua carteira salva neste navegador.
+                    Fundos que você pesquisou e que ainda não estão na sua carteira.
                 </p>
                 {(mode === "openai" || mode === "perplexity" || mode === "cache") && (
                     <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
