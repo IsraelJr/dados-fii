@@ -49,7 +49,6 @@ type WalletSnapshot = {
   createdAt: string;
   updatedAt: string;
 };
-
 type DividendMonth = { month: string; label: string; value: number };
 type DividendHistory = {
   months: DividendMonth[];
@@ -60,7 +59,6 @@ type DividendHistory = {
   worst: DividendMonth | null;
   topPayer: { ticker: string; value: number } | null;
 };
-
 type WalletInsights = {
   currentMonth: string;
   enriched: EnrichedFii[];
@@ -303,6 +301,10 @@ function readSnapshots(): WalletSnapshot[] {
   }
 }
 
+function snapshotSignature(items: WalletSnapshot[]) {
+  return JSON.stringify(items.map((item) => ({ monthKey: item.monthKey, totalValue: item.totalValue, estimatedMonthlyIncome: item.estimatedMonthlyIncome })));
+}
+
 export default function WalletPage() {
   const [ticker, setTicker] = useState("");
   const [quotas, setQuotas] = useState("");
@@ -388,12 +390,6 @@ export default function WalletPage() {
     const announcedIncome = enriched.reduce((acc, item) => acc + item.announcedIncome, 0);
     const currentValue = enriched.reduce((acc, item) => acc + item.currentValuePosition, 0);
     const waiting = enriched.filter((item) => item.waitingAnnouncement);
-    const segmentTotalsByQuotas = enriched.reduce((acc: Record<string, number>, item) => {
-      acc[item.segment] = (acc[item.segment] || 0) + item.quotas;
-      return acc;
-    }, {});
-    const segmentBase = Object.values(segmentTotalsByQuotas).reduce((acc, value) => acc + value, 0);
-    const segmentBreakdown = Object.entries(segmentTotalsByQuotas).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([segment, value]) => ({ ticker: segment, value: `${segmentBase > 0 ? ((value / segmentBase) * 100).toFixed(1).replace(".", ",") : "0,0"}%` }));
     const topIncome = [...enriched].sort((a, b) => b.estimatedIncome - a.estimatedIncome).slice(0, 3);
     const topWeight = [...enriched].sort((a, b) => b.currentValuePosition - a.currentValuePosition).slice(0, 3);
     const assetWeights = topWeight.map((item) => ({ label: item.ticker, value: item.currentValuePosition, detail: currentValue ? formatPercentValue((item.currentValuePosition / currentValue) * 100) : "0,0%" }));
@@ -402,6 +398,8 @@ export default function WalletPage() {
       return acc;
     }, {});
     const segmentWeights = Object.entries(segmentValueTotals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([segment, value]) => ({ label: segment, value, detail: currentValue ? formatPercentValue((value / currentValue) * 100) : "0,0%" }));
+    const segmentBase = segmentWeights.reduce((acc, item) => acc + item.value, 0);
+    const segmentBreakdown = segmentWeights.slice(0, 3).map((item) => ({ ticker: item.label, value: segmentBase > 0 ? formatPercentValue((item.value / segmentBase) * 100) : "0,0%" }));
     const incomeByFii = topIncome.map((item) => ({ label: item.ticker, value: item.estimatedIncome, detail: monthlyIncome ? formatPercentValue((item.estimatedIncome / monthlyIncome) * 100) : "0,0%" }));
     const dividendHistory = buildDividendHistory(enriched);
     return { currentMonth, enriched, monthlyIncome, announcedIncome, currentValue, pendingIncome: Math.max(monthlyIncome - announcedIncome, 0), waiting, topIncome, topWeight, segmentBreakdown, mainSegment: segmentBreakdown[0], assetWeights, segmentWeights, incomeByFii, dividendHistory };
@@ -412,27 +410,31 @@ export default function WalletPage() {
     const now = new Date();
     const key = monthKey(now);
     const label = monthLabelFromKey(key);
-    const current = snapshots.find((item) => item.monthKey === key);
-    const nextSnapshot: WalletSnapshot = {
-      monthKey: key,
-      label,
-      totalValue: insights.currentValue,
-      estimatedMonthlyIncome: insights.monthlyIncome,
-      announcedMonthlyIncome: insights.announcedIncome,
-      walletCount: items.length,
-      topWeightTicker: insights.topWeight[0]?.ticker,
-      topIncomeTicker: insights.topIncome[0]?.ticker,
-      createdAt: current?.createdAt || now.toISOString(),
-      updatedAt: now.toISOString(),
-    };
-    const next = [...snapshots.filter((item) => item.monthKey !== key), nextSnapshot].sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-60);
-    try {
-      window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
-    } catch {
-      return;
-    }
-    setSnapshots(next);
-  }, [loading, items.length, insights.currentValue, insights.monthlyIncome, insights.announcedIncome]);
+
+    setSnapshots((currentSnapshots) => {
+      const current = currentSnapshots.find((item) => item.monthKey === key);
+      const nextSnapshot: WalletSnapshot = {
+        monthKey: key,
+        label,
+        totalValue: insights.currentValue,
+        estimatedMonthlyIncome: insights.monthlyIncome,
+        announcedMonthlyIncome: insights.announcedIncome,
+        walletCount: items.length,
+        topWeightTicker: insights.topWeight[0]?.ticker,
+        topIncomeTicker: insights.topIncome[0]?.ticker,
+        createdAt: current?.createdAt || now.toISOString(),
+        updatedAt: now.toISOString(),
+      };
+      const next = [...currentSnapshots.filter((item) => item.monthKey !== key), nextSnapshot].sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-60);
+      if (snapshotSignature(next) === snapshotSignature(currentSnapshots)) return currentSnapshots;
+      try {
+        window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
+      } catch {
+        return currentSnapshots;
+      }
+      return next;
+    });
+  }, [loading, items.length, insights.currentValue, insights.monthlyIncome, insights.announcedIncome, insights.topIncome, insights.topWeight]);
 
   const upcomingPayments = useMemo(() => getUpcomingPayments(loaded), [loaded]);
   const displayedUpcomingPayments = upcomingPayments.slice(0, 12);
@@ -518,68 +520,79 @@ export default function WalletPage() {
       <AppToast message={message} variant={toastVariant(message)} onClose={() => setMessage("")} />
       <PageHeader
         title="Minha Carteira"
-        subtitle="Sua carteira fica salva neste navegador e pode ser recuperada pelo e-mail confirmado."
+        subtitle="Acompanhe sua carteira de FIIs, renda mensal, próximos pagamentos e evolução patrimonial."
         action={<Link href="/calendario-dividendos-fiis" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">Calendário público</Link>}
       />
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <MetricBox label="Renda mensal estimada" value={formatCurrency(insights.monthlyIncome)} detail="Baseada no último rendimento disponível." tone="green" />
-        <MetricBox label="Valor aproximado da carteira" value={formatCurrency(insights.currentValue)} detail="Calculado pelo preço atual." tone="indigo" />
-        <MetricBox label="Segmento principal por cotas" value={insights.mainSegment?.value || "-"} detail={insights.mainSegment?.ticker || "Adicione FIIs para calcular."} tone="yellow" />
-      </section>
-
+      <DailyWalletPanel insights={insights} firstPayment={firstPayment} />
       <WalletRiskReportCard walletCount={items.length} />
-      <SimpleMonthlySummary insights={insights} topWeight={topWeight} topWeightPercent={topWeightPercent} />
+      <AttentionSection insights={insights} updatingMissing={updatingMissing} updateMissingDividends={updateMissingDividends} />
       <VisualHistorySection snapshots={snapshots} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
-
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-        <h2 className="text-xl font-extrabold text-white">Resumo da carteira</h2>
-        {!items.length ? (
-          <p className="mt-3 text-sm font-medium text-gray-300">Adicione FIIs para gerar um resumo automático da carteira.</p>
-        ) : (
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <SummaryItem label="Concentração por cotas" value={insights.mainSegment ? `${insights.mainSegment.ticker} concentra ${insights.mainSegment.value} das cotas cadastradas.` : "Sem segmento calculado."} />
-            <SummaryItem label="Maior fonte de renda estimada" value={topIncome ? `${topIncome.ticker} lidera com ${formatCurrency(topIncome.estimatedIncome)} por mês estimado.` : "Sem renda estimada ainda."} />
-            <SummaryItem label="Comunicados do mês" value={insights.waiting.length ? `${insights.waiting.length} FII(s) ainda aguardam comunicado de ${MONTHS_PTBR[insights.currentMonth]}.` : `Todos os FIIs carregados já têm comunicado de ${MONTHS_PTBR[insights.currentMonth]}.`} />
-            <SummaryItem label="Próximo pagamento" value={firstPayment ? `${firstPayment.ticker}: ${formatPaymentSummary(firstPayment)}.` : "Nenhum pagamento futuro identificado na base."} />
-          </div>
-        )}
-      </section>
-
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-          <div>
-            <h2 className="flex items-center gap-2 text-xl font-extrabold text-white"><AlertTriangle size={20} className="text-yellow-300" /> Aguardando comunicado</h2>
-            <p className="mt-2 text-sm font-medium text-gray-300">
-              {insights.waiting.length ? `${insights.waiting.length} FII(s) da carteira ainda não têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base. Estimativa pendente: ${formatCurrency(insights.pendingIncome)}.` : `Todos os FIIs carregados já têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base.`}
-            </p>
-            {insights.waiting.length > 0 && <p className="mt-2 text-sm font-medium text-gray-200">{insights.waiting.map((item) => item.ticker).join(", ")}</p>}
-          </div>
-          <button type="button" onClick={updateMissingDividends} disabled={!insights.waiting.length || updatingMissing} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400">
-            <RefreshCw size={16} className={updatingMissing ? "animate-spin" : ""} /> Atualizar pendentes
-          </button>
-        </div>
-      </section>
-
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
-        <h2 className="mb-4 text-xl font-extrabold text-white">Adicionar FII</h2>
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
-          <input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); quotasInputRef.current?.focus(); } }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
-          <input ref={quotasInputRef} value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
-          <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
-          <button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
-        </div>
-      </section>
-
+      <SimpleMonthlySummary insights={insights} topWeight={topWeight} topWeightPercent={topWeightPercent} />
+      <WalletEditorSection ticker={ticker} setTicker={setTicker} quotas={quotas} setQuotas={setQuotas} quotasInputRef={quotasInputRef} addItem={addItem} exportCsv={exportCsv} canExport={loaded.length > 0} />
       <WalletTable items={items} insights={insights} loading={loading} editingQuotas={editingQuotas} setEditingQuotas={setEditingQuotas} upcomingPayments={upcomingPayments} updateQuotas={updateQuotas} removeItem={removeItem} />
+      <UpcomingPaymentsSection payments={displayedUpcomingPayments} shouldScroll={shouldScrollUpcomingPayments} />
       <section className="mt-6 grid gap-4 md:grid-cols-3">
         <RankingCard title="Maior renda estimada" items={insights.topIncome.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.estimatedIncome) }))} />
         <RankingCard title="Maior peso financeiro" items={insights.topWeight.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.currentValuePosition) }))} />
-        <RankingCard title="Distribuição por segmento (cotas)" items={insights.segmentBreakdown} />
+        <RankingCard title="Distribuição por segmento" items={insights.segmentBreakdown} />
       </section>
-      <UpcomingPaymentsSection payments={displayedUpcomingPayments} shouldScroll={shouldScrollUpcomingPayments} />
     </main>
+  );
+}
+
+function DailyWalletPanel({ insights, firstPayment }: { insights: WalletInsights; firstPayment?: Payment }) {
+  const strongestMoves = insights.enriched
+    .filter((item) => Math.abs(item.dailyVariation) >= 0.005)
+    .sort((a, b) => Math.abs(b.dailyVariation) - Math.abs(a.dailyVariation))
+    .slice(0, 3);
+
+  return (
+    <section className="rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+        <div>
+          <p className="inline-flex rounded-full bg-indigo-500/15 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-200">Hoje na sua carteira</p>
+          <h2 className="mt-3 text-2xl font-black text-white">Painel diário dos seus FIIs</h2>
+          <p className="mt-2 text-sm leading-6 text-gray-300">Resumo rápido para saber valor, renda, pagamentos e pendências sem precisar procurar pela tela.</p>
+        </div>
+        {strongestMoves.length > 0 && (
+          <div className="rounded-2xl bg-gray-800 p-3 ring-1 ring-white/10">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Maiores movimentos hoje</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {strongestMoves.map((item) => <DailyVariationBadge key={item.ticker} value={item.dailyVariation} labelPrefix={item.ticker} />)}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <DarkMetric label="Carteira hoje" value={formatCurrency(insights.currentValue)} detail={`${insights.enriched.length} FII(s) cadastrados`} tone="indigo" />
+        <DarkMetric label="Renda prevista" value={formatCurrency(insights.monthlyIncome)} detail="Baseada no último rendimento disponível" tone="green" />
+        <DarkMetric label="Renda anunciada" value={formatCurrency(insights.announcedIncome)} detail={`Para ${MONTHS_PTBR[insights.currentMonth]}`} tone="indigo" />
+        <DarkMetric label="Próximo pagamento" value={firstPayment ? formatCurrency(firstPayment.amount) : "-"} detail={firstPayment ? `${firstPayment.ticker} em ${firstPayment.date}` : "Nenhum pagamento futuro"} tone="green" />
+        <DarkMetric label="Pendências" value={String(insights.waiting.length)} detail={insights.waiting.length ? "FIIs aguardando comunicado" : "Tudo certo no mês"} tone={insights.waiting.length ? "yellow" : "indigo"} />
+      </div>
+    </section>
+  );
+}
+
+function AttentionSection({ insights, updatingMissing, updateMissingDividends }: { insights: WalletInsights; updatingMissing: boolean; updateMissingDividends: () => void }) {
+  const hasWaiting = insights.waiting.length > 0;
+  return (
+    <section className={`mt-6 rounded-2xl p-5 shadow-sm ring-1 ${hasWaiting ? "bg-yellow-50 text-yellow-950 ring-yellow-200" : "bg-white text-slate-800 ring-slate-200"}`}>
+      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-extrabold"><AlertTriangle size={20} className={hasWaiting ? "text-yellow-600" : "text-indigo-600"} /> Atenção da carteira</h2>
+          <p className={`mt-2 text-sm font-medium leading-6 ${hasWaiting ? "text-yellow-800" : "text-slate-600"}`}>
+            {hasWaiting ? `${insights.waiting.length} FII(s) ainda não têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base. Estimativa pendente: ${formatCurrency(insights.pendingIncome)}.` : `Tudo certo: todos os FIIs carregados já têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base.`}
+          </p>
+          {hasWaiting && <p className="mt-2 text-sm font-extrabold text-yellow-900">{insights.waiting.map((item) => item.ticker).join(", ")}</p>}
+        </div>
+        <button type="button" onClick={updateMissingDividends} disabled={!hasWaiting || updatingMissing} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
+          <RefreshCw size={16} className={updatingMissing ? "animate-spin" : ""} /> Atualizar pendentes
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -589,7 +602,7 @@ function SimpleMonthlySummary({ insights, topWeight, topWeightPercent }: { insig
     <section className="mt-6 rounded-2xl bg-white p-5 text-slate-800 shadow-sm ring-1 ring-slate-200">
       <div>
         <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BarChart3 size={14} /> Resumo</p>
-        <h2 className="mt-3 text-2xl font-black text-slate-900">Números gerais da carteira</h2>
+        <h2 className="mt-3 text-xl font-black text-slate-900">Leitura rápida dos números</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">Resumo numérico e educativo. Não substitui o relatório de risco completo.</p>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -599,8 +612,6 @@ function SimpleMonthlySummary({ insights, topWeight, topWeightPercent }: { insig
         <LightMetric label="Média mensal estimada" value={formatCurrency(history.average)} />
         <LightMetric label="Maior pagador no ano" value={history.topPayer ? `${history.topPayer.ticker}: ${formatCurrency(history.topPayer.value)}` : "-"} />
         <LightMetric label="Maior peso financeiro" value={topWeight ? `${topWeight.ticker}: ${formatPercentValue(topWeightPercent)}` : "-"} />
-        <LightMetric label="Quantidade de FIIs" value={String(insights.enriched.length)} />
-        <LightMetric label="Renda anunciada no mês" value={formatCurrency(insights.announcedIncome)} />
       </div>
     </section>
   );
@@ -609,9 +620,7 @@ function SimpleMonthlySummary({ insights, topWeight, topWeightPercent }: { insig
 function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const years = getHistoryYears();
-  const yearSnapshots = snapshots
-    .filter((item) => getSnapshotYear(item) === selectedYear)
-    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  const yearSnapshots = snapshots.filter((item) => getSnapshotYear(item) === selectedYear).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
   const patrimonySnapshots = yearSnapshots.filter((item) => item.totalValue > 0);
   const dividendSnapshots = yearSnapshots.filter((item) => item.estimatedMonthlyIncome > 0);
 
@@ -619,38 +628,27 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
     <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução patrimonial</p>
-          <h2 className="mt-3 text-xl font-black text-slate-900">Histórico por ano</h2>
+          <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução</p>
+          <h2 className="mt-3 text-xl font-black text-slate-900">Patrimônio e dividendos por ano</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">Use os botões para consultar anos anteriores, limitado aos últimos 5 anos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {years.map((year) => {
             const hasData = snapshots.some((item) => getSnapshotYear(item) === year && (item.totalValue > 0 || item.estimatedMonthlyIncome > 0));
             return (
-              <button
-                key={year}
-                type="button"
-                onClick={() => setSelectedYear(year)}
-                className={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ${selectedYear === year ? "bg-indigo-600 text-white ring-indigo-600" : hasData ? "bg-white text-slate-700 ring-slate-300 hover:bg-indigo-50" : "bg-slate-50 text-slate-400 ring-slate-200"}`}
-              >
-                {year}
-              </button>
+              <button key={year} type="button" onClick={() => setSelectedYear(year)} className={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ${selectedYear === year ? "bg-indigo-600 text-white ring-indigo-600" : hasData ? "bg-white text-slate-700 ring-slate-300 hover:bg-indigo-50" : "bg-slate-50 text-slate-400 ring-slate-200"}`}>{year}</button>
             );
           })}
         </div>
       </div>
 
       <div className="mt-5 grid gap-6 lg:grid-cols-2">
-        <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-          <h3 className="text-base font-black text-slate-900">Patrimônio estimado em {selectedYear}</h3>
-          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">Valor total da carteira nos meses com histórico salvo.</p>
-          <div className="mt-4"><LineHistoryChart snapshots={patrimonySnapshots} year={selectedYear} /></div>
-        </article>
-        <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-          <h3 className="text-base font-black text-slate-900">Dividendos pagos em {selectedYear}</h3>
-          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">Meses do ano selecionado em que houve pagamento registrado.</p>
-          <div className="mt-4"><DividendSnapshotChart snapshots={dividendSnapshots} year={selectedYear} /></div>
-        </article>
+        <HistoryChartCard title={`Patrimônio estimado em ${selectedYear}`} subtitle="Valor total da carteira nos meses com histórico salvo.">
+          <HistoryLineChart snapshots={patrimonySnapshots} year={selectedYear} getValue={(item) => item.totalValue} emptyText={`Nenhum patrimônio registrado em ${selectedYear} ainda.`} />
+        </HistoryChartCard>
+        <HistoryChartCard title={`Dividendos pagos em ${selectedYear}`} subtitle="Meses do ano selecionado em que houve pagamento registrado.">
+          <HistoryLineChart snapshots={dividendSnapshots} year={selectedYear} getValue={(item) => item.estimatedMonthlyIncome} emptyText={`Nenhum pagamento registrado em ${selectedYear} ainda.`} />
+        </HistoryChartCard>
       </div>
     </section>
   );
@@ -658,10 +656,37 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
 
 function PortfolioCharts({ assetWeights, incomeByFii, segmentWeights }: { assetWeights: ChartItem[]; incomeByFii: ChartItem[]; segmentWeights: ChartItem[] }) {
   return (
-    <section className="mt-6 grid gap-6 lg:grid-cols-3">
-      <ChartCard icon={<PieChart size={14} />} title="Peso por ativo" subtitle="Valor financeiro estimado por FII."><BarList items={assetWeights} /></ChartCard>
-      <ChartCard icon={<TrendingUp size={14} />} title="Renda por FII" subtitle="Renda mensal estimada por ativo."><BarList items={incomeByFii} /></ChartCard>
-      <ChartCard icon={<BarChart3 size={14} />} title="Peso por segmento" subtitle="Distribuição financeira estimada."><BarList items={segmentWeights} /></ChartCard>
+    <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><PieChart size={14} /> Composição</p>
+      <h2 className="mt-3 text-xl font-black text-slate-900">Como a carteira está distribuída</h2>
+      <div className="mt-5 grid gap-6 lg:grid-cols-3">
+        <ChartCard title="Peso por ativo" subtitle="Valor financeiro estimado por FII."><BarList items={assetWeights} /></ChartCard>
+        <ChartCard title="Renda por FII" subtitle="Renda mensal estimada por ativo."><BarList items={incomeByFii} /></ChartCard>
+        <ChartCard title="Peso por segmento" subtitle="Distribuição financeira estimada."><BarList items={segmentWeights} /></ChartCard>
+      </div>
+    </section>
+  );
+}
+
+function WalletEditorSection({ ticker, setTicker, quotas, setQuotas, quotasInputRef, addItem, exportCsv, canExport }: {
+  ticker: string;
+  setTicker: (value: string) => void;
+  quotas: string;
+  setQuotas: (value: string) => void;
+  quotasInputRef: React.RefObject<HTMLInputElement | null>;
+  addItem: () => void;
+  exportCsv: () => void;
+  canExport: boolean;
+}) {
+  return (
+    <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+      <h2 className="mb-4 text-xl font-extrabold text-white">Adicionar ou atualizar FII</h2>
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+        <input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); quotasInputRef.current?.focus(); } }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+        <input ref={quotasInputRef} value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+        <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
+        <button onClick={exportCsv} disabled={!canExport} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
+      </div>
     </section>
   );
 }
@@ -741,69 +766,56 @@ function UpcomingPaymentsSection({ payments, shouldScroll }: { payments: Payment
   );
 }
 
-function MetricBox({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: "green" | "indigo" | "yellow" }) {
+function DarkMetric({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: "green" | "indigo" | "yellow" }) {
   const valueClass = tone === "green" ? "text-green-300" : tone === "yellow" ? "text-yellow-300" : "text-indigo-300";
-  return <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10"><p className="text-base font-extrabold text-white">{label}</p><strong className={`mt-2 block text-3xl ${valueClass}`}>{value}</strong><p className="mt-2 text-sm font-medium text-gray-300">{detail}</p></div>;
+  return <div className="rounded-2xl bg-gray-800 p-4 ring-1 ring-white/10"><p className="text-xs font-extrabold uppercase tracking-wide text-gray-400">{label}</p><strong className={`mt-2 block text-2xl ${valueClass}`}>{value}</strong><p className="mt-2 text-xs font-medium leading-5 text-gray-300">{detail}</p></div>;
 }
 
 function LightMetric({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-sm font-black text-slate-900">{value}</p></div>;
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-gray-800 p-4 ring-1 ring-white/5"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p><p className="mt-2 text-sm font-bold text-gray-100">{value}</p></div>;
+function HistoryChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  return <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="text-base font-black text-slate-900">{title}</h3><p className="mt-1 text-xs font-medium leading-5 text-slate-500">{subtitle}</p><div className="mt-4">{children}</div></article>;
 }
 
-function ChartCard({ icon, title, subtitle, children }: { icon: ReactNode; title: string; subtitle: string; children: ReactNode }) {
-  return <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">{icon} Carteira</p><h2 className="mt-3 text-xl font-black text-slate-900">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{subtitle}</p><div className="mt-5">{children}</div></article>;
+function ChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+  return <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="text-base font-black text-slate-900">{title}</h3><p className="mt-1 text-xs font-medium leading-5 text-slate-500">{subtitle}</p><div className="mt-4">{children}</div></article>;
 }
 
 function BarList({ items, emptyText = "Sem dados suficientes para exibir." }: { items: ChartItem[]; emptyText?: string }) {
   const filtered = items.filter((item) => item.value > 0);
   const max = Math.max(...filtered.map((item) => item.value), 1);
-  if (!filtered.length) return <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-200">{emptyText}</p>;
+  if (!filtered.length) return <p className="rounded-xl bg-white p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-200">{emptyText}</p>;
   return <div className="space-y-3">{filtered.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold"><span className="truncate text-slate-700">{item.label}</span><span className="shrink-0 text-slate-500">{item.detail || formatCurrency(item.value)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((item.value / max) * 100, 3)}%` }} /></div></div>)}</div>;
 }
 
-function LineHistoryChart({ snapshots, year }: { snapshots: WalletSnapshot[]; year: number }) {
-  const points = snapshots.map((item) => item.totalValue);
-  if (snapshots.length < 2) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Quando houver dois ou mais meses em {year}, o gráfico de evolução aparecerá aqui.</div>;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  const coords = snapshots.map((item, index) => {
-    const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20;
-    const y = 120 - ((item.totalValue - min) / range) * 82 + 24;
-    return `${x},${y}`;
-  }).join(" ");
-  return <svg viewBox="0 0 360 170" className="h-52 w-full rounded-2xl bg-white ring-1 ring-slate-200"><polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />{snapshots.map((item, index) => { const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20; const y = 120 - ((item.totalValue - min) / range) * 82 + 24; const labelBelow = index % 2 === 1 || y < 42; const labelY = labelBelow ? y + 18 : y - 26; return <g key={item.monthKey}><circle cx={x} cy={y} r="4.5" className="fill-indigo-700" /><text x={x} y={labelY} textAnchor="middle" className="fill-slate-600 text-[9px] font-bold">{getSnapshotMonthLabel(item)}</text><text x={x} y={labelY + 11} textAnchor="middle" className="fill-slate-800 text-[9px] font-black">{formatCurrencyCompact(item.totalValue)}</text></g>; })}</svg>;
-}
-
-function DividendSnapshotChart({ snapshots, year }: { snapshots: WalletSnapshot[]; year: number }) {
-  const points = snapshots.map((item) => item.estimatedMonthlyIncome);
-  if (!snapshots.length) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Nenhum pagamento registrado em {year} ainda.</div>;
+function HistoryLineChart({ snapshots, year, getValue, emptyText }: { snapshots: WalletSnapshot[]; year: number; getValue: (item: WalletSnapshot) => number; emptyText: string }) {
+  const points = snapshots.map(getValue).filter((value) => value > 0);
+  if (!snapshots.length || !points.length) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">{emptyText}</div>;
   const min = Math.min(...points, 0);
   const max = Math.max(...points, 1);
   const range = max - min || 1;
+  const width = Math.max(360, snapshots.length * 72);
   const coords = snapshots.map((item, index) => {
-    const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20;
-    const y = 120 - ((item.estimatedMonthlyIncome - min) / range) * 82 + 24;
+    const x = snapshots.length === 1 ? width / 2 : (index / (snapshots.length - 1)) * (width - 48) + 24;
+    const y = 124 - ((getValue(item) - min) / range) * 86 + 24;
     return `${x},${y}`;
   }).join(" ");
-  return <svg viewBox="0 0 360 170" className="h-52 w-full rounded-2xl bg-white ring-1 ring-slate-200">{snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}{snapshots.map((item, index) => { const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20; const y = 120 - ((item.estimatedMonthlyIncome - min) / range) * 82 + 24; const labelBelow = index % 2 === 1 || y < 42; const labelY = labelBelow ? y + 18 : y - 26; return <g key={item.monthKey}><circle cx={x} cy={y} r="4.5" className="fill-indigo-700" /><text x={x} y={labelY} textAnchor="middle" className="fill-slate-600 text-[9px] font-bold">{getSnapshotMonthLabel(item)}</text><text x={x} y={labelY + 11} textAnchor="middle" className="fill-slate-800 text-[9px] font-black">{formatCurrencyCompact(item.estimatedMonthlyIncome)}</text></g>; })}</svg>;
+  return <div className="overflow-x-auto"><svg viewBox={`0 0 ${width} 180`} className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200">{snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}{snapshots.map((item, index) => { const x = snapshots.length === 1 ? width / 2 : (index / (snapshots.length - 1)) * (width - 48) + 24; const y = 124 - ((getValue(item) - min) / range) * 86 + 24; const labelBelow = index % 2 === 1 || y < 44; const labelY = labelBelow ? y + 18 : y - 26; return <g key={item.monthKey}><circle cx={x} cy={y} r="4.5" className="fill-indigo-700" /><text x={x} y={labelY} textAnchor="middle" className="fill-slate-600 text-[9px] font-bold">{getSnapshotMonthLabel(item)}</text><text x={x} y={labelY + 11} textAnchor="middle" className="fill-slate-800 text-[9px] font-black">{formatCurrencyCompact(getValue(item))}</text></g>; })}</svg></div>;
 }
 
 function FiiTickerLink({ ticker }: { ticker: string }) {
   return <Link href={`/fii/${ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">{ticker}</Link>;
 }
 
-function DailyVariationBadge({ value }: { value?: number }) {
+function DailyVariationBadge({ value, labelPrefix }: { value?: number; labelPrefix?: string }) {
   const variation = Number(value || 0);
-  if (!Number.isFinite(variation) || Math.abs(variation) < 0.005) return <span className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-xs font-extrabold text-gray-400 ring-1 ring-gray-700" title="Sem variação no dia"><Minus size={12} /> -</span>;
+  if (!Number.isFinite(variation) || Math.abs(variation) < 0.005) return <span className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-xs font-extrabold text-gray-400 ring-1 ring-gray-700" title="Sem variação no dia"><Minus size={12} /> {labelPrefix ? `${labelPrefix} ` : ""}-</span>;
   const isUp = variation > 0;
   const Icon = isUp ? TrendingUp : TrendingDown;
   const label = `${Math.abs(variation).toFixed(2).replace(".", ",")}% ${isUp ? "alta" : "baixa"}`;
-  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold ring-1 ${isUp ? "bg-green-950/40 text-green-300 ring-green-900/60" : "bg-red-950/40 text-red-300 ring-red-900/60"}`} title={`Movimento do dia: ${label}`}><Icon size={12} /> {label}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold ring-1 ${isUp ? "bg-green-950/40 text-green-300 ring-green-900/60" : "bg-red-950/40 text-red-300 ring-red-900/60"}`} title={`Movimento do dia: ${label}`}><Icon size={12} /> {labelPrefix ? `${labelPrefix} ` : ""}{label}</span>;
 }
 
 function WalletMobileCard({ item, nextPayment, draftQuotas, changed, onQuotaChange, onSave, onRemove }: { item: EnrichedFii; nextPayment?: Payment; draftQuotas: string; changed: boolean; onQuotaChange: (value: string) => void; onSave: () => void; onRemove: () => void }) {
