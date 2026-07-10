@@ -1,5 +1,7 @@
 name: Wallet UX Compact Hotfix
 
+# trigger: compact-wallet-ux
+
 on:
   push:
     branches:
@@ -45,7 +47,6 @@ type LastVisitSnapshot = {
           if 'type LastVisitSnapshot = {' not in text:
               text = text.replace('type WalletInsights = {', last_visit_type + '\ntype WalletInsights = {')
 
-          # Compact top panel classes and keep shorter copy.
           text = text.replace(
               '<section className="overflow-hidden rounded-3xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">',
               '<section className="overflow-hidden rounded-3xl bg-gray-900 p-4 text-gray-100 shadow-lg ring-1 ring-white/10 sm:p-5">',
@@ -64,8 +65,6 @@ type LastVisitSnapshot = {
               '<LastVisitChange insights={insights} />\n      <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 xl:grid-cols-5">',
               1
           )
-
-          # Make metric values more compact on mobile.
           text = text.replace(
               'return <div className="rounded-2xl bg-gray-800 p-4 ring-1 ring-white/10"><p className="text-xs font-extrabold uppercase tracking-wide text-gray-400">{label}</p><strong className={`mt-2 block text-2xl ${valueClass}`}>{value}</strong><p className="mt-2 text-xs font-medium leading-5 text-gray-300">{detail}</p></div>;',
               'return <div className="rounded-2xl bg-gray-800 p-3 ring-1 ring-white/10 sm:p-4"><p className="text-[11px] font-extrabold uppercase tracking-wide text-gray-400 sm:text-xs">{label}</p><strong className={`mt-2 block text-xl ${valueClass} sm:text-2xl`}>{value}</strong><p className="mt-2 text-xs font-medium leading-5 text-gray-300">{detail}</p></div>;'
@@ -77,7 +76,6 @@ function LastVisitChange({ insights }: { insights: WalletInsights }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-
     try {
       const stored = window.localStorage.getItem(LAST_VISIT_KEY);
       if (stored) setPrevious(JSON.parse(stored));
@@ -89,7 +87,6 @@ function LastVisitChange({ insights }: { insights: WalletInsights }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!insights.enriched.length && insights.currentValue <= 0) return;
-
     const timeout = window.setTimeout(() => {
       const snapshot: LastVisitSnapshot = {
         currentValue: insights.currentValue,
@@ -104,12 +101,10 @@ function LastVisitChange({ insights }: { insights: WalletInsights }) {
         return;
       }
     }, 1200);
-
     return () => window.clearTimeout(timeout);
   }, [insights.currentValue, insights.monthlyIncome, insights.announcedIncome, insights.waiting.length, insights.enriched.length]);
 
   if (!previous || (!previous.currentValue && !previous.monthlyIncome && !previous.announcedIncome)) return null;
-
   const valueDiff = insights.currentValue - previous.currentValue;
   const incomeDiff = insights.monthlyIncome - previous.monthlyIncome;
   const announcedDiff = insights.announcedIncome - previous.announcedIncome;
@@ -117,11 +112,7 @@ function LastVisitChange({ insights }: { insights: WalletInsights }) {
   const hasChange = Math.abs(valueDiff) >= 0.01 || Math.abs(incomeDiff) >= 0.01 || Math.abs(announcedDiff) >= 0.01 || waitingDiff !== 0;
 
   if (!hasChange) {
-    return (
-      <div className="mt-4 rounded-2xl bg-gray-800/70 p-3 text-xs font-bold text-gray-300 ring-1 ring-white/10">
-        Desde sua última visita, não identificamos mudanças relevantes na carteira.
-      </div>
-    );
+    return <div className="mt-4 rounded-2xl bg-gray-800/70 p-3 text-xs font-bold text-gray-300 ring-1 ring-white/10">Desde sua última visita, não identificamos mudanças relevantes na carteira.</div>;
   }
 
   return (
@@ -141,10 +132,8 @@ function LastVisitChange({ insights }: { insights: WalletInsights }) {
           if 'function LastVisitChange({ insights }' not in text:
               text = text.replace('function AttentionSection({ insights, updatingMissing, updateMissingDividends }', last_visit_component + 'function AttentionSection({ insights, updatingMissing, updateMissingDividends }')
 
-          # Compact line chart dimensions.
           text = text.replace('const width = Math.max(360, snapshots.length * 72);', 'const width = Math.max(320, snapshots.length * 52);')
           text = text.replace('const y = 124 - ((getValue(item) - min) / range) * 86 + 24;', 'const y = 82 - ((getValue(item) - min) / range) * 48 + 22;')
-          text = text.replace('return `${x},${y}`;', 'return `${x},${y}`;', 1)
           text = text.replace('const y = 124 - ((getValue(item) - min) / range) * 86 + 24;', 'const y = 82 - ((getValue(item) - min) / range) * 48 + 22;')
           text = text.replace('viewBox={`0 0 ${width} 180`}', 'viewBox={`0 0 ${width} 116`}')
           text = text.replace('className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200"', 'className="h-36 min-w-full rounded-2xl bg-white ring-1 ring-slate-200 sm:h-44"')
