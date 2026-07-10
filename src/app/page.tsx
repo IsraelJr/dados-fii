@@ -25,8 +25,23 @@ type MarketCardState = {
     trend?: "up" | "down" | "flat";
 };
 
+type MacroContextItem = {
+    label: string;
+    formatted: string;
+    date?: string | null;
+};
+
+type MacroContextState = {
+    title: string;
+    items: MacroContextItem[];
+    secondary?: string | null;
+    note?: string | null;
+    updatedAt?: string | null;
+};
+
 const DOLLAR_CACHE_KEY = "dados-fii-dollar-cache-v1";
 const IFIX_CACHE_KEY = "dados-fii-ifix-cache-v1";
+const MACRO_CONTEXT_CACHE_KEY = "dados-fii-macro-context-cache-v1";
 const FII_RESULT_ANCHOR = "fii-search-result";
 const MARKET_OPEN_HOUR = 9;
 const MARKET_CLOSE_HOUR = 19;
@@ -48,6 +63,28 @@ function getCachedMarketCard(key: string): MarketCardState {
 function saveCachedMarketCard(key: string, value: MarketCardState) {
     try {
         window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        return;
+    }
+}
+
+function getCachedMacroContext(): MacroContextState | null {
+    if (typeof window === "undefined") return null;
+
+    try {
+        const stored = window.localStorage.getItem(MACRO_CONTEXT_CACHE_KEY);
+        if (!stored) return null;
+
+        const parsed = JSON.parse(stored) as MacroContextState;
+        return Array.isArray(parsed?.items) && parsed.items.length ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function saveCachedMacroContext(value: MacroContextState) {
+    try {
+        window.localStorage.setItem(MACRO_CONTEXT_CACHE_KEY, JSON.stringify(value));
     } catch {
         return;
     }
@@ -132,12 +169,38 @@ function MarketInfoCard({ title, value }: { title: string; value: MarketCardStat
     );
 }
 
+function MacroContextStrip({ macro }: { macro: MacroContextState | null }) {
+    if (!macro?.items?.length) return null;
+
+    return (
+        <div className="rounded-2xl bg-white/90 p-4 text-left shadow-sm ring-1 ring-slate-200">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{macro.title || "Contexto macro para FIIs"}</p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+                        {macro.items.map((item) => (
+                            <span key={item.label} className="text-sm font-bold text-slate-800">
+                                {item.label}: <span className="text-indigo-700">{item.formatted}</span>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+                {macro.secondary && (
+                    <p className="text-xs font-bold text-slate-500 sm:text-right">{macro.secondary}</p>
+                )}
+            </div>
+            {macro.note && <p className="mt-2 text-xs leading-5 text-slate-500">{macro.note}</p>}
+        </div>
+    );
+}
+
 export default function Home() {
     const [ticker, setTicker] = useState("");
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState("");
     const [dolar, setDolar] = useState<MarketCardState>(() => getCachedMarketCard(DOLLAR_CACHE_KEY));
     const [ifix, setIfix] = useState<MarketCardState>(() => getCachedMarketCard(IFIX_CACHE_KEY));
+    const [macroContext, setMacroContext] = useState<MacroContextState | null>(() => getCachedMacroContext());
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
     const [showLogin, setShowLogin] = useState(false);
@@ -288,8 +351,31 @@ export default function Home() {
             }
         };
 
+        const fetchMacroContext = async () => {
+            try {
+                const res = await fetch(`/api/macro-context?ts=${Date.now()}`, { cache: "no-store" });
+                const json = await res.json();
+
+                if (!active || !json?.ok || !Array.isArray(json.items)) return;
+
+                const nextMacro: MacroContextState = {
+                    title: json.title || "Contexto macro para FIIs",
+                    items: json.items,
+                    secondary: json.secondary,
+                    note: json.note,
+                    updatedAt: json.updatedAt,
+                };
+
+                setMacroContext(nextMacro);
+                saveCachedMacroContext(nextMacro);
+            } catch {
+                return;
+            }
+        };
+
         fetchDolar();
         fetchIfix();
+        fetchMacroContext();
         const interval = setInterval(() => {
             if (isMarketRefreshWindow()) {
                 fetchDolar();
@@ -383,6 +469,8 @@ export default function Home() {
                             <MarketInfoCard title="Dólar comercial" value={dolar} />
                             <MarketInfoCard title="IFIX" value={ifix} />
                         </div>
+
+                        <MacroContextStrip macro={macroContext} />
 
                         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                             <FeatureCard title="Consulta rápida" description="Preço, dividendos, DY, P/VP e dados cadastrais." />
