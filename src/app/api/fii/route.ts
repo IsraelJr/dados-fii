@@ -1,5 +1,6 @@
 import admin from "firebase-admin";
 import { NextResponse } from "next/server";
+import { logObservabilityEvent } from "@/lib/observability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,9 +135,10 @@ function withSourceMetadata(data: any, options: { hasPrice: boolean; hasFundData
 }
 
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const ticker = normalizeTicker(url.searchParams.get("ticker"));
+
   try {
-    const url = new URL(req.url);
-    const ticker = normalizeTicker(url.searchParams.get("ticker"));
     const allFiis = await getAllPricesFromSheet();
 
     if (ticker) {
@@ -144,8 +146,18 @@ export async function GET(req: Request) {
       const docData = await getFirestoreFii(ticker);
 
       if (!match && !docData) {
+        await logObservabilityEvent({ type: "fii_lookup", ok: false, statusCode: 404, ticker, error: "FII não encontrado", source: "api/fii" });
         return NextResponse.json({ error: "FII não encontrado" }, { status: 404 });
       }
+
+      await logObservabilityEvent({
+        type: "fii_lookup",
+        ok: true,
+        statusCode: 200,
+        ticker,
+        source: "api/fii",
+        metadata: { hasPrice: Boolean(match), hasFundData: Boolean(docData) },
+      });
 
       return NextResponse.json(
         withSourceMetadata(
@@ -171,6 +183,9 @@ export async function GET(req: Request) {
       },
     });
   } catch (err: any) {
+    if (ticker) {
+      await logObservabilityEvent({ type: "fii_lookup", ok: false, statusCode: 500, ticker, error: err.message || "Erro ao buscar FII", source: "api/fii" });
+    }
     return NextResponse.json({ error: err.message || "Erro ao buscar FII" }, { status: 500 });
   }
 }
