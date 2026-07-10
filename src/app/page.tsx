@@ -484,10 +484,11 @@ export default function Home() {
     );
 }
 
-function FeatureCard({ title, description }: { title: string }) {
+function FeatureCard({ title, description }: { title: string; description: string }) {
     return (
         <div className="rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-extrabold text-slate-800">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
         </div>
     );
 }
