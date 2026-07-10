@@ -53,6 +53,12 @@ function parseBcbDate(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function parseIsoDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function addMonths(date: Date, months: number) {
   const next = new Date(date);
   next.setMonth(next.getMonth() + months);
@@ -115,6 +121,35 @@ function envList(name: string, fallback: string) {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function mergePricePoints(...groups: PricePoint[][]) {
+  const byDate = new Map<string, PricePoint>();
+  groups.flat().forEach((point) => {
+    if (point?.isoDate && point.close > 0) byDate.set(point.isoDate, point);
+  });
+  return Array.from(byDate.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+async function fetchStoredIfixHistory() {
+  try {
+    const snapshot = await adminDb.collection(COLLECTION).orderBy("date", "desc").limit(450).get();
+    const points: PricePoint[] = [];
+
+    snapshot.docs.forEach((doc) => {
+      if (doc.id === LATEST_DOC) return;
+      const data = doc.data() || {};
+      const close = numberOf(data?.ifix?.close);
+      const rawDate = String(data?.ifix?.lastDate || data?.date || doc.id || "").slice(0, 10);
+      const date = parseIsoDate(rawDate);
+      if (!date || close <= 0) return;
+      points.push({ date, isoDate: dateKey(date), close });
+    });
+
+    return points.sort((a, b) => a.date.getTime() - b.date.getTime());
+  } catch {
+    return [];
+  }
 }
 
 async function fetchBcbSerie(code: number, start: Date, end = new Date()) {
@@ -316,7 +351,7 @@ function buildIndexReturnResult(params: {
   note: string;
 }) {
   const { provider, source, sourceType, symbol, range, values, attempts, note } = params;
-  if (values.length < 5) throw new Error("sem histórico suficiente");
+  if (!values.length) throw new Error("sem fechamento disponível");
 
   const now = new Date();
   const latest = values.at(-1)!;
@@ -326,7 +361,8 @@ function buildIndexReturnResult(params: {
   const monthReturn = percentReturn(monthAnchor?.close, latest.close);
   const yearReturn = percentReturn(yearAnchor?.close, latest.close);
   const twelveMonthsReturn = percentReturn(twelveMonthsAnchor?.close, latest.close);
-  const partialComparisonReady = Boolean(recentEnough(latest.isoDate, 10) && monthReturn !== null);
+  const currentReady = Boolean(recentEnough(latest.isoDate, 10) && latest.close > 0);
+  const partialComparisonReady = Boolean(currentReady && monthReturn !== null);
   const comparisonReady = Boolean(partialComparisonReady && yearReturn !== null && twelveMonthsReturn !== null);
 
   return {
@@ -348,9 +384,16 @@ function buildIndexReturnResult(params: {
       twelveMonthsStart: twelveMonthsAnchor ? { date: twelveMonthsAnchor.isoDate, close: Number(twelveMonthsAnchor.close.toFixed(2)) } : null,
     },
     observations: values.length,
+    currentReady,
     comparisonReady,
     partialComparisonReady,
-    quality: comparisonReady ? "secondary_calculated" : partialComparisonReady ? "partial_secondary_calculated" : "incomplete",
+    quality: comparisonReady
+      ? "secondary_calculated"
+      : partialComparisonReady
+        ? "partial_secondary_calculated"
+        : currentReady
+          ? "latest_close_only"
+          : "incomplete",
     attempts,
     note,
   };
@@ -359,6 +402,7 @@ function buildIndexReturnResult(params: {
 async function fetchIfixReturns() {
   const attempts: BenchmarkAttempt[] = [];
   const errors: string[] = [];
+  const storedValues = await fetchStoredIfixHistory();
   const brapiSymbols = envList("BENCHMARK_IFIX_BRAPI_SYMBOLS", "IFIX.SA,^IFIX,IFIX");
   const brapiRanges = envList("BENCHMARK_IFIX_BRAPI_RANGES", "3mo,1mo");
   const yahooSymbols = envList("BENCHMARK_IFIX_SYMBOLS", "IFIX.SA,^IFIX");
@@ -367,6 +411,7 @@ async function fetchIfixReturns() {
     for (const symbol of brapiSymbols) {
       try {
         const { url, values, usedRange } = await fetchBrapiHistorical(symbol, range);
+        const mergedValues = mergePricePoints(storedValues, values);
         attempts.push({
           provider: "brapi",
           symbol,
@@ -384,9 +429,9 @@ async function fetchIfixReturns() {
           sourceType: "secondary_market_data_provider",
           symbol,
           range: usedRange,
-          values,
+          values: mergedValues,
           attempts,
-          note: "Fonte secundária via brapi.dev. O plano atual pode limitar o histórico a janelas curtas; retornos anual e 12 meses só são preenchidos quando houver janela suficiente ou fonte/licença superior.",
+          note: "Fonte secundária via brapi.dev. O sistema preserva o fechamento atual e usa o histórico próprio salvo diariamente para calcular retornos quando houver janela suficiente.",
         });
       } catch (err: any) {
         const message = err.message || "erro";
@@ -399,6 +444,7 @@ async function fetchIfixReturns() {
   for (const symbol of yahooSymbols) {
     try {
       const { url, values } = await fetchYahooChart(symbol, "2y");
+      const mergedValues = mergePricePoints(storedValues, values);
       attempts.push({
         provider: "yahoo",
         symbol,
@@ -416,9 +462,9 @@ async function fetchIfixReturns() {
         sourceType: "secondary_market_data_provider",
         symbol,
         range: "2y",
-        values,
+        values: mergedValues,
         attempts,
-        note: "Fonte secundária. Para auditoria institucional, substituir por fonte oficial/licenciada da B3 quando disponível no projeto.",
+        note: "Fonte secundária. O sistema preserva o fechamento atual e usa o histórico próprio salvo diariamente para calcular retornos quando houver janela suficiente.",
       });
     } catch (err: any) {
       const message = err.message || "erro";
@@ -436,6 +482,7 @@ async function fetchIfixReturns() {
     yearReturn: null,
     twelveMonthsReturn: null,
     lastDate: null,
+    currentReady: false,
     comparisonReady: false,
     partialComparisonReady: false,
     quality: "unavailable",
@@ -457,7 +504,7 @@ function generatedMetadata() {
     methodology: {
       cdi: "Retornos acumulados calculados por composição geométrica das taxas diárias oficiais da série SGS 12.",
       ipca: "Retornos acumulados calculados pela soma das variações mensais oficiais da série SGS 433.",
-      ifix: "Retornos calculados por variação de fechamento do índice. Retornos anuais e 12 meses exigem histórico suficiente; no plano gratuito da fonte secundária, pode haver apenas janela curta.",
+      ifix: "Fechamento do IFIX obtido por fonte secundária. Retornos são calculados quando houver histórico próprio suficiente salvo na base.",
     },
   };
 }
@@ -472,7 +519,7 @@ async function fetchFreshBenchmarks() {
 
   const benchmarkData = {
     ...generatedMetadata(),
-    ifix: ifix.status === "fulfilled" ? ifix.value : { close: null, monthReturn: null, yearReturn: null, twelveMonthsReturn: null, comparisonReady: false, partialComparisonReady: false, error: ifix.reason?.message || "erro" },
+    ifix: ifix.status === "fulfilled" ? ifix.value : { close: null, monthReturn: null, yearReturn: null, twelveMonthsReturn: null, currentReady: false, comparisonReady: false, partialComparisonReady: false, error: ifix.reason?.message || "erro" },
     cdi: cdi.status === "fulfilled" ? cdi.value : { monthReturn: null, yearReturn: null, twelveMonthsReturn: null, comparisonReady: false, error: cdi.reason?.message || "erro" },
     ipca: ipca.status === "fulfilled" ? ipca.value : { monthReturn: null, yearReturn: null, twelveMonthsReturn: null, comparisonReady: false, error: ipca.reason?.message || "erro" },
     selic: selic.status === "fulfilled" ? selic.value : { rate: null, comparisonReady: false, error: selic.reason?.message || "erro" },
@@ -502,9 +549,10 @@ function summarizeBenchmarks(data: any) {
     generatedAt: data?.generatedAt || null,
     date: data?.date || null,
     ifix: {
-      ok: Boolean(data?.ifix?.comparisonReady || data?.ifix?.partialComparisonReady),
+      ok: Boolean(data?.ifix?.comparisonReady || data?.ifix?.partialComparisonReady || data?.ifix?.currentReady),
       fullOk: Boolean(data?.ifix?.comparisonReady),
       partialOk: Boolean(data?.ifix?.partialComparisonReady),
+      currentOk: Boolean(data?.ifix?.currentReady),
       provider: data?.ifix?.provider || null,
       symbol: data?.ifix?.symbol || null,
       range: data?.ifix?.range || null,
@@ -514,6 +562,7 @@ function summarizeBenchmarks(data: any) {
       twelveMonthsReturn: data?.ifix?.twelveMonthsReturn ?? null,
       lastDate: data?.ifix?.lastDate || null,
       quality: data?.ifix?.quality || null,
+      observations: data?.ifix?.observations ?? null,
       attempts: data?.ifix?.attempts || [],
       errors: data?.ifix?.errors || [],
     },
