@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v1.7.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v1.8.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -76,10 +76,11 @@ Regras obrigatórias:
 - Se numberShares estiver disponível, use como quantidade de cotas emitidas. Não confunda com a quantidade de cotas do investidor.
 - Se numberShareholders estiver ausente, diga apenas que faltam dados de cotistas, e não que faltam todos os dados de liquidez.
 - Se pvp ou vpCota estiverem zerados, negativos ou incoerentes, ignore-os e trate como dado não confiável. Não exiba P/VP ou VP por cota igual a zero.
-- Use CDI, IPCA, Selic e IFIX quando benchmarkData trouxer monthReturn, yearReturn ou twelveMonthsReturn. Não escreva que CDI ou IFIX são "não confiáveis" se comparisonReady for verdadeiro; nesse caso, explique a fonte e o método de cálculo em linguagem de cliente.
+- Use CDI, IPCA, Selic e IFIX quando benchmarkData trouxer retornos, fechamento ou taxa atual.
 - Para CDI vindo da série oficial do Banco Central, trate os retornos acumulados como utilizáveis quando comparisonReady for verdadeiro.
-- Para IFIX vindo de fonte secundária, trate como benchmark de mercado utilizável para teste interno quando comparisonReady for verdadeiro, mas mencione com discrição que a fonte do fechamento é secundária. Não transforme isso em falha do relatório.
-- Se benchmarkData indicar comparisonReady falso ou retornos ausentes, escreva que o benchmark está indisponível para comparação de performance no período, sem desqualificar o indicador.
+- Para IFIX com currentReady verdadeiro, informe o fechamento atual, a data e a fonte. Não escreva que o IFIX é não confiável; diga apenas que os retornos acumulados do IFIX ainda não estão disponíveis quando monthReturn, yearReturn ou twelveMonthsReturn estiverem ausentes.
+- Para IFIX com comparisonReady verdadeiro, use mês, ano e 12 meses. Para partialComparisonReady verdadeiro, use somente os períodos disponíveis. Para currentReady verdadeiro e sem retornos, use apenas o fechamento atual.
+- Se benchmarkData indicar comparisonReady falso e não trouxer fechamento atual nem retornos, escreva que o benchmark está indisponível para comparação de performance no período, sem desqualificar o indicador.
 - Quando uma informação de perfil não estiver disponível, como reserva de emergência ou dependência dos dividendos, escreva "não informado". Não converta ausência de informação em "não possui" ou "não depende".
 - Não crie tabelas longas repetindo "dados insuficientes". Resuma ausências relevantes na seção de qualidade dos dados e nas limitações.
 - Evite repetição: cada seção deve acrescentar uma leitura nova. Não repita a mesma frase sobre TGAR11 + VGIA11 em todas as seções; cite a concentração no diagnóstico, use números nas tabelas e retome no plano de ação de forma resumida.
@@ -127,7 +128,7 @@ Inclua tabela em Markdown com ativo, liquidez diária, cotas emitidas, cotistas,
 Não exiba P/VP, VP por cota ou valor patrimonial igual a zero. Se o dado estiver zerado, negativo, ausente ou incoerente, escreva "dados não confiáveis" e explique uma única vez.
 
 ## Benchmarks
-Quando benchmarkData trouxer retornos acumulados, inclua tabela com IFIX, CDI, IPCA e Selic, usando mês, ano e 12 meses quando disponíveis. Informe a fonte de forma simples e sem termos técnicos. Só escreva "indisponível" quando o retorno realmente estiver ausente.
+Inclua uma tabela curta com IFIX, CDI, IPCA e Selic quando disponíveis. Para IFIX, se houver apenas fechamento atual, mostre pontos, data e fonte; nos retornos, escreva "não disponível". Para CDI, IPCA e Selic, use os retornos/taxas disponíveis. Não diga que o IFIX é não confiável quando houver fechamento atual válido.
 
 ## Stress test
 Inclua tabela em Markdown com cenário, probabilidade estimada, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação recomendada.
@@ -184,7 +185,7 @@ ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks apenas quando os retornos estiverem disponíveis no benchmarkData; quando comparisonReady for verdadeiro, trate o benchmark como utilizável para comparação. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
+Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
 `.trim();
 }
 
