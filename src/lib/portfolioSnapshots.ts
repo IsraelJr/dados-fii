@@ -203,6 +203,11 @@ function buildMarketMetrics(data: any) {
   });
 }
 
+function calculatedMarketCap(currentPrice?: number, numberShares?: number) {
+  if (!currentPrice || !numberShares || currentPrice <= 0 || numberShares <= 0) return undefined;
+  return Number((currentPrice * numberShares).toFixed(2));
+}
+
 export async function buildPortfolioSnapshot(userDocId: string, email: string, wallet: WalletItem[]) {
   const sheetPrices = await getSheetPrices();
   const assets = await Promise.all(wallet.map(async (item) => {
@@ -213,6 +218,7 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
     const currentValue = currentPrice && currentPrice > 0 ? currentPrice * item.quotas : undefined;
     const investedValue = averagePrice ? averagePrice * item.quotas : undefined;
     const marketMetrics = buildMarketMetrics(data);
+    const marketCap = calculatedMarketCap(currentPrice, marketMetrics.numberShares) || derived.valuation?.marketCap || derived.marketCap;
 
     return removeUndefinedFields({
       ticker: item.ticker,
@@ -229,10 +235,14 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
       manager: firstText(data, ["manager", "gestor", "management"]),
       administrator: firstText(data, ["administrator", "administrador"]),
       dividendYield: firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]) || derived.valuation?.dy12m,
-      pvp: firstNumber(data, ["pvp", "p_vp", "pvpa", "priceToBook", "valuation.pvp"]) || derived.valuation?.pvp,
-      vpCota: firstNumber(data, ["valorPatrimonialPorCota", "vpCota", "vpa", "bookValuePerShare", "valuation.vpCota"]) || derived.valuation?.vpCota,
-      netWorth: firstNumber(data, ["patrimonioLiquido", "patrimony", "netWorth", "equityValue", "equity", "patrimonio", "valuation.netWorth"]) || derived.valuation?.netWorth,
-      marketCap: firstNumber(data, ["marketCap", "valorMercado", "marketData.marketCap"]) || derived.marketCap,
+      pvp: derived.valuation?.pvp,
+      vpCota: derived.valuation?.vpCota,
+      netWorth: derived.valuation?.netWorth,
+      marketCap,
+      valuationDataQuality: removeUndefinedFields({
+        ...derived.valuation?.dataQuality,
+        marketCapSource: marketCap ? "calculado por preço atual x cotas emitidas" : derived.valuation?.dataQuality?.marketCapSource,
+      }),
       lastDividend: firstNumber(data, ["lastDividend", "ultimoRendimento", "dividends.lastDividend"]) || derived.lastDividend,
       lastDividendDate: firstText(data, ["lastDividendDate", "ultimaDataPagamento", "dividends.lastDividendDate"]) || derived.lastDividendDate,
       averageDividend12m: firstNumber(data, ["averageDividend12m", "mediaDividendos12m", "dividends.average12m"]) || derived.averageDividend12m,
