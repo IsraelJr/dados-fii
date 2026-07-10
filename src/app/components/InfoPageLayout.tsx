@@ -41,7 +41,7 @@ export default function InfoPageLayout({
       <section className="mt-6 grid gap-4 md:grid-cols-2">
         {sections.map((section) => (
           <article key={section.title} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <h2 className="text-xl font-extrabold text-slate-850">{section.title}</h2>
+            <h2 className="text-xl font-extrabold text-slate-800">{section.title}</h2>
             <div className="mt-3 text-sm leading-6 text-slate-600">{section.body}</div>
           </article>
         ))}
