@@ -17,11 +17,57 @@ function readDailyMetric(section: Element, label: string) {
   return value || "-";
 }
 
+function parseMoney(value: string) {
+  const cleaned = value
+    .replace(/[^\d,.-]/g, "")
+    .replace(/\.(?=\d{3})/g, "")
+    .replace(",", ".");
+  const number = Number(cleaned);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function parseNumber(value: string) {
+  const number = Number(value.replace(/[^\d-]/g, ""));
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 function findDailyPanel() {
   return Array.from(document.querySelectorAll("main section")).find((section) => {
     const text = textOf(section);
     return text.includes("Hoje na sua carteira") && text.includes("Painel diário dos seus FIIs");
   });
+}
+
+function findAttentionSection() {
+  return Array.from(document.querySelectorAll("main section")).find((section) => textOf(section).includes("Atenção da carteira"));
+}
+
+function findPaymentsSection() {
+  return Array.from(document.querySelectorAll("main section")).find((section) => textOf(section).includes("Próximos pagamentos"));
+}
+
+function readPendingTickers() {
+  const section = findAttentionSection();
+  if (!section) return "";
+  const text = textOf(section);
+  if (!text.includes("aguardando comunicado") && !text.includes("ainda não têm rendimento")) return "";
+
+  const candidates = Array.from(section.querySelectorAll("p"))
+    .map((item) => textOf(item))
+    .filter((item) => /[A-Z]{4}\d{2}/.test(item));
+
+  return candidates[candidates.length - 1] || "";
+}
+
+function readNextPayment() {
+  const section = findPaymentsSection();
+  if (!section) return "";
+  const firstItem = section.querySelector("li");
+  return textOf(firstItem);
 }
 
 function buildCurrentState(section: Element): WalletVisitState {
@@ -30,33 +76,75 @@ function buildCurrentState(section: Element): WalletVisitState {
     "Renda prevista": readDailyMetric(section, "Renda prevista"),
     "Renda anunciada": readDailyMetric(section, "Renda anunciada"),
     "Pendências": readDailyMetric(section, "Pendências"),
+    "Tickers pendentes": readPendingTickers(),
+    "Próximo pagamento": readNextPayment(),
   };
+}
+
+function buildInsightPhrases(current: WalletVisitState, previous: WalletVisitState | null) {
+  const phrases: string[] = [];
+
+  if (previous) {
+    const announcedDiff = parseMoney(current["Renda anunciada"]) - parseMoney(previous["Renda anunciada"] || "");
+    if (Math.abs(announcedDiff) >= 0.01) {
+      phrases.push(`Sua renda anunciada ${announcedDiff > 0 ? "subiu" : "caiu"} ${formatCurrency(Math.abs(announcedDiff))} desde a última visita.`);
+    }
+
+    const forecastDiff = parseMoney(current["Renda prevista"]) - parseMoney(previous["Renda prevista"] || "");
+    if (Math.abs(forecastDiff) >= 0.01) {
+      phrases.push(`Sua renda prevista ${forecastDiff > 0 ? "subiu" : "caiu"} ${formatCurrency(Math.abs(forecastDiff))}.`);
+    }
+
+    const valueDiff = parseMoney(current["Carteira hoje"]) - parseMoney(previous["Carteira hoje"] || "");
+    if (Math.abs(valueDiff) >= 1) {
+      phrases.push(`O valor da carteira ${valueDiff > 0 ? "aumentou" : "reduziu"} ${formatCurrency(Math.abs(valueDiff))}.`);
+    }
+
+    const pendingDiff = parseNumber(current["Pendências"]) - parseNumber(previous["Pendências"] || "0");
+    if (pendingDiff !== 0) {
+      phrases.push(pendingDiff < 0 ? `Você tem ${Math.abs(pendingDiff)} pendência(s) a menos do que na última visita.` : `Você tem ${pendingDiff} nova(s) pendência(s) para acompanhar.`);
+    }
+  }
+
+  const pendingTickers = current["Tickers pendentes"];
+  if (pendingTickers) {
+    phrases.push(`${pendingTickers} ainda ${pendingTickers.includes(",") ? "estão" : "está"} pendente(s) neste mês.`);
+  }
+
+  const nextPayment = current["Próximo pagamento"];
+  if (nextPayment && !nextPayment.includes("Ainda não há")) {
+    phrases.push(`Próximo pagamento: ${nextPayment}.`);
+  }
+
+  if (!phrases.length) {
+    phrases.push("Desde sua última visita, não identificamos mudanças relevantes na carteira.");
+  }
+
+  return phrases.slice(0, 3);
 }
 
 function insertVisitMessage(section: Element, current: WalletVisitState, previous: WalletVisitState | null) {
   const existing = document.getElementById("wallet-last-visit-change");
   if (existing) existing.remove();
-  if (!previous) return;
 
-  const changes = Object.entries(current)
-    .filter(([key, value]) => previous[key] && previous[key] !== value)
-    .map(([key, value]) => `${key}: ${previous[key]} → ${value}`);
-
+  const phrases = buildInsightPhrases(current, previous);
   const box = document.createElement("div");
   box.id = "wallet-last-visit-change";
   box.className = "mt-4 rounded-2xl bg-gray-800/70 p-3 text-xs font-bold leading-5 text-gray-300 ring-1 ring-white/10";
 
-  if (!changes.length) {
-    box.textContent = "Desde sua última visita, não identificamos mudanças relevantes na carteira.";
-  } else {
-    const title = document.createElement("p");
-    title.className = "mb-1 text-xs font-extrabold uppercase tracking-wide text-gray-400";
-    title.textContent = "Desde sua última visita";
-    const detail = document.createElement("p");
-    detail.textContent = changes.slice(0, 3).join(" · ");
-    box.appendChild(title);
-    box.appendChild(detail);
-  }
+  const title = document.createElement("p");
+  title.className = "mb-1 text-xs font-extrabold uppercase tracking-wide text-gray-400";
+  title.textContent = "Desde sua última visita";
+  box.appendChild(title);
+
+  const list = document.createElement("ul");
+  list.className = "space-y-1";
+  phrases.forEach((phrase) => {
+    const item = document.createElement("li");
+    item.textContent = phrase;
+    list.appendChild(item);
+  });
+  box.appendChild(list);
 
   const metricGrid = Array.from(section.querySelectorAll("div")).find((item) => textOf(item).includes("Carteira hoje") && textOf(item).includes("Renda prevista"));
   section.insertBefore(box, metricGrid || null);
@@ -121,6 +209,10 @@ export default function WalletPageUxEnhancer() {
           height: 9rem !important;
         }
 
+        main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article {
+          padding: 0.85rem !important;
+        }
+
         main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 {
           grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
           gap: 0.5rem !important;
@@ -128,7 +220,7 @@ export default function WalletPageUxEnhancer() {
 
         main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 > div {
           min-width: 0 !important;
-          padding: 0.7rem !important;
+          padding: 0.65rem !important;
         }
 
         main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 > div:nth-child(5) {
@@ -136,13 +228,13 @@ export default function WalletPageUxEnhancer() {
         }
 
         main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 p:first-child {
-          font-size: 0.66rem !important;
-          line-height: 1rem !important;
+          font-size: 0.64rem !important;
+          line-height: 0.95rem !important;
         }
 
         main section.rounded-2xl.bg-gray-900 div[class*="md:hidden"] article > div.grid.gap-3 p:last-child {
-          font-size: 0.8rem !important;
-          line-height: 1.15rem !important;
+          font-size: 0.78rem !important;
+          line-height: 1.1rem !important;
           overflow-wrap: anywhere !important;
         }
       }
