@@ -120,6 +120,11 @@ function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatCurrencyCompact(value: number) {
+  if (Math.abs(value) >= 1000) return `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: value >= 100 ? 0 : 2 });
+}
+
 function formatPercentValue(value: number) {
   return `${value.toFixed(1).replace(".", ",")}%`;
 }
@@ -175,6 +180,26 @@ function monthLabelFromKey(key: string) {
   const [year, month] = key.split("-");
   const index = Number(month) - 1;
   return `${MONTHS_SHORT_PTBR[MONTHS[index]] || month}/${String(year).slice(-2)}`;
+}
+
+function getSnapshotYear(snapshot: WalletSnapshot) {
+  const year = Number(String(snapshot.monthKey || "").slice(0, 4));
+  return Number.isFinite(year) ? year : new Date().getFullYear();
+}
+
+function getSnapshotMonthIndex(snapshot: WalletSnapshot) {
+  const index = Number(String(snapshot.monthKey || "").slice(5, 7)) - 1;
+  return Number.isFinite(index) && index >= 0 ? index : 0;
+}
+
+function getSnapshotMonthLabel(snapshot: WalletSnapshot) {
+  const month = MONTHS[getSnapshotMonthIndex(snapshot)];
+  return MONTHS_SHORT_PTBR[month] || snapshot.label || snapshot.monthKey;
+}
+
+function getHistoryYears() {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, index) => currentYear - index);
 }
 
 function getBarWidthClass(value: string) {
@@ -400,7 +425,7 @@ export default function WalletPage() {
       createdAt: current?.createdAt || now.toISOString(),
       updatedAt: now.toISOString(),
     };
-    const next = [...snapshots.filter((item) => item.monthKey !== key), nextSnapshot].sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-36);
+    const next = [...snapshots.filter((item) => item.monthKey !== key), nextSnapshot].sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-60);
     try {
       window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
     } catch {
@@ -505,7 +530,7 @@ export default function WalletPage() {
 
       <WalletRiskReportCard walletCount={items.length} />
       <SimpleMonthlySummary insights={insights} topWeight={topWeight} topWeightPercent={topWeightPercent} />
-      <VisualHistorySection snapshots={snapshots} dividendHistory={insights.dividendHistory} />
+      <VisualHistorySection snapshots={snapshots} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
@@ -581,20 +606,52 @@ function SimpleMonthlySummary({ insights, topWeight, topWeightPercent }: { insig
   );
 }
 
-function VisualHistorySection({ snapshots, dividendHistory }: { snapshots: WalletSnapshot[]; dividendHistory: DividendHistory }) {
+function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const years = getHistoryYears();
+  const yearSnapshots = snapshots
+    .filter((item) => getSnapshotYear(item) === selectedYear)
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  const patrimonySnapshots = yearSnapshots.filter((item) => item.totalValue > 0);
+  const dividendSnapshots = yearSnapshots.filter((item) => item.estimatedMonthlyIncome > 0);
+
   return (
-    <section className="mt-6 grid gap-6 lg:grid-cols-2">
-      <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução patrimonial</p>
-        <h2 className="mt-3 text-xl font-black text-slate-900">Patrimônio estimado por mês</h2>
-        <div className="mt-5"><LineHistoryChart snapshots={snapshots} /></div>
-      </article>
-      <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <p className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-emerald-700"><TrendingUp size={14} /> Dividendos estimados</p>
-        <h2 className="mt-3 text-xl font-black text-slate-900">Renda estimada por mês</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Cálculo com os dividendos disponíveis na base e a quantidade atual de cotas cadastrada.</p>
-        <div className="mt-5"><BarList items={dividendHistory.months.map((item) => ({ label: item.label, value: item.value }))} emptyText="Sem dividendos estimados para montar o gráfico." /></div>
-      </article>
+    <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+        <div>
+          <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução patrimonial</p>
+          <h2 className="mt-3 text-xl font-black text-slate-900">Histórico por ano</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Ao abrir, exibimos o ano corrente. Use os botões para consultar anos anteriores, limitado aos últimos 5 anos.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {years.map((year) => {
+            const hasData = snapshots.some((item) => getSnapshotYear(item) === year && (item.totalValue > 0 || item.estimatedMonthlyIncome > 0));
+            return (
+              <button
+                key={year}
+                type="button"
+                onClick={() => setSelectedYear(year)}
+                className={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ${selectedYear === year ? "bg-indigo-600 text-white ring-indigo-600" : hasData ? "bg-white text-slate-700 ring-slate-300 hover:bg-indigo-50" : "bg-slate-50 text-slate-400 ring-slate-200"}`}
+              >
+                {year}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-6 lg:grid-cols-2">
+        <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+          <h3 className="text-base font-black text-slate-900">Patrimônio estimado em {selectedYear}</h3>
+          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">Valor total da carteira nos meses com histórico salvo.</p>
+          <div className="mt-4"><LineHistoryChart snapshots={patrimonySnapshots} year={selectedYear} /></div>
+        </article>
+        <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
+          <h3 className="text-base font-black text-slate-900">Dividendos pagos em {selectedYear}</h3>
+          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">Meses do ano selecionado em que houve pagamento registrado.</p>
+          <div className="mt-4"><DividendSnapshotChart snapshots={dividendSnapshots} year={selectedYear} /></div>
+        </article>
+      </div>
     </section>
   );
 }
@@ -708,18 +765,24 @@ function BarList({ items, emptyText = "Sem dados suficientes para exibir." }: { 
   return <div className="space-y-3">{filtered.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold"><span className="truncate text-slate-700">{item.label}</span><span className="shrink-0 text-slate-500">{item.detail || formatCurrency(item.value)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((item.value / max) * 100, 3)}%` }} /></div></div>)}</div>;
 }
 
-function LineHistoryChart({ snapshots }: { snapshots: WalletSnapshot[] }) {
+function LineHistoryChart({ snapshots, year }: { snapshots: WalletSnapshot[]; year: number }) {
   const points = snapshots.map((item) => item.totalValue);
-  if (snapshots.length < 2) return <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Quando houver dois ou mais meses, o gráfico de evolução aparecerá aqui.</div>;
+  if (snapshots.length < 2) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Quando houver dois ou mais meses em {year}, o gráfico de evolução aparecerá aqui.</div>;
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = max - min || 1;
   const coords = snapshots.map((item, index) => {
-    const x = snapshots.length === 1 ? 160 : (index / (snapshots.length - 1)) * 300 + 10;
-    const y = 100 - ((item.totalValue - min) / range) * 80 + 10;
+    const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20;
+    const y = 120 - ((item.totalValue - min) / range) * 82 + 24;
     return `${x},${y}`;
   }).join(" ");
-  return <div><svg viewBox="0 0 320 130" className="h-40 w-full rounded-2xl bg-slate-50 ring-1 ring-slate-200"><polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />{snapshots.map((item, index) => { const x = snapshots.length === 1 ? 160 : (index / (snapshots.length - 1)) * 300 + 10; const y = 100 - ((item.totalValue - min) / range) * 80 + 10; return <circle key={item.monthKey} cx={x} cy={y} r="4" className="fill-indigo-700" />; })}</svg><div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">{snapshots.slice(-6).map((item) => <span key={item.monthKey} className="rounded-full bg-slate-100 px-2 py-1">{item.label}: {formatCurrency(item.totalValue)}</span>)}</div></div>;
+  return <svg viewBox="0 0 360 170" className="h-52 w-full rounded-2xl bg-white ring-1 ring-slate-200"><polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />{snapshots.map((item, index) => { const x = snapshots.length === 1 ? 170 : (index / (snapshots.length - 1)) * 320 + 20; const y = 120 - ((item.totalValue - min) / range) * 82 + 24; const labelBelow = index % 2 === 1 || y < 42; const labelY = labelBelow ? y + 18 : y - 26; return <g key={item.monthKey}><circle cx={x} cy={y} r="4.5" className="fill-indigo-700" /><text x={x} y={labelY} textAnchor="middle" className="fill-slate-600 text-[9px] font-bold">{getSnapshotMonthLabel(item)}</text><text x={x} y={labelY + 11} textAnchor="middle" className="fill-slate-800 text-[9px] font-black">{formatCurrencyCompact(item.totalValue)}</text></g>; })}</svg>;
+}
+
+function DividendSnapshotChart({ snapshots, year }: { snapshots: WalletSnapshot[]; year: number }) {
+  const max = Math.max(...snapshots.map((item) => item.estimatedMonthlyIncome), 1);
+  if (!snapshots.length) return <div className="rounded-2xl bg-white p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Nenhum pagamento registrado em {year} ainda.</div>;
+  return <div className="grid min-h-56 grid-flow-col auto-cols-fr items-end gap-2 overflow-x-auto rounded-2xl bg-white p-4 ring-1 ring-slate-200">{snapshots.map((item) => { const height = Math.max((item.estimatedMonthlyIncome / max) * 100, 28); return <div key={item.monthKey} className="flex h-48 min-w-[76px] flex-col justify-end"><div className="relative flex min-h-[3.5rem] items-start justify-center rounded-t-2xl bg-emerald-500 px-1 pt-2 text-center shadow-sm" style={{ height: `${height}%` }}><span className="text-[10px] font-black leading-3 text-white drop-shadow-sm">{getSnapshotMonthLabel(item)}<br />{formatCurrencyCompact(item.estimatedMonthlyIncome)}</span></div></div>; })}</div>;
 }
 
 function FiiTickerLink({ ticker }: { ticker: string }) {
