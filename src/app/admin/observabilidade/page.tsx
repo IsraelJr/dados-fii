@@ -27,10 +27,10 @@ const adminLinks = [
 ];
 
 function allowedAdminEmails() {
-  return Array.from(new Set([
-    ...String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "").split(","),
-    ...String(process.env.NEXT_PUBLIC_RISK_REPORT_ALLOWED_EMAILS || "").split(","),
-  ].map((email) => email.trim().toLowerCase()).filter(Boolean)));
+  return String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 function formatDateTime(value?: string | null) {
