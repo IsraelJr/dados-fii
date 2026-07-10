@@ -133,7 +133,7 @@ export async function getAllPricesFromSheet(): Promise<Map<string, any>> {
 
     const entries: Array<[string, any]> = rows
       .filter((row: any[]) => row?.[0])
-      .map((row: any[]) => [
+      .map((row: any[]): [string, any] => [
         normalizeTicker(row[0]),
         {
           code: normalizeTicker(row[0]),
@@ -144,7 +144,7 @@ export async function getAllPricesFromSheet(): Promise<Map<string, any>> {
           maximum: row[5]?.toString().trim() || "",
         },
       ])
-      .filter(([ticker]) => Boolean(ticker));
+      .filter((entry: [string, any]) => Boolean(entry[0]));
 
     return new Map<string, any>(entries);
   } catch (error) {
