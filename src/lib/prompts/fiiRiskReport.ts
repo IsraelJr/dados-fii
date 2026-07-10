@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v2.1.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v2.2.0";
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -102,6 +102,12 @@ Regras obrigatórias:
 - Não trate a resposta como recomendação individual definitiva; escreva como análise educacional e estratégica baseada nos dados disponíveis.
 - Use português brasileiro correto, profissional, direto e objetivo.
 
+Regras de apresentação:
+- Não mostre números técnicos crus, como "volatilidade 0,139052". Converta volatilidade de dividendos em linguagem de risco: baixa, moderada ou alta volatilidade. Se exibir percentual, use formato percentual com duas casas, como 13,91%.
+- No heat map, use rótulos visuais: 🟢 Baixo, 🟡 Moderado, 🟠 Alto e 🔴 Muito alto.
+- Quando gestor, administrador ou dados operacionais estiverem ausentes, use o rótulo "Visibilidade de governança". Não escreva apenas "Governança alta", pois isso pode parecer acusação de má governança.
+- Em tabelas com muitas colunas, seja telegráfico. Evite frases longas dentro das células.
+
 Regra de raciocínio institucional:
 - Cada conclusão importante deve conter, explicitamente ou de forma compacta: evidência nos dados, interpretação de risco, impacto potencial e ação de gestão sugerida.
 - Não apenas descreva riscos. Mostre o que poderia quebrar a carteira, em qual cenário, por qual canal de transmissão e qual ação reduziria esse risco.
@@ -138,7 +144,7 @@ Inclua uma tabela curta com categoria, dados disponíveis, dados ausentes, níve
 Use tabela em Markdown com ativo/segmento, valor financeiro, percentual da carteira, fator de risco comum e leitura de risco. Nunca use quantidade de cotas para calcular concentração por segmento; use currentValue, investedValue, totalValue ou weight.
 
 ## Sustentabilidade da renda
-Crie um score de segurança da renda da carteira e uma tabela por ativo com último dividendo, média 12m quando houver, recorrência de pagamento, volatilidade/cortes quando houver, participação estimada na renda e risco de corte. Se os dados forem insuficientes, explique a limitação sem repetir em excesso.
+Crie um score de segurança da renda da carteira e uma tabela por ativo com último dividendo, média 12m quando houver, recorrência de pagamento, volatilidade/cortes quando houver, participação estimada na renda e risco de corte. Para volatilidade, use linguagem de risco ou percentual formatado; nunca exiba decimal bruto.
 
 ## Liquidez e risco de saída
 Inclua tabela em Markdown com ativo, liquidez diária, cotas emitidas, cotistas, participação no IFIX, dias para zerar, leitura de risco e observação curta.
@@ -156,7 +162,7 @@ Inclua tabela por ativo com: bull case, bear case, risco dominante, nota de risc
 Inclua uma tabela curta com IFIX, CDI, IPCA e Selic quando disponíveis. Para IFIX, se houver apenas fechamento atual, mostre pontos, data e fonte; nos retornos, escreva "não disponível". Para CDI, IPCA e Selic, use os retornos/taxas disponíveis. Não diga que o IFIX é não confiável quando houver fechamento atual válido.
 
 ## Stress test e tail risks
-Inclua tabela em Markdown com cenário, probabilidade estimada, canal de transmissão, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação preventiva. Inclua pelo menos: juros altos persistentes, recessão/crédito, queda relevante do IFIX, corte de dividendos e crise específica no maior ativo.
+Inclua tabela em Markdown com cenário, probabilidade estimada, canal de transmissão, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação preventiva. Inclua pelo menos: juros altos persistentes, recessão/crédito, queda relevante do IFIX, corte de dividendos e crise específica no maior ativo. Em tabelas largas, use frases curtas.
 
 ## Red team: o que pode dar errado?
 Liste os 5 riscos que poderiam invalidar a tese da carteira. Para cada risco, mostre sinal de alerta, impacto provável e ação preventiva. Esta seção deve ser crítica, direta e sem suavizar riscos relevantes.
@@ -168,7 +174,7 @@ Inclua limites sugeridos por ativo e por segmento, classificação core/satélit
 Inclua plano objetivo para 30, 90 e 180 dias. Liste próximos eventos a acompanhar: novos dividendos, comunicados, deterioração de renda, concentração, liquidez, mudanças de preço e cenário de juros.
 
 ## Heat map final
-Use tabela em Markdown. A escala é: 🟢 baixo, 🟡 moderado, 🟠 alto, 🔴 muito alto.
+Use tabela em Markdown. A escala é: 🟢 Baixo, 🟡 Moderado, 🟠 Alto, 🔴 Muito alto. Use a coluna "Visibilidade de governança" quando o risco estiver ligado à ausência de dados de gestor, administrador ou comunicação.
 
 ## Limitações da análise
 Liste apenas as limitações que ainda não foram suficientemente explicadas na seção de qualidade dos dados.
@@ -213,7 +219,7 @@ ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Escreva como um memorando de comitê de investimentos: diagnóstico, evidência, cenário, risco, impacto, ação e gatilho de revisão. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Em valuation, separe patrimônio líquido de valor de mercado e não exiba dados patrimoniais com unidade duvidosa. Em rebalanceamento, substitua linguagem de compra por prioridade de novos aportes para diluição e gestão de concentração. Inclua bull case, bear case, ranking ajustado ao risco, red team e gatilhos de monitoramento sem inventar dados. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
+Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Escreva como um memorando de comitê de investimentos: diagnóstico, evidência, cenário, risco, impacto, ação e gatilho de revisão. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Em valuation, separe patrimônio líquido de valor de mercado e não exiba dados patrimoniais com unidade duvidosa. Em rebalanceamento, substitua linguagem de compra por prioridade de novos aportes para diluição e gestão de concentração. Inclua bull case, bear case, ranking ajustado ao risco, red team e gatilhos de monitoramento sem inventar dados. Nunca exiba volatilidade em decimal bruto; traduza para linguagem de risco. Use "Visibilidade de governança" quando o problema for falta de dado. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
 `.trim();
 }
 
