@@ -13,6 +13,12 @@ const MONTHS = [
   "December",
 ];
 
+const MIN_AGGREGATE_VALUE = 1_000_000;
+const MAX_PVP = 10;
+const MIN_PVP = 0.01;
+const MIN_VP_COTA = 0.01;
+const MAX_VP_COTA = 100_000;
+
 function numberOf(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const raw = String(value || "").replace("R$", "").replace("%", "").trim();
@@ -92,6 +98,26 @@ function removeUndefinedFields<T>(value: T): T {
   }
 
   return value;
+}
+
+function isPlausiblePvp(value?: number) {
+  return Boolean(value && value >= MIN_PVP && value <= MAX_PVP);
+}
+
+function isPlausibleVpCota(value?: number) {
+  return Boolean(value && value >= MIN_VP_COTA && value <= MAX_VP_COTA);
+}
+
+function isPlausibleAggregate(value?: number) {
+  return Boolean(value && value >= MIN_AGGREGATE_VALUE);
+}
+
+function validateAggregateWithShares(value?: number, shares?: number) {
+  if (!isPlausibleAggregate(value)) return undefined;
+  if (!shares) return value;
+
+  const vpCota = value! / shares;
+  return isPlausibleVpCota(vpCota) ? value : undefined;
 }
 
 function classifySector(data: any) {
@@ -205,21 +231,51 @@ function buildDividendSummary(data: any, price?: number) {
 }
 
 function buildValuation(data: any, price?: number) {
-  const netWorth = firstNumber(data, ["netWorth", "equityValue", "patrimonioLiquido", "patrimony", "equity", "patrimonio", "valuation.netWorth"]);
+  const rawNetWorth = firstNumber(data, ["netWorth", "equityValue", "patrimonioLiquido", "patrimony", "equity", "patrimonio", "valuation.netWorth"]);
   const numberShares = firstNumber(data, ["numberShares", "sharesOutstanding", "numberOfShares", "quotasIssued", "issuedQuotas", "cotasEmitidas", "numeroCotas", "marketData.numberShares"]);
   const directVpCota = firstNumber(data, ["valorPatrimonialPorCota", "vpCota", "vpa", "bookValuePerShare", "valuation.vpCota"]);
   const directPvp = firstNumber(data, ["pvp", "p_vp", "pvpa", "priceToBook", "valuation.pvp"]);
+  const directMarketCap = firstNumber(data, ["marketCap", "valorMercado", "marketData.marketCap", "valuation.marketCap"]);
 
-  const vpCota = directVpCota || (netWorth && numberShares ? netWorth / numberShares : undefined) || (price && directPvp ? price / directPvp : undefined);
-  const pvp = directPvp || (price && vpCota ? price / vpCota : undefined);
-  const marketCap = price && numberShares ? price * numberShares : undefined;
+  const notes: string[] = [];
+  const pvpInput = isPlausiblePvp(directPvp) ? directPvp : undefined;
+  const vpCotaInput = isPlausibleVpCota(directVpCota) ? directVpCota : undefined;
+  const validatedNetWorth = validateAggregateWithShares(rawNetWorth, numberShares);
+  const impliedVpCota = price && pvpInput ? price / pvpInput : undefined;
+  const vpCota = vpCotaInput || (validatedNetWorth && numberShares ? validatedNetWorth / numberShares : undefined) || (isPlausibleVpCota(impliedVpCota) ? impliedVpCota : undefined);
+  const pvp = pvpInput || (price && vpCota ? price / vpCota : undefined);
+  const calculatedMarketCap = price && numberShares ? price * numberShares : undefined;
+  const validatedDirectMarketCap = validateAggregateWithShares(directMarketCap, numberShares);
+  const marketCap = calculatedMarketCap || validatedDirectMarketCap;
+  const impliedNetWorth = vpCota && numberShares ? vpCota * numberShares : undefined;
+  const netWorth = validatedNetWorth || (isPlausibleAggregate(impliedNetWorth) ? impliedNetWorth : undefined);
+
+  if (rawNetWorth && !validatedNetWorth) {
+    notes.push("Patrimônio líquido bruto ignorado por unidade ausente ou incompatível com cotas emitidas.");
+  }
+  if (directMarketCap && !validatedDirectMarketCap && !calculatedMarketCap) {
+    notes.push("Valor de mercado bruto ignorado por unidade ausente ou incompatível com cotas emitidas.");
+  }
+  if (directPvp && !pvpInput) {
+    notes.push("P/VP bruto ignorado por faixa incompatível.");
+  }
+  if (directVpCota && !vpCotaInput) {
+    notes.push("VP por cota bruto ignorado por faixa incompatível.");
+  }
 
   return removeUndefinedFields({
-    netWorth,
+    netWorth: netWorth && netWorth > 0 ? round(netWorth, 2) : undefined,
     numberShares,
-    vpCota: vpCota && vpCota > 0 ? round(vpCota, 4) : undefined,
-    pvp: pvp && pvp > 0 ? round(pvp, 4) : undefined,
+    vpCota: vpCota && isPlausibleVpCota(vpCota) ? round(vpCota, 4) : undefined,
+    pvp: pvp && isPlausiblePvp(pvp) ? round(pvp, 4) : undefined,
     marketCap: marketCap && marketCap > 0 ? round(marketCap, 2) : undefined,
+    dataQuality: {
+      marketCapSource: calculatedMarketCap ? "calculado por preço atual x cotas emitidas" : validatedDirectMarketCap ? "informado e validado" : undefined,
+      netWorthSource: validatedNetWorth ? "informado e validado" : impliedNetWorth && isPlausibleAggregate(impliedNetWorth) ? "estimado a partir de VP/cota ou P/VP" : undefined,
+      vpCotaSource: vpCotaInput ? "informado" : validatedNetWorth && numberShares ? "calculado por patrimônio líquido / cotas emitidas" : impliedVpCota && isPlausibleVpCota(impliedVpCota) ? "estimado por preço / P/VP" : undefined,
+      pvpSource: pvpInput ? "informado" : price && vpCota ? "calculado por preço / VP por cota" : undefined,
+      notes: notes.length ? notes : undefined,
+    },
   });
 }
 
@@ -238,6 +294,7 @@ export function deriveFiiRiskData(data: any) {
     vpCota: valuation.vpCota,
     pvp: valuation.pvp,
     netWorth: valuation.netWorth,
+    valuationDataQuality: valuation.dataQuality,
     lastDividend: dividendSummary.lastDividend,
     lastDividendDate: dividendSummary.lastDividendDate,
     averageDividend12m: dividendSummary.averageDividend12m,
@@ -251,6 +308,7 @@ export function deriveFiiRiskData(data: any) {
       vpCota: valuation.vpCota,
       pvp: valuation.pvp,
       marketCap: valuation.marketCap,
+      dataQuality: valuation.dataQuality,
       dy12m: dividendYield || dividendSummary.dy12mCalculated,
       dy12mCalculated: dividendSummary.dy12mCalculated,
       dy6mAnnualized: dividendSummary.dy6mAnnualized,
