@@ -5,6 +5,19 @@ const COLLECTION = "MarketBenchmarks";
 const LATEST_DOC = "latest";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const BCB_BASE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs";
+const BRAPI_BASE_URL = "https://brapi.dev/api/v2";
+
+type PricePoint = { date: Date; isoDate: string; close: number };
+type BenchmarkAttempt = {
+  provider: string;
+  symbol: string;
+  status: string;
+  url?: string;
+  observations?: number;
+  firstDate?: string | null;
+  lastDate?: string | null;
+  error?: string;
+};
 
 function dateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -94,6 +107,13 @@ function recentEnough(isoDate?: string | null, maxCalendarDays = 7) {
   const date = new Date(`${isoDate}T12:00:00`);
   if (Number.isNaN(date.getTime())) return false;
   return Date.now() - date.getTime() <= maxCalendarDays * 24 * 60 * 60 * 1000;
+}
+
+function envList(name: string, fallback: string) {
+  return String(process.env[name] || fallback)
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 async function fetchBcbSerie(code: number, start: Date, end = new Date()) {
@@ -227,84 +247,172 @@ async function fetchYahooChart(symbol: string, range = "2y") {
   return { url, values };
 }
 
-function firstOnOrAfter(values: Array<{ date: Date; close: number; isoDate: string }>, target: Date) {
+async function fetchBrapiHistorical(symbol: string) {
+  const apiKey = process.env.BRAPI_API_TOKEN || process.env.BRAPI_TOKEN || "";
+  const url = `${BRAPI_BASE_URL}/stocks/historical?symbols=${encodeURIComponent(symbol)}&range=2y&interval=1d&sortOrder=asc`;
+
+  if (!apiKey) {
+    throw new Error("BRAPI_API_TOKEN ausente");
+  }
+
+  const authValue = ["Bearer", apiKey].join(" ");
+  const res = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      Authorization: authValue,
+      "User-Agent": "dados-fii/1.0",
+    },
+  });
+
+  if (!res.ok) throw new Error(`brapi ${symbol} HTTP ${res.status}`);
+
+  const json = await res.json();
+  const result = Array.isArray(json?.results) ? json.results[0] : null;
+  const prices = result?.data?.historicalDataPrice;
+  const values: PricePoint[] = Array.isArray(prices)
+    ? prices
+        .map((item: any) => {
+          const rawDate = item?.date;
+          const date = typeof rawDate === "number"
+            ? new Date(rawDate * 1000)
+            : new Date(`${String(rawDate || "").slice(0, 10)}T12:00:00`);
+          const close = numberOf(item?.adjustedClose ?? item?.close);
+          return { date, isoDate: dateKey(date), close };
+        })
+        .filter((item) => !Number.isNaN(item.date.getTime()) && item.close > 0)
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+    : [];
+
+  return { url, values };
+}
+
+function firstOnOrAfter(values: PricePoint[], target: Date) {
   return values.find((item) => item.date.getTime() >= target.getTime()) || values[0];
 }
 
-function firstOnOrBefore(values: Array<{ date: Date; close: number; isoDate: string }>, target: Date) {
+function firstOnOrBefore(values: PricePoint[], target: Date) {
   return [...values].reverse().find((item) => item.date.getTime() <= target.getTime()) || values[0];
 }
 
+function buildIndexReturnResult(params: {
+  provider: string;
+  source: string;
+  sourceType: string;
+  symbol: string;
+  values: PricePoint[];
+  attempts: BenchmarkAttempt[];
+  note: string;
+}) {
+  const { provider, source, sourceType, symbol, values, attempts, note } = params;
+  if (values.length < 40) throw new Error("sem histórico suficiente");
+
+  const now = new Date();
+  const latest = values.at(-1)!;
+  const monthStart = firstOnOrAfter(values, startOfMonth(now));
+  const yearStart = firstOnOrAfter(values, startOfYear(now));
+  const twelveMonthsStart = firstOnOrBefore(values, addMonths(latest.date, -12));
+  const monthReturn = percentReturn(monthStart?.close, latest.close);
+  const yearReturn = percentReturn(yearStart?.close, latest.close);
+  const twelveMonthsReturn = percentReturn(twelveMonthsStart?.close, latest.close);
+  const comparisonReady = Boolean(
+    recentEnough(latest.isoDate, 10)
+    && monthReturn !== null
+    && yearReturn !== null
+    && twelveMonthsReturn !== null
+  );
+
+  return {
+    symbol,
+    provider,
+    source,
+    sourceType,
+    method: "Retorno calculado pela variação do fechamento do IFIX entre as datas-base e o último fechamento disponível.",
+    unit: "percent",
+    close: Number(latest.close.toFixed(2)),
+    monthReturn,
+    yearReturn,
+    twelveMonthsReturn,
+    lastDate: latest.isoDate,
+    anchors: {
+      monthStart: monthStart ? { date: monthStart.isoDate, close: Number(monthStart.close.toFixed(2)) } : null,
+      yearStart: yearStart ? { date: yearStart.isoDate, close: Number(yearStart.close.toFixed(2)) } : null,
+      twelveMonthsStart: twelveMonthsStart ? { date: twelveMonthsStart.isoDate, close: Number(twelveMonthsStart.close.toFixed(2)) } : null,
+    },
+    observations: values.length,
+    comparisonReady,
+    quality: comparisonReady ? "secondary_calculated" : "incomplete",
+    attempts,
+    note,
+  };
+}
+
 async function fetchIfixReturns() {
-  const symbols = String(process.env.BENCHMARK_IFIX_SYMBOLS || "^IFIX,IFIX.SA")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
+  const attempts: BenchmarkAttempt[] = [];
   const errors: string[] = [];
-  const attempts: Array<{ symbol: string; status: string; url?: string; observations?: number; firstDate?: string; lastDate?: string; error?: string }> = [];
+  const brapiSymbols = envList("BENCHMARK_IFIX_BRAPI_SYMBOLS", "^IFIX,IFIX");
+  const yahooSymbols = envList("BENCHMARK_IFIX_SYMBOLS", "^IFIX,IFIX.SA");
 
-  for (const symbol of symbols) {
+  for (const symbol of brapiSymbols) {
     try {
-      const { url, values } = await fetchYahooChart(symbol, "2y");
+      const { url, values } = await fetchBrapiHistorical(symbol);
       attempts.push({
+        provider: "brapi",
         symbol,
         status: "fetched",
         url,
         observations: values.length,
-        firstDate: values[0]?.isoDate || null as any,
-        lastDate: values.at(-1)?.isoDate || null as any,
+        firstDate: values[0]?.isoDate || null,
+        lastDate: values.at(-1)?.isoDate || null,
       });
 
-      if (values.length < 40) throw new Error("sem histórico suficiente");
-
-      const now = new Date();
-      const latest = values.at(-1)!;
-      const monthStart = firstOnOrAfter(values, startOfMonth(now));
-      const yearStart = firstOnOrAfter(values, startOfYear(now));
-      const twelveMonthsStart = firstOnOrBefore(values, addMonths(latest.date, -12));
-      const monthReturn = percentReturn(monthStart?.close, latest.close);
-      const yearReturn = percentReturn(yearStart?.close, latest.close);
-      const twelveMonthsReturn = percentReturn(twelveMonthsStart?.close, latest.close);
-      const comparisonReady = Boolean(
-        recentEnough(latest.isoDate, 10)
-        && monthReturn !== null
-        && yearReturn !== null
-        && twelveMonthsReturn !== null
-      );
-
-      return {
-        symbol,
-        source: "Yahoo Finance",
+      return buildIndexReturnResult({
+        provider: "brapi",
+        source: "brapi.dev",
         sourceType: "secondary_market_data_provider",
-        method: "Retorno calculado pela variação do fechamento do IFIX entre as datas-base e o último fechamento disponível.",
-        unit: "percent",
-        close: Number(latest.close.toFixed(2)),
-        monthReturn,
-        yearReturn,
-        twelveMonthsReturn,
-        lastDate: latest.isoDate,
-        anchors: {
-          monthStart: monthStart ? { date: monthStart.isoDate, close: Number(monthStart.close.toFixed(2)) } : null,
-          yearStart: yearStart ? { date: yearStart.isoDate, close: Number(yearStart.close.toFixed(2)) } : null,
-          twelveMonthsStart: twelveMonthsStart ? { date: twelveMonthsStart.isoDate, close: Number(twelveMonthsStart.close.toFixed(2)) } : null,
-        },
-        observations: values.length,
-        comparisonReady,
-        quality: comparisonReady ? "secondary_calculated" : "incomplete",
+        symbol,
+        values,
         attempts,
-        note: "Fonte secundária. Para auditoria institucional, substituir por fonte oficial/licenciada da B3 quando disponível no projeto.",
-      };
+        note: "Fonte secundária via brapi.dev. Para auditoria institucional, substituir por fonte oficial/licenciada da B3 quando disponível no projeto.",
+      });
     } catch (err: any) {
       const message = err.message || "erro";
-      errors.push(`${symbol}: ${message}`);
-      attempts.push({ symbol, status: "error", error: message });
+      errors.push(`brapi ${symbol}: ${message}`);
+      attempts.push({ provider: "brapi", symbol, status: "error", error: message });
+    }
+  }
+
+  for (const symbol of yahooSymbols) {
+    try {
+      const { url, values } = await fetchYahooChart(symbol, "2y");
+      attempts.push({
+        provider: "yahoo",
+        symbol,
+        status: "fetched",
+        url,
+        observations: values.length,
+        firstDate: values[0]?.isoDate || null,
+        lastDate: values.at(-1)?.isoDate || null,
+      });
+
+      return buildIndexReturnResult({
+        provider: "yahoo",
+        source: "Yahoo Finance",
+        sourceType: "secondary_market_data_provider",
+        symbol,
+        values,
+        attempts,
+        note: "Fonte secundária. Para auditoria institucional, substituir por fonte oficial/licenciada da B3 quando disponível no projeto.",
+      });
+    } catch (err: any) {
+      const message = err.message || "erro";
+      errors.push(`Yahoo ${symbol}: ${message}`);
+      attempts.push({ provider: "yahoo", symbol, status: "error", error: message });
     }
   }
 
   return {
-    symbol: symbols[0] || "IFIX",
-    source: "Yahoo Finance",
+    symbol: brapiSymbols[0] || yahooSymbols[0] || "IFIX",
+    source: "brapi.dev / Yahoo Finance",
     sourceType: "secondary_market_data_provider",
     close: null,
     monthReturn: null,
@@ -326,7 +434,7 @@ function generatedMetadata() {
       "Banco Central do Brasil - SGS 12: CDI diário",
       "Banco Central do Brasil - SGS 433: IPCA mensal",
       "Banco Central do Brasil - SGS 432: Selic meta",
-      "Yahoo Finance, quando disponível: IFIX",
+      "brapi.dev ou Yahoo Finance, quando disponível: IFIX",
     ],
     methodology: {
       cdi: "Retornos acumulados calculados por composição geométrica das taxas diárias oficiais da série SGS 12.",
@@ -377,6 +485,7 @@ function summarizeBenchmarks(data: any) {
     date: data?.date || null,
     ifix: {
       ok: Boolean(data?.ifix?.comparisonReady),
+      provider: data?.ifix?.provider || null,
       symbol: data?.ifix?.symbol || null,
       close: data?.ifix?.close ?? null,
       monthReturn: data?.ifix?.monthReturn ?? null,
