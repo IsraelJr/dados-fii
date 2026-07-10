@@ -85,7 +85,6 @@ function shouldAutoLoadFromCloud(email: string, currentWallet: WalletItem[]) {
 }
 
 function diffTickers(previous: WalletItem[], current: WalletItem[]) {
-  const previousSet = new Set(previous.map((item) => item.ticker));
   const currentSet = new Set(current.map((item) => item.ticker));
 
   return {
@@ -268,7 +267,7 @@ export default function WalletEmailVerifiedSync() {
     const signature = walletSignature(wallet);
     if (signature === lastSavedSignature.current) return;
 
-    setMessage("Alterações salvas neste navegador. Vamos sincronizar automaticamente depois de alguns minutos ou ao sair da página.");
+    setMessage("Alterações serão salvas automaticamente.");
     const timeout = window.setTimeout(() => {
       saveCurrentWallet({ silent: true });
     }, 120000);
@@ -308,7 +307,7 @@ export default function WalletEmailVerifiedSync() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (hasSession) {
-      setMessage("Este dispositivo já está confirmado. Use Carregar ou altere a carteira normalmente.");
+      setMessage("Este dispositivo já está confirmado. Alterações serão salvas automaticamente.");
       return;
     }
 
@@ -392,10 +391,10 @@ export default function WalletEmailVerifiedSync() {
               <span className="min-w-0">Salve sua carteira</span>
             </h2>
             <p className="mt-2 text-sm font-medium leading-6 text-gray-300">
-              Sua carteira fica salva neste navegador e pode ser recuperada pelo e-mail confirmado. Quando já houver dados locais, usamos a versão local para evitar carregamentos repetidos.
+              Sua carteira fica salva neste navegador e pode ser recuperada pelo e-mail confirmado.
             </p>
             <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
-              {hasSession ? "Este dispositivo já está confirmado. Alterações ficam no navegador e sincronizam automaticamente ao sair ou após alguns minutos." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
+              {hasSession ? "Este dispositivo já está confirmado. Alterações serão salvas automaticamente." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
             </p>
           </div>
 
