@@ -424,53 +424,55 @@ export default function Home() {
             )}
 
             <section className="bg-gradient-to-b from-white to-slate-50 px-4 py-8 md:py-12">
-                <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
-                    <div className="rounded-3xl bg-white p-6 text-left shadow-sm ring-1 ring-slate-200 md:p-8">
-                        <p className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">
-                            Fundos imobiliários, dividendos e carteira
-                        </p>
-                        <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
-                            Consulte FIIs com mais clareza.
-                        </h1>
-                        <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-                            O Dados FII reúne consulta de fundos imobiliários, calendário de dividendos, próximos pagamentos,
-                            carteira de FIIs, notícias e educação financeira em uma navegação simples.
-                        </p>
+                <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start">
+                    <div className="space-y-4 lg:max-w-[640px]">
+                        <div className="rounded-3xl bg-white p-6 text-left shadow-sm ring-1 ring-slate-200 md:p-8">
+                            <p className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">
+                                Fundos imobiliários, dividendos e carteira
+                            </p>
+                            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-5xl">
+                                Consulte FIIs com mais clareza.
+                            </h1>
+                            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+                                O Dados FII reúne consulta de fundos imobiliários, calendário de dividendos, próximos pagamentos,
+                                carteira de FIIs, notícias e educação financeira em uma navegação simples.
+                            </p>
 
-                        <div className="mt-6 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                                <input
-                                    type="text"
-                                    placeholder="Digite o ticker, ex: ABCD11"
-                                    value={ticker}
-                                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter") fetchFII();
-                                    }}
-                                    className="min-h-12 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                                />
-                                <button
-                                    onClick={fetchFII}
-                                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-extrabold text-white shadow-sm hover:bg-indigo-700"
-                                >
-                                    <Search size={18} /> Consultar
-                                </button>
+                            <div className="mt-6 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                                <div className="flex flex-col gap-2 sm:flex-row">
+                                    <input
+                                        type="text"
+                                        placeholder="Digite o ticker, ex: ABCD11"
+                                        value={ticker}
+                                        onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") fetchFII();
+                                        }}
+                                        className="min-h-12 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-base font-bold text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                    />
+                                    <button
+                                        onClick={fetchFII}
+                                        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-extrabold text-white shadow-sm hover:bg-indigo-700"
+                                    >
+                                        <Search size={18} /> Consultar
+                                    </button>
+                                </div>
+                                {error && <p className="mt-3 text-sm font-bold text-red-600">{error}</p>}
+                                {loadingFII && (
+                                    <p className="mt-3 flex items-center gap-2 text-sm font-bold text-slate-500">
+                                        <Loader2 className="animate-spin" size={18} /> Carregando dados do FII...
+                                    </p>
+                                )}
                             </div>
-                            {error && <p className="mt-3 text-sm font-bold text-red-600">{error}</p>}
-                            {loadingFII && (
-                                <p className="mt-3 flex items-center gap-2 text-sm font-bold text-slate-500">
-                                    <Loader2 className="animate-spin" size={18} /> Carregando dados do FII...
-                                </p>
-                            )}
                         </div>
-                    </div>
 
-                    <aside className="grid gap-3">
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                        <div className="grid gap-3 sm:grid-cols-2">
                             <MarketInfoCard title="Dólar comercial" value={dolar} />
                             <MarketInfoCard title="IFIX" value={ifix} />
                         </div>
+                    </div>
 
+                    <aside className="grid gap-3 lg:pt-1">
                         <MacroContextStrip macro={macroContext} />
 
                         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
