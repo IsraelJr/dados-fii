@@ -3,45 +3,199 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, BarChart3, CalendarDays, Download, LineChart, Loader2, Minus, PieChart, Plus, RefreshCw, Save, Trash2, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  CalendarDays,
+  Download,
+  LineChart,
+  Loader2,
+  Minus,
+  PieChart,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import WalletRiskReportCard from "../components/WalletRiskReportCard";
 import AppToast from "../components/AppToast";
 
 type WalletItem = { ticker: string; quotas: number };
 type LoadedFii = WalletItem & { data?: any; error?: string };
+type EnrichedFii = LoadedFii & {
+  lastDividend: { month: string; info: any } | null;
+  currentDividend: { month: string; info: any } | null;
+  estimatedIncome: number;
+  announcedIncome: number;
+  currentValuePosition: number;
+  segment: string;
+  dailyVariation: number;
+  waitingAnnouncement: boolean;
+};
 type Payment = { ticker: string; quotas: number; date: string; dateWith?: string; amount: number; dividend: number; month: string };
 type ChartItem = { label: string; value: number; detail?: string };
-type WalletSnapshot = { monthKey: string; label: string; totalValue: number; estimatedMonthlyIncome: number; announcedMonthlyIncome: number; walletCount: number; topWeightTicker?: string; topIncomeTicker?: string; createdAt: string; updatedAt: string };
+type WalletSnapshot = {
+  monthKey: string;
+  label: string;
+  totalValue: number;
+  estimatedMonthlyIncome: number;
+  announcedMonthlyIncome: number;
+  walletCount: number;
+  topWeightTicker?: string;
+  topIncomeTicker?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type DividendMonth = { month: string; label: string; value: number };
+type DividendHistory = {
+  months: DividendMonth[];
+  visibleMonths: DividendMonth[];
+  total: number;
+  average: number;
+  best: DividendMonth | null;
+  worst: DividendMonth | null;
+  topPayer: { ticker: string; value: number } | null;
+};
+
+type WalletInsights = {
+  currentMonth: string;
+  enriched: EnrichedFii[];
+  monthlyIncome: number;
+  announcedIncome: number;
+  currentValue: number;
+  pendingIncome: number;
+  waiting: EnrichedFii[];
+  topIncome: EnrichedFii[];
+  topWeight: EnrichedFii[];
+  segmentBreakdown: Array<{ ticker: string; value: string }>;
+  mainSegment?: { ticker: string; value: string };
+  assetWeights: ChartItem[];
+  segmentWeights: ChartItem[];
+  incomeByFii: ChartItem[];
+  dividendHistory: DividendHistory;
+};
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
 const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const MONTHS_PTBR: Record<string, string> = { January: "Janeiro", February: "Fevereiro", March: "Março", April: "Abril", May: "Maio", June: "Junho", July: "Julho", August: "Agosto", September: "Setembro", October: "Outubro", November: "Novembro", December: "Dezembro" };
-const MONTHS_SHORT_PTBR: Record<string, string> = { January: "Jan", February: "Fev", March: "Mar", April: "Abr", May: "Mai", June: "Jun", July: "Jul", August: "Ago", September: "Set", October: "Out", November: "Nov", December: "Dez" };
+const MONTHS_PTBR: Record<string, string> = {
+  January: "Janeiro",
+  February: "Fevereiro",
+  March: "Março",
+  April: "Abril",
+  May: "Maio",
+  June: "Junho",
+  July: "Julho",
+  August: "Agosto",
+  September: "Setembro",
+  October: "Outubro",
+  November: "Novembro",
+  December: "Dezembro",
+};
+const MONTHS_SHORT_PTBR: Record<string, string> = {
+  January: "Jan",
+  February: "Fev",
+  March: "Mar",
+  April: "Abr",
+  May: "Mai",
+  June: "Jun",
+  July: "Jul",
+  August: "Ago",
+  September: "Set",
+  October: "Out",
+  November: "Nov",
+  December: "Dez",
+};
 
 function parseCurrency(value: unknown) {
-  if (typeof value === "number") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   return Number(String(value || "0").replace("R$", "").replace(/\./g, "").replace(",", ".").trim()) || 0;
 }
-function formatCurrency(value: number) { return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
-function formatPercentValue(value: number) { return `${value.toFixed(1).replace(".", ",")}%`; }
-function formatPaymentSummary(payment?: Payment) { return payment ? `${formatCurrency(payment.amount)} em ${payment.date}` : "Sem pagamento futuro na base"; }
-function getCurrentMonthName() { return MONTHS[new Date().getMonth()]; }
-function getYearData(data: any, year = new Date().getFullYear()) { return data?.[`earnings${year}`] || {}; }
-function getCurrentYearData(data: any) { const year = new Date().getFullYear(); return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {}; }
-function getLastDividend(data: any) { const yearData = getCurrentYearData(data); const months = Object.keys(yearData).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b)); const lastMonth = months[months.length - 1]; return lastMonth ? { month: lastMonth, info: yearData[lastMonth] } : null; }
-function getCurrentMonthDividend(data: any) { const month = getCurrentMonthName(); const yearData = getCurrentYearData(data); return yearData?.[month] ? { month, info: yearData[month] } : null; }
-function getSegmentName(data: any) { return data?.segment_new || data?.segment || "Sem segmento"; }
-function percentToNumber(value: unknown) { return Number(String(value || "0").replace("%", "").replace(",", ".").trim()) || 0; }
-function getDailyVariation(data: any) { const value = percentToNumber(data?.variation ?? data?.dailyVariation ?? data?.changePercent); return Number.isFinite(value) ? value : 0; }
-function monthKey(date = new Date()) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
-function monthLabelFromKey(key: string) { const [year, month] = key.split("-"); const index = Number(month) - 1; return `${MONTHS_SHORT_PTBR[MONTHS[index]] || month}/${String(year).slice(-2)}`; }
-function getBarWidthClass(value: string) { const percent = percentToNumber(value); if (percent >= 90) return "w-full"; if (percent >= 80) return "w-10/12"; if (percent >= 70) return "w-9/12"; if (percent >= 60) return "w-8/12"; if (percent >= 50) return "w-7/12"; if (percent >= 40) return "w-6/12"; if (percent >= 30) return "w-5/12"; if (percent >= 20) return "w-4/12"; if (percent >= 10) return "w-3/12"; if (percent > 0) return "w-2/12"; return "w-0"; }
+
+function formatCurrency(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatPercentValue(value: number) {
+  return `${value.toFixed(1).replace(".", ",")}%`;
+}
+
+function formatPaymentSummary(payment?: Payment) {
+  return payment ? `${formatCurrency(payment.amount)} em ${payment.date}` : "Sem pagamento futuro na base";
+}
+
+function getCurrentMonthName() {
+  return MONTHS[new Date().getMonth()];
+}
+
+function getYearData(data: any, year = new Date().getFullYear()) {
+  return data?.[`earnings${year}`] || {};
+}
+
+function getCurrentYearData(data: any) {
+  const year = new Date().getFullYear();
+  return data?.[`earnings${year}`] || data?.[`earnings${year - 1}`] || {};
+}
+
+function getLastDividend(data: any) {
+  const yearData = getCurrentYearData(data);
+  const months = Object.keys(yearData).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+  const lastMonth = months[months.length - 1];
+  return lastMonth ? { month: lastMonth, info: yearData[lastMonth] } : null;
+}
+
+function getCurrentMonthDividend(data: any) {
+  const month = getCurrentMonthName();
+  const yearData = getCurrentYearData(data);
+  return yearData?.[month] ? { month, info: yearData[month] } : null;
+}
+
+function getSegmentName(data: any) {
+  return data?.segment_new || data?.segment || "Sem segmento";
+}
+
+function percentToNumber(value: unknown) {
+  return Number(String(value || "0").replace("%", "").replace(",", ".").trim()) || 0;
+}
+
+function getDailyVariation(data: any) {
+  const value = percentToNumber(data?.variation ?? data?.dailyVariation ?? data?.changePercent);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function monthKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabelFromKey(key: string) {
+  const [year, month] = key.split("-");
+  const index = Number(month) - 1;
+  return `${MONTHS_SHORT_PTBR[MONTHS[index]] || month}/${String(year).slice(-2)}`;
+}
+
+function getBarWidthClass(value: string) {
+  const percent = percentToNumber(value);
+  if (percent >= 90) return "w-full";
+  if (percent >= 80) return "w-10/12";
+  if (percent >= 70) return "w-9/12";
+  if (percent >= 60) return "w-8/12";
+  if (percent >= 50) return "w-7/12";
+  if (percent >= 40) return "w-6/12";
+  if (percent >= 30) return "w-5/12";
+  if (percent >= 20) return "w-4/12";
+  if (percent >= 10) return "w-3/12";
+  if (percent > 0) return "w-2/12";
+  return "w-0";
+}
 
 function getUpcomingPayments(items: LoadedFii[]) {
   const today = new Date();
   const payments: Payment[] = [];
+
   items.forEach((item) => {
     if (!item.data) return;
     Object.entries(getCurrentYearData(item.data)).forEach(([month, info]: any) => {
@@ -54,10 +208,15 @@ function getUpcomingPayments(items: LoadedFii[]) {
       payments.push({ ticker: item.ticker, quotas: item.quotas, date: info.payment_date, dateWith: info.date_with, amount: dividend * item.quotas, dividend, month });
     });
   });
-  return payments.sort((a, b) => { const [dayA, monthA, yearA] = a.date.split("/").map(Number); const [dayB, monthB, yearB] = b.date.split("/").map(Number); return new Date(yearA, monthA - 1, dayA).getTime() - new Date(yearB, monthB - 1, dayB).getTime(); });
+
+  return payments.sort((a, b) => {
+    const [dayA, monthA, yearA] = a.date.split("/").map(Number);
+    const [dayB, monthB, yearB] = b.date.split("/").map(Number);
+    return new Date(yearA, monthA - 1, dayA).getTime() - new Date(yearB, monthB - 1, dayB).getTime();
+  });
 }
 
-function buildDividendHistory(items: Array<LoadedFii & { estimatedIncome: number }>) {
+function buildDividendHistory(items: EnrichedFii[]): DividendHistory {
   const year = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
   const byTicker: Record<string, number> = {};
@@ -81,11 +240,43 @@ function buildDividendHistory(items: Array<LoadedFii & { estimatedIncome: number
 
 function buildCsv(items: LoadedFii[]) {
   const header = ["Ticker", "Movimento do dia", "Cotas", "Preco", "Ultimo rendimento", "Mes ultimo rendimento", "Renda estimada", "Rendimento mes atual", "Renda anunciada mes atual"];
-  const rows = items.map((item) => { const lastDividend = getLastDividend(item.data); const currentDividend = getCurrentMonthDividend(item.data); const lastValue = parseCurrency(lastDividend?.info?.earnings); const currentValue = parseCurrency(currentDividend?.info?.earnings); return [item.ticker, item.data?.variation || "", String(item.quotas), item.data?.price || "", lastDividend?.info?.earnings || "", MONTHS_PTBR[lastDividend?.month || ""] || lastDividend?.month || "", formatCurrency(lastValue * item.quotas), currentDividend?.info?.earnings || "", formatCurrency(currentValue * item.quotas)]; });
+  const rows = items.map((item) => {
+    const lastDividend = getLastDividend(item.data);
+    const currentDividend = getCurrentMonthDividend(item.data);
+    const lastValue = parseCurrency(lastDividend?.info?.earnings);
+    const currentValue = parseCurrency(currentDividend?.info?.earnings);
+    return [
+      item.ticker,
+      item.data?.variation || "",
+      String(item.quotas),
+      item.data?.price || "",
+      lastDividend?.info?.earnings || "",
+      MONTHS_PTBR[lastDividend?.month || ""] || lastDividend?.month || "",
+      formatCurrency(lastValue * item.quotas),
+      currentDividend?.info?.earnings || "",
+      formatCurrency(currentValue * item.quotas),
+    ];
+  });
   return [header, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
 }
-function toastVariant(message: string): "success" | "error" | "warning" | "info" { if (!message) return "info"; const normalized = message.toLowerCase(); if (normalized.includes("informe") || normalized.includes("erro") || normalized.includes("falha")) return "warning"; if (normalized.includes("removido") || normalized.includes("atualizado") || normalized.includes("adicionado") || normalized.includes("sucesso")) return "success"; return "info"; }
-function readSnapshots(): WalletSnapshot[] { if (typeof window === "undefined") return []; try { const parsed = JSON.parse(window.localStorage.getItem(SNAPSHOT_KEY) || "[]"); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
+
+function toastVariant(message: string): "success" | "error" | "warning" | "info" {
+  if (!message) return "info";
+  const normalized = message.toLowerCase();
+  if (normalized.includes("informe") || normalized.includes("erro") || normalized.includes("falha")) return "warning";
+  if (normalized.includes("removido") || normalized.includes("atualizado") || normalized.includes("adicionado") || normalized.includes("sucesso")) return "success";
+  return "info";
+}
+
+function readSnapshots(): WalletSnapshot[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SNAPSHOT_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function WalletPage() {
   const [ticker, setTicker] = useState("");
@@ -99,37 +290,92 @@ export default function WalletPage() {
   const [snapshots, setSnapshots] = useState<WalletSnapshot[]>([]);
   const quotasInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => { const stored = window.localStorage.getItem(STORAGE_KEY); setSnapshots(readSnapshots()); if (!stored) return; try { const parsed = JSON.parse(stored); if (Array.isArray(parsed)) setItems(parsed); } catch { window.localStorage.removeItem(STORAGE_KEY); } }, []);
-  useEffect(() => { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); setEditingQuotas((current) => { const next: Record<string, string> = {}; items.forEach((item) => { next[item.ticker] = current[item.ticker] ?? String(item.quotas); }); return next; }); }, [items]);
+  useEffect(() => {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    setSnapshots(readSnapshots());
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) setItems(parsed);
+    } catch {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    setEditingQuotas((current) => {
+      const next: Record<string, string> = {};
+      items.forEach((item) => { next[item.ticker] = current[item.ticker] ?? String(item.quotas); });
+      return next;
+    });
+  }, [items]);
 
   useEffect(() => {
     async function loadWallet() {
-      if (!items.length) { setLoaded([]); return; }
+      if (!items.length) {
+        setLoaded([]);
+        return;
+      }
       setLoading(true);
       try {
-        const response = await fetch("/api/fii/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tickers: items.map((item) => item.ticker) }) });
+        const response = await fetch("/api/fii/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tickers: items.map((item) => item.ticker) }),
+        });
         const json = await response.json();
-        if (!response.ok || !json?.ok) { setLoaded(items.map((item) => ({ ...item, error: json?.error || "Erro ao buscar dados" }))); return; }
-        setLoaded(items.map((item) => { const data = json.items?.[item.ticker]; if (!data) return { ...item, error: json.errors?.[item.ticker] || "FII não encontrado" }; return { ...item, data }; }));
-      } catch { setLoaded(items.map((item) => ({ ...item, error: "Erro ao buscar dados" }))); } finally { setLoading(false); }
+        if (!response.ok || !json?.ok) {
+          setLoaded(items.map((item) => ({ ...item, error: json?.error || "Erro ao buscar dados" })));
+          return;
+        }
+        setLoaded(items.map((item) => {
+          const data = json.items?.[item.ticker];
+          if (!data) return { ...item, error: json.errors?.[item.ticker] || "FII não encontrado" };
+          return { ...item, data };
+        }));
+      } catch {
+        setLoaded(items.map((item) => ({ ...item, error: "Erro ao buscar dados" })));
+      } finally {
+        setLoading(false);
+      }
     }
+
     loadWallet();
   }, [items]);
 
-  const insights = useMemo(() => {
+  const insights = useMemo<WalletInsights>(() => {
     const currentMonth = getCurrentMonthName();
-    const enriched = loaded.map((item) => { const lastDividend = getLastDividend(item.data); const currentDividend = getCurrentMonthDividend(item.data); const lastValue = parseCurrency(lastDividend?.info?.earnings); const currentValue = parseCurrency(currentDividend?.info?.earnings); const price = parseCurrency(item.data?.price); const estimatedIncome = lastValue * item.quotas; const announcedIncome = currentValue * item.quotas; const currentValuePosition = price * item.quotas; const segment = getSegmentName(item.data); const dailyVariation = getDailyVariation(item.data); return { ...item, lastDividend, currentDividend, estimatedIncome, announcedIncome, currentValuePosition, segment, dailyVariation, waitingAnnouncement: Boolean(item.data) && !currentDividend }; });
+    const enriched: EnrichedFii[] = loaded.map((item) => {
+      const lastDividend = getLastDividend(item.data);
+      const currentDividend = getCurrentMonthDividend(item.data);
+      const lastValue = parseCurrency(lastDividend?.info?.earnings);
+      const currentValue = parseCurrency(currentDividend?.info?.earnings);
+      const price = parseCurrency(item.data?.price);
+      const estimatedIncome = lastValue * item.quotas;
+      const announcedIncome = currentValue * item.quotas;
+      const currentValuePosition = price * item.quotas;
+      const segment = getSegmentName(item.data);
+      const dailyVariation = getDailyVariation(item.data);
+      return { ...item, lastDividend, currentDividend, estimatedIncome, announcedIncome, currentValuePosition, segment, dailyVariation, waitingAnnouncement: Boolean(item.data) && !currentDividend };
+    });
     const monthlyIncome = enriched.reduce((acc, item) => acc + item.estimatedIncome, 0);
     const announcedIncome = enriched.reduce((acc, item) => acc + item.announcedIncome, 0);
     const currentValue = enriched.reduce((acc, item) => acc + item.currentValuePosition, 0);
     const waiting = enriched.filter((item) => item.waitingAnnouncement);
-    const segmentTotalsByQuotas = enriched.reduce((acc: Record<string, number>, item) => { acc[item.segment] = (acc[item.segment] || 0) + item.quotas; return acc; }, {});
+    const segmentTotalsByQuotas = enriched.reduce((acc: Record<string, number>, item) => {
+      acc[item.segment] = (acc[item.segment] || 0) + item.quotas;
+      return acc;
+    }, {});
     const segmentBase = Object.values(segmentTotalsByQuotas).reduce((acc, value) => acc + value, 0);
     const segmentBreakdown = Object.entries(segmentTotalsByQuotas).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([segment, value]) => ({ ticker: segment, value: `${segmentBase > 0 ? ((value / segmentBase) * 100).toFixed(1).replace(".", ",") : "0,0"}%` }));
     const topIncome = [...enriched].sort((a, b) => b.estimatedIncome - a.estimatedIncome).slice(0, 3);
     const topWeight = [...enriched].sort((a, b) => b.currentValuePosition - a.currentValuePosition).slice(0, 3);
     const assetWeights = topWeight.map((item) => ({ label: item.ticker, value: item.currentValuePosition, detail: currentValue ? formatPercentValue((item.currentValuePosition / currentValue) * 100) : "0,0%" }));
-    const segmentValueTotals = enriched.reduce((acc: Record<string, number>, item) => { acc[item.segment] = (acc[item.segment] || 0) + item.currentValuePosition; return acc; }, {});
+    const segmentValueTotals = enriched.reduce((acc: Record<string, number>, item) => {
+      acc[item.segment] = (acc[item.segment] || 0) + item.currentValuePosition;
+      return acc;
+    }, {});
     const segmentWeights = Object.entries(segmentValueTotals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([segment, value]) => ({ label: segment, value, detail: currentValue ? formatPercentValue((value / currentValue) * 100) : "0,0%" }));
     const incomeByFii = topIncome.map((item) => ({ label: item.ticker, value: item.estimatedIncome, detail: monthlyIncome ? formatPercentValue((item.estimatedIncome / monthlyIncome) * 100) : "0,0%" }));
     const dividendHistory = buildDividendHistory(enriched);
@@ -142,9 +388,24 @@ export default function WalletPage() {
     const key = monthKey(now);
     const label = monthLabelFromKey(key);
     const current = snapshots.find((item) => item.monthKey === key);
-    const nextSnapshot: WalletSnapshot = { monthKey: key, label, totalValue: insights.currentValue, estimatedMonthlyIncome: insights.monthlyIncome, announcedMonthlyIncome: insights.announcedIncome, walletCount: items.length, topWeightTicker: insights.topWeight[0]?.ticker, topIncomeTicker: insights.topIncome[0]?.ticker, createdAt: current?.createdAt || now.toISOString(), updatedAt: now.toISOString() };
+    const nextSnapshot: WalletSnapshot = {
+      monthKey: key,
+      label,
+      totalValue: insights.currentValue,
+      estimatedMonthlyIncome: insights.monthlyIncome,
+      announcedMonthlyIncome: insights.announcedIncome,
+      walletCount: items.length,
+      topWeightTicker: insights.topWeight[0]?.ticker,
+      topIncomeTicker: insights.topIncome[0]?.ticker,
+      createdAt: current?.createdAt || now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
     const next = [...snapshots.filter((item) => item.monthKey !== key), nextSnapshot].sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-36);
-    try { window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next)); } catch { return; }
+    try {
+      window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
+    } catch {
+      return;
+    }
     setSnapshots(next);
   }, [loading, items.length, insights.currentValue, insights.monthlyIncome, insights.announcedIncome]);
 
@@ -155,59 +416,334 @@ export default function WalletPage() {
   const topIncome = insights.topIncome[0];
   const topWeight = insights.topWeight[0];
   const topWeightPercent = insights.currentValue && topWeight ? (topWeight.currentValuePosition / insights.currentValue) * 100 : 0;
-  const topIncomePercent = insights.monthlyIncome && topIncome ? (topIncome.estimatedIncome / insights.monthlyIncome) * 100 : 0;
 
-  function addItem() { const code = ticker.trim().toUpperCase(); const totalQuotas = Number(quotas.replace(",", ".")); if (!code || !Number.isFinite(totalQuotas) || totalQuotas <= 0) { setMessage("Informe um ticker e uma quantidade de cotas válida."); return; } let existed = false; setItems((current) => { const existing = current.find((item) => item.ticker === code); existed = Boolean(existing); if (existing) return current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item); return [...current, { ticker: code, quotas: totalQuotas }].sort((a, b) => a.ticker.localeCompare(b.ticker)); }); setTicker(""); setQuotas(""); setMessage(existed ? `${code} atualizado para ${totalQuotas} cotas.` : `${code} adicionado à carteira.`); }
-  function updateQuotas(code: string) { const totalQuotas = Number(String(editingQuotas[code] || "").replace(",", ".")); if (!Number.isFinite(totalQuotas) || totalQuotas <= 0) { setMessage("Informe uma quantidade de cotas válida para salvar."); return; } setItems((current) => current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item)); setMessage(`${code} atualizado para ${totalQuotas} cotas.`); }
-  function removeItem(code: string) { setItems((current) => current.filter((item) => item.ticker !== code)); setEditingQuotas((current) => { const next = { ...current }; delete next[code]; return next; }); setMessage(`${code} removido da carteira.`); }
-  function exportCsv() { const csv = buildCsv(loaded); const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "minha-carteira-fiis.csv"; link.click(); URL.revokeObjectURL(url); setMessage("Carteira exportada em CSV."); }
-  async function updateMissingDividends() { if (!insights.waiting.length) return; setUpdatingMissing(true); let updated = 0; let failed = 0; for (const item of insights.waiting) { try { const response = await fetch("/api/update-dividends", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker: item.ticker }) }); if (response.ok) updated += 1; else failed += 1; } catch { failed += 1; } } const tickers = items.map((item) => item.ticker); setItems(tickers.map((code) => ({ ticker: code, quotas: items.find((item) => item.ticker === code)?.quotas || 0 }))); setUpdatingMissing(false); setMessage(`Atualização concluída. Sucesso: ${updated}. Falhas ou limite diário: ${failed}.`); }
+  function addItem() {
+    const code = ticker.trim().toUpperCase();
+    const totalQuotas = Number(quotas.replace(",", "."));
+    if (!code || !Number.isFinite(totalQuotas) || totalQuotas <= 0) {
+      setMessage("Informe um ticker e uma quantidade de cotas válida.");
+      return;
+    }
+    let existed = false;
+    setItems((current) => {
+      const existing = current.find((item) => item.ticker === code);
+      existed = Boolean(existing);
+      if (existing) return current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item);
+      return [...current, { ticker: code, quotas: totalQuotas }].sort((a, b) => a.ticker.localeCompare(b.ticker));
+    });
+    setTicker("");
+    setQuotas("");
+    setMessage(existed ? `${code} atualizado para ${totalQuotas} cotas.` : `${code} adicionado à carteira.`);
+  }
+
+  function updateQuotas(code: string) {
+    const totalQuotas = Number(String(editingQuotas[code] || "").replace(",", "."));
+    if (!Number.isFinite(totalQuotas) || totalQuotas <= 0) {
+      setMessage("Informe uma quantidade de cotas válida para salvar.");
+      return;
+    }
+    setItems((current) => current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item));
+    setMessage(`${code} atualizado para ${totalQuotas} cotas.`);
+  }
+
+  function removeItem(code: string) {
+    setItems((current) => current.filter((item) => item.ticker !== code));
+    setEditingQuotas((current) => {
+      const next = { ...current };
+      delete next[code];
+      return next;
+    });
+    setMessage(`${code} removido da carteira.`);
+  }
+
+  function exportCsv() {
+    const csv = buildCsv(loaded);
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "minha-carteira-fiis.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setMessage("Carteira exportada em CSV.");
+  }
+
+  async function updateMissingDividends() {
+    if (!insights.waiting.length) return;
+    setUpdatingMissing(true);
+    let updated = 0;
+    let failed = 0;
+    for (const item of insights.waiting) {
+      try {
+        const response = await fetch("/api/update-dividends", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker: item.ticker }) });
+        if (response.ok) updated += 1;
+        else failed += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    const tickers = items.map((item) => item.ticker);
+    setItems(tickers.map((code) => ({ ticker: code, quotas: items.find((item) => item.ticker === code)?.quotas || 0 })));
+    setUpdatingMissing(false);
+    setMessage(`Atualização concluída. Sucesso: ${updated}. Falhas ou limite diário: ${failed}.`);
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <AppToast message={message} variant={toastVariant(message)} onClose={() => setMessage("")} />
-      <PageHeader title="Minha Carteira" subtitle="Salva neste navegador. Adicione seus FIIs e veja renda estimada, movimentação diária, evolução simples e próximos pagamentos." action={<Link href="/calendario-dividendos-fiis" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">Calendário público</Link>} />
+      <PageHeader
+        title="Minha Carteira"
+        subtitle="Sua carteira fica salva neste navegador e pode ser recuperada pelo e-mail confirmado."
+        action={<Link href="/calendario-dividendos-fiis" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">Calendário público</Link>}
+      />
 
-      <section className="grid gap-4 md:grid-cols-3"><MetricBox label="Renda mensal estimada" value={formatCurrency(insights.monthlyIncome)} detail="Baseada no último rendimento disponível." tone="green" /><MetricBox label="Valor aproximado da carteira" value={formatCurrency(insights.currentValue)} detail="Calculado pelo preço atual retornado pela consulta." tone="indigo" /><MetricBox label="Segmento principal por cotas" value={insights.mainSegment?.value || "-"} detail={insights.mainSegment?.ticker || "Adicione FIIs para calcular."} tone="yellow" /></section>
+      <section className="grid gap-4 md:grid-cols-3">
+        <MetricBox label="Renda mensal estimada" value={formatCurrency(insights.monthlyIncome)} detail="Baseada no último rendimento disponível." tone="green" />
+        <MetricBox label="Valor aproximado da carteira" value={formatCurrency(insights.currentValue)} detail="Calculado pelo preço atual." tone="indigo" />
+        <MetricBox label="Segmento principal por cotas" value={insights.mainSegment?.value || "-"} detail={insights.mainSegment?.ticker || "Adicione FIIs para calcular."} tone="yellow" />
+      </section>
 
       <WalletRiskReportCard walletCount={items.length} />
-      <SimpleMonthlySummary insights={insights} topWeight={topWeight} topWeightPercent={topWeightPercent} topIncome={topIncome} topIncomePercent={topIncomePercent} snapshots={snapshots} />
+      <SimpleMonthlySummary insights={insights} topWeight={topWeight} topWeightPercent={topWeightPercent} />
       <VisualHistorySection snapshots={snapshots} dividendHistory={insights.dividendHistory} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
 
       <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
         <h2 className="text-xl font-extrabold text-white">Resumo da carteira</h2>
-        {!items.length ? <p className="mt-3 text-sm font-medium text-gray-300">Adicione FIIs para gerar um resumo automático da carteira.</p> : <div className="mt-4 grid gap-3 md:grid-cols-2"><SummaryItem label="Concentração por cotas" value={insights.mainSegment ? `${insights.mainSegment.ticker} concentra ${insights.mainSegment.value} das cotas cadastradas.` : "Sem segmento calculado."} /><SummaryItem label="Maior fonte de renda estimada" value={topIncome ? `${topIncome.ticker} lidera com ${formatCurrency(topIncome.estimatedIncome)} por mês estimado.` : "Sem renda estimada ainda."} /><SummaryItem label="Comunicados do mês" value={insights.waiting.length ? `${insights.waiting.length} FII(s) ainda aguardam comunicado de ${MONTHS_PTBR[insights.currentMonth]}.` : `Todos os FIIs carregados já têm comunicado de ${MONTHS_PTBR[insights.currentMonth]}.`} /><SummaryItem label="Próximo pagamento" value={firstPayment ? `${firstPayment.ticker}: ${formatPaymentSummary(firstPayment)}.` : "Nenhum pagamento futuro identificado na base."} /></div>}
+        {!items.length ? (
+          <p className="mt-3 text-sm font-medium text-gray-300">Adicione FIIs para gerar um resumo automático da carteira.</p>
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <SummaryItem label="Concentração por cotas" value={insights.mainSegment ? `${insights.mainSegment.ticker} concentra ${insights.mainSegment.value} das cotas cadastradas.` : "Sem segmento calculado."} />
+            <SummaryItem label="Maior fonte de renda estimada" value={topIncome ? `${topIncome.ticker} lidera com ${formatCurrency(topIncome.estimatedIncome)} por mês estimado.` : "Sem renda estimada ainda."} />
+            <SummaryItem label="Comunicados do mês" value={insights.waiting.length ? `${insights.waiting.length} FII(s) ainda aguardam comunicado de ${MONTHS_PTBR[insights.currentMonth]}.` : `Todos os FIIs carregados já têm comunicado de ${MONTHS_PTBR[insights.currentMonth]}.`} />
+            <SummaryItem label="Próximo pagamento" value={firstPayment ? `${firstPayment.ticker}: ${formatPaymentSummary(firstPayment)}.` : "Nenhum pagamento futuro identificado na base."} />
+          </div>
+        )}
       </section>
 
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-center"><div><h2 className="flex items-center gap-2 text-xl font-extrabold text-white"><AlertTriangle size={20} className="text-yellow-300" /> Aguardando comunicado</h2><p className="mt-2 text-sm font-medium text-gray-300">{insights.waiting.length ? `${insights.waiting.length} FII(s) da carteira ainda não têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base. Estimativa pendente: ${formatCurrency(insights.pendingIncome)}.` : `Todos os FIIs carregados já têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base.`}</p>{insights.waiting.length > 0 && <p className="mt-2 text-sm font-medium text-gray-200">{insights.waiting.map((item) => item.ticker).join(", ")}</p>}</div><button type="button" onClick={updateMissingDividends} disabled={!insights.waiting.length || updatingMissing} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"><RefreshCw size={16} className={updatingMissing ? "animate-spin" : ""} /> Atualizar pendentes</button></div></section>
+      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-extrabold text-white"><AlertTriangle size={20} className="text-yellow-300" /> Aguardando comunicado</h2>
+            <p className="mt-2 text-sm font-medium text-gray-300">
+              {insights.waiting.length ? `${insights.waiting.length} FII(s) da carteira ainda não têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base. Estimativa pendente: ${formatCurrency(insights.pendingIncome)}.` : `Todos os FIIs carregados já têm rendimento de ${MONTHS_PTBR[insights.currentMonth]} na base.`}
+            </p>
+            {insights.waiting.length > 0 && <p className="mt-2 text-sm font-medium text-gray-200">{insights.waiting.map((item) => item.ticker).join(", ")}</p>}
+          </div>
+          <button type="button" onClick={updateMissingDividends} disabled={!insights.waiting.length || updatingMissing} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400">
+            <RefreshCw size={16} className={updatingMissing ? "animate-spin" : ""} /> Atualizar pendentes
+          </button>
+        </div>
+      </section>
 
-      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10"><h2 className="mb-4 text-xl font-extrabold text-white">Adicionar FII</h2><div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]"><input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); quotasInputRef.current?.focus(); } }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" /><input ref={quotasInputRef} value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" /><button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button><button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button></div></section>
+      <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+        <h2 className="mb-4 text-xl font-extrabold text-white">Adicionar FII</h2>
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+          <input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); quotasInputRef.current?.focus(); } }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+          <input ref={quotasInputRef} value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+          <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
+          <button onClick={exportCsv} disabled={!loaded.length} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
+        </div>
+      </section>
 
       <WalletTable items={items} insights={insights} loading={loading} editingQuotas={editingQuotas} setEditingQuotas={setEditingQuotas} upcomingPayments={upcomingPayments} updateQuotas={updateQuotas} removeItem={removeItem} />
-      <section className="mt-6 grid gap-4 md:grid-cols-3"><RankingCard title="Maior renda estimada" items={insights.topIncome.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.estimatedIncome) }))} /><RankingCard title="Maior peso financeiro" items={insights.topWeight.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.currentValuePosition) }))} /><RankingCard title="Distribuição por segmento (cotas)" items={insights.segmentBreakdown} /></section>
+      <section className="mt-6 grid gap-4 md:grid-cols-3">
+        <RankingCard title="Maior renda estimada" items={insights.topIncome.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.estimatedIncome) }))} />
+        <RankingCard title="Maior peso financeiro" items={insights.topWeight.map((item) => ({ ticker: item.ticker, value: formatCurrency(item.currentValuePosition) }))} />
+        <RankingCard title="Distribuição por segmento (cotas)" items={insights.segmentBreakdown} />
+      </section>
       <UpcomingPaymentsSection payments={displayedUpcomingPayments} shouldScroll={shouldScrollUpcomingPayments} />
     </main>
   );
 }
 
-function SimpleMonthlySummary({ insights, topWeight, topWeightPercent, topIncome, topIncomePercent, snapshots }: any) {
+function SimpleMonthlySummary({ insights, topWeight, topWeightPercent }: { insights: WalletInsights; topWeight?: EnrichedFii; topWeightPercent: number }) {
   const history = insights.dividendHistory;
-  const alerts = [topWeightPercent >= 40 && topWeight ? `${topWeight.ticker} representa ${formatPercentValue(topWeightPercent)} do valor estimado da carteira.` : "", topIncomePercent >= 40 && topIncome ? `${topIncome.ticker} representa ${formatPercentValue(topIncomePercent)} da renda mensal estimada.` : ""].filter(Boolean);
-  return <section className="mt-6 rounded-2xl bg-white p-5 text-slate-800 shadow-sm ring-1 ring-slate-200"><div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"><div><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BarChart3 size={14} /> Resumo simples</p><h2 className="mt-3 text-2xl font-black text-slate-900">Números gerais da carteira</h2><p className="mt-2 text-sm leading-6 text-slate-600">Resumo numérico e educativo. Não substitui o relatório de risco completo.</p></div><p className="text-xs font-bold text-slate-500">Histórico salvo neste navegador: {snapshots.length} mês(es)</p></div><div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4"><LightMetric label="Maior mês estimado" value={history.best ? `${history.best.label}: ${formatCurrency(history.best.value)}` : "-"} /><LightMetric label="Menor mês estimado" value={history.worst ? `${history.worst.label}: ${formatCurrency(history.worst.value)}` : "-"} /><LightMetric label="Total estimado no ano" value={formatCurrency(history.total)} /><LightMetric label="Média mensal estimada" value={formatCurrency(history.average)} /><LightMetric label="Maior pagador no ano" value={history.topPayer ? `${history.topPayer.ticker}: ${formatCurrency(history.topPayer.value)}` : "-"} /><LightMetric label="Maior peso financeiro" value={topWeight ? `${topWeight.ticker}: ${formatPercentValue(topWeightPercent)}` : "-"} /><LightMetric label="Quantidade de FIIs" value={String(insights.enriched.length)} /><LightMetric label="Renda anunciada no mês" value={formatCurrency(insights.announcedIncome)} /></div>{!!alerts.length && <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900 ring-1 ring-amber-100"><p className="font-extrabold">Alertas numéricos simples</p><ul className="mt-2 list-disc space-y-1 pl-5">{alerts.map((alert) => <li key={alert}>{alert}</li>)}</ul></div>}</section>;
+  return (
+    <section className="mt-6 rounded-2xl bg-white p-5 text-slate-800 shadow-sm ring-1 ring-slate-200">
+      <div>
+        <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BarChart3 size={14} /> Resumo</p>
+        <h2 className="mt-3 text-2xl font-black text-slate-900">Números gerais da carteira</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Resumo numérico e educativo. Não substitui o relatório de risco completo.</p>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <LightMetric label="Maior mês estimado" value={history.best ? `${history.best.label}: ${formatCurrency(history.best.value)}` : "-"} />
+        <LightMetric label="Menor mês estimado" value={history.worst ? `${history.worst.label}: ${formatCurrency(history.worst.value)}` : "-"} />
+        <LightMetric label="Total estimado no ano" value={formatCurrency(history.total)} />
+        <LightMetric label="Média mensal estimada" value={formatCurrency(history.average)} />
+        <LightMetric label="Maior pagador no ano" value={history.topPayer ? `${history.topPayer.ticker}: ${formatCurrency(history.topPayer.value)}` : "-"} />
+        <LightMetric label="Maior peso financeiro" value={topWeight ? `${topWeight.ticker}: ${formatPercentValue(topWeightPercent)}` : "-"} />
+        <LightMetric label="Quantidade de FIIs" value={String(insights.enriched.length)} />
+        <LightMetric label="Renda anunciada no mês" value={formatCurrency(insights.announcedIncome)} />
+      </div>
+    </section>
+  );
 }
-function VisualHistorySection({ snapshots, dividendHistory }: { snapshots: WalletSnapshot[]; dividendHistory: any }) { return <section className="mt-6 grid gap-6 lg:grid-cols-2"><article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução patrimonial</p><h2 className="mt-3 text-xl font-black text-slate-900">Patrimônio estimado por mês</h2><p className="mt-2 text-sm leading-6 text-slate-600">O site salva uma fotografia mensal da carteira neste navegador para criar histórico a partir de agora.</p><div className="mt-5"><LineHistoryChart snapshots={snapshots} /></div></article><article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><p className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-emerald-700"><TrendingUp size={14} /> Dividendos estimados</p><h2 className="mt-3 text-xl font-black text-slate-900">Renda estimada por mês</h2><p className="mt-2 text-sm leading-6 text-slate-600">Cálculo com os dividendos disponíveis na base e a quantidade atual de cotas cadastrada.</p><div className="mt-5"><BarList items={dividendHistory.months.map((item: any) => ({ label: item.label, value: item.value }))} emptyText="Sem dividendos estimados para montar o gráfico." /></div></article></section>; }
-function PortfolioCharts({ assetWeights, incomeByFii, segmentWeights }: { assetWeights: ChartItem[]; incomeByFii: ChartItem[]; segmentWeights: ChartItem[] }) { return <section className="mt-6 grid gap-6 lg:grid-cols-3"><ChartCard icon={<PieChart size={14} />} title="Peso por ativo" subtitle="Valor financeiro estimado por FII."><BarList items={assetWeights} /></ChartCard><ChartCard icon={<TrendingUp size={14} />} title="Renda por FII" subtitle="Renda mensal estimada por ativo."><BarList items={incomeByFii} /></ChartCard><ChartCard icon={<BarChart3 size={14} />} title="Peso por segmento" subtitle="Distribuição financeira estimada."><BarList items={segmentWeights} /></ChartCard></section>; }
-function WalletTable({ items, insights, loading, editingQuotas, setEditingQuotas, upcomingPayments, updateQuotas, removeItem }: any) { return <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10"><div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-extrabold text-white">FIIs na carteira</h2>{loading && <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-300"><Loader2 className="animate-spin" size={16} /> Atualizando...</span>}</div>{!items.length ? <p className="rounded-xl border border-dashed border-gray-700 p-6 text-center text-sm font-medium text-gray-300">Sua carteira ainda está vazia. Comece adicionando um ticker e a quantidade de cotas.</p> : <><div className="space-y-3 md:hidden">{insights.enriched.map((item: any) => { const nextPayment = upcomingPayments.find((payment: Payment) => payment.ticker === item.ticker); const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas); const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas; return <WalletMobileCard key={`mobile-${item.ticker}`} item={item} nextPayment={nextPayment} draftQuotas={draftQuotas} changed={changed} onQuotaChange={(value) => setEditingQuotas((current: any) => ({ ...current, [item.ticker]: value }))} onSave={() => updateQuotas(item.ticker)} onRemove={() => removeItem(item.ticker)} />; })}</div><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[940px] text-left text-sm"><thead className="text-gray-300"><tr className="border-b border-gray-800"><th className="py-3 font-bold">FII</th><th className="font-bold">Cotas</th><th className="font-bold">Preço</th><th className="font-bold">Último rendimento</th><th className="font-bold">Anunciado no mês</th><th className="font-bold">Renda estimada</th><th className="font-bold">Próximo pagamento</th><th></th></tr></thead><tbody>{insights.enriched.map((item: any) => { const nextPayment = upcomingPayments.find((payment: Payment) => payment.ticker === item.ticker); const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas); const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas; return <tr key={item.ticker} className="border-b border-gray-800 text-gray-100"><td className="py-3 font-bold"><div className="flex items-center gap-2"><FiiTickerLink ticker={item.ticker} /><DailyVariationBadge value={item.dailyVariation} /></div></td><td><div className="flex items-center gap-2"><input value={draftQuotas} onChange={(event) => setEditingQuotas((current: any) => ({ ...current, [item.ticker]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }} inputMode="decimal" className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button onClick={() => updateQuotas(item.ticker)} disabled={!changed} className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`} title="Salvar cotas"><Save size={17} /></button></div></td><td className="font-medium text-gray-200">{item.data?.price || "-"}</td><td className="font-medium text-gray-200">{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td><td className="font-medium text-gray-200">{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td><td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td><td className="font-medium text-gray-200">{formatPaymentSummary(nextPayment)}</td><td className="text-right"><button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button></td></tr>; })}</tbody></table></div></>}</section>; }
-function UpcomingPaymentsSection({ payments, shouldScroll }: { payments: Payment[]; shouldScroll: boolean }) { return <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10"><h2 className="mb-4 flex items-center gap-2 text-xl font-extrabold text-white"><CalendarDays className="text-green-300" /> Próximos pagamentos</h2>{!payments.length ? <p className="text-sm font-medium text-gray-300">Ainda não há pagamentos futuros identificados para os FIIs da sua carteira.</p> : <ul className={`${shouldScroll ? "max-h-[520px] overflow-y-auto pr-2" : ""} space-y-3`}>{payments.map((payment) => <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center"><div><FiiTickerLink ticker={payment.ticker} /><span className="ml-2 text-sm font-medium text-gray-300">{MONTHS_PTBR[payment.month] || payment.month} · Pagamento em {payment.date}</span></div><strong className="text-green-300">{formatCurrency(payment.amount)}</strong></li>)}</ul>}</section>; }
-function MetricBox({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: "green" | "indigo" | "yellow" }) { const valueClass = tone === "green" ? "text-green-300" : tone === "yellow" ? "text-yellow-300" : "text-indigo-300"; return <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10"><p className="text-base font-extrabold text-white">{label}</p><strong className={`mt-2 block text-3xl ${valueClass}`}>{value}</strong><p className="mt-2 text-sm font-medium text-gray-300">{detail}</p></div>; }
-function LightMetric({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-sm font-black text-slate-900">{value}</p></div>; }
-function SummaryItem({ label, value }: { label: string; value: string }) { return <div className="rounded-xl bg-gray-800 p-4 ring-1 ring-white/5"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p><p className="mt-2 text-sm font-bold text-gray-100">{value}</p></div>; }
-function ChartCard({ icon, title, subtitle, children }: { icon: ReactNode; title: string; subtitle: string; children: ReactNode }) { return <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">{icon} Carteira</p><h2 className="mt-3 text-xl font-black text-slate-900">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{subtitle}</p><div className="mt-5">{children}</div></article>; }
-function BarList({ items, emptyText = "Sem dados suficientes para exibir." }: { items: ChartItem[]; emptyText?: string }) { const filtered = items.filter((item) => item.value > 0); const max = Math.max(...filtered.map((item) => item.value), 1); if (!filtered.length) return <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-200">{emptyText}</p>; return <div className="space-y-3">{filtered.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold"><span className="truncate text-slate-700">{item.label}</span><span className="shrink-0 text-slate-500">{item.detail || formatCurrency(item.value)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((item.value / max) * 100, 3)}%` }} /></div></div>)}</div>; }
-function LineHistoryChart({ snapshots }: { snapshots: WalletSnapshot[] }) { const points = snapshots.map((item) => item.totalValue); if (snapshots.length < 2) return <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Primeira fotografia mensal salva. Quando houver dois ou mais meses, o gráfico de evolução aparecerá aqui.</div>; const min = Math.min(...points); const max = Math.max(...points); const range = max - min || 1; const coords = snapshots.map((item, index) => { const x = snapshots.length === 1 ? 160 : (index / (snapshots.length - 1)) * 300 + 10; const y = 100 - ((item.totalValue - min) / range) * 80 + 10; return `${x},${y}`; }).join(" "); return <div><svg viewBox="0 0 320 130" className="h-40 w-full rounded-2xl bg-slate-50 ring-1 ring-slate-200"><polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />{snapshots.map((item, index) => { const x = snapshots.length === 1 ? 160 : (index / (snapshots.length - 1)) * 300 + 10; const y = 100 - ((item.totalValue - min) / range) * 80 + 10; return <circle key={item.monthKey} cx={x} cy={y} r="4" className="fill-indigo-700" />; })}</svg><div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">{snapshots.slice(-6).map((item) => <span key={item.monthKey} className="rounded-full bg-slate-100 px-2 py-1">{item.label}: {formatCurrency(item.totalValue)}</span>)}</div></div>; }
-function FiiTickerLink({ ticker }: { ticker: string }) { return <Link href={`/fii/${ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">{ticker}</Link>; }
-function DailyVariationBadge({ value }: { value?: number }) { const variation = Number(value || 0); if (!Number.isFinite(variation) || Math.abs(variation) < 0.005) return <span className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-xs font-extrabold text-gray-400 ring-1 ring-gray-700" title="Sem variação no dia"><Minus size={12} /> -</span>; const isUp = variation > 0; const Icon = isUp ? TrendingUp : TrendingDown; const label = `${Math.abs(variation).toFixed(2).replace(".", ",")}% ${isUp ? "alta" : "baixa"}`; return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold ring-1 ${isUp ? "bg-green-950/40 text-green-300 ring-green-900/60" : "bg-red-950/40 text-red-300 ring-red-900/60"}`} title={`Movimento do dia: ${label}`}><Icon size={12} /> {label}</span>; }
-function WalletMobileCard({ item, nextPayment, draftQuotas, changed, onQuotaChange, onSave, onRemove }: { item: any; nextPayment?: Payment; draftQuotas: string; changed: boolean; onQuotaChange: (value: string) => void; onSave: () => void; onRemove: () => void }) { return <article className="rounded-2xl bg-gray-800 p-4 text-gray-100 ring-1 ring-white/10"><div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="flex flex-wrap items-center gap-2 text-xl font-extrabold"><FiiTickerLink ticker={item.ticker} /><DailyVariationBadge value={item.dailyVariation} /></h3><p className="mt-1 text-sm font-medium text-gray-300">{item.quotas} cotas</p></div><button onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button></div><div className="grid gap-3"><InfoRow label="Preço atual" value={item.data?.price || "-"} /><InfoRow label="Último rendimento" value={item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"} /><InfoRow label="Anunciado no mês" value={item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"} /><InfoRow label="Renda estimada" value={formatCurrency(item.estimatedIncome)} highlight="green" /><InfoRow label="Próximo pagamento" value={formatPaymentSummary(nextPayment)} /></div><div className="mt-4 grid grid-cols-[1fr_auto] gap-2"><input value={draftQuotas} onChange={(event) => onQuotaChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSave(); }} inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button onClick={onSave} disabled={!changed} className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-bold ${changed ? "bg-indigo-600 text-white hover:bg-indigo-700" : "cursor-not-allowed bg-gray-700 text-gray-400"}`}><Save size={16} /> Salvar</button></div></article>; }
-function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" }) { return <div className="rounded-xl bg-gray-900 p-3 ring-1 ring-white/5"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p><p className={`mt-1 text-sm font-bold ${highlight === "green" ? "text-green-300" : "text-gray-100"}`}>{value}</p></div>; }
-function RankingCard({ title, items }: { title: string; items: Array<{ ticker: string; value: string }> }) { const isSegmentDistribution = title.includes("Distribuição por segmento"); return <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10"><h3 className="mb-3 text-base font-extrabold text-white">{title}</h3>{!items.length ? <p className="text-sm font-medium text-gray-300">Sem dados ainda.</p> : isSegmentDistribution ? <ol className="space-y-4 text-sm">{items.map((item, index) => <li key={`${title}-${item.ticker}`} className="rounded-lg bg-gray-800 px-3 py-3 text-gray-200"><div className="mb-2 flex items-center justify-between gap-3"><span className="font-medium"><strong className="text-gray-400">#{index + 1}</strong> {item.ticker}</span><strong className="text-indigo-200">{item.value}</strong></div><div className="h-2.5 overflow-hidden rounded-full bg-gray-700"><div className={`h-full rounded-full bg-indigo-400 ${getBarWidthClass(item.value)}`} /></div></li>)}</ol> : <ol className="space-y-2 text-sm">{items.map((item, index) => <li key={`${title}-${item.ticker}`} className="flex justify-between gap-3 rounded-lg bg-gray-800 px-3 py-2 text-gray-200"><span><strong className="text-gray-400">#{index + 1}</strong> <FiiTickerLink ticker={item.ticker} /></span><strong className="text-indigo-200">{item.value}</strong></li>)}</ol>}</div>; }
+
+function VisualHistorySection({ snapshots, dividendHistory }: { snapshots: WalletSnapshot[]; dividendHistory: DividendHistory }) {
+  return (
+    <section className="mt-6 grid gap-6 lg:grid-cols-2">
+      <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><LineChart size={14} /> Evolução patrimonial</p>
+        <h2 className="mt-3 text-xl font-black text-slate-900">Patrimônio estimado por mês</h2>
+        <div className="mt-5"><LineHistoryChart snapshots={snapshots} /></div>
+      </article>
+      <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <p className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-emerald-700"><TrendingUp size={14} /> Dividendos estimados</p>
+        <h2 className="mt-3 text-xl font-black text-slate-900">Renda estimada por mês</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Cálculo com os dividendos disponíveis na base e a quantidade atual de cotas cadastrada.</p>
+        <div className="mt-5"><BarList items={dividendHistory.months.map((item) => ({ label: item.label, value: item.value }))} emptyText="Sem dividendos estimados para montar o gráfico." /></div>
+      </article>
+    </section>
+  );
+}
+
+function PortfolioCharts({ assetWeights, incomeByFii, segmentWeights }: { assetWeights: ChartItem[]; incomeByFii: ChartItem[]; segmentWeights: ChartItem[] }) {
+  return (
+    <section className="mt-6 grid gap-6 lg:grid-cols-3">
+      <ChartCard icon={<PieChart size={14} />} title="Peso por ativo" subtitle="Valor financeiro estimado por FII."><BarList items={assetWeights} /></ChartCard>
+      <ChartCard icon={<TrendingUp size={14} />} title="Renda por FII" subtitle="Renda mensal estimada por ativo."><BarList items={incomeByFii} /></ChartCard>
+      <ChartCard icon={<BarChart3 size={14} />} title="Peso por segmento" subtitle="Distribuição financeira estimada."><BarList items={segmentWeights} /></ChartCard>
+    </section>
+  );
+}
+
+function WalletTable({ items, insights, loading, editingQuotas, setEditingQuotas, upcomingPayments, updateQuotas, removeItem }: {
+  items: WalletItem[];
+  insights: WalletInsights;
+  loading: boolean;
+  editingQuotas: Record<string, string>;
+  setEditingQuotas: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  upcomingPayments: Payment[];
+  updateQuotas: (code: string) => void;
+  removeItem: (code: string) => void;
+}) {
+  return (
+    <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xl font-extrabold text-white">FIIs na carteira</h2>
+        {loading && <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-300"><Loader2 className="animate-spin" size={16} /> Atualizando...</span>}
+      </div>
+      {!items.length ? (
+        <p className="rounded-xl border border-dashed border-gray-700 p-6 text-center text-sm font-medium text-gray-300">Sua carteira ainda está vazia. Comece adicionando um ticker e a quantidade de cotas.</p>
+      ) : (
+        <>
+          <div className="space-y-3 md:hidden">
+            {insights.enriched.map((item) => {
+              const nextPayment = upcomingPayments.find((payment) => payment.ticker === item.ticker);
+              const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas);
+              const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas;
+              return <WalletMobileCard key={`mobile-${item.ticker}`} item={item} nextPayment={nextPayment} draftQuotas={draftQuotas} changed={changed} onQuotaChange={(value) => setEditingQuotas((current) => ({ ...current, [item.ticker]: value }))} onSave={() => updateQuotas(item.ticker)} onRemove={() => removeItem(item.ticker)} />;
+            })}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full min-w-[940px] text-left text-sm">
+              <thead className="text-gray-300">
+                <tr className="border-b border-gray-800"><th className="py-3 font-bold">FII</th><th className="font-bold">Cotas</th><th className="font-bold">Preço</th><th className="font-bold">Último rendimento</th><th className="font-bold">Anunciado no mês</th><th className="font-bold">Renda estimada</th><th className="font-bold">Próximo pagamento</th><th></th></tr>
+              </thead>
+              <tbody>
+                {insights.enriched.map((item) => {
+                  const nextPayment = upcomingPayments.find((payment) => payment.ticker === item.ticker);
+                  const draftQuotas = editingQuotas[item.ticker] ?? String(item.quotas);
+                  const changed = Number(String(draftQuotas).replace(",", ".")) !== item.quotas;
+                  return (
+                    <tr key={item.ticker} className="border-b border-gray-800 text-gray-100">
+                      <td className="py-3 font-bold"><div className="flex items-center gap-2"><FiiTickerLink ticker={item.ticker} /><DailyVariationBadge value={item.dailyVariation} /></div></td>
+                      <td><div className="flex items-center gap-2"><input value={draftQuotas} onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }} inputMode="decimal" className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button onClick={() => updateQuotas(item.ticker)} disabled={!changed} className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`} title="Salvar cotas"><Save size={17} /></button></div></td>
+                      <td className="font-medium text-gray-200">{item.data?.price || "-"}</td>
+                      <td className="font-medium text-gray-200">{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
+                      <td className="font-medium text-gray-200">{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
+                      <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
+                      <td className="font-medium text-gray-200">{formatPaymentSummary(nextPayment)}</td>
+                      <td className="text-right"><button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function UpcomingPaymentsSection({ payments, shouldScroll }: { payments: Payment[]; shouldScroll: boolean }) {
+  return (
+    <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
+      <h2 className="mb-4 flex items-center gap-2 text-xl font-extrabold text-white"><CalendarDays className="text-green-300" /> Próximos pagamentos</h2>
+      {!payments.length ? (
+        <p className="text-sm font-medium text-gray-300">Ainda não há pagamentos futuros identificados para os FIIs da sua carteira.</p>
+      ) : (
+        <ul className={`${shouldScroll ? "max-h-[520px] overflow-y-auto pr-2" : ""} space-y-3`}>
+          {payments.map((payment) => <li key={`${payment.ticker}-${payment.date}-${payment.month}`} className="flex flex-col justify-between gap-1 rounded-xl bg-gray-800 p-4 md:flex-row md:items-center"><div><FiiTickerLink ticker={payment.ticker} /><span className="ml-2 text-sm font-medium text-gray-300">{MONTHS_PTBR[payment.month] || payment.month} · Pagamento em {payment.date}</span></div><strong className="text-green-300">{formatCurrency(payment.amount)}</strong></li>)}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function MetricBox({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: "green" | "indigo" | "yellow" }) {
+  const valueClass = tone === "green" ? "text-green-300" : tone === "yellow" ? "text-yellow-300" : "text-indigo-300";
+  return <div className="rounded-2xl bg-gray-900 p-5 shadow-lg ring-1 ring-white/10"><p className="text-base font-extrabold text-white">{label}</p><strong className={`mt-2 block text-3xl ${valueClass}`}>{value}</strong><p className="mt-2 text-sm font-medium text-gray-300">{detail}</p></div>;
+}
+
+function LightMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-sm font-black text-slate-900">{value}</p></div>;
+}
+
+function SummaryItem({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-gray-800 p-4 ring-1 ring-white/5"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p><p className="mt-2 text-sm font-bold text-gray-100">{value}</p></div>;
+}
+
+function ChartCard({ icon, title, subtitle, children }: { icon: ReactNode; title: string; subtitle: string; children: ReactNode }) {
+  return <article className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">{icon} Carteira</p><h2 className="mt-3 text-xl font-black text-slate-900">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{subtitle}</p><div className="mt-5">{children}</div></article>;
+}
+
+function BarList({ items, emptyText = "Sem dados suficientes para exibir." }: { items: ChartItem[]; emptyText?: string }) {
+  const filtered = items.filter((item) => item.value > 0);
+  const max = Math.max(...filtered.map((item) => item.value), 1);
+  if (!filtered.length) return <p className="rounded-xl bg-slate-50 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-200">{emptyText}</p>;
+  return <div className="space-y-3">{filtered.map((item) => <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs font-bold"><span className="truncate text-slate-700">{item.label}</span><span className="shrink-0 text-slate-500">{item.detail || formatCurrency(item.value)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max((item.value / max) * 100, 3)}%` }} /></div></div>)}</div>;
+}
+
+function LineHistoryChart({ snapshots }: { snapshots: WalletSnapshot[] }) {
+  const points = snapshots.map((item) => item.totalValue);
+  if (snapshots.length < 2) return <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600 ring-1 ring-slate-200">Quando houver dois ou mais meses, o gráfico de evolução aparecerá aqui.</div>;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const coords = snapshots.map((item, index) => {
+    const x = snapshots.length === 1 ? 160 : (index / (snapshots.length - 1)) * 300 + 10;
+    const y = 100 - ((item.totalValue - min) / range) * 80 + 10;
+    return `${x},${y}`;
+  }).join(" ");
+  return <div><svg viewBox="0 0 320 130" className="h-40 w-full rounded-2xl bg-slate-50 ring-1 ring-slate-200"><polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />{snapshots.map((item, index) => { const x = snapshots.length === 1 ? 160 : (index / (snapshots.length - 1)) * 300 + 10; const y = 100 - ((item.totalValue - min) / range) * 80 + 10; return <circle key={item.monthKey} cx={x} cy={y} r="4" className="fill-indigo-700" />; })}</svg><div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-500">{snapshots.slice(-6).map((item) => <span key={item.monthKey} className="rounded-full bg-slate-100 px-2 py-1">{item.label}: {formatCurrency(item.totalValue)}</span>)}</div></div>;
+}
+
+function FiiTickerLink({ ticker }: { ticker: string }) {
+  return <Link href={`/fii/${ticker}`} className="font-bold text-indigo-200 hover:text-indigo-100">{ticker}</Link>;
+}
+
+function DailyVariationBadge({ value }: { value?: number }) {
+  const variation = Number(value || 0);
+  if (!Number.isFinite(variation) || Math.abs(variation) < 0.005) return <span className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-xs font-extrabold text-gray-400 ring-1 ring-gray-700" title="Sem variação no dia"><Minus size={12} /> -</span>;
+  const isUp = variation > 0;
+  const Icon = isUp ? TrendingUp : TrendingDown;
+  const label = `${Math.abs(variation).toFixed(2).replace(".", ",")}% ${isUp ? "alta" : "baixa"}`;
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-extrabold ring-1 ${isUp ? "bg-green-950/40 text-green-300 ring-green-900/60" : "bg-red-950/40 text-red-300 ring-red-900/60"}`} title={`Movimento do dia: ${label}`}><Icon size={12} /> {label}</span>;
+}
+
+function WalletMobileCard({ item, nextPayment, draftQuotas, changed, onQuotaChange, onSave, onRemove }: { item: EnrichedFii; nextPayment?: Payment; draftQuotas: string; changed: boolean; onQuotaChange: (value: string) => void; onSave: () => void; onRemove: () => void }) {
+  return <article className="rounded-2xl bg-gray-800 p-4 text-gray-100 ring-1 ring-white/10"><div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="flex flex-wrap items-center gap-2 text-xl font-extrabold"><FiiTickerLink ticker={item.ticker} /><DailyVariationBadge value={item.dailyVariation} /></h3><p className="mt-1 text-sm font-medium text-gray-300">{item.quotas} cotas</p></div><button onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button></div><div className="grid gap-3"><InfoRow label="Preço atual" value={item.data?.price || "-"} /><InfoRow label="Último rendimento" value={item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"} /><InfoRow label="Anunciado no mês" value={item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"} /><InfoRow label="Renda estimada" value={formatCurrency(item.estimatedIncome)} highlight="green" /><InfoRow label="Próximo pagamento" value={formatPaymentSummary(nextPayment)} /></div><div className="mt-4 grid grid-cols-[1fr_auto] gap-2"><input value={draftQuotas} onChange={(event) => onQuotaChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSave(); }} inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button onClick={onSave} disabled={!changed} className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-bold ${changed ? "bg-indigo-600 text-white hover:bg-indigo-700" : "cursor-not-allowed bg-gray-700 text-gray-400"}`}><Save size={16} /> Salvar</button></div></article>;
+}
+
+function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" }) {
+  return <div className="rounded-xl bg-gray-900 p-3 ring-1 ring-white/5"><p className="text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p><p className={`mt-1 text-sm font-bold ${highlight === "green" ? "text-green-300" : "text-gray-100"}`}>{value}</p></div>;
+}
+
+function RankingCard({ title, items }: { title: string; items: Array<{ ticker: string; value: string }> }) {
+  const isSegmentDistribution = title.includes("Distribuição por segmento");
+  return <div className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10"><h3 className="mb-3 text-base font-extrabold text-white">{title}</h3>{!items.length ? <p className="text-sm font-medium text-gray-300">Sem dados ainda.</p> : isSegmentDistribution ? <ol className="space-y-4 text-sm">{items.map((item, index) => <li key={`${title}-${item.ticker}`} className="rounded-lg bg-gray-800 px-3 py-3 text-gray-200"><div className="mb-2 flex items-center justify-between gap-3"><span className="font-medium"><strong className="text-gray-400">#{index + 1}</strong> {item.ticker}</span><strong className="text-indigo-200">{item.value}</strong></div><div className="h-2.5 overflow-hidden rounded-full bg-gray-700"><div className={`h-full rounded-full bg-indigo-400 ${getBarWidthClass(item.value)}`} /></div></li>)}</ol> : <ol className="space-y-2 text-sm">{items.map((item, index) => <li key={`${title}-${item.ticker}`} className="flex justify-between gap-3 rounded-lg bg-gray-800 px-3 py-2 text-gray-200"><span><strong className="text-gray-400">#{index + 1}</strong> <FiiTickerLink ticker={item.ticker} /></span><strong className="text-indigo-200">{item.value}</strong></li>)}</ol>}</div>;
+}
