@@ -10,6 +10,14 @@ interface Props {
 
 const WALLET_EMAIL_KEY = "dados-fii-wallet-email";
 const WALLET_TOKEN_KEY = "dados-fii-wallet-session";
+const VIP_EMAILS = String(process.env.NEXT_PUBLIC_VIP_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+function isVipEmail(value: string) {
+    return VIP_EMAILS.includes(value.trim().toLowerCase());
+}
 
 function isValidEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -45,6 +53,7 @@ export default function FiiAlert({ fiiCode }: Props) {
             if (storedToken && isValidEmail(cleanEmail)) {
                 setConfirmedEmail(cleanEmail);
                 setEmail(cleanEmail);
+                if (isVipEmail(cleanEmail)) setIsPremium(true);
             }
         } catch {
             return;
@@ -58,7 +67,7 @@ export default function FiiAlert({ fiiCode }: Props) {
                 if (res.ok) {
                     const data = await res.json();
                     const cleanEmail = String(data?.email || "").trim().toLowerCase();
-                    setIsPremium(data?.isPremium || false);
+                    setIsPremium(Boolean(data?.isPremium) || isVipEmail(cleanEmail));
 
                     if (isValidEmail(cleanEmail)) {
                         setConfirmedEmail(cleanEmail);
@@ -213,12 +222,12 @@ export default function FiiAlert({ fiiCode }: Props) {
 
                 <div className="mb-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
                     <p className="text-sm font-bold text-indigo-100">
-                        {isPremium ? "Premium ativo" : "Quer escolher o percentual?"}
+                        {isPremium ? "VIP ativo" : "Configuração VIP"}
                     </p>
                     <p className="mt-1 text-xs font-medium text-gray-300">
                         {isPremium
                             ? "Você pode ajustar os percentuais de queda e alta abaixo."
-                            : "No Premium, você poderá personalizar os percentuais de alta e queda."}
+                            : "No VIP, você configura alertas personalizados de 1% a 20%, além do padrão de 3%."}
                     </p>
                 </div>
 
@@ -233,41 +242,41 @@ export default function FiiAlert({ fiiCode }: Props) {
                     disabled={success}
                 />
 
-                {isPremium && (
-                    <div className="mb-3 grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-300">Queda</label>
-                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
-                                <ArrowDown className="h-5 w-5 text-red-400" />
-                                <input
-                                    type="number"
-                                    min={-20}
-                                    max={-1}
-                                    value={percentDown}
-                                    onChange={handleChangeDown}
-                                    className="w-full bg-transparent p-1 text-center text-white outline-none"
-                                    disabled={success}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-300">Alta</label>
-                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={20}
-                                    value={percentUp}
-                                    onChange={handleChangeUp}
-                                    className="w-full bg-transparent p-1 text-center text-white outline-none"
-                                    disabled={success}
-                                />
-                                <ArrowUp className="h-5 w-5 text-green-400" />
-                            </div>
+                <div className={`mb-3 grid grid-cols-2 gap-3 ${isPremium ? "" : "opacity-60"}`}>
+                    <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-300">Queda VIP</label>
+                        <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                            <ArrowDown className="h-5 w-5 text-red-400" />
+                            <input
+                                type="number"
+                                min={-20}
+                                max={-1}
+                                value={percentDown}
+                                onChange={handleChangeDown}
+                                className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
+                                disabled={success || !isPremium}
+                            />
                         </div>
                     </div>
-                )}
+
+                    <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-300">Alta VIP</label>
+                        <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                            <input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={percentUp}
+                                onChange={handleChangeUp}
+                                className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
+                                disabled={success || !isPremium}
+                            />
+                            <ArrowUp className="h-5 w-5 text-green-400" />
+                        </div>
+                    </div>
+                </div>
+
+                {!isPremium && <p className="mb-3 rounded-lg bg-gray-800/70 p-2 text-center text-xs font-bold text-gray-300">No plano grátis, o alerta usa o padrão de {ALERT_VALUE}%.</p>}
 
                 <button
                     onClick={handleSubmit}
