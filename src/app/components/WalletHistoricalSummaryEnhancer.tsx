@@ -31,6 +31,11 @@ function formatMonthYear(monthKey: string) {
   return `${MONTHS_PT[monthIndex] || month}/${year}`;
 }
 
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function readSnapshots(): MonthPoint[] {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(SNAPSHOT_KEY) || "[]");
@@ -76,6 +81,25 @@ function makeCard(label: string, month: string, value: string, emphasis = false)
   return card;
 }
 
+function getBestDividendYear(points: MonthPoint[]) {
+  const byYear = new Map<string, number>();
+  points.forEach((item) => {
+    const year = item.monthKey.slice(0, 4);
+    byYear.set(year, (byYear.get(year) || 0) + item.income);
+  });
+  return Array.from(byYear.entries())
+    .map(([year, income]) => ({ year, income }))
+    .sort((a, b) => b.income - a.income)[0] || null;
+}
+
+function replaceWalletCopies() {
+  Array.from(document.querySelectorAll("td, p, span")).forEach((element) => {
+    if (textOf(element) === "Sem pagamento futuro na base") {
+      element.textContent = "Aguardando comunicado";
+    }
+  });
+}
+
 function applyHistoricalSummary() {
   const section = findSummarySection();
   if (!section) return false;
@@ -84,12 +108,14 @@ function applyHistoricalSummary() {
   if (!snapshots.length) return false;
 
   const currentYear = new Date().getFullYear();
-  const currentYearPoints = snapshots.filter((item) => Number(item.monthKey.slice(0, 4)) === currentYear);
+  const currentLimit = currentMonthKey();
+  const currentYearPoints = snapshots.filter((item) => Number(item.monthKey.slice(0, 4)) === currentYear && item.monthKey <= currentLimit);
 
   const currentBest = [...currentYearPoints].sort((a, b) => b.income - a.income)[0] || null;
   const currentWorst = [...currentYearPoints].sort((a, b) => a.income - b.income)[0] || null;
   const historicalBest = [...snapshots].sort((a, b) => b.income - a.income)[0] || null;
   const historicalWorst = [...snapshots].sort((a, b) => a.income - b.income)[0] || null;
+  const bestYear = getBestDividendYear(snapshots);
   const currentTotal = currentYearPoints.reduce((sum, item) => sum + item.income, 0);
   const currentAverage = currentYearPoints.length ? currentTotal / currentYearPoints.length : 0;
 
@@ -117,8 +143,9 @@ function applyHistoricalSummary() {
   extremesGrid.appendChild(makeCard("Menor da história", historicalWorst ? formatMonthYear(historicalWorst.monthKey) : "-", historicalWorst ? formatCurrency(historicalWorst.income) : "-", true));
 
   const supportingGrid = document.createElement("div");
-  supportingGrid.className = "mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4";
-  supportingGrid.appendChild(makeCard(`Total registrado em ${currentYear}`, "", currentYearPoints.length ? formatCurrency(currentTotal) : "-"));
+  supportingGrid.className = "mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5";
+  supportingGrid.appendChild(makeCard("Maior ano de dividendos", bestYear ? bestYear.year : "-", bestYear ? formatCurrency(bestYear.income) : "-"));
+  supportingGrid.appendChild(makeCard("Total do ano", String(currentYear), currentYearPoints.length ? formatCurrency(currentTotal) : "-"));
   supportingGrid.appendChild(makeCard(`Média mensal em ${currentYear}`, "", currentYearPoints.length ? formatCurrency(currentAverage) : "-"));
   supportingGrid.appendChild(makeCard("Maior pagador estimado hoje", "", topPayerValue));
   supportingGrid.appendChild(makeCard("Maior peso financeiro hoje", "", topWeightValue));
@@ -132,7 +159,7 @@ function applyHistoricalSummary() {
 
   const description = Array.from(section.querySelectorAll("p")).find((item) => textOf(item).includes("Resumo numérico e educativo"));
   if (description) {
-    description.textContent = "Os melhores e piores meses usam o histórico mensal salvo da carteira, respeitando a quantidade de cotas que existia em cada período.";
+    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira.";
   }
 
   return true;
@@ -143,6 +170,7 @@ export default function WalletHistoricalSummaryEnhancer() {
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
+      replaceWalletCopies();
       const applied = applyHistoricalSummary();
       if (applied || attempts > 30) window.clearInterval(timer);
     }, 500);
