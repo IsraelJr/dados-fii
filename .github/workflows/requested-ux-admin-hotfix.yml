@@ -1,0 +1,203 @@
+name: Requested UX and Admin Hotfix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/requested-ux-admin-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply requested UX and admin fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise SystemExit(f'Pattern not found in {path}: {old[:80]}')
+              file.write_text(text.replace(old, new))
+
+          # Carteira: shorter total-year label and waiting copy.
+          replace(
+              'src/app/components/WalletPageUxEnhancer.tsx',
+              'grid.appendChild(createDividendCard(`Total ${currentYear} até ${currentShortDateLabel()}`, currentYearTotal.year, currentYearTotal.value));',
+              'grid.appendChild(createDividendCard("Total do ano", currentYearTotal.year, currentYearTotal.value));'
+          )
+          replace(
+              'src/app/carteira/page.tsx',
+              'return payment ? `${formatCurrency(payment.amount)} em ${payment.date}` : "Sem pagamento futuro na base";',
+              'return payment ? `${formatCurrency(payment.amount)} em ${payment.date}` : "Aguardando comunicado";'
+          )
+
+          # Calendar and glossary copy.
+          replace(
+              'src/app/calendario-dividendos-fiis/page.tsx',
+              'subtitle="Consulte pagamentos da semana, rendimentos anunciados no mês e pagamentos recentes dos fundos imobiliários da base Dados FII."',
+              'subtitle="Consulte pagamentos da semana, rendimentos anunciados no mês e pagamentos recentes dos fundos."'
+          )
+          replace(
+              'src/app/glossario/page.tsx',
+              'Use este glossário para traduzir os principais termos que aparecem nas consultas, na carteira e no relatório de risco. Ele não recomenda ativos; apenas explica conceitos.',
+              'Use este glossário para traduzir os principais termos que aparecem nas consultas, na carteira e no relatório de risco.'
+          )
+
+          # Fii alert: make VIP configuration visible even for non-VIP users, and recognize VIP/admin emails client-side.
+          fii_path = Path('src/app/components/FiiAlert.tsx')
+          text = fii_path.read_text()
+          text = text.replace(
+              'const WALLET_TOKEN_KEY = "dados-fii-wallet-session";\n\nfunction isValidEmail',
+              'const WALLET_TOKEN_KEY = "dados-fii-wallet-session";\nconst VIP_EMAILS = String(process.env.NEXT_PUBLIC_VIP_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")\n    .split(",")\n    .map((email) => email.trim().toLowerCase())\n    .filter(Boolean);\n\nfunction isVipEmail(value: string) {\n    return VIP_EMAILS.includes(value.trim().toLowerCase());\n}\n\nfunction isValidEmail'
+          )
+          text = text.replace(
+              'if (storedToken && isValidEmail(cleanEmail)) {\n                setConfirmedEmail(cleanEmail);\n                setEmail(cleanEmail);\n            }',
+              'if (storedToken && isValidEmail(cleanEmail)) {\n                setConfirmedEmail(cleanEmail);\n                setEmail(cleanEmail);\n                if (isVipEmail(cleanEmail)) setIsPremium(true);\n            }'
+          )
+          text = text.replace(
+              'setIsPremium(data?.isPremium || false);',
+              'setIsPremium(Boolean(data?.isPremium) || isVipEmail(cleanEmail));'
+          )
+          text = text.replace(
+              '<p className="text-sm font-bold text-indigo-100">\n                        {isPremium ? "Premium ativo" : "Quer escolher o percentual?"}\n                    </p>\n                    <p className="mt-1 text-xs font-medium text-gray-300">\n                        {isPremium\n                            ? "Você pode ajustar os percentuais de queda e alta abaixo."\n                            : "No Premium, você poderá personalizar os percentuais de alta e queda."}\n                    </p>',
+              '<p className="text-sm font-bold text-indigo-100">\n                        {isPremium ? "VIP ativo" : "Configuração VIP"}\n                    </p>\n                    <p className="mt-1 text-xs font-medium text-gray-300">\n                        {isPremium\n                            ? "Você pode ajustar os percentuais de queda e alta abaixo."\n                            : "No VIP, você configura alertas personalizados de 1% a 20%, além do padrão de 3%."}\n                    </p>'
+          )
+          old_block = '''                {isPremium && (
+                    <div className="mb-3 grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="mb-1 block text-xs font-bold text-gray-300">Queda</label>
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                                <ArrowDown className="h-5 w-5 text-red-400" />
+                                <input
+                                    type="number"
+                                    min={-20}
+                                    max={-1}
+                                    value={percentDown}
+                                    onChange={handleChangeDown}
+                                    className="w-full bg-transparent p-1 text-center text-white outline-none"
+                                    disabled={success}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-xs font-bold text-gray-300">Alta</label>
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={percentUp}
+                                    onChange={handleChangeUp}
+                                    className="w-full bg-transparent p-1 text-center text-white outline-none"
+                                    disabled={success}
+                                />
+                                <ArrowUp className="h-5 w-5 text-green-400" />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <button'''
+          new_block = '''                <div className={`mb-3 grid grid-cols-2 gap-3 ${isPremium ? "" : "opacity-60"}`}>
+                    <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-300">Queda VIP</label>
+                        <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                            <ArrowDown className="h-5 w-5 text-red-400" />
+                            <input
+                                type="number"
+                                min={-20}
+                                max={-1}
+                                value={percentDown}
+                                onChange={handleChangeDown}
+                                className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
+                                disabled={success || !isPremium}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-300">Alta VIP</label>
+                        <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                            <input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={percentUp}
+                                onChange={handleChangeUp}
+                                className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
+                                disabled={success || !isPremium}
+                            />
+                            <ArrowUp className="h-5 w-5 text-green-400" />
+                        </div>
+                    </div>
+                </div>
+
+                {!isPremium && <p className="mb-3 rounded-lg bg-gray-800/70 p-2 text-center text-xs font-bold text-gray-300">No plano grátis, o alerta usa o padrão de {ALERT_VALUE}%.</p>}
+
+                <button'''
+          if old_block not in text:
+              raise SystemExit('FiiAlert input block not found')
+          fii_path.write_text(text.replace(old_block, new_block))
+
+          # Admin: surface failing services directly in health summary and a focused analysis block.
+          admin_path = Path('src/app/admin/observabilidade/page.tsx')
+          text = admin_path.read_text()
+          text = text.replace(
+              'const health = data?.health;\n',
+              'const health = data?.health;\n  const failingServices = health?.services?.filter((service) => !service.ok) || [];\n'
+          )
+          text = text.replace(
+              '<MetricCard title="Saúde geral" value={`${health?.score || 0}%`} detail={`${health?.healthyServices || 0} de ${health?.totalServices || 0} serviços OK`} icon={ShieldCheck} kind={(health?.score || 0) >= 90 ? "success" : "error"} />',
+              '<MetricCard title="Saúde geral" value={`${health?.score || 0}%`} detail={failingServices.length ? `Atenção: ${failingServices.map((service) => service.label).join(", ")}` : `${health?.healthyServices || 0} de ${health?.totalServices || 0} serviços OK`} icon={ShieldCheck} kind={(health?.score || 0) >= 90 ? "success" : "error"} />'
+          )
+          marker = '''          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-indigo-100">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"><div><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><Activity size={14} /> Saúde do sistema</p><h2 className="mt-3 text-2xl font-black text-slate-900">Serviços principais</h2></div><p className="text-xs font-bold text-slate-500">Atualizado em {formatDateTime(data.generatedAt)}</p></div>'''
+          insert = '''          {failingServices.length > 0 && (
+            <section className="rounded-3xl bg-red-50 p-5 shadow-sm ring-1 ring-red-100">
+              <p className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-red-700"><AlertTriangle size={14} /> Serviços com atenção</p>
+              <h2 className="mt-3 text-2xl font-black text-red-950">O que está afetando a saúde geral</h2>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {failingServices.map((service) => (
+                  <article key={service.key} className="rounded-2xl bg-white p-4 ring-1 ring-red-100">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-extrabold text-slate-900">{service.label}</h3>
+                        <p className="mt-1 text-sm leading-5 text-slate-600">{service.detail || "Sem detalhe disponível"}</p>
+                      </div>
+                      <HealthBadge ok={false} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+'''
+          if marker not in text:
+              raise SystemExit('Admin health marker not found')
+          if 'Serviços com atenção' not in text:
+              text = text.replace(marker, insert + marker)
+          admin_path.write_text(text)
+          PY
+
+      - name: Commit hotfix and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/requested-ux-admin-hotfix.yml
+          git add src/app/components/WalletPageUxEnhancer.tsx src/app/carteira/page.tsx src/app/calendario-dividendos-fiis/page.tsx src/app/glossario/page.tsx src/app/components/FiiAlert.tsx src/app/admin/observabilidade/page.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Apply requested wallet, alert, glossary and admin tweaks"
+          git push
