@@ -94,8 +94,12 @@ function getBestDividendYear(points: MonthPoint[]) {
 
 function replaceWalletCopies() {
   Array.from(document.querySelectorAll("td, p, span")).forEach((element) => {
-    if (textOf(element) === "Sem pagamento futuro na base") {
+    const text = textOf(element);
+    if (text === "Sem pagamento futuro na base") {
       element.textContent = "Aguardando comunicado";
+    }
+    if (/^Total \d{4} até \d{2}\/\d{2}$/i.test(text)) {
+      element.textContent = "Total do ano";
     }
   });
 }
