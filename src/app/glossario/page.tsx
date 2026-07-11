@@ -93,7 +93,7 @@ export default function GlossarioPage() {
       <section className="rounded-3xl bg-gray-900 p-6 text-gray-100 shadow-lg ring-1 ring-white/10 md:p-8">
         <p className="inline-flex rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-200">Para consultar sem travar</p>
         <h2 className="mt-4 text-2xl font-black text-white md:text-3xl">Entenda antes de interpretar</h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-300">Use este glossário para traduzir os principais termos que aparecem nas consultas, na carteira e no relatório de risco. Ele não recomenda ativos; apenas explica conceitos.</p>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-300">Use este glossário para traduzir os principais termos que aparecem nas consultas, na carteira e no relatório de risco.</p>
       </section>
 
       <nav className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
@@ -122,13 +122,10 @@ export default function GlossarioPage() {
         ))}
       </div>
 
-      <footer className="mt-8 rounded-2xl bg-indigo-50 p-5 text-sm leading-6 text-indigo-950 ring-1 ring-indigo-100">
-        Este glossário tem finalidade educativa e não é recomendação de compra ou venda. Para decisões relevantes, confirme dados nos documentos oficiais dos fundos.
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/fontes-dos-dados" className="rounded-full bg-white px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100">Fontes dos dados</Link>
-          <Link href="/metodologia" className="rounded-full bg-white px-3 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100">Metodologia</Link>
-        </div>
-      </footer>
+      <section className="mt-6 rounded-2xl bg-indigo-50 p-5 text-sm leading-6 text-indigo-950 ring-1 ring-indigo-100">
+        <strong>Nota:</strong> os conceitos ajudam na leitura dos dados, mas não substituem análise individual, objetivos pessoais, diversificação e gestão de risco.
+        <Link href="/metodologia" className="ml-1 font-extrabold text-indigo-700 hover:underline">Veja também a metodologia.</Link>
+      </section>
     </main>
   );
 }
