@@ -14,6 +14,7 @@ type WalletSnapshotLike = {
   announcedMonthlyIncome?: number;
 };
 type DividendExtreme = { monthKey: string; value: number } | null;
+type DividendYearTotal = { year: string; value: number } | null;
 
 function textOf(element: Element | null) {
   return element?.textContent?.replace(/\s+/g, " ").trim() || "";
@@ -52,6 +53,15 @@ function monthLabel(monthKey: string) {
   return `${months[index]}/${year}`;
 }
 
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function currentShortDateLabel() {
+  return new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 function snapshotDividendIncome(snapshot: WalletSnapshotLike) {
   const candidates = [snapshot.estimatedMonthlyIncome, snapshot.estimatedDividendIncome, snapshot.announcedMonthlyIncome];
   const value = candidates.find((item) => typeof item === "number" && Number.isFinite(item));
@@ -80,6 +90,31 @@ function getExtremes(items: Array<{ monthKey: string; value: number }>) {
     max: [...items].sort((a, b) => b.value - a.value)[0],
     min: [...items].sort((a, b) => a.value - b.value)[0],
   };
+}
+
+function getYearTotals(items: Array<{ monthKey: string; value: number }>) {
+  const totals = new Map<string, number>();
+  items.forEach((item) => {
+    const year = item.monthKey.slice(0, 4);
+    totals.set(year, (totals.get(year) || 0) + item.value);
+  });
+  return Array.from(totals.entries()).map(([year, value]) => ({ year, value })).sort((a, b) => a.year.localeCompare(b.year));
+}
+
+function getBestDividendYear(items: Array<{ monthKey: string; value: number }>): DividendYearTotal {
+  const totals = getYearTotals(items);
+  if (!totals.length) return null;
+  return [...totals].sort((a, b) => b.value - a.value)[0];
+}
+
+function getCurrentYearDividendTotalToDate(items: Array<{ monthKey: string; value: number }>) {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const limitMonthKey = currentMonthKey();
+  const value = items
+    .filter((item) => item.monthKey.startsWith(`${year}-`) && item.monthKey <= limitMonthKey)
+    .reduce((total, item) => total + item.value, 0);
+  return { year, value };
 }
 
 function findDailyPanel() {
@@ -201,7 +236,7 @@ function insertVisitMessage(section: Element, current: WalletVisitState, previou
   section.insertBefore(box, metricGrid || null);
 }
 
-function createDividendExtremeCard(title: string, item: DividendExtreme) {
+function createDividendCard(title: string, primary: string, value?: number) {
   const card = document.createElement("div");
   card.className = "rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200";
 
@@ -209,17 +244,17 @@ function createDividendExtremeCard(title: string, item: DividendExtreme) {
   label.className = "text-xs font-extrabold uppercase tracking-wide text-slate-500";
   label.textContent = title;
 
-  const month = document.createElement("p");
-  month.className = "mt-2 text-sm font-black text-slate-900";
-  month.textContent = item ? monthLabel(item.monthKey) : "Sem histórico";
+  const main = document.createElement("p");
+  main.className = "mt-2 text-sm font-black text-slate-900";
+  main.textContent = primary;
 
-  const value = document.createElement("p");
-  value.className = "mt-1 text-sm font-black text-indigo-700";
-  value.textContent = item ? formatCurrency(item.value) : "-";
+  const amount = document.createElement("p");
+  amount.className = "mt-1 text-sm font-black text-indigo-700";
+  amount.textContent = typeof value === "number" ? formatCurrency(value) : "-";
 
   card.appendChild(label);
-  card.appendChild(month);
-  card.appendChild(value);
+  card.appendChild(main);
+  card.appendChild(amount);
   return card;
 }
 
@@ -232,10 +267,12 @@ function replaceDividendExtremesSummary() {
   const currentYearSnapshots = snapshots.filter((snapshot) => snapshot.monthKey.startsWith(`${currentYear}-`));
   const currentYearExtremes = getExtremes(currentYearSnapshots);
   const historicalExtremes = getExtremes(snapshots);
+  const bestYear = getBestDividendYear(snapshots);
+  const currentYearTotal = getCurrentYearDividendTotalToDate(snapshots);
 
   const description = Array.from(section.querySelectorAll("p")).find((item) => textOf(item).includes("Resumo numérico"));
   if (description) {
-    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira, sem recalcular meses antigos com as cotas atuais.";
+    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira.";
   }
 
   const grid = Array.from(section.querySelectorAll("div")).find((item) => {
@@ -245,12 +282,14 @@ function replaceDividendExtremesSummary() {
 
   if (!grid) return;
 
-  grid.className = "mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4";
+  grid.className = "mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6";
   grid.innerHTML = "";
-  grid.appendChild(createDividendExtremeCard(`Maior mês (${currentYear})`, currentYearExtremes.max));
-  grid.appendChild(createDividendExtremeCard(`Menor mês (${currentYear})`, currentYearExtremes.min));
-  grid.appendChild(createDividendExtremeCard("Maior da história", historicalExtremes.max));
-  grid.appendChild(createDividendExtremeCard("Menor da história", historicalExtremes.min));
+  grid.appendChild(createDividendCard(`Maior mês (${currentYear})`, currentYearExtremes.max ? monthLabel(currentYearExtremes.max.monthKey) : "Sem histórico", currentYearExtremes.max?.value));
+  grid.appendChild(createDividendCard(`Menor mês (${currentYear})`, currentYearExtremes.min ? monthLabel(currentYearExtremes.min.monthKey) : "Sem histórico", currentYearExtremes.min?.value));
+  grid.appendChild(createDividendCard("Maior da história", historicalExtremes.max ? monthLabel(historicalExtremes.max.monthKey) : "Sem histórico", historicalExtremes.max?.value));
+  grid.appendChild(createDividendCard("Menor da história", historicalExtremes.min ? monthLabel(historicalExtremes.min.monthKey) : "Sem histórico", historicalExtremes.min?.value));
+  grid.appendChild(createDividendCard("Maior ano de dividendos", bestYear ? bestYear.year : "Sem histórico", bestYear?.value));
+  grid.appendChild(createDividendCard(`Total ${currentYear} até ${currentShortDateLabel()}`, currentYearTotal.year, currentYearTotal.value));
   section.setAttribute("data-dividend-extremes-fixed", "true");
 }
 
