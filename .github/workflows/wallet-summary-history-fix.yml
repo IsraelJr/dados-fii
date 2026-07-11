@@ -1,5 +1,7 @@
 name: Wallet Historical Summary Fix
 
+# trigger: historical-dividend-summary
+
 on:
   push:
     branches:
