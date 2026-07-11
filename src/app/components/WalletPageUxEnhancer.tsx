@@ -3,8 +3,17 @@
 import { useEffect } from "react";
 
 const LAST_VISIT_KEY = "dados-fii-wallet-last-visit-v1";
+const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";
 
 type WalletVisitState = Record<string, string>;
+type WalletSnapshotLike = {
+  monthKey?: string;
+  label?: string;
+  estimatedMonthlyIncome?: number;
+  estimatedDividendIncome?: number;
+  announcedMonthlyIncome?: number;
+};
+type DividendExtreme = { monthKey: string; value: number } | null;
 
 function textOf(element: Element | null) {
   return element?.textContent?.replace(/\s+/g, " ").trim() || "";
@@ -35,6 +44,44 @@ function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function monthLabel(monthKey: string) {
+  const [year, month] = String(monthKey || "").split("-");
+  const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const index = Number(month) - 1;
+  if (!year || !Number.isFinite(index) || index < 0 || index > 11) return monthKey || "-";
+  return `${months[index]}/${year}`;
+}
+
+function snapshotDividendIncome(snapshot: WalletSnapshotLike) {
+  const candidates = [snapshot.estimatedMonthlyIncome, snapshot.estimatedDividendIncome, snapshot.announcedMonthlyIncome];
+  const value = candidates.find((item) => typeof item === "number" && Number.isFinite(item));
+  return value || 0;
+}
+
+function readHistoricalDividendSnapshots() {
+  if (typeof window === "undefined") return [] as Array<{ monthKey: string; value: number }>;
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SNAPSHOT_KEY) || "[]") as WalletSnapshotLike[];
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((snapshot) => ({ monthKey: String(snapshot.monthKey || ""), value: snapshotDividendIncome(snapshot) }))
+      .filter((snapshot) => /^\d{4}-\d{2}$/.test(snapshot.monthKey) && snapshot.value > 0)
+      .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  } catch {
+    return [];
+  }
+}
+
+function getExtremes(items: Array<{ monthKey: string; value: number }>) {
+  if (!items.length) return { max: null as DividendExtreme, min: null as DividendExtreme };
+  return {
+    max: [...items].sort((a, b) => b.value - a.value)[0],
+    min: [...items].sort((a, b) => a.value - b.value)[0],
+  };
+}
+
 function findDailyPanel() {
   return Array.from(document.querySelectorAll("main section")).find((section) => {
     const text = textOf(section);
@@ -48,6 +95,10 @@ function findAttentionSection() {
 
 function findPaymentsSection() {
   return Array.from(document.querySelectorAll("main section")).find((section) => textOf(section).includes("Próximos pagamentos"));
+}
+
+function findQuickSummarySection() {
+  return Array.from(document.querySelectorAll("main section")).find((section) => textOf(section).includes("Leitura rápida dos números"));
 }
 
 function readPendingTickers() {
@@ -150,6 +201,59 @@ function insertVisitMessage(section: Element, current: WalletVisitState, previou
   section.insertBefore(box, metricGrid || null);
 }
 
+function createDividendExtremeCard(title: string, item: DividendExtreme) {
+  const card = document.createElement("div");
+  card.className = "rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200";
+
+  const label = document.createElement("p");
+  label.className = "text-xs font-extrabold uppercase tracking-wide text-slate-500";
+  label.textContent = title;
+
+  const month = document.createElement("p");
+  month.className = "mt-2 text-sm font-black text-slate-900";
+  month.textContent = item ? monthLabel(item.monthKey) : "Sem histórico";
+
+  const value = document.createElement("p");
+  value.className = "mt-1 text-sm font-black text-indigo-700";
+  value.textContent = item ? formatCurrency(item.value) : "-";
+
+  card.appendChild(label);
+  card.appendChild(month);
+  card.appendChild(value);
+  return card;
+}
+
+function replaceDividendExtremesSummary() {
+  const section = findQuickSummarySection();
+  if (!section || section.getAttribute("data-dividend-extremes-fixed") === "true") return;
+
+  const snapshots = readHistoricalDividendSnapshots();
+  const currentYear = new Date().getFullYear();
+  const currentYearSnapshots = snapshots.filter((snapshot) => snapshot.monthKey.startsWith(`${currentYear}-`));
+  const currentYearExtremes = getExtremes(currentYearSnapshots);
+  const historicalExtremes = getExtremes(snapshots);
+
+  const description = Array.from(section.querySelectorAll("p")).find((item) => textOf(item).includes("Resumo numérico"));
+  if (description) {
+    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira, sem recalcular meses antigos com as cotas atuais.";
+  }
+
+  const grid = Array.from(section.querySelectorAll("div")).find((item) => {
+    const text = textOf(item);
+    return text.includes("Maior mês") && text.includes("Menor mês");
+  });
+
+  if (!grid) return;
+
+  grid.className = "mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4";
+  grid.innerHTML = "";
+  grid.appendChild(createDividendExtremeCard(`Maior mês (${currentYear})`, currentYearExtremes.max));
+  grid.appendChild(createDividendExtremeCard(`Menor mês (${currentYear})`, currentYearExtremes.min));
+  grid.appendChild(createDividendExtremeCard("Maior da história", historicalExtremes.max));
+  grid.appendChild(createDividendExtremeCard("Menor da história", historicalExtremes.min));
+  section.setAttribute("data-dividend-extremes-fixed", "true");
+}
+
 export default function WalletPageUxEnhancer() {
   useEffect(() => {
     let attempts = 0;
@@ -174,6 +278,7 @@ export default function WalletPageUxEnhancer() {
       }
 
       insertVisitMessage(section, current, previous);
+      replaceDividendExtremesSummary();
 
       window.setTimeout(() => {
         try {
