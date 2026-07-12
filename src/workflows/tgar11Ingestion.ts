@@ -6,11 +6,8 @@ type FiiIngestionInput = {
   cnpj?: string;
   year?: number;
   delayMinutes?: number;
+  enableAi?: boolean;
 };
-
-function normalizeTicker(value: unknown) {
-  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
 
 async function updateRun(runId: string, payload: Record<string, unknown>) {
   "use step";
@@ -39,10 +36,53 @@ async function importDocuments(input: { runId: string; ticker: string; cnpj: str
   return importEventualDocuments({ ...input, limit: 40 });
 }
 
-async function extractDocuments(input: { runId: string; ticker: string; documents: Array<Record<string, unknown>> }) {
+async function extractDocuments(input: {
+  runId: string;
+  ticker: string;
+  documents: Array<Record<string, unknown>>;
+  enabled: boolean;
+}) {
   "use step";
-  const { extractPilotInsightsV2 } = await import("@/lib/cvmPilotAi");
-  return extractPilotInsightsV2(input);
+
+  if (!input.enabled) {
+    return {
+      enabled: false,
+      status: "disabled",
+      quality: "not_requested",
+      reason: "disabled_by_configuration",
+      documentsSubmitted: 0,
+      sourceUrlsUsed: 0,
+      sourceCoverage: 0,
+      externalSourceUrls: [],
+    };
+  }
+
+  try {
+    const { extractPilotInsightsV2 } = await import("@/lib/cvmPilotAi");
+    return {
+      enabled: true,
+      ...await extractPilotInsightsV2(input),
+    };
+  } catch (error: any) {
+    const message = String(error?.message || "Falha opcional na extração documental por IA.");
+    const normalized = message.toLowerCase();
+    const errorCode = normalized.includes("insufficient_quota")
+      || normalized.includes("exceeded your current quota")
+      ? "quota_exhausted"
+      : "ai_optional_failure";
+
+    return {
+      enabled: true,
+      status: "failed_optional",
+      quality: "incomplete",
+      reason: message,
+      errorCode,
+      documentsSubmitted: Math.min(input.documents.length, 8),
+      sourceUrlsUsed: 0,
+      sourceCoverage: 0,
+      externalSourceUrls: [],
+    };
+  }
 }
 
 async function validate(input: { runId: string; ticker: string; cnpj: string; monthly: any; documents: any; ai: any }) {
@@ -75,12 +115,14 @@ async function markFailed(runId: string, error: string) {
   }, { merge: true });
 }
 
-export async function tgar11IngestionWorkflow(input: FiiIngestionInput) {
+export async function fiiIngestionWorkflow(input: FiiIngestionInput) {
   "use workflow";
 
-  const ticker = normalizeTicker(input.ticker || "TGAR11");
+  const { assertSupportedIngestionTicker } = await import("@/lib/fiiIngestionConfig");
+  const ticker = assertSupportedIngestionTicker(input.ticker || "TGAR11");
   const year = Number(input.year || 2026);
   const delayMinutes = Math.min(Math.max(Number(input.delayMinutes || 0), 0), 1440);
+  const enableAi = input.enableAi === true;
 
   try {
     await updateRun(input.runId, {
@@ -89,6 +131,7 @@ export async function tgar11IngestionWorkflow(input: FiiIngestionInput) {
       ticker,
       year,
       parserVersion: 2,
+      enableAi,
       publishToOfficialBase: false,
     });
 
@@ -102,18 +145,26 @@ export async function tgar11IngestionWorkflow(input: FiiIngestionInput) {
     await updateRun(input.runId, { monthly, currentStep: "cvm_documents" });
 
     const documents = await importDocuments({ runId: input.runId, ticker, cnpj, year });
-    await updateRun(input.runId, { documents, currentStep: "ai_extraction" });
+    await updateRun(input.runId, { documents, currentStep: enableAi ? "ai_extraction" : "validation" });
 
-    const ai = await extractDocuments({ runId: input.runId, ticker, documents: documents.documents });
+    const ai = await extractDocuments({
+      runId: input.runId,
+      ticker,
+      documents: documents.documents,
+      enabled: enableAi,
+    });
     await updateRun(input.runId, { ai, currentStep: "validation" });
 
     const validation = await validate({ runId: input.runId, ticker, cnpj, monthly, documents, ai });
-    const result = { ticker, cnpj, year, parserVersion: 2, monthly, documents, ai, validation };
+    const result = { ticker, cnpj, year, parserVersion: 2, enableAi, monthly, documents, ai, validation };
     await markCompleted(input.runId, result);
     return result;
   } catch (error: any) {
-    const message = error?.message || "Erro desconhecido no piloto de ingestão.";
+    const message = error?.message || "Erro desconhecido no modo operacional de ingestão.";
     await markFailed(input.runId, message);
     throw error;
   }
 }
+
+// Compatibilidade com execuções e imports anteriores do piloto TGAR11.
+export const tgar11IngestionWorkflow = fiiIngestionWorkflow;
