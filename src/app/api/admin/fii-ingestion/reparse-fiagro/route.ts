@@ -3,6 +3,7 @@ import { isAdminAuthorized } from "@/lib/adminSession";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { reconcileFiagroMonthlyFields } from "@/lib/cvmFiagroPostProcessing";
 import { validateOperationalRun } from "@/lib/cvmOperationalValidation";
+import { getIngestionFundConfig, normalizeIngestionTicker } from "@/lib/fiiIngestionConfig";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,11 +40,12 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
 
     const run = (runSnapshot.data() || {}) as Record<string, any>;
     const result = (run.result || {}) as Record<string, any>;
-    const ticker = String(run.ticker || result.ticker || "").toUpperCase();
-    if (ticker !== "VGIA11") {
+    const ticker = normalizeIngestionTicker(run.ticker || result.ticker);
+    const fundConfig = getIngestionFundConfig(ticker);
+    if (!fundConfig || fundConfig.fundType !== "FIAGRO" || fundConfig.adapterId !== "cvm-fiagro-v2") {
       return reply({
         ok: false,
-        error: "O reprocessamento FIAGRO está restrito ao VGIA11 neste piloto.",
+        error: `${ticker || "O fundo"} não utiliza o adaptador FIAGRO v2.`,
       }, 400);
     }
 
@@ -87,6 +89,8 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
       ...result,
       ticker,
       cnpj,
+      fundType: fundConfig.fundType,
+      adapterId: fundConfig.adapterId,
       parserVersion: 2,
       monthly,
       documents,
@@ -97,6 +101,8 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
     await runRef.set({
       status: "completed",
       currentStep: "completed",
+      fundType: fundConfig.fundType,
+      adapterId: fundConfig.adapterId,
       result: nextResult,
       validation,
       fiagroReparseStatus: "completed",
@@ -110,6 +116,8 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
       ok: true,
       runId,
       ticker,
+      fundType: fundConfig.fundType,
+      adapterId: fundConfig.adapterId,
       reconciliation,
       validation: {
         readyForReview: validation.readyForReview,
