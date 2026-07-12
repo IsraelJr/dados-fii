@@ -2,6 +2,10 @@ export const SUPPORTED_INGESTION_TICKERS = ["TGAR11", "VGIA11"] as const;
 
 export type SupportedIngestionTicker = typeof SUPPORTED_INGESTION_TICKERS[number];
 
+const KNOWN_INGESTION_CNPJS: Partial<Record<SupportedIngestionTicker, string>> = {
+  VGIA11: "41081088000109",
+};
+
 export function normalizeIngestionTicker(value: unknown) {
   return String(value || "")
     .trim()
@@ -22,4 +26,10 @@ export function assertSupportedIngestionTicker(value: unknown): SupportedIngesti
     );
   }
   return ticker;
+}
+
+export function getKnownIngestionCnpj(value: unknown) {
+  const ticker = normalizeIngestionTicker(value);
+  if (!isSupportedIngestionTicker(ticker)) return "";
+  return KNOWN_INGESTION_CNPJS[ticker] || "";
 }
