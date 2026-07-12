@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminAuthorized } from "@/lib/adminSession";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
@@ -14,22 +15,6 @@ type UpdateResult = {
   fetchedMonths?: string[];
   error?: string;
 };
-
-function allowedSecrets() {
-  return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
-}
-
-function isAuthorized(req: NextRequest, body?: any) {
-  const secrets = allowedSecrets();
-  if (!secrets.length) return false;
-
-  const authHeader = req.headers.get("authorization") || "";
-  const headerSecret = req.headers.get("x-admin-secret") || authHeader.replace(/^Bearer\s+/i, "");
-  const querySecret = req.nextUrl.searchParams.get("secret");
-  const bodySecret = body?.secret;
-
-  return [headerSecret, querySecret, bodySecret].some((value) => Boolean(value && secrets.includes(value)));
-}
 
 function saoPauloParts() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -275,7 +260,7 @@ async function runPendingUpdate(limit: number, tickersFilter?: string[], cursorO
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  if (!isAdminAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
   }
 
@@ -289,7 +274,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
 
-  if (!isAuthorized(req, body)) {
+  if (!isAdminAuthorized(req, body)) {
     return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
   }
 
