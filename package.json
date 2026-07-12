@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "test:ingestion": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "prebuild": "npm run test:ingestion",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
