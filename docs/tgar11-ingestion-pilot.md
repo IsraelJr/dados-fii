@@ -36,6 +36,25 @@ O parser v2:
 
 A chave do snapshot é derivada de `ticker + data de referência`, sem índice de linha.
 
+## Análise documental por IA
+
+A análise documental não depende mais de busca web. Os oito documentos oficiais mais recentes são enviados à Responses API como `input_file` por URL, com detalhe visual baixo para controlar custo e tokens.
+
+Regras:
+
+- somente links oficiais da CVM, FNET ou RAD são aceitos;
+- sites agregadores e fontes externas não entram na análise;
+- a cobertura é calculada pela interseção entre URLs submetidas e documentos marcados como realmente acessados;
+- fontes não autorizadas retornadas pelo modelo são descartadas;
+- cobertura inferior a 50% permanece como `partial`;
+- o modo de entrada é registrado como `direct_pdf`.
+
+É possível repetir somente esta etapa, preservando os snapshots mensais:
+
+```text
+/api/admin/fii-ingestion/retry-ai?runId=IDENTIFICADOR
+```
+
 ## Fluxo
 
 1. O administrador entra em `/admin` uma vez.
@@ -46,7 +65,7 @@ A chave do snapshot é derivada de `ticker + data de referência`, sem índice d
 6. O catálogo CKAN da CVM localiza o recurso anual do informe mensal.
 7. O ZIP é baixado, filtrado pelo CNPJ e consolidado pelo parser v2.
 8. O catálogo de documentos eventuais é filtrado pelo mesmo CNPJ.
-9. A OpenAI tenta extrair dados adicionais a partir dos documentos oficiais localizados.
+9. A OpenAI recebe diretamente os PDFs oficiais selecionados.
 10. O validador calcula cobertura, duplicidades, conflitos e cobertura documental da IA.
 
 ## Coleções
@@ -57,17 +76,6 @@ FiiIngestionStaging/{runId}
 FiiIngestionStaging/{runId}/MonthlySnapshots/{snapshotId}
 FiiIngestionStaging/{runId}/Documents/{documentId}
 ```
-
-## Disparo pelo painel
-
-A página `/admin` possui o card **Piloto de ingestão TGAR11** com:
-
-- CNPJ opcional;
-- ano de referência;
-- atraso em minutos;
-- status atualizado automaticamente.
-
-A página restaura automaticamente a sessão enquanto o cookie continuar válido.
 
 ## QA manual por API
 
@@ -105,11 +113,15 @@ FiiIngestionStaging/{runId}.manualQa
 
 A API nunca autoriza publicação automática. Mesmo um resultado aprovado permanece bloqueado até revisão humana.
 
-## Configuração adicional opcional
+## Configuração opcional
 
-É possível configurar uma chave exclusiva para assinar as sessões administrativas e alterar a duração padrão. Quando a chave exclusiva não existe, a aplicação usa a chave administrativa atual como fallback.
+- `ADMIN_SESSION_SECRET`: chave exclusiva para assinatura da sessão;
+- `ADMIN_SESSION_TTL_SECONDS`: duração da sessão;
+- `OPENAI_DOCUMENT_MODEL`: modelo com suporte a PDF/visão usado na análise direta.
 
-O projeto precisa estar com Vercel Workflows habilitado e Fluid Compute ativo no ambiente de implantação.
+Quando `OPENAI_DOCUMENT_MODEL` não existe, a aplicação usa `OPENAI_MODEL` e, por último, `gpt-4.1-mini`.
+
+O projeto precisa estar com Vercel Workflows e Fluid Compute habilitados.
 
 ## Critério de aprovação do piloto
 
