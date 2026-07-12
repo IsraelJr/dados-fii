@@ -2,7 +2,13 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 
 type RawFragment = {
   sourceKind?: string;
+  sourceFile?: string;
   raw?: Record<string, unknown>;
+};
+
+type Candidate = {
+  value?: number | string;
+  sourceFile?: string;
 };
 
 function normalizeKey(value: string) {
@@ -40,7 +46,42 @@ function numberOf(value: unknown) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-export async function reconcileFiagroDailyFields(input: {
+function findCandidate(
+  fragments: RawFragment[],
+  fields: string[],
+  options?: { preferredKinds?: string[]; numeric?: boolean }
+): Candidate {
+  const preferredKinds = options?.preferredKinds || [];
+  const ordered = [...fragments].sort((left, right) => {
+    const leftIndex = preferredKinds.indexOf(String(left.sourceKind || ""));
+    const rightIndex = preferredKinds.indexOf(String(right.sourceKind || ""));
+    const leftScore = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+    const rightScore = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+    return leftScore - rightScore;
+  });
+
+  for (const fragment of ordered) {
+    const raw = fragment?.raw && typeof fragment.raw === "object" ? fragment.raw : null;
+    if (!raw) continue;
+    const rawValue = firstValue(raw, fields);
+    const value = options?.numeric ? numberOf(rawValue) : rawValue;
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return { value: value as number | string, sourceFile: fragment.sourceFile };
+    }
+  }
+
+  return {};
+}
+
+function materiallyDifferent(left: unknown, right: unknown) {
+  if (left === undefined || left === null || right === undefined || right === null) return false;
+  if (typeof left === "number" && typeof right === "number") {
+    return Math.abs(left - right) > Math.max(0.000001, Math.abs(left) * 0.000001);
+  }
+  return String(left) !== String(right);
+}
+
+export async function reconcileFiagroMonthlyFields(input: {
   runId: string;
   ticker: string;
 }) {
@@ -53,45 +94,94 @@ export async function reconcileFiagroDailyFields(input: {
   let batch = adminDb.batch();
   let operations = 0;
   let reconciled = 0;
-  const missingDailyReference: string[] = [];
+  const incompleteSnapshots: string[] = [];
+  const conflictsFound: Array<Record<string, unknown>> = [];
 
   for (const doc of snapshot.docs) {
     const data = (doc.data() || {}) as Record<string, any>;
     const fragments = Array.isArray(data.rawFragments)
       ? data.rawFragments as RawFragment[]
       : [];
-    const daily = fragments.find((fragment) => fragment?.sourceKind === "fi_daily_month_end");
-    const raw = daily?.raw && typeof daily.raw === "object" ? daily.raw : null;
 
-    if (!raw) {
-      missingDailyReference.push(String(data.referenceDate || doc.id));
-      continue;
+    const fundName = findCandidate(fragments, [
+      "Nome_Classe",
+      "Nome_Subclasse",
+    ], { preferredKinds: ["fiagro_mensal", "subclasse"] });
+    const netWorth = findCandidate(fragments, [
+      "Patrimonio_Liquido",
+    ], { preferredKinds: ["fiagro_mensal"], numeric: true });
+    const sharesOutstanding = findCandidate(fragments, [
+      "Cotas_Emitidas",
+      "Numero_Cotas",
+    ], { preferredKinds: ["fiagro_mensal", "subclasse"], numeric: true });
+    const numberShareholders = findCandidate(fragments, [
+      "Numero_Cotistas",
+    ], { preferredKinds: ["fiagro_mensal"], numeric: true });
+    const vpCota = findCandidate(fragments, [
+      "Valor_Patrimonial_Cotas",
+      "Valor_Patrimonial_Cota",
+    ], { preferredKinds: ["fiagro_mensal", "subclasse"], numeric: true });
+    const totalPortfolioValue = findCandidate(fragments, [
+      "Valor_Ativo",
+    ], { preferredKinds: ["fiagro_mensal"], numeric: true });
+
+    const conflicts = Array.isArray(data.conflicts) ? [...data.conflicts] : [];
+    const crossChecks = [
+      { field: "sharesOutstanding", primary: "Cotas_Emitidas", fallback: "Numero_Cotas" },
+      { field: "vpCota", primary: "Valor_Patrimonial_Cotas", fallback: "Valor_Patrimonial_Cota" },
+    ];
+
+    for (const check of crossChecks) {
+      const primary = findCandidate(fragments, [check.primary], {
+        preferredKinds: ["fiagro_mensal"],
+        numeric: true,
+      });
+      const fallback = findCandidate(fragments, [check.fallback], {
+        preferredKinds: ["subclasse"],
+        numeric: true,
+      });
+      if (materiallyDifferent(primary.value, fallback.value)) {
+        const conflict = {
+          field: check.field,
+          kept: primary.value,
+          incoming: fallback.value,
+          sourceFile: fallback.sourceFile || "unknown",
+        };
+        conflicts.push(conflict);
+        conflictsFound.push({ referenceDate: data.referenceDate || doc.id, ...conflict });
+      }
     }
 
-    const dailyNetWorth = numberOf(firstValue(raw, ["VL_PATRIM_LIQ"]));
-    const dailyVpCota = numberOf(firstValue(raw, ["VL_QUOTA", "VL_COTA"]));
-    const numberShareholders = numberOf(firstValue(raw, ["NR_COTST", "NR_COTISTAS"]));
-    const dailyReferenceDate = String(firstValue(raw, ["DT_COMPTC"]) || data.dailyReferenceDate || "").trim();
-    const sharesOutstanding = dailyNetWorth && dailyVpCota && dailyVpCota > 0
-      ? dailyNetWorth / dailyVpCota
-      : undefined;
-
-    const derivedFields = Array.from(new Set([
-      ...(Array.isArray(data.derivedFields) ? data.derivedFields : []),
-      ...(sharesOutstanding !== undefined ? ["sharesOutstanding:dailyNetWorth/dailyVpCota"] : []),
-    ]));
-
-    batch.set(doc.ref, {
+    const update = {
       ticker: input.ticker,
-      dailyNetWorth: dailyNetWorth ?? null,
-      dailyVpCota: dailyVpCota ?? null,
-      dailyReferenceDate: dailyReferenceDate || null,
-      vpCota: dailyVpCota ?? data.vpCota ?? null,
-      numberShareholders: numberShareholders ?? data.numberShareholders ?? null,
-      sharesOutstanding: sharesOutstanding ?? data.sharesOutstanding ?? null,
-      derivedFields,
-      fiagroDailyReconciledAt: adminFieldValue.serverTimestamp(),
-    }, { merge: true });
+      fundName: fundName.value ?? data.fundName ?? null,
+      netWorth: netWorth.value ?? data.netWorth ?? null,
+      sharesOutstanding: sharesOutstanding.value ?? data.sharesOutstanding ?? null,
+      numberShareholders: numberShareholders.value ?? data.numberShareholders ?? null,
+      vpCota: vpCota.value ?? data.vpCota ?? null,
+      totalPortfolioValue: totalPortfolioValue.value ?? data.totalPortfolioValue ?? null,
+      conflicts,
+      fieldSources: {
+        fundName: fundName.sourceFile || null,
+        netWorth: netWorth.sourceFile || null,
+        sharesOutstanding: sharesOutstanding.sourceFile || null,
+        numberShareholders: numberShareholders.sourceFile || null,
+        vpCota: vpCota.sourceFile || null,
+        totalPortfolioValue: totalPortfolioValue.sourceFile || null,
+      },
+      fiagroMonthlyReconciledAt: adminFieldValue.serverTimestamp(),
+    };
+
+    if (
+      update.netWorth === null
+      || update.sharesOutstanding === null
+      || update.numberShareholders === null
+      || update.vpCota === null
+    ) {
+      incompleteSnapshots.push(String(data.referenceDate || doc.id));
+    }
+
+    batch.set(doc.ref, update, { merge: true });
     operations += 1;
     reconciled += 1;
 
@@ -107,6 +197,10 @@ export async function reconcileFiagroDailyFields(input: {
   return {
     reconciled,
     totalSnapshots: snapshot.size,
-    missingDailyReference,
+    incompleteSnapshots,
+    conflictsFound,
   };
 }
+
+// Compatibilidade com o workflow já implantado durante o piloto.
+export const reconcileFiagroDailyFields = reconcileFiagroMonthlyFields;
