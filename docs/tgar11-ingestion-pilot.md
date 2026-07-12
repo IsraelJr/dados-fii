@@ -86,6 +86,8 @@ A resposta inclui:
 - amostras compactas para revisão;
 - `assistantReviewPayload`, pronto para copiar e enviar ao assistente.
 
+Para revisão no chat, basta copiar o objeto `assistantReviewPayload`. O relatório completo continua disponível na mesma resposta para investigação de qualquer alerta.
+
 A API nunca autoriza publicação automática. Mesmo um resultado aprovado permanece bloqueado até revisão humana.
 
 ## Configuração adicional opcional
