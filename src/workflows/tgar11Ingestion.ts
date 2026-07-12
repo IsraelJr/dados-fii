@@ -39,6 +39,12 @@ async function resolveCnpj(input: FiiIngestionInput) {
 
 async function importMonthly(input: { runId: string; ticker: string; cnpj: string; year: number }) {
   "use step";
+
+  if (input.ticker === "VGIA11") {
+    const { importFiagroMonthlyData } = await import("@/lib/cvmFiagroMonthlyIngestion");
+    return importFiagroMonthlyData(input);
+  }
+
   const { importMonthlyCvmDataV2 } = await import("@/lib/cvmMonthlyIngestion");
   return importMonthlyCvmDataV2(input);
 }
