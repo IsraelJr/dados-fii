@@ -1,17 +1,20 @@
 import { sleep } from "workflow";
-import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
-import {
-  extractPilotInsights,
-  importEventualDocuments,
-  importMonthlyCvmData,
-  normalizeTicker,
-  resolvePilotCnpj,
-  validatePilotRun,
-  type FiiIngestionInput,
-} from "@/lib/cvmIngestion";
+
+type FiiIngestionInput = {
+  runId: string;
+  ticker: string;
+  cnpj?: string;
+  year?: number;
+  delayMinutes?: number;
+};
+
+function normalizeTicker(value: unknown) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
 
 async function updateRun(runId: string, payload: Record<string, unknown>) {
   "use step";
+  const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
   await adminDb.collection("FiiIngestionRuns").doc(runId).set({
     ...payload,
     updatedAt: adminFieldValue.serverTimestamp(),
@@ -20,31 +23,37 @@ async function updateRun(runId: string, payload: Record<string, unknown>) {
 
 async function resolveCnpj(input: FiiIngestionInput) {
   "use step";
+  const { resolvePilotCnpj } = await import("@/lib/cvmIngestion");
   return resolvePilotCnpj(input.ticker, input.cnpj);
 }
 
 async function importMonthly(input: { runId: string; ticker: string; cnpj: string; year: number }) {
   "use step";
+  const { importMonthlyCvmData } = await import("@/lib/cvmIngestion");
   return importMonthlyCvmData(input);
 }
 
 async function importDocuments(input: { runId: string; ticker: string; cnpj: string; year: number }) {
   "use step";
+  const { importEventualDocuments } = await import("@/lib/cvmIngestion");
   return importEventualDocuments({ ...input, limit: 40 });
 }
 
 async function extractDocuments(input: { runId: string; ticker: string; documents: Array<Record<string, unknown>> }) {
   "use step";
+  const { extractPilotInsights } = await import("@/lib/cvmIngestion");
   return extractPilotInsights(input);
 }
 
 async function validate(input: { runId: string; ticker: string; cnpj: string; monthly: any; documents: any; ai: any }) {
   "use step";
+  const { validatePilotRun } = await import("@/lib/cvmIngestion");
   return validatePilotRun(input);
 }
 
 async function markCompleted(runId: string, result: Record<string, unknown>) {
   "use step";
+  const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
   await adminDb.collection("FiiIngestionRuns").doc(runId).set({
     status: "completed",
     currentStep: "completed",
@@ -56,6 +65,7 @@ async function markCompleted(runId: string, result: Record<string, unknown>) {
 
 async function markFailed(runId: string, error: string) {
   "use step";
+  const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
   await adminDb.collection("FiiIngestionRuns").doc(runId).set({
     status: "failed",
     currentStep: "failed",
