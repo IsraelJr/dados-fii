@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthorized } from "@/lib/adminSession";
 import { adminDb } from "@/lib/firebaseAdmin";
+import {
+  isSupportedIngestionTicker,
+  normalizeIngestionTicker,
+  SUPPORTED_INGESTION_TICKERS,
+} from "@/lib/fiiIngestionConfig";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,22 +28,36 @@ function serialize(doc: any) {
   };
 }
 
-async function readStatus(runId?: string) {
+async function readStatus(runId?: string, tickerValue?: string) {
   if (runId) {
     const snap = await adminDb.collection("FiiIngestionRuns").doc(runId).get();
     if (!snap.exists) return null;
-    return serialize(snap);
+    const run = serialize(snap);
+    return isSupportedIngestionTicker(run.ticker) ? run : null;
   }
 
+  const ticker = normalizeIngestionTicker(tickerValue);
   const snapshot = await adminDb
     .collection("FiiIngestionRuns")
     .orderBy("createdAt", "desc")
-    .limit(30)
+    .limit(50)
     .get();
+
   return snapshot.docs
     .map(serialize)
-    .filter((run) => run.ticker === "TGAR11")
-    .slice(0, 10);
+    .filter((run) => isSupportedIngestionTicker(run.ticker))
+    .filter((run) => !ticker || run.ticker === ticker)
+    .slice(0, 15);
+}
+
+function invalidTickerResponse(value: unknown) {
+  const ticker = normalizeIngestionTicker(value);
+  if (!ticker || isSupportedIngestionTicker(ticker)) return null;
+  return NextResponse.json({
+    ok: false,
+    error: "Ticker não autorizado para consulta operacional.",
+    supportedTickers: SUPPORTED_INGESTION_TICKERS,
+  }, { status: 400 });
 }
 
 export async function GET(req: NextRequest) {
@@ -48,7 +67,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const runId = String(req.nextUrl.searchParams.get("runId") || "").trim();
-    const data = await readStatus(runId || undefined);
+    const ticker = String(req.nextUrl.searchParams.get("ticker") || "").trim();
+    const invalid = invalidTickerResponse(ticker);
+    if (invalid) return invalid;
+
+    const data = await readStatus(runId || undefined, ticker || undefined);
     if (runId && !data) {
       return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
     }
@@ -72,7 +95,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const runId = String(body?.runId || "").trim();
-    const data = await readStatus(runId || undefined);
+    const ticker = String(body?.ticker || "").trim();
+    const invalid = invalidTickerResponse(ticker);
+    if (invalid) return invalid;
+
+    const data = await readStatus(runId || undefined, ticker || undefined);
     if (runId && !data) {
       return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
     }
