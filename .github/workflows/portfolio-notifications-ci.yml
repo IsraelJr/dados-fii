@@ -18,8 +18,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm install
+      - run: npm install --silent
       - name: Build application
+        id: build
+        continue-on-error: true
         shell: bash
         run: |
           PRIVATE_KEY="$(openssl genrsa 2048)"
@@ -28,4 +30,14 @@ jobs:
           export NEXT_PUBLIC_BASE_URL="https://www.dadosfii.com.br"
           export CRON_SECRET="ci-only-secret"
           export ADMIN_UPDATE_SECRET="ci-only-secret"
-          npm run build
+          npm run build > build.log 2>&1
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-notifications-build-log
+          path: build.log
+          if-no-files-found: error
+      - name: Fail when build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
