@@ -5,6 +5,10 @@
       "schedule": "0 11 * * *"
     },
     {
+      "path": "/api/admin/process-portfolio-notifications?limit=100",
+      "schedule": "30 11 * * *"
+    },
+    {
       "path": "/api/admin/clean-wallet-sessions?limit=200",
       "schedule": "0 10 * * *"
     },
