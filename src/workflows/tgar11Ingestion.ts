@@ -29,8 +29,8 @@ async function resolveCnpj(input: FiiIngestionInput) {
 
 async function importMonthly(input: { runId: string; ticker: string; cnpj: string; year: number }) {
   "use step";
-  const { importMonthlyCvmData } = await import("@/lib/cvmIngestion");
-  return importMonthlyCvmData(input);
+  const { importMonthlyCvmDataV2 } = await import("@/lib/cvmMonthlyIngestion");
+  return importMonthlyCvmDataV2(input);
 }
 
 async function importDocuments(input: { runId: string; ticker: string; cnpj: string; year: number }) {
@@ -41,14 +41,14 @@ async function importDocuments(input: { runId: string; ticker: string; cnpj: str
 
 async function extractDocuments(input: { runId: string; ticker: string; documents: Array<Record<string, unknown>> }) {
   "use step";
-  const { extractPilotInsights } = await import("@/lib/cvmIngestion");
-  return extractPilotInsights(input);
+  const { extractPilotInsightsV2 } = await import("@/lib/cvmPilotAi");
+  return extractPilotInsightsV2(input);
 }
 
 async function validate(input: { runId: string; ticker: string; cnpj: string; monthly: any; documents: any; ai: any }) {
   "use step";
-  const { validatePilotRun } = await import("@/lib/cvmIngestion");
-  return validatePilotRun(input);
+  const { validatePilotRunV2 } = await import("@/lib/cvmMonthlyIngestion");
+  return validatePilotRunV2(input);
 }
 
 async function markCompleted(runId: string, result: Record<string, unknown>) {
@@ -88,6 +88,7 @@ export async function tgar11IngestionWorkflow(input: FiiIngestionInput) {
       currentStep: delayMinutes > 0 ? "waiting" : "resolve_cnpj",
       ticker,
       year,
+      parserVersion: 2,
       publishToOfficialBase: false,
     });
 
@@ -107,7 +108,7 @@ export async function tgar11IngestionWorkflow(input: FiiIngestionInput) {
     await updateRun(input.runId, { ai, currentStep: "validation" });
 
     const validation = await validate({ runId: input.runId, ticker, cnpj, monthly, documents, ai });
-    const result = { ticker, cnpj, year, monthly, documents, ai, validation };
+    const result = { ticker, cnpj, year, parserVersion: 2, monthly, documents, ai, validation };
     await markCompleted(input.runId, result);
     return result;
   } catch (error: any) {
