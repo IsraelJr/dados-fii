@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminAuthorized, readAdminSession } from "@/lib/adminSession";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
@@ -12,15 +13,6 @@ function tickerOf(value: unknown) {
 
 function textOf(value: unknown) {
   return String(value || "").trim();
-}
-
-function isAdminAuthorized(req: NextRequest, body: any) {
-  const expected = process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET;
-  if (!expected) return false;
-
-  const fromHeader = req.headers.get("x-admin-secret") || "";
-  const fromBody = String(body?.secret || "");
-  return fromHeader === expected || fromBody === expected;
 }
 
 function emptyLike(value: any): any {
@@ -198,6 +190,7 @@ export async function POST(req: NextRequest) {
     const base = emptyLike(template);
     const now = adminFieldValue.serverTimestamp();
     const field = `earnings${fetched.earningsYear}`;
+    const session = readAdminSession(req);
 
     const data = {
       ...base,
@@ -212,7 +205,7 @@ export async function POST(req: NextRequest) {
       assetType: fetched.assetType,
       created_in: now,
       modified_in: now,
-      createdBy: "admin-create-fii",
+      createdBy: session?.user || "admin-create-fii",
     };
 
     await adminDb.collection("Fiis").doc(code).set(data, { merge: false });
