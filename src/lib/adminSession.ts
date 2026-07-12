@@ -63,24 +63,18 @@ function safeEqual(left: string, right: string) {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-export function validateAdminCredentials(userValue: unknown, tokenValue: unknown) {
-  const user = String(userValue || "").trim();
+export function validateAdminCredentials(_userValue: unknown, tokenValue: unknown) {
   const token = String(tokenValue || "");
-  const expectedUser = expectedAdminUser();
   const expectedToken = process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET || "";
-
   if (!expectedToken || !sessionSecret()) return false;
-  const userMatches = !user || safeEqual(user, expectedUser);
-  return userMatches && safeEqual(token, expectedToken);
+  return safeEqual(token, expectedToken);
 }
 
-export function createAdminSessionToken(userValue?: unknown) {
-  const expectedUser = expectedAdminUser();
-  const providedUser = String(userValue || "").trim();
-  const user = providedUser || expectedUser;
+export function createAdminSessionToken() {
+  const user = expectedAdminUser();
   const secret = sessionSecret();
 
-  if (!secret || !expectedUser || user !== expectedUser) {
+  if (!secret || !user) {
     throw new Error("Sessão administrativa não configurada.");
   }
 
