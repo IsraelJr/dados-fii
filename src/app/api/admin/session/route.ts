@@ -3,6 +3,7 @@ import {
   adminSessionDurationSeconds,
   clearAdminSessionCookie,
   createAdminSessionToken,
+  expectedAdminUser,
   readAdminSession,
   setAdminSessionCookie,
   validateAdminCredentials,
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
   const user = String(body?.user || "").trim();
   const token = String(body?.token || "");
 
-  if (!process.env.ADMIN_USER || !(process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET)) {
+  if (!(process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET)) {
     return NextResponse.json(
       { ok: false, error: "Acesso administrativo não configurado." },
       { status: 500 }
@@ -48,12 +49,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Acesso negado." }, { status: 401 });
   }
 
-  const session = createAdminSessionToken(user);
+  const session = createAdminSessionToken(user || expectedAdminUser());
   const response = NextResponse.json(
     {
       ok: true,
       authenticated: true,
-      user,
+      user: session.payload.user,
       expiresAt: new Date(session.payload.expiresAt * 1000).toISOString(),
       sessionDurationSeconds: adminSessionDurationSeconds(),
     },
