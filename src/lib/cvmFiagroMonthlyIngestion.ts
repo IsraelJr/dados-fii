@@ -4,7 +4,9 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { normalizeCnpj, parseDelimitedLine } from "@/lib/cvmIngestion";
 
 const FIAGRO_MONTHLY_BASE = "https://dados.cvm.gov.br/dados/FIAGRO/DOC/INF_MENSAL/DADOS";
+const FI_DAILY_BASE = "https://dados.cvm.gov.br/dados/FI/DOC/INF_DIARIO/DADOS";
 const FIAGRO_MONTHLY_DATASET = "fiagro-doc-inf_mensal";
+const FI_DAILY_DATASET = "fi-doc-inf_diario";
 
 type CsvRow = Record<string, string>;
 type Conflict = {
@@ -18,6 +20,7 @@ type FiagroSnapshot = {
   ticker: string;
   cnpj: string;
   referenceDate: string;
+  dailyReferenceDate?: string;
   fundName?: string;
   netWorth?: number;
   vpCota?: number;
@@ -30,6 +33,7 @@ type FiagroSnapshot = {
   source: {
     dataset: string;
     url: string;
+    urls?: string[];
     importedAt: string;
     files: string[];
     kinds: string[];
@@ -143,6 +147,41 @@ function parseRows(text: string, expectedCnpj: string) {
   return rows;
 }
 
+function emptySnapshot(input: {
+  ticker: string;
+  cnpj: string;
+  referenceDate: string;
+  sourceUrl: string;
+  sourceFile: string;
+  sourceKind: string;
+  sourceRowIndex: number;
+  raw: CsvRow;
+  dataset?: string;
+}): FiagroSnapshot {
+  return {
+    ticker: input.ticker,
+    cnpj: input.cnpj,
+    referenceDate: input.referenceDate,
+    derivedFields: [],
+    conflicts: [],
+    source: {
+      dataset: input.dataset || FIAGRO_MONTHLY_DATASET,
+      url: input.sourceUrl,
+      urls: [input.sourceUrl],
+      importedAt: new Date().toISOString(),
+      files: [input.sourceFile],
+      kinds: [input.sourceKind],
+      fragmentCount: 1,
+    },
+    rawFragments: [{
+      sourceKind: input.sourceKind,
+      sourceFile: input.sourceFile,
+      sourceRowIndex: input.sourceRowIndex,
+      raw: input.raw,
+    }],
+  };
+}
+
 function buildFragment(input: {
   row: CsvRow;
   ticker: string;
@@ -160,71 +199,91 @@ function buildFragment(input: {
   if (!referenceDate) return null;
 
   const kind = sourceKind(input.sourceFile);
-  const reportedShares = firstNumber(input.row, [
+  const fragment = emptySnapshot({
+    ticker: input.ticker,
+    cnpj: input.cnpj,
+    referenceDate,
+    sourceUrl: input.sourceUrl,
+    sourceFile: input.sourceFile,
+    sourceKind: kind,
+    sourceRowIndex: input.sourceRowIndex,
+    raw: input.row,
+  });
+
+  fragment.fundName = firstText(input.row, [
+    "DENOM_SOCIAL",
+    "DENOM_CLASSE",
+    "DENOM_SUBCLASSE",
+    "DENOM_FUNDO",
+    "NM_FUNDO",
+    "NOME_FUNDO",
+  ]);
+  fragment.netWorth = firstNumber(input.row, [
+    "VL_PATRIM_LIQ",
+    "TAB_IV_A_VL_PL",
+    "VL_PL",
+    "PATRIMONIO_LIQUIDO",
+  ]);
+  fragment.vpCota = firstNumber(input.row, [
+    "VL_QUOTA",
+    "VL_COTA",
+    "VL_PATRIM_COTA",
+    "VL_QUOTA_SUBCLASSE",
+  ]);
+  fragment.sharesOutstanding = firstNumber(input.row, [
     "QT_COTAS",
     "QTD_COTAS",
     "NR_COTAS",
     "QT_COTAS_EMITIDAS",
     "QT_COTA",
   ]);
+  fragment.numberShareholders = firstNumber(input.row, [
+    "NR_COTST",
+    "NR_COTISTAS",
+    "QT_COTISTAS",
+    "QT_COTST",
+  ]);
+  fragment.totalPortfolioValue = firstNumber(input.row, [
+    "VL_TOTAL",
+    "VL_CARTEIRA_TOTAL",
+  ]);
+  fragment.delinquentCreditValue = firstNumber(input.row, [
+    "TAB_VI_B_VL_DIRCRED_INAD",
+    "TAB_VI_B_VL_TOTAL",
+    "TAB_VI_VL_TOTAL_INAD",
+  ]);
 
-  return {
+  return fragment;
+}
+
+function buildDailyFragment(input: {
+  row: CsvRow;
+  ticker: string;
+  cnpj: string;
+  competenceDate: string;
+  sourceUrl: string;
+  sourceFile: string;
+  sourceRowIndex: number;
+}): FiagroSnapshot {
+  const fragment = emptySnapshot({
     ticker: input.ticker,
     cnpj: input.cnpj,
-    referenceDate,
-    fundName: firstText(input.row, [
-      "DENOM_SOCIAL",
-      "DENOM_CLASSE",
-      "DENOM_SUBCLASSE",
-      "DENOM_FUNDO",
-      "NM_FUNDO",
-      "NOME_FUNDO",
-    ]),
-    netWorth: firstNumber(input.row, [
-      "VL_PATRIM_LIQ",
-      "TAB_IV_A_VL_PL",
-      "VL_PL",
-      "PATRIMONIO_LIQUIDO",
-    ]),
-    vpCota: firstNumber(input.row, [
-      "VL_QUOTA",
-      "VL_COTA",
-      "VL_PATRIM_COTA",
-      "VL_QUOTA_SUBCLASSE",
-    ]),
-    sharesOutstanding: reportedShares,
-    numberShareholders: firstNumber(input.row, [
-      "NR_COTST",
-      "NR_COTISTAS",
-      "QT_COTISTAS",
-      "QT_COTST",
-    ]),
-    totalPortfolioValue: firstNumber(input.row, [
-      "VL_TOTAL",
-      "VL_CARTEIRA_TOTAL",
-    ]),
-    delinquentCreditValue: firstNumber(input.row, [
-      "TAB_VI_B_VL_DIRCRED_INAD",
-      "TAB_VI_B_VL_TOTAL",
-      "TAB_VI_VL_TOTAL_INAD",
-    ]),
-    derivedFields: [],
-    conflicts: [],
-    source: {
-      dataset: FIAGRO_MONTHLY_DATASET,
-      url: input.sourceUrl,
-      importedAt: new Date().toISOString(),
-      files: [input.sourceFile],
-      kinds: [kind],
-      fragmentCount: 1,
-    },
-    rawFragments: [{
-      sourceKind: kind,
-      sourceFile: input.sourceFile,
-      sourceRowIndex: input.sourceRowIndex,
-      raw: input.row,
-    }],
-  };
+    referenceDate: input.competenceDate,
+    sourceUrl: input.sourceUrl,
+    sourceFile: input.sourceFile,
+    sourceKind: "fi_daily_month_end",
+    sourceRowIndex: input.sourceRowIndex,
+    raw: input.row,
+    dataset: FI_DAILY_DATASET,
+  });
+
+  fragment.dailyReferenceDate = normalizeReferenceDate(firstText(input.row, ["DT_COMPTC"]));
+  fragment.fundName = firstText(input.row, ["DENOM_SOCIAL", "DENOM_CLASSE", "NM_FUNDO"]);
+  fragment.vpCota = firstNumber(input.row, ["VL_QUOTA", "VL_COTA"]);
+  fragment.numberShareholders = firstNumber(input.row, ["NR_COTST", "NR_COTISTAS"]);
+  fragment.totalPortfolioValue = firstNumber(input.row, ["VL_TOTAL", "VL_CARTEIRA_TOTAL"]);
+
+  return fragment;
 }
 
 function valuesDiffer(left: unknown, right: unknown) {
@@ -246,12 +305,16 @@ function mergeSnapshots(current: FiagroSnapshot | undefined, incoming: FiagroSna
     "numberShareholders",
     "totalPortfolioValue",
     "delinquentCreditValue",
+    "dailyReferenceDate",
   ];
+  const currentUrls = current.source.urls || [current.source.url];
+  const incomingUrls = incoming.source.urls || [incoming.source.url];
   const merged: FiagroSnapshot = {
     ...current,
     source: {
       ...current.source,
-      url: incoming.source.url || current.source.url,
+      url: current.source.url || incoming.source.url,
+      urls: Array.from(new Set([...currentUrls, ...incomingUrls])),
       files: Array.from(new Set([...current.source.files, ...incoming.source.files])),
       kinds: Array.from(new Set([...current.source.kinds, ...incoming.source.kinds])),
       fragmentCount: current.source.fragmentCount + incoming.source.fragmentCount,
@@ -295,6 +358,80 @@ function monthsForYear(year: number) {
   if (year < now.getFullYear()) return Array.from({ length: 12 }, (_, index) => index + 1);
   if (year > now.getFullYear()) return [];
   return Array.from({ length: now.getMonth() + 1 }, (_, index) => index + 1);
+}
+
+async function enrichFromDailyReports(input: {
+  ticker: string;
+  cnpj: string;
+  snapshotsByDate: Map<string, FiagroSnapshot>;
+}) {
+  const resourcesRead: string[] = [];
+  const missingResources: string[] = [];
+  const filesRead: string[] = [];
+  let matchedRows = 0;
+  let zipBytes = 0;
+
+  const snapshots = [...input.snapshotsByDate.values()]
+    .filter((snapshot) => !snapshot.vpCota || snapshot.numberShareholders === undefined)
+    .sort((left, right) => left.referenceDate.localeCompare(right.referenceDate));
+
+  for (const snapshot of snapshots) {
+    const period = snapshot.referenceDate.slice(0, 7).replace("-", "");
+    const sourceUrl = `${FI_DAILY_BASE}/inf_diario_fi_${period}.zip`;
+    const response = await fetch(sourceUrl, { cache: "no-store" });
+
+    if (response.status === 404) {
+      missingResources.push(sourceUrl);
+      continue;
+    }
+    if (!response.ok) {
+      throw new Error(`Falha ao baixar Informe Diário CVM ${period}: ${response.status}`);
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    zipBytes += bytes.byteLength;
+    resourcesRead.push(sourceUrl);
+    const files = unzipSync(bytes);
+    const candidates: Array<{ row: CsvRow; rowIndex: number; filename: string; date: string }> = [];
+
+    for (const [filename, content] of Object.entries(files)) {
+      if (!/\.csv$/i.test(filename)) continue;
+      filesRead.push(filename);
+      const text = new TextDecoder("latin1").decode(content);
+      const rows = parseRows(text, input.cnpj);
+      matchedRows += rows.length;
+      for (const item of rows) {
+        const date = normalizeReferenceDate(firstText(item.row, ["DT_COMPTC"]));
+        if (!date || !date.startsWith(snapshot.referenceDate.slice(0, 7))) continue;
+        candidates.push({ ...item, filename, date });
+      }
+    }
+
+    const latest = candidates.sort((left, right) => right.date.localeCompare(left.date))[0];
+    if (!latest) continue;
+
+    const dailyFragment = buildDailyFragment({
+      row: latest.row,
+      ticker: input.ticker,
+      cnpj: input.cnpj,
+      competenceDate: snapshot.referenceDate,
+      sourceUrl,
+      sourceFile: latest.filename,
+      sourceRowIndex: latest.rowIndex,
+    });
+    input.snapshotsByDate.set(
+      snapshot.referenceDate,
+      mergeSnapshots(input.snapshotsByDate.get(snapshot.referenceDate), dailyFragment)
+    );
+  }
+
+  return {
+    resourcesRead,
+    missingResources,
+    filesRead: Array.from(new Set(filesRead)),
+    matchedRows,
+    zipBytes,
+  };
 }
 
 export async function importFiagroMonthlyData(input: {
@@ -353,6 +490,11 @@ export async function importFiagroMonthlyData(input: {
     }
   }
 
+  const daily = await enrichFromDailyReports({
+    ticker: input.ticker,
+    cnpj: input.cnpj,
+    snapshotsByDate,
+  });
   const snapshots = [...snapshotsByDate.values()]
     .map(finalizeSnapshot)
     .sort((left, right) => left.referenceDate.localeCompare(right.referenceDate));
@@ -388,6 +530,7 @@ export async function importFiagroMonthlyData(input: {
     filesRead,
     zipBytes,
     matchedRows,
+    dailyEnrichment: daily,
     snapshotsSaved: snapshots.length,
     referenceDates: snapshots.map((snapshot) => snapshot.referenceDate),
     conflictCount: snapshots.reduce((total, snapshot) => total + snapshot.conflicts.length, 0),
