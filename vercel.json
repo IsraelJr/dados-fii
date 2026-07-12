@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/admin/expire-vip-gifts?limit=300",
-      "schedule": "15 * * * *"
+      "schedule": "15 4 * * *"
     }
   ]
 }
