@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       mode: "operational_staging",
       status: delayMinutes > 0 ? "scheduled" : "queued",
       publishToOfficialBase: false,
-      qaUrl: `/api/admin/fii-ingestion/qa?runId=${encodeURIComponent(runId)}&persist=1`,
+      qaUrl: `/api/admin/fii-ingestion/operational-qa?runId=${encodeURIComponent(runId)}&persist=1`,
     });
   } catch (error: any) {
     await runRef.set({
