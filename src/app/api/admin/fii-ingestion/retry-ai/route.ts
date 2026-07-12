@@ -6,6 +6,7 @@ import { validatePilotRunV2 } from "@/lib/cvmMonthlyIngestion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 function response(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
@@ -115,6 +116,7 @@ async function retryAi(req: NextRequest, body?: Record<string, any>) {
         status: ai.status,
         quality: ai.quality,
         reason: ai.reason,
+        inputMode: ai.inputMode,
         documentsSubmitted: ai.documentsSubmitted,
         sourceUrlsUsed: ai.sourceUrlsUsed,
         sourceCoverage: ai.sourceCoverage,
