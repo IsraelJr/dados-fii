@@ -24,8 +24,19 @@ function sessionSecret() {
   );
 }
 
-function expectedAdminUser() {
-  return String(process.env.ADMIN_USER || "").trim();
+function firstConfiguredAdminEmail() {
+  return String(
+    process.env.ADMIN_EMAILS ||
+    process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+    ""
+  )
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .find(Boolean) || "";
+}
+
+export function expectedAdminUser() {
+  return String(process.env.ADMIN_USER || firstConfiguredAdminEmail() || "admin").trim();
 }
 
 export function adminSessionDurationSeconds() {
@@ -58,14 +69,17 @@ export function validateAdminCredentials(userValue: unknown, tokenValue: unknown
   const expectedUser = expectedAdminUser();
   const expectedToken = process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET || "";
 
-  if (!expectedUser || !expectedToken || !sessionSecret()) return false;
-  return safeEqual(user, expectedUser) && safeEqual(token, expectedToken);
+  if (!expectedToken || !sessionSecret()) return false;
+  const userMatches = !user || safeEqual(user, expectedUser);
+  return userMatches && safeEqual(token, expectedToken);
 }
 
-export function createAdminSessionToken(userValue: unknown) {
-  const user = String(userValue || "").trim();
-  const secret = sessionSecret();
+export function createAdminSessionToken(userValue?: unknown) {
   const expectedUser = expectedAdminUser();
+  const providedUser = String(userValue || "").trim();
+  const user = providedUser || expectedUser;
+  const secret = sessionSecret();
+
   if (!secret || !expectedUser || user !== expectedUser) {
     throw new Error("Sessão administrativa não configurada.");
   }
