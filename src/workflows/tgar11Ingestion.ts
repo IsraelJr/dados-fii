@@ -87,8 +87,8 @@ async function extractDocuments(input: {
 
 async function validate(input: { runId: string; ticker: string; cnpj: string; monthly: any; documents: any; ai: any }) {
   "use step";
-  const { validatePilotRunV2 } = await import("@/lib/cvmMonthlyIngestion");
-  return validatePilotRunV2(input);
+  const { validateOperationalRun } = await import("@/lib/cvmOperationalValidation");
+  return validateOperationalRun(input);
 }
 
 async function markCompleted(runId: string, result: Record<string, unknown>) {
