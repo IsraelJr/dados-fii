@@ -15,6 +15,27 @@ O piloto valida a descoberta, extração e normalização de dados oficiais ante
 - O botão Sair encerra a sessão imediatamente.
 - As chaves atuais continuam aceitas em chamadas técnicas e tarefas agendadas.
 
+## Parser mensal v2
+
+O ZIP anual da CVM possui três subtipos de CSV:
+
+- `geral`: identificação, nome, ISIN, segmento, mandato e quantidade de cotas;
+- `complemento`: patrimônio líquido, cotas emitidas, VP/cota, cotistas, dividend yield e rentabilidades;
+- `ativo_passivo`: caixa, CRI, LCI, imóveis, contas a receber e rendimentos a distribuir.
+
+O parser v2:
+
+1. lê somente esses três arquivos reconhecidos;
+2. decodifica os CSVs como Latin-1;
+3. filtra o CNPJ por coluna, não apenas por ocorrência textual;
+4. mantém a versão mais recente de cada subtipo por competência;
+5. consolida `geral + complemento + ativo_passivo` por `CNPJ + Data_Referencia`;
+6. grava uma única linha por competência;
+7. registra arquivos de origem, subtipo, linha, versão e fragmentos brutos;
+8. identifica divergências entre subtipos como conflitos explícitos.
+
+A chave do snapshot é derivada de `ticker + data de referência`, sem índice de linha.
+
 ## Fluxo
 
 1. O administrador entra em `/admin` uma vez.
@@ -23,10 +44,10 @@ O piloto valida a descoberta, extração e normalização de dados oficiais ante
 4. Um Vercel Workflow é iniciado imediatamente ou após o atraso informado.
 5. O CNPJ é resolvido pelo parâmetro, pelo documento `Fiis/TGAR11` ou pela configuração do ambiente.
 6. O catálogo CKAN da CVM localiza o recurso anual do informe mensal.
-7. O ZIP é baixado, filtrado pelo CNPJ e normalizado.
+7. O ZIP é baixado, filtrado pelo CNPJ e consolidado pelo parser v2.
 8. O catálogo de documentos eventuais é filtrado pelo mesmo CNPJ.
 9. A OpenAI tenta extrair dados adicionais a partir dos documentos oficiais localizados.
-10. O validador calcula cobertura e deixa o resultado pronto para revisão.
+10. O validador calcula cobertura, duplicidades, conflitos e cobertura documental da IA.
 
 ## Coleções
 
@@ -48,45 +69,39 @@ A página `/admin` possui o card **Piloto de ingestão TGAR11** com:
 
 A página restaura automaticamente a sessão enquanto o cookie continuar válido.
 
-## Disparo por API
-
-Chamadas técnicas continuam compatíveis com o cabeçalho administrativo já utilizado pelo projeto.
-
 ## QA manual por API
 
 Após a execução terminar com `status: completed`, o administrador pode abrir:
 
 ```text
-/api/admin/fii-ingestion/qa
-```
-
-A rota seleciona automaticamente a execução concluída mais recente do TGAR11. Também aceita um identificador específico:
-
-```text
-/api/admin/fii-ingestion/qa?runId=IDENTIFICADOR
-```
-
-Para salvar o relatório de QA no documento da execução e no staging:
-
-```text
 /api/admin/fii-ingestion/qa?persist=1
 ```
 
-A resposta inclui:
+A rota seleciona automaticamente a execução concluída mais recente. Também aceita:
 
-- status e escopo da execução;
-- confirmação de bloqueio da publicação oficial;
-- contagem real e esperada de snapshots e documentos;
-- cobertura dos campos mensais;
-- consistência do CNPJ;
-- plausibilidade de datas e valores;
-- verificação das fontes oficiais;
-- situação da extração por IA;
-- score, veredito, alertas e recomendações;
-- amostras compactas para revisão;
-- `assistantReviewPayload`, pronto para copiar e enviar ao assistente.
+```text
+/api/admin/fii-ingestion/qa?runId=IDENTIFICADOR&persist=1
+```
 
-Para revisão no chat, basta copiar o objeto `assistantReviewPayload`. O relatório completo continua disponível na mesma resposta para investigação de qualquer alerta.
+O QA retorna `fail` quando houver qualquer uma destas condições:
+
+- execução produzida pelo parser antigo;
+- publicação oficial não comprovadamente bloqueada;
+- ausência do staging ou CNPJ inválido;
+- mais de uma linha para a mesma competência;
+- cobertura de qualquer campo essencial abaixo de 80%;
+- conflito entre os três subtipos mensais;
+- divergência entre contagem gravada e resumo do workflow;
+- `readyForReview` falso ou bloqueios registrados pelo workflow.
+
+A extração por IA só recebe `pass` quando utiliza pelo menos 50% dos documentos submetidos. Abaixo disso, permanece como análise parcial e gera alerta.
+
+A resposta inclui `assistantReviewPayload`, pronto para copiar e enviar ao assistente. O relatório completo pode ser persistido em:
+
+```text
+FiiIngestionRuns/{runId}.manualQa
+FiiIngestionStaging/{runId}.manualQa
+```
 
 A API nunca autoriza publicação automática. Mesmo um resultado aprovado permanece bloqueado até revisão humana.
 
@@ -98,11 +113,12 @@ O projeto precisa estar com Vercel Workflows habilitado e Fluid Compute ativo no
 
 ## Critério de aprovação do piloto
 
-O piloto é considerado tecnicamente promissor quando:
+O piloto somente avança para revisão humana quando:
 
-- encontra registros mensais pelo CNPJ;
-- indexa documentos oficiais;
+- usa o parser v2;
+- encontra competências mensais únicas;
+- alcança pelo menos 80% de cobertura em data, patrimônio, cotas, cotistas e VP/cota;
+- não apresenta conflitos entre subtipos;
 - mantém rastreabilidade da origem;
-- calcula cobertura dos campos críticos;
 - não altera a base oficial;
-- identifica claramente extrações que precisam de revisão humana.
+- classifica corretamente a cobertura parcial da IA.
