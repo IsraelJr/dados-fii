@@ -6,6 +6,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PILOT_TICKER = "TGAR11";
+const ESSENTIAL_FIELDS = [
+  "referenceDate",
+  "netWorth",
+  "sharesOutstanding",
+  "numberShareholders",
+  "vpCota",
+] as const;
 const OFFICIAL_SOURCE_HOSTS = [
   "cvm.gov.br",
   "dados.cvm.gov.br",
@@ -14,7 +21,7 @@ const OFFICIAL_SOURCE_HOSTS = [
 ];
 
 type CheckLevel = "pass" | "warn" | "fail";
-
+type PlainDocument = Record<string, any> & { id: string };
 type QaCheck = {
   id: string;
   level: CheckLevel;
@@ -23,24 +30,20 @@ type QaCheck = {
   evidence?: unknown;
 };
 
-type PlainDocument = Record<string, any> & { id: string };
+function jsonResponse(payload: unknown, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      "Content-Type": "application/json; charset=utf-8",
+    },
+  });
+}
 
 function toIso(value: any) {
   if (!value) return null;
   const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function serializeValue(value: any): any {
-  if (value === undefined || value === null) return null;
-  if (typeof value?.toDate === "function") return toIso(value);
-  if (Array.isArray(value)) return value.map(serializeValue);
-  if (typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, serializeValue(item)])
-    );
-  }
-  return value;
 }
 
 function normalizeCnpj(value: unknown) {
@@ -62,16 +65,6 @@ function fieldCoverage(items: PlainDocument[], field: string) {
   return Number(((present / items.length) * 100).toFixed(1));
 }
 
-function percentage(numerator: number, denominator: number) {
-  if (!denominator) return 0;
-  return Number(((numerator / denominator) * 100).toFixed(1));
-}
-
-function validDate(value: unknown) {
-  if (!value) return false;
-  return !Number.isNaN(new Date(String(value)).getTime());
-}
-
 function hostnameOf(value: unknown) {
   try {
     return new URL(String(value || "")).hostname.toLowerCase();
@@ -83,35 +76,13 @@ function hostnameOf(value: unknown) {
 function isOfficialSource(value: unknown) {
   const hostname = hostnameOf(value);
   return Boolean(
-    hostname && OFFICIAL_SOURCE_HOSTS.some((allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`))
+    hostname && OFFICIAL_SOURCE_HOSTS.some((allowed) =>
+      hostname === allowed || hostname.endsWith(`.${allowed}`)
+    )
   );
 }
 
-function snapshotSample(data: PlainDocument) {
-  return {
-    referenceDate: data.referenceDate || null,
-    cnpj: data.cnpj || null,
-    fundName: data.fundName || null,
-    netWorth: numeric(data.netWorth),
-    sharesOutstanding: numeric(data.sharesOutstanding),
-    numberShareholders: numeric(data.numberShareholders),
-    vpCota: numeric(data.vpCota),
-    sourceUrl: data.source?.url || null,
-  };
-}
-
-function documentSample(data: PlainDocument) {
-  return {
-    documentType: data.documentType || null,
-    documentName: data.documentName || null,
-    referenceDate: data.referenceDate || null,
-    deliveryDate: data.deliveryDate || null,
-    documentUrl: data.documentUrl || null,
-    sourceUrl: data.source?.url || null,
-  };
-}
-
-function check(
+function addCheck(
   checks: QaCheck[],
   id: string,
   level: CheckLevel,
@@ -119,7 +90,35 @@ function check(
   detail: string,
   evidence?: unknown
 ) {
-  checks.push({ id, level, title, detail, evidence });
+  checks.push(evidence === undefined
+    ? { id, level, title, detail }
+    : { id, level, title, detail, evidence });
+}
+
+function monthlySample(item: PlainDocument) {
+  return {
+    referenceDate: item.referenceDate || null,
+    cnpj: item.cnpj || null,
+    fundName: item.fundName || null,
+    netWorth: numeric(item.netWorth),
+    sharesOutstanding: numeric(item.sharesOutstanding),
+    numberShareholders: numeric(item.numberShareholders),
+    vpCota: numeric(item.vpCota),
+    sourceFiles: Array.isArray(item.source?.files) ? item.source.files : [],
+    sourceKinds: Array.isArray(item.source?.kinds) ? item.source.kinds : [],
+    conflicts: Array.isArray(item.conflicts) ? item.conflicts : [],
+  };
+}
+
+function documentSample(item: PlainDocument) {
+  return {
+    documentType: item.documentType || null,
+    documentName: item.documentName || null,
+    referenceDate: item.referenceDate || null,
+    deliveryDate: item.deliveryDate || null,
+    documentUrl: item.documentUrl || null,
+    sourceUrl: item.source?.url || null,
+  };
 }
 
 async function findRun(runId?: string) {
@@ -140,25 +139,19 @@ async function findRun(runId?: string) {
   }) || snapshot.docs.find((doc) => (doc.data() || {}).ticker === PILOT_TICKER) || null;
 }
 
-function recommendationsFor(checks: QaCheck[]) {
+function buildRecommendations(checks: QaCheck[]) {
+  const failures = checks.filter((check) => check.level === "fail");
+  const warnings = checks.filter((check) => check.level === "warn");
   const recommendations: string[] = [];
-  const failures = checks.filter((item) => item.level === "fail");
-  const warnings = checks.filter((item) => item.level === "warn");
 
   if (failures.length) {
-    recommendations.push("Não publicar dados. Corrigir as verificações com nível fail antes de avançar.");
+    recommendations.push("Não publicar. Corrigir todos os checks com nível fail e repetir a ingestão em staging.");
   }
-  if (warnings.some((item) => item.id === "monthly-coverage")) {
-    recommendations.push("Revisar o mapeamento dos campos do informe mensal da CVM.");
-  }
-  if (warnings.some((item) => item.id === "documents" || item.id === "document-sources")) {
-    recommendations.push("Revisar os documentos eventuais e os links oficiais retornados.");
-  }
-  if (warnings.some((item) => item.id === "ai-extraction")) {
-    recommendations.push("Revisar a configuração da OpenAI e a disponibilidade dos documentos oficiais.");
+  if (warnings.some((check) => check.id === "ai-coverage")) {
+    recommendations.push("Tratar a análise documental da IA como parcial e revisar manualmente os documentos não acessados.");
   }
   if (!failures.length) {
-    recommendations.push("Realizar revisão humana dos valores e fontes antes de qualquer publicação oficial.");
+    recommendations.push("Prosseguir somente para revisão humana dos valores e fontes; a publicação automática permanece bloqueada.");
   }
   return recommendations;
 }
@@ -171,6 +164,7 @@ async function runQa(runId?: string, persist = false) {
 
   const selectedRunId = runSnapshot.id;
   const run = (runSnapshot.data() || {}) as Record<string, any>;
+  const result = (run.result || {}) as Record<string, any>;
   const stagingRef = adminDb.collection("FiiIngestionStaging").doc(selectedRunId);
   const [stagingSnapshot, monthlySnapshot, documentsSnapshot, officialSnapshot] = await Promise.all([
     stagingRef.get(),
@@ -180,6 +174,9 @@ async function runQa(runId?: string, persist = false) {
   ]);
 
   const staging = (stagingSnapshot.data() || {}) as Record<string, any>;
+  const validation = (staging.validation || result.validation || {}) as Record<string, any>;
+  const ai = (result.ai || run.ai || {}) as Record<string, any>;
+  const aiExtraction = (staging.aiExtraction || ai.extraction || null) as Record<string, any> | null;
   const monthly: PlainDocument[] = monthlySnapshot.docs.map((doc) => ({
     id: doc.id,
     ...((doc.data() || {}) as Record<string, any>),
@@ -188,232 +185,229 @@ async function runQa(runId?: string, persist = false) {
     id: doc.id,
     ...((doc.data() || {}) as Record<string, any>),
   }));
-
-  const result = (run.result || {}) as Record<string, any>;
-  const validation = (staging.validation || result.validation || run.validation || {}) as Record<string, any>;
-  const ai = (result.ai || run.ai || {}) as Record<string, any>;
-  const aiExtraction = (staging.aiExtraction || ai.extraction || null) as Record<string, any> | null;
   const expectedCnpj = normalizeCnpj(run.cnpj || result.cnpj || staging.cnpj);
-  const expectedMonthly = numeric(result.monthly?.snapshotsSaved ?? run.monthly?.snapshotsSaved);
-  const expectedDocuments = numeric(result.documents?.documentsSaved ?? run.documents?.documentsSaved);
+  const parserVersion = Number(run.parserVersion || result.parserVersion || validation.parserVersion || 1);
   const checks: QaCheck[] = [];
 
-  check(
+  addCheck(
     checks,
     "run-status",
     run.status === "completed" && run.currentStep === "completed" ? "pass" : "fail",
     "Execução concluída",
-    run.status === "completed" ? "A execução terminou com status completed." : `Status atual: ${run.status || "ausente"}.`,
+    run.status === "completed"
+      ? "A execução terminou com status completed."
+      : `Status atual: ${run.status || "ausente"}.`,
     { status: run.status || null, currentStep: run.currentStep || null, error: run.error || null }
   );
 
-  check(
+  addCheck(
     checks,
-    "ticker-scope",
-    run.ticker === PILOT_TICKER ? "pass" : "fail",
-    "Escopo restrito ao TGAR11",
-    run.ticker === PILOT_TICKER ? "O piloto permaneceu restrito ao ticker autorizado." : `Ticker inesperado: ${run.ticker || "ausente"}.`,
-    { ticker: run.ticker || null }
+    "parser-version",
+    parserVersion >= 2 ? "pass" : "fail",
+    "Parser mensal consolidado",
+    parserVersion >= 2
+      ? `A execução utilizou o parser v${parserVersion}.`
+      : "A execução foi produzida pelo parser antigo e deve ser repetida.",
+    { parserVersion }
   );
 
-  const publicationFlags = [run.publishToOfficialBase, validation.publishToOfficialBase]
-    .filter((value) => value !== undefined);
-  const publicationBlocked = publicationFlags.length > 0 && publicationFlags.every((value) => value === false);
-  check(
+  const publicationBlocked = run.publishToOfficialBase === false
+    && validation.publishToOfficialBase === false;
+  addCheck(
     checks,
     "publication-safety",
     publicationBlocked ? "pass" : "fail",
     "Proteção da base oficial",
     publicationBlocked
-      ? "Os indicadores confirmam que o piloto não publica na coleção oficial."
-      : "Não foi possível confirmar publishToOfficialBase=false.",
-    { run: run.publishToOfficialBase ?? null, validation: validation.publishToOfficialBase ?? null }
+      ? "A execução e a validação mantiveram publishToOfficialBase=false."
+      : "Não foi possível comprovar o bloqueio de publicação.",
+    {
+      run: run.publishToOfficialBase ?? null,
+      validation: validation.publishToOfficialBase ?? null,
+    }
   );
 
-  check(
+  addCheck(
     checks,
     "staging-root",
     stagingSnapshot.exists ? "pass" : "fail",
     "Documento de staging",
     stagingSnapshot.exists
-      ? "O documento raiz da execução existe em FiiIngestionStaging."
+      ? "O documento raiz existe em FiiIngestionStaging."
       : "O documento raiz de staging não foi encontrado."
   );
 
-  check(
+  addCheck(
     checks,
     "cnpj",
     expectedCnpj ? "pass" : "fail",
     "CNPJ resolvido",
-    expectedCnpj ? `CNPJ válido com 14 dígitos: ${expectedCnpj}.` : "O CNPJ da execução está ausente ou inválido."
+    expectedCnpj
+      ? `CNPJ válido com 14 dígitos: ${expectedCnpj}.`
+      : "O CNPJ da execução está ausente ou inválido."
   );
 
-  const monthlyCnpjMismatch = expectedCnpj
-    ? monthly.filter((item) => normalizeCnpj(item.cnpj) && normalizeCnpj(item.cnpj) !== expectedCnpj).length
-    : monthly.length;
-  const documentCnpjMismatch = expectedCnpj
-    ? documents.filter((item) => normalizeCnpj(item.cnpj) && normalizeCnpj(item.cnpj) !== expectedCnpj).length
-    : documents.length;
-  check(
+  const cnpjMismatch = monthly.filter((item) =>
+    expectedCnpj && normalizeCnpj(item.cnpj) !== expectedCnpj
+  ).length;
+  addCheck(
     checks,
     "cnpj-consistency",
-    monthlyCnpjMismatch === 0 && documentCnpjMismatch === 0 ? "pass" : "fail",
+    cnpjMismatch === 0 ? "pass" : "fail",
     "Consistência do CNPJ",
-    monthlyCnpjMismatch === 0 && documentCnpjMismatch === 0
-      ? "Nenhum registro apresenta CNPJ divergente."
-      : "Foram encontrados registros associados a outro CNPJ.",
-    { monthlyCnpjMismatch, documentCnpjMismatch }
+    cnpjMismatch === 0
+      ? "Todos os snapshots pertencem ao CNPJ esperado."
+      : `${cnpjMismatch} snapshots apresentam CNPJ divergente.`,
+    { cnpjMismatch }
   );
 
-  check(
-    checks,
-    "monthly-count",
-    monthly.length > 0 ? "pass" : "fail",
-    "Informes mensais encontrados",
-    monthly.length > 0 ? `${monthly.length} snapshots mensais foram encontrados.` : "Nenhum snapshot mensal foi encontrado.",
-    { actual: monthly.length, expected: expectedMonthly }
-  );
-
-  if (expectedMonthly !== null) {
-    check(
-      checks,
-      "monthly-count-match",
-      monthly.length === expectedMonthly ? "pass" : "warn",
-      "Contagem mensal consistente",
-      monthly.length === expectedMonthly
-        ? "A quantidade gravada corresponde ao resumo da execução."
-        : "A quantidade no staging difere do resumo do workflow.",
-      { actual: monthly.length, expected: expectedMonthly }
-    );
+  const dateCounts = new Map<string, number>();
+  for (const item of monthly) {
+    const date = String(item.referenceDate || "");
+    if (date) dateCounts.set(date, (dateCounts.get(date) || 0) + 1);
   }
+  const duplicateDates = [...dateCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([date, count]) => ({ date, count }));
+  addCheck(
+    checks,
+    "monthly-uniqueness",
+    monthly.length > 0 && duplicateDates.length === 0 ? "pass" : "fail",
+    "Uma linha por competência",
+    monthly.length === 0
+      ? "Nenhum snapshot mensal foi encontrado."
+      : duplicateDates.length
+        ? "Existem competências duplicadas após a consolidação."
+        : `${monthly.length} competências únicas foram encontradas.`,
+    { monthlySnapshots: monthly.length, duplicateDates }
+  );
 
-  const coverage = {
-    referenceDate: fieldCoverage(monthly, "referenceDate"),
-    netWorth: fieldCoverage(monthly, "netWorth"),
-    sharesOutstanding: fieldCoverage(monthly, "sharesOutstanding"),
-    numberShareholders: fieldCoverage(monthly, "numberShareholders"),
-    vpCota: fieldCoverage(monthly, "vpCota"),
-  };
-  const essentialCoverage = [coverage.referenceDate, coverage.netWorth, coverage.sharesOutstanding, coverage.vpCota];
-  const minimumCoverage = essentialCoverage.length ? Math.min(...essentialCoverage) : 0;
-  check(
+  const coverage = Object.fromEntries(
+    ESSENTIAL_FIELDS.map((field) => [field, fieldCoverage(monthly, field)])
+  ) as Record<string, number>;
+  const minimumCoverage = Math.min(...ESSENTIAL_FIELDS.map((field) => coverage[field] || 0));
+  addCheck(
     checks,
     "monthly-coverage",
-    minimumCoverage >= 80 ? "pass" : minimumCoverage > 0 ? "warn" : "fail",
+    minimumCoverage >= 80 ? "pass" : "fail",
     "Cobertura dos campos mensais",
     minimumCoverage >= 80
-      ? "Os campos essenciais possuem cobertura igual ou superior a 80%."
-      : `A menor cobertura entre os campos essenciais é ${minimumCoverage}%.`,
+      ? `A cobertura mínima dos campos essenciais é ${minimumCoverage}%.`
+      : `A cobertura mínima é ${minimumCoverage}%, abaixo do limite de 80%.`,
     coverage
   );
 
-  const rowsWithDate = monthly.filter((item) => item.referenceDate);
-  const invalidDates = rowsWithDate.filter((item) => !validDate(item.referenceDate)).length;
-  check(
+  const conflictCount = monthly.reduce(
+    (total, item) => total + (Array.isArray(item.conflicts) ? item.conflicts.length : 0),
+    0
+  );
+  addCheck(
     checks,
-    "monthly-dates",
-    invalidDates === 0 && coverage.referenceDate >= 80 ? "pass" : invalidDates < rowsWithDate.length ? "warn" : "fail",
-    "Datas de referência",
-    invalidDates === 0 ? "As datas preenchidas são interpretáveis." : `${invalidDates} datas não puderam ser interpretadas.`,
-    { invalidDates, rowsWithDate: rowsWithDate.length }
+    "monthly-conflicts",
+    conflictCount === 0 ? "pass" : "fail",
+    "Conflitos entre subtipos",
+    conflictCount === 0
+      ? "Nenhum valor conflitante foi encontrado entre geral, complemento e ativo/passivo."
+      : `${conflictCount} conflitos precisam de revisão.`,
+    { conflictCount }
   );
 
-  const positiveNetWorth = monthly.filter((item) => numeric(item.netWorth) !== null && Number(item.netWorth) > 0).length;
-  const positiveShares = monthly.filter((item) => numeric(item.sharesOutstanding) !== null && Number(item.sharesOutstanding) > 0).length;
-  const positiveVpCota = monthly.filter((item) => numeric(item.vpCota) !== null && Number(item.vpCota) > 0).length;
-  const plausibleRatio = Math.min(
-    percentage(positiveNetWorth, monthly.length),
-    percentage(positiveShares, monthly.length),
-    percentage(positiveVpCota, monthly.length)
-  );
-  check(
+  const expectedMonthly = numeric(result.monthly?.snapshotsSaved ?? run.monthly?.snapshotsSaved);
+  addCheck(
     checks,
-    "monthly-values",
-    plausibleRatio >= 80 ? "pass" : plausibleRatio > 0 ? "warn" : "fail",
-    "Plausibilidade dos valores mensais",
-    plausibleRatio >= 80
-      ? "A maioria dos registros possui patrimônio, cotas e VP/cota positivos."
-      : `A menor taxa de valores positivos é ${plausibleRatio}%.`,
-    { positiveNetWorth, positiveShares, positiveVpCota, total: monthly.length }
+    "monthly-count-match",
+    expectedMonthly === null || expectedMonthly === monthly.length ? "pass" : "fail",
+    "Contagem mensal consistente",
+    expectedMonthly === null || expectedMonthly === monthly.length
+      ? "A quantidade gravada corresponde ao resumo do workflow."
+      : "A quantidade no staging difere do resumo do workflow.",
+    { actual: monthly.length, expected: expectedMonthly }
   );
 
-  check(
+  const expectedDocuments = numeric(result.documents?.documentsSaved ?? run.documents?.documentsSaved);
+  addCheck(
     checks,
     "documents",
     documents.length > 0 ? "pass" : "warn",
     "Documentos eventuais",
-    documents.length > 0 ? `${documents.length} documentos foram indexados.` : "Nenhum documento eventual foi indexado.",
+    documents.length > 0
+      ? `${documents.length} documentos foram indexados.`
+      : "Nenhum documento eventual foi indexado.",
     { actual: documents.length, expected: expectedDocuments }
   );
-
-  if (expectedDocuments !== null) {
-    check(
-      checks,
-      "document-count-match",
-      documents.length === expectedDocuments ? "pass" : "warn",
-      "Contagem de documentos consistente",
-      documents.length === expectedDocuments
-        ? "A quantidade gravada corresponde ao resumo da execução."
-        : "A quantidade atual difere do resumo do workflow.",
-      { actual: documents.length, expected: expectedDocuments }
-    );
-  }
 
   const datasetUrls = documents.map((item) => item.source?.url).filter(Boolean);
   const documentUrls = documents.map((item) => item.documentUrl).filter(Boolean);
   const officialDatasetUrls = datasetUrls.filter(isOfficialSource).length;
   const officialDocumentUrls = documentUrls.filter(isOfficialSource).length;
-  const sourceCheckPassed = documents.length > 0
+  const officialSources = documents.length > 0
     && officialDatasetUrls === datasetUrls.length
-    && (documentUrls.length === 0 || officialDocumentUrls === documentUrls.length);
-  check(
+    && officialDocumentUrls === documentUrls.length;
+  addCheck(
     checks,
     "document-sources",
-    sourceCheckPassed ? "pass" : "warn",
+    officialSources ? "pass" : "warn",
     "Fontes dos documentos",
-    documents.length === 0 ? "Sem documentos para validar as fontes." : "As origens dos catálogos e documentos foram verificadas.",
+    officialSources
+      ? "Todos os catálogos e links de documentos usam hosts oficiais aceitos."
+      : "Nem todas as fontes puderam ser confirmadas como oficiais.",
     {
       datasetUrls: datasetUrls.length,
       officialDatasetUrls,
       documentUrls: documentUrls.length,
       officialDocumentUrls,
-      acceptedHosts: OFFICIAL_SOURCE_HOSTS,
     }
   );
 
-  const aiCompleted = ai.status === "completed" && Boolean(aiExtraction);
-  check(
+  const aiCoverage = Number(ai.sourceCoverage || 0);
+  const aiReviewable = ai.status === "completed" && aiCoverage >= 50 && Boolean(aiExtraction);
+  addCheck(
     checks,
-    "ai-extraction",
-    aiCompleted ? "pass" : "warn",
-    "Extração por IA",
-    aiCompleted
-      ? "A extração por IA terminou e foi armazenada no staging."
-      : `Extração não concluída ou não armazenada: ${ai.reason || ai.status || "estado desconhecido"}.`,
-    { status: ai.status || null, reason: ai.reason || null, hasExtraction: Boolean(aiExtraction) }
+    "ai-coverage",
+    aiReviewable ? "pass" : "warn",
+    "Cobertura documental da IA",
+    aiReviewable
+      ? `A IA utilizou ${aiCoverage}% dos documentos submetidos.`
+      : `A análise documental é parcial: ${aiCoverage}% de cobertura.`,
+    {
+      status: ai.status || null,
+      quality: ai.quality || null,
+      documentsSubmitted: ai.documentsSubmitted || 0,
+      sourceUrlsUsed: ai.sourceUrlsUsed || 0,
+      sourceCoverage: aiCoverage,
+      reason: ai.reason || null,
+    }
   );
 
-  check(
+  const workflowReady = validation.readyForReview === true
+    && (!Array.isArray(validation.blockingIssues) || validation.blockingIssues.length === 0);
+  addCheck(
     checks,
     "workflow-validation",
-    validation.readyForReview === true ? "pass" : "warn",
+    workflowReady ? "pass" : "fail",
     "Validação do workflow",
-    validation.readyForReview === true
+    workflowReady
       ? "O workflow marcou os dados como prontos para revisão humana."
-      : "O workflow não marcou os dados como prontos para revisão humana.",
-    serializeValue(validation)
+      : "O workflow encontrou bloqueios de qualidade.",
+    {
+      readyForReview: validation.readyForReview ?? null,
+      blockingIssues: validation.blockingIssues || [],
+      warnings: validation.warnings || [],
+      minimumCoverage: validation.minimumCoverage ?? null,
+      conflictCount: validation.conflictCount ?? null,
+      duplicateDates: validation.duplicateDates || [],
+    }
   );
 
-  const passCount = checks.filter((item) => item.level === "pass").length;
-  const warnCount = checks.filter((item) => item.level === "warn").length;
-  const failCount = checks.filter((item) => item.level === "fail").length;
+  const passCount = checks.filter((check) => check.level === "pass").length;
+  const warnCount = checks.filter((check) => check.level === "warn").length;
+  const failCount = checks.filter((check) => check.level === "fail").length;
   const score = Math.max(0, Math.min(100, 100 - failCount * 25 - warnCount * 6));
   const verdict = failCount > 0
     ? "failed"
     : warnCount > 0
       ? "approved_with_warnings"
       : "approved_for_human_review";
-
   const sortedMonthly = [...monthly]
     .sort((left, right) => String(right.referenceDate || "").localeCompare(String(left.referenceDate || "")));
   const sortedDocuments = [...documents]
@@ -421,16 +415,20 @@ async function runQa(runId?: string, persist = false) {
       .localeCompare(String(left.deliveryDate || left.referenceDate || "")));
 
   const assistantReviewPayload = {
-    instruction: "Revise este QA do piloto TGAR11. Identifique inconsistências, riscos de qualidade e campos ausentes. Diga se o próximo passo deve ser corrigir, repetir a ingestão ou iniciar revisão humana. Não autorize publicação automática.",
+    instruction: "Revise este QA do piloto TGAR11. Não autorize publicação automática. Informe se o próximo passo é corrigir, repetir a ingestão ou iniciar revisão humana.",
     verdict,
     score,
     runId: selectedRunId,
-    counts: { monthly: monthly.length, documents: documents.length },
+    parserVersion,
+    counts: {
+      monthly: monthly.length,
+      documents: documents.length,
+    },
     coverage,
-    failures: checks.filter((item) => item.level === "fail"),
-    warnings: checks.filter((item) => item.level === "warn"),
+    failures: checks.filter((check) => check.level === "fail"),
+    warnings: checks.filter((check) => check.level === "warn"),
     samples: {
-      monthly: sortedMonthly.slice(0, 3).map(snapshotSample),
+      monthly: sortedMonthly.slice(0, 3).map(monthlySample),
       documents: sortedDocuments.slice(0, 3).map(documentSample),
     },
     aiSummary: aiExtraction ? {
@@ -447,9 +445,10 @@ async function runQa(runId?: string, persist = false) {
     ticker: run.ticker || null,
     cnpj: expectedCnpj || null,
     year: run.year || result.year || null,
+    parserVersion,
     verdict,
     score,
-    canProceedToHumanReview: failCount === 0 && monthly.length > 0,
+    canProceedToHumanReview: failCount === 0 && workflowReady,
     canPublishToOfficialBase: false,
     publicationDecision: "blocked_pending_human_review",
     summary: { pass: passCount, warn: warnCount, fail: failCount },
@@ -461,7 +460,7 @@ async function runQa(runId?: string, persist = false) {
     },
     coverage,
     checks,
-    recommendations: recommendationsFor(checks),
+    recommendations: buildRecommendations(checks),
     run: {
       status: run.status || null,
       currentStep: run.currentStep || null,
@@ -473,20 +472,15 @@ async function runQa(runId?: string, persist = false) {
       publishToOfficialBase: run.publishToOfficialBase ?? null,
       error: run.error || null,
     },
-    staging: {
-      exists: stagingSnapshot.exists,
-      updatedAt: toIso(staging.updatedAt),
-      aiExtractionUpdatedAt: toIso(staging.aiExtractionUpdatedAt),
-      validation: serializeValue(validation),
-    },
+    validation,
     officialBaseObservation: {
       documentExists: officialSnapshot.exists,
       code: officialSnapshot.data()?.code || officialSnapshot.id,
       updatedAt: toIso(officialSnapshot.data()?.updatedAt),
-      note: "Esta API não altera Fiis/TGAR11. Ela valida os indicadores de não publicação do piloto, mas não afirma ausência de alterações externas concorrentes.",
+      note: "Esta API não altera Fiis/TGAR11 e não autoriza publicação automática.",
     },
     samples: {
-      latestMonthlySnapshots: sortedMonthly.slice(0, 5).map(snapshotSample),
+      latestMonthlySnapshots: sortedMonthly.slice(0, 5).map(monthlySample),
       latestDocuments: sortedDocuments.slice(0, 5).map(documentSample),
     },
     aiReview: aiExtraction ? {
@@ -494,20 +488,21 @@ async function runQa(runId?: string, persist = false) {
       warnings: Array.isArray(aiExtraction.warnings) ? aiExtraction.warnings : [],
       risks: Array.isArray(aiExtraction.risks) ? aiExtraction.risks : [],
       sourceUrls: Array.isArray(aiExtraction.sourceUrls) ? aiExtraction.sourceUrls : [],
+      sourceCoverage: aiCoverage,
     } : null,
     assistantReviewPayload,
   };
 
   if (persist) {
     await Promise.all([
-      stagingRef.set(
-        { manualQa: report, manualQaUpdatedAt: adminFieldValue.serverTimestamp() },
-        { merge: true }
-      ),
-      runSnapshot.ref.set(
-        { manualQa: report, manualQaUpdatedAt: adminFieldValue.serverTimestamp() },
-        { merge: true }
-      ),
+      stagingRef.set({
+        manualQa: report,
+        manualQaUpdatedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: true }),
+      runSnapshot.ref.set({
+        manualQa: report,
+        manualQaUpdatedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: true }),
     ]);
   }
 
@@ -516,7 +511,7 @@ async function runQa(runId?: string, persist = false) {
 
 async function handle(req: NextRequest, body?: Record<string, any>) {
   if (!isAdminAuthorized(req, body)) {
-    return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+    return jsonResponse({ ok: false, error: "Não autorizado." }, 401);
   }
 
   try {
@@ -529,18 +524,15 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
     const result = await runQa(runId || undefined, persist);
 
     if (!result.found) {
-      return NextResponse.json({ ok: false, error: result.error }, { status: 404 });
+      return jsonResponse({ ok: false, error: result.error }, 404);
     }
 
-    return NextResponse.json(
-      { ok: true, ...result },
-      { headers: { "Cache-Control": "no-store" } }
-    );
+    return jsonResponse({ ok: true, ...result });
   } catch (error: any) {
-    return NextResponse.json(
-      { ok: false, error: error?.message || "Erro ao validar o piloto." },
-      { status: 500, headers: { "Cache-Control": "no-store" } }
-    );
+    return jsonResponse({
+      ok: false,
+      error: error?.message || "Erro ao validar o piloto.",
+    }, 500);
   }
 }
 
