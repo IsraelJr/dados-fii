@@ -68,11 +68,11 @@ export async function extractPilotInsightsV2(input: {
   const selectedDocuments = input.documents
     .filter((document) => isOfficialDocumentUrl(document.documentUrl))
     .slice(0, 8);
-  const submittedUrls = [...new Set(
+  const submittedUrls: string[] = Array.from(new Set<string>(
     selectedDocuments
       .map((document) => normalizeUrl(document.documentUrl))
-      .filter(Boolean)
-  )];
+      .filter((url): url is string => Boolean(url))
+  ));
 
   if (!apiKey) {
     return {
@@ -81,8 +81,8 @@ export async function extractPilotInsightsV2(input: {
       documentsSubmitted: submittedUrls.length,
       submittedUrls,
       sourceUrlsUsed: 0,
-      matchedUsedUrls: [],
-      externalSourceUrls: [],
+      matchedUsedUrls: [] as string[],
+      externalSourceUrls: [] as string[],
       sourceCoverage: 0,
       quality: "incomplete",
     };
@@ -93,10 +93,10 @@ export async function extractPilotInsightsV2(input: {
       status: "skipped",
       reason: "Nenhum documento oficial com URL válida encontrado",
       documentsSubmitted: 0,
-      submittedUrls: [],
+      submittedUrls: [] as string[],
       sourceUrlsUsed: 0,
-      matchedUsedUrls: [],
-      externalSourceUrls: [],
+      matchedUsedUrls: [] as string[],
+      externalSourceUrls: [] as string[],
       sourceCoverage: 0,
       quality: "incomplete",
     };
@@ -186,9 +186,13 @@ Retorne somente JSON válido:
   const extraction = safeJsonParse(extractOutputText(payload));
   if (!extraction) throw new Error("A extração por IA não retornou JSON válido.");
 
-  const submittedSet = new Set(submittedUrls);
-  const rawUsedUrls = Array.isArray(extraction.sourceUrls)
-    ? [...new Set(extraction.sourceUrls.map(normalizeUrl).filter(Boolean))]
+  const submittedSet = new Set<string>(submittedUrls);
+  const rawUsedUrls: string[] = Array.isArray(extraction.sourceUrls)
+    ? Array.from(new Set<string>(
+        extraction.sourceUrls
+          .map((value: unknown) => normalizeUrl(value))
+          .filter((url: string): url is string => Boolean(url))
+      ))
     : [];
   const matchedUsedUrls = rawUsedUrls.filter((url) => submittedSet.has(url));
   const externalSourceUrls = rawUsedUrls.filter((url) => !submittedSet.has(url));
