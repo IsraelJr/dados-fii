@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   build:
@@ -20,6 +22,8 @@ jobs:
           cache: npm
       - run: npm install --silent
       - name: Build application
+        id: build
+        continue-on-error: true
         shell: bash
         run: |
           PRIVATE_KEY="$(openssl genrsa 2048)"
@@ -36,4 +40,48 @@ jobs:
           export CRON_SECRET="ci-only-secret"
           export ADMIN_UPDATE_SECRET="ci-only-secret"
           export OPENAI_API_KEY="ci-only-key"
-          npm run build
+          npm run build > build.log 2>&1
+      - name: Prepare build error summary
+        if: steps.build.outcome == 'failure'
+        id: build_error
+        shell: bash
+        run: |
+          {
+            echo 'tail<<EOF'
+            tail -n 120 build.log
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+      - name: Comment build error on PR
+        if: steps.build.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          BUILD_TAIL: ${{ steps.build_error.outputs.tail }}
+        with:
+          script: |
+            const marker = '<!-- feature-build-ci-error -->';
+            const body = `${marker}\n### Build completo falhou\n\n\`\`\`text\n${process.env.BUILD_TAIL || 'Log indisponível'}\n\`\`\``;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+      - name: Fail workflow when build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
