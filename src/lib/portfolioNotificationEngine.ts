@@ -406,7 +406,7 @@ async function createNotification(userRef: any, input: NotificationInput) {
   let created = false;
 
   await adminDb.runTransaction(async (transaction) => {
-    const snap = await transaction.get(ref);
+    const snap: any = await transaction.get(ref);
     if (snap.exists) return;
     transaction.set(ref, {
       id,
