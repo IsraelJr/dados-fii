@@ -21,7 +21,20 @@ async function updateRun(runId: string, payload: Record<string, unknown>) {
 async function resolveCnpj(input: FiiIngestionInput) {
   "use step";
   const { resolvePilotCnpj } = await import("@/lib/cvmIngestion");
-  return resolvePilotCnpj(input.ticker, input.cnpj);
+  const { getKnownIngestionCnpj, normalizeIngestionTicker } = await import("@/lib/fiiIngestionConfig");
+  const ticker = normalizeIngestionTicker(input.ticker);
+  const environmentName = `${ticker}_CNPJ`;
+  const environmentCnpj = String(process.env[environmentName] || "").replace(/\D/g, "");
+  const knownCnpj = getKnownIngestionCnpj(ticker);
+  const fallback = input.cnpj || (environmentCnpj.length === 14 ? environmentCnpj : "") || knownCnpj;
+
+  try {
+    return await resolvePilotCnpj(ticker, fallback || undefined);
+  } catch {
+    throw new Error(
+      `CNPJ não encontrado para ${ticker}. Informe no disparo, em Fiis/${ticker} ou na variável ${environmentName}.`
+    );
+  }
 }
 
 async function importMonthly(input: { runId: string; ticker: string; cnpj: string; year: number }) {
