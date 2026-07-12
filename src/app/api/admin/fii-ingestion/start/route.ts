@@ -4,10 +4,32 @@ import { start } from "workflow/api";
 import { isAdminAuthorized, readAdminSession } from "@/lib/adminSession";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { normalizeCnpj } from "@/lib/cvmIngestion";
-import { tgar11IngestionWorkflow } from "@/workflows/tgar11Ingestion";
+import {
+  assertSupportedIngestionTicker,
+  SUPPORTED_INGESTION_TICKERS,
+} from "@/lib/fiiIngestionConfig";
+import { fiiIngestionWorkflow } from "@/workflows/tgar11Ingestion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function trueValue(value: unknown) {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
+
+async function findActiveRun(ticker: string) {
+  const snapshot = await adminDb
+    .collection("FiiIngestionRuns")
+    .orderBy("createdAt", "desc")
+    .limit(30)
+    .get();
+
+  return snapshot.docs.find((doc) => {
+    const data = doc.data() || {};
+    return data.ticker === ticker
+      && ["queued", "scheduled", "running"].includes(String(data.status || ""));
+  }) || null;
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -15,15 +37,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
   }
 
-  const ticker = String(body?.ticker || "TGAR11").trim().toUpperCase();
-  if (ticker !== "TGAR11") {
-    return NextResponse.json({ ok: false, error: "O piloto está restrito ao TGAR11." }, { status: 400 });
+  let ticker: string;
+  try {
+    ticker = assertSupportedIngestionTicker(body?.ticker || "TGAR11");
+  } catch (error: any) {
+    return NextResponse.json({
+      ok: false,
+      error: error?.message || "Ticker não autorizado.",
+      supportedTickers: SUPPORTED_INGESTION_TICKERS,
+    }, { status: 400 });
+  }
+
+  const activeRun = await findActiveRun(ticker);
+  if (activeRun) {
+    const data = activeRun.data() || {};
+    return NextResponse.json({
+      ok: false,
+      error: `Já existe uma execução ativa para ${ticker}.`,
+      runId: activeRun.id,
+      status: data.status || null,
+      currentStep: data.currentStep || null,
+    }, { status: 409 });
   }
 
   const delayMinutes = Math.min(Math.max(Number(body?.delayMinutes || 0), 0), 1440);
   const currentYear = new Date().getFullYear();
   const year = Math.min(Math.max(Number(body?.year || currentYear), 2016), currentYear);
   const cnpj = normalizeCnpj(body?.cnpj) || undefined;
+  const enableAi = trueValue(body?.enableAi);
   const runId = randomUUID();
   const runRef = adminDb.collection("FiiIngestionRuns").doc(runId);
   const session = readAdminSession(req);
@@ -35,7 +76,8 @@ export async function POST(req: NextRequest) {
       cnpj: cnpj || null,
       year,
       delayMinutes,
-      mode: "staging",
+      enableAi,
+      mode: "operational_staging",
       publishToOfficialBase: false,
       requestedBy: session?.user || "legacy-admin-secret",
       status: delayMinutes > 0 ? "scheduled" : "queued",
@@ -45,8 +87,18 @@ export async function POST(req: NextRequest) {
       updatedAt: adminFieldValue.serverTimestamp(),
     });
 
-    const workflowRun = await start(tgar11IngestionWorkflow, [{ runId, ticker, cnpj, year, delayMinutes }]);
-    await runRef.set({ workflowRunId: workflowRun.runId, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true });
+    const workflowRun = await start(fiiIngestionWorkflow, [{
+      runId,
+      ticker,
+      cnpj,
+      year,
+      delayMinutes,
+      enableAi,
+    }]);
+    await runRef.set({
+      workflowRunId: workflowRun.runId,
+      updatedAt: adminFieldValue.serverTimestamp(),
+    }, { merge: true });
 
     return NextResponse.json({
       ok: true,
@@ -55,8 +107,11 @@ export async function POST(req: NextRequest) {
       ticker,
       year,
       delayMinutes,
+      enableAi,
+      mode: "operational_staging",
       status: delayMinutes > 0 ? "scheduled" : "queued",
       publishToOfficialBase: false,
+      qaUrl: `/api/admin/fii-ingestion/qa?runId=${encodeURIComponent(runId)}&persist=1`,
     });
   } catch (error: any) {
     await runRef.set({
@@ -67,6 +122,10 @@ export async function POST(req: NextRequest) {
       updatedAt: adminFieldValue.serverTimestamp(),
     }, { merge: true }).catch(() => undefined);
 
-    return NextResponse.json({ ok: false, runId, error: error?.message || "Falha ao iniciar workflow." }, { status: 500 });
+    return NextResponse.json({
+      ok: false,
+      runId,
+      error: error?.message || "Falha ao iniciar workflow.",
+    }, { status: 500 });
   }
 }
