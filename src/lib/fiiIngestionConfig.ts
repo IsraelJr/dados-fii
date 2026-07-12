@@ -43,6 +43,7 @@ export const FII_INGESTION_REGISTRY = {
     fundType: "FIAGRO",
     adapterId: "cvm-fiagro-v2",
     operational: true,
+    cnpj: "41745701000137",
     description: "Segundo FIAGRO para teste de reutilização do adaptador.",
   },
   BODB11: {
