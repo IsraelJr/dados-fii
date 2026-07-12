@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import admin, { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { isAdminAuthorized } from "@/lib/adminSession";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,15 +20,12 @@ const FIELDS_TO_DELETE = [
   "cnpjSource",
 ];
 
-function authorized(req: NextRequest, body: any) {
-  const expected = process.env.ADMIN_UPDATE_SECRET;
-  return Boolean(expected && (req.headers.get("x-admin-secret") === expected || body?.secret === expected));
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    if (!authorized(req, body)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    if (!isAdminAuthorized(req, body)) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
 
     const limit = Math.min(Math.max(Number(body.limit || 50), 1), 200);
     const cursor = body.cursor ? String(body.cursor) : undefined;
