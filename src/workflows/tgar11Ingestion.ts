@@ -1,4 +1,5 @@
 import { sleep } from "workflow";
+import type { IngestionAdapterId } from "@/lib/fiiIngestionConfig";
 
 type FiiIngestionInput = {
   runId: string;
@@ -37,22 +38,16 @@ async function resolveCnpj(input: FiiIngestionInput) {
   }
 }
 
-async function importMonthly(input: { runId: string; ticker: string; cnpj: string; year: number }) {
+async function importMonthly(input: {
+  runId: string;
+  ticker: string;
+  cnpj: string;
+  year: number;
+  adapterId: IngestionAdapterId;
+}) {
   "use step";
-
-  if (input.ticker === "VGIA11") {
-    const { importFiagroMonthlyData } = await import("@/lib/cvmFiagroMonthlyIngestion");
-    const { reconcileFiagroDailyFields } = await import("@/lib/cvmFiagroPostProcessing");
-    const monthly = await importFiagroMonthlyData(input);
-    const reconciliation = await reconcileFiagroDailyFields({
-      runId: input.runId,
-      ticker: input.ticker,
-    });
-    return { ...monthly, reconciliation };
-  }
-
-  const { importMonthlyCvmDataV2 } = await import("@/lib/cvmMonthlyIngestion");
-  return importMonthlyCvmDataV2(input);
+  const { runMonthlyIngestionAdapter } = await import("@/lib/fiiIngestionAdapters");
+  return runMonthlyIngestionAdapter(input.adapterId, input);
 }
 
 async function importDocuments(input: { runId: string; ticker: string; cnpj: string; year: number }) {
@@ -143,8 +138,15 @@ async function markFailed(runId: string, error: string) {
 export async function fiiIngestionWorkflow(input: FiiIngestionInput) {
   "use workflow";
 
-  const { assertSupportedIngestionTicker } = await import("@/lib/fiiIngestionConfig");
+  const {
+    assertSupportedIngestionTicker,
+    getIngestionAdapterId,
+    getIngestionFundConfig,
+  } = await import("@/lib/fiiIngestionConfig");
   const ticker = assertSupportedIngestionTicker(input.ticker || "TGAR11");
+  const fundConfig = getIngestionFundConfig(ticker);
+  const adapterId = getIngestionAdapterId(ticker);
+  const fundType = fundConfig?.fundType || "FII";
   const year = Number(input.year || 2026);
   const delayMinutes = Math.min(Math.max(Number(input.delayMinutes || 0), 0), 1440);
   const enableAi = input.enableAi === true;
@@ -154,6 +156,8 @@ export async function fiiIngestionWorkflow(input: FiiIngestionInput) {
       status: delayMinutes > 0 ? "scheduled" : "running",
       currentStep: delayMinutes > 0 ? "waiting" : "resolve_cnpj",
       ticker,
+      fundType,
+      adapterId,
       year,
       parserVersion: 2,
       enableAi,
@@ -166,7 +170,7 @@ export async function fiiIngestionWorkflow(input: FiiIngestionInput) {
     const cnpj = await resolveCnpj({ ...input, ticker, year });
     await updateRun(input.runId, { cnpj, currentStep: "cvm_monthly" });
 
-    const monthly = await importMonthly({ runId: input.runId, ticker, cnpj, year });
+    const monthly = await importMonthly({ runId: input.runId, ticker, cnpj, year, adapterId });
     await updateRun(input.runId, { monthly, currentStep: "cvm_documents" });
 
     const documents = await importDocuments({ runId: input.runId, ticker, cnpj, year });
@@ -181,7 +185,19 @@ export async function fiiIngestionWorkflow(input: FiiIngestionInput) {
     await updateRun(input.runId, { ai, currentStep: "validation" });
 
     const validation = await validate({ runId: input.runId, ticker, cnpj, monthly, documents, ai });
-    const result = { ticker, cnpj, year, parserVersion: 2, enableAi, monthly, documents, ai, validation };
+    const result = {
+      ticker,
+      cnpj,
+      fundType,
+      adapterId,
+      year,
+      parserVersion: 2,
+      enableAi,
+      monthly,
+      documents,
+      ai,
+      validation,
+    };
     await markCompleted(input.runId, result);
     return result;
   } catch (error: any) {
