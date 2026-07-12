@@ -3,7 +3,6 @@ import {
   adminSessionDurationSeconds,
   clearAdminSessionCookie,
   createAdminSessionToken,
-  expectedAdminUser,
   readAdminSession,
   setAdminSessionCookie,
   validateAdminCredentials,
@@ -35,7 +34,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const user = String(body?.user || "").trim();
   const token = String(body?.token || "");
 
   if (!(process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET)) {
@@ -45,11 +43,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!validateAdminCredentials(user, token)) {
+  if (!validateAdminCredentials(body?.user, token)) {
     return NextResponse.json({ ok: false, error: "Acesso negado." }, { status: 401 });
   }
 
-  const session = createAdminSessionToken(user || expectedAdminUser());
+  const session = createAdminSessionToken();
   const response = NextResponse.json(
     {
       ok: true,
