@@ -79,6 +79,71 @@ async function getReports() {
   }
 }
 
+async function getPortfolioNotifications() {
+  try {
+    const snapshot = await adminDb.collection("PortfolioNotificationRuns").orderBy("createdAt", "desc").limit(20).get();
+    const runs = snapshot.docs.map((doc) => {
+      const data = doc.data() || {};
+      const summary = data.summary || {};
+      return {
+        id: doc.id,
+        ok: data.ok !== false && Number(summary.error || 0) === 0,
+        dateKey: data.dateKey || null,
+        totalUsersRead: Number(data.totalUsersRead || 0),
+        durationMs: Number(data.durationMs || 0),
+        processed: Number(summary.processed || 0),
+        skipped: Number(summary.skipped || 0),
+        errors: Number(summary.error || 0),
+        freeUsers: Number(summary.freeUsers || 0),
+        vipUsers: Number(summary.vipUsers || 0),
+        notificationsCreated: Number(summary.notificationsCreated || 0),
+        emailsSent: Number(summary.emailsSent || 0),
+        digestsSent: Number(summary.digestsSent || 0),
+        createdAt: toIso(data.createdAt),
+      };
+    });
+
+    const totals = runs.reduce((acc, run) => {
+      acc.totalUsersRead += run.totalUsersRead;
+      acc.processed += run.processed;
+      acc.skipped += run.skipped;
+      acc.errors += run.errors;
+      acc.freeUsers += run.freeUsers;
+      acc.vipUsers += run.vipUsers;
+      acc.notificationsCreated += run.notificationsCreated;
+      acc.emailsSent += run.emailsSent;
+      acc.digestsSent += run.digestsSent;
+      return acc;
+    }, { totalUsersRead: 0, processed: 0, skipped: 0, errors: 0, freeUsers: 0, vipUsers: 0, notificationsCreated: 0, emailsSent: 0, digestsSent: 0 });
+
+    return {
+      ok: true,
+      hasRuns: runs.length > 0,
+      totalRuns: runs.length,
+      ...totals,
+      latest: runs[0] || null,
+      recent: runs.slice(0, 10),
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      hasRuns: false,
+      totalRuns: 0,
+      totalUsersRead: 0,
+      processed: 0,
+      skipped: 0,
+      errors: 0,
+      freeUsers: 0,
+      vipUsers: 0,
+      notificationsCreated: 0,
+      emailsSent: 0,
+      digestsSent: 0,
+      recent: [],
+      error: err.message || "Erro ao consultar notificações da carteira",
+    };
+  }
+}
+
 function summarizeLookups(events: any[]) {
   const lookupEvents = events.filter((event) => event.type === "fii_lookup");
   const success = lookupEvents.filter((event) => event.ok === true && Number(event.statusCode) < 400).length;
@@ -132,19 +197,20 @@ async function getEvents() {
 }
 
 async function payload() {
-  const [fiis, userReports, walletSessions, benchmarks, traffic, reports, events] = await Promise.all([sampleCollection("Fiis"), sampleCollection("UserRiskReports"), sampleCollection("WalletSessions"), getBenchmarks(), getStats(), getReports(), getEvents()]);
+  const [fiis, userReports, walletSessions, benchmarks, traffic, reports, portfolioNotifications, events] = await Promise.all([sampleCollection("Fiis"), sampleCollection("UserRiskReports"), sampleCollection("WalletSessions"), getBenchmarks(), getStats(), getReports(), getPortfolioNotifications(), getEvents()]);
   const lookups = summarizeLookups(events);
   const services = [
     { key: "fiis", label: "Base de FIIs", ok: fiis.ok && fiis.hasSample, detail: fiis.hasSample ? `Amostra: ${fiis.sampleId}` : "Sem amostra" },
     { key: "reports", label: "Relatorios", ok: userReports.ok && userReports.hasSample, detail: userReports.hasSample ? "Relatorios encontrados" : "Nenhum relatorio" },
     { key: "sessions", label: "Sessoes de carteira", ok: walletSessions.ok && walletSessions.hasSample, detail: walletSessions.hasSample ? "Sessoes encontradas" : "Nenhuma sessao" },
+    { key: "portfolioNotifications", label: "Notificações da carteira", ok: Boolean(portfolioNotifications.ok), detail: portfolioNotifications.hasRuns ? `${portfolioNotifications.totalRuns} execução(ões) recente(s) · ${portfolioNotifications.emailsSent} e-mail(s)` : "Aguardando primeira execução" },
     { key: "ifix", label: "IFIX", ok: Boolean(benchmarks?.ifix?.ok), detail: benchmarks?.ifix?.currentReady ? `Fechamento ${benchmarks.ifix.close} em ${benchmarks.ifix.lastDate}` : "Indisponivel" },
     { key: "cdi", label: "CDI", ok: Boolean(benchmarks?.cdi?.ok), detail: benchmarks?.cdi?.lastDate ? `Atualizado em ${benchmarks.cdi.lastDate}` : "Indisponivel" },
     { key: "ipca", label: "IPCA", ok: Boolean(benchmarks?.ipca?.ok), detail: benchmarks?.ipca?.lastDate ? `Ultimo dado ${benchmarks.ipca.lastDate}` : "Indisponivel" },
     { key: "selic", label: "Selic", ok: Boolean(benchmarks?.selic?.ok), detail: benchmarks?.selic?.rate ? `${benchmarks.selic.rate}% em ${benchmarks.selic.date}` : "Indisponivel" },
   ];
   const healthy = services.filter((service) => service.ok).length;
-  return { ok: services.every((service) => service.ok), generatedAt: new Date().toISOString(), health: { score: Math.round((healthy / services.length) * 100), healthyServices: healthy, totalServices: services.length, services }, traffic, lookups, reports, benchmarks, collections: { fiis, userReports, walletSessions }, recentEvents: events.slice(0, 20) };
+  return { ok: services.every((service) => service.ok), generatedAt: new Date().toISOString(), health: { score: Math.round((healthy / services.length) * 100), healthyServices: healthy, totalServices: services.length, services }, traffic, lookups, reports, portfolioNotifications, benchmarks, collections: { fiis, userReports, walletSessions }, recentEvents: events.slice(0, 20) };
 }
 
 function json(data: unknown, status = 200) {

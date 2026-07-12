@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": "22.x"
   },
   "dependencies": {
     "@types/js-cookie": "^3.0.6",

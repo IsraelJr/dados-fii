@@ -3,7 +3,7 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 const OBSERVABILITY_COLLECTION = "AppObservabilityEvents";
 
 export type ObservabilityEventInput = {
-  type: "fii_lookup" | "fii_batch_lookup" | "risk_report" | "system";
+  type: "fii_lookup" | "fii_batch_lookup" | "risk_report" | "portfolio_notifications" | "system";
   ok: boolean;
   statusCode?: number;
   ticker?: string;

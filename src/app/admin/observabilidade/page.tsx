@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Eye, FileText, Home, KeyRound, Menu, RefreshCw, Search, ShieldCheck, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, BellRing, CheckCircle2, Clock, Database, Eye, FileText, Home, KeyRound, MailCheck, Menu, RefreshCw, Search, ShieldCheck, Users, XCircle } from "lucide-react";
 
 type Service = { key: string; label: string; ok: boolean; detail?: string };
 type LookupEvent = { id: string; type?: string; ok: boolean; statusCode: number; ticker?: string | null; error?: string | null; source?: string | null; createdAt?: string | null };
+type PortfolioRun = { id: string; ok: boolean; dateKey?: string | null; totalUsersRead: number; durationMs: number; processed: number; skipped: number; errors: number; freeUsers: number; vipUsers: number; notificationsCreated: number; emailsSent: number; digestsSent: number; createdAt?: string | null };
+type PortfolioNotificationSummary = { ok: boolean; hasRuns: boolean; totalRuns: number; totalUsersRead: number; processed: number; skipped: number; errors: number; freeUsers: number; vipUsers: number; notificationsCreated: number; emailsSent: number; digestsSent: number; latest?: PortfolioRun | null; recent: PortfolioRun[]; error?: string };
 type ObservabilityPayload = {
   ok: boolean;
   generatedAt: string;
@@ -22,6 +24,7 @@ type ObservabilityPayload = {
     byTicker: Array<{ ticker: string; total: number; success: number; errors: number; lastStatusCode: number; lastAt?: string | null }>;
   };
   reports?: { ok: boolean; totalSample: number; done: number; pending: number; failed: number; latest?: { id: string; status?: string | null; month?: string | null; updatedAt?: string | null }; error?: string };
+  portfolioNotifications?: PortfolioNotificationSummary;
   benchmarks?: any;
   recentEvents?: LookupEvent[];
 };
@@ -34,6 +37,7 @@ const adminLinks = [
   { href: "#pesquisas", label: "Pesquisas de FIIs", icon: Search },
   { href: "#benchmarks", label: "Benchmarks", icon: BarChart3 },
   { href: "#relatorios", label: "Relatórios", icon: FileText },
+  { href: "#notificacoes", label: "Notificações", icon: BellRing },
   { href: "#eventos", label: "Eventos recentes", icon: Activity },
   { href: "/", label: "Voltar ao site", icon: Home },
 ];
@@ -180,6 +184,7 @@ export default function AdminObservabilityPage() {
 
   const lookupSummary = data?.lookups;
   const reportSummary = data?.reports;
+  const notificationSummary = data?.portfolioNotifications;
   const health = data?.health;
 
   if (!allowedEmail) {
@@ -215,16 +220,42 @@ export default function AdminObservabilityPage() {
 
       {data && (
         <div className="mt-6 space-y-6">
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             <MetricCard title="Saúde geral" value={`${health?.score || 0}%`} detail={`${health?.healthyServices || 0} de ${health?.totalServices || 0} serviços OK`} icon={ShieldCheck} kind={(health?.score || 0) >= 90 ? "success" : "error"} />
             <MetricCard title="Pesquisas monitoradas" value={lookupSummary?.total || 0} detail={`${lookupSummary?.success || 0} sucesso · ${lookupSummary?.errors || 0} erro(s)`} icon={Search} kind={(lookupSummary?.errors || 0) > 0 ? "error" : "success"} />
             <MetricCard title="Taxa de sucesso" value={`${lookupSummary?.successRate || 0}%`} detail={lookupSummary?.errorSummary || "Sem consultas monitoradas"} icon={BarChart3} kind={(lookupSummary?.successRate || 0) >= 90 ? "success" : "error"} />
             <MetricCard title="Relatórios" value={reportSummary?.done || 0} detail={`${reportSummary?.pending || 0} pendente(s) · ${reportSummary?.failed || 0} falha(s)`} icon={FileText} kind={(reportSummary?.failed || 0) > 0 ? "error" : "success"} />
+            <MetricCard title="E-mails de carteira" value={notificationSummary?.emailsSent || 0} detail={`${notificationSummary?.digestsSent || 0} resumo(s) · ${notificationSummary?.notificationsCreated || 0} notificação(ões)`} icon={MailCheck} kind={(notificationSummary?.errors || 0) > 0 ? "error" : "success"} />
+            <MetricCard title="Execuções do monitor" value={notificationSummary?.totalRuns || 0} detail={`${notificationSummary?.processed || 0} processado(s) · ${notificationSummary?.errors || 0} erro(s)`} icon={BellRing} kind={(notificationSummary?.errors || 0) > 0 ? "error" : "success"} />
           </section>
 
           <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-indigo-100">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between"><div><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><Activity size={14} /> Saúde do sistema</p><h2 className="mt-3 text-2xl font-black text-slate-900">Serviços principais</h2></div><p className="text-xs font-bold text-slate-500">Atualizado em {formatDateTime(data.generatedAt)}</p></div>
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{health?.services.map((service) => <article key={service.key} className="rounded-2xl bg-indigo-50/40 p-4 ring-1 ring-indigo-100"><div className="flex items-start justify-between gap-3"><div><h3 className="font-extrabold text-slate-900">{service.label}</h3><p className="mt-1 text-sm leading-5 text-slate-600">{service.detail || "Sem detalhe"}</p></div><HealthBadge ok={service.ok} /></div></article>)}</div>
+          </section>
+
+          <section id="notificacoes" className="scroll-mt-24 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-indigo-100">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div><p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BellRing size={14} /> Notificações da carteira</p><h2 className="mt-3 text-2xl font-black text-slate-900">Cron, e-mails e resumos</h2><p className="mt-1 text-sm text-slate-500">O plano grátis recebe o resumo às sextas-feiras. O plano VIP mantém frequência configurável.</p></div>
+              <HealthBadge ok={Boolean(notificationSummary?.ok)} />
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+              <MetricCard title="Usuários lidos" value={notificationSummary?.totalUsersRead || 0} detail={`${notificationSummary?.freeUsers || 0} grátis · ${notificationSummary?.vipUsers || 0} VIP`} icon={Users} kind="neutral" />
+              <MetricCard title="Processados" value={notificationSummary?.processed || 0} detail={`${notificationSummary?.skipped || 0} ignorado(s)`} icon={CheckCircle2} kind="success" />
+              <MetricCard title="Criadas" value={notificationSummary?.notificationsCreated || 0} detail="Central e toast" icon={BellRing} kind="neutral" />
+              <MetricCard title="E-mails" value={notificationSummary?.emailsSent || 0} detail="Alertas e resumos" icon={MailCheck} kind="success" />
+              <MetricCard title="Resumos" value={notificationSummary?.digestsSent || 0} detail="Carteiras enviadas" icon={FileText} kind="success" />
+              <MetricCard title="Erros" value={notificationSummary?.errors || 0} detail={notificationSummary?.error || "Execuções recentes"} icon={AlertTriangle} kind={(notificationSummary?.errors || 0) > 0 ? "error" : "success"} />
+            </div>
+            <div className="mt-5 overflow-hidden rounded-2xl ring-1 ring-indigo-100">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-indigo-50 text-xs uppercase tracking-wide text-indigo-700"><tr><th className="px-4 py-3">Execução</th><th className="px-4 py-3">Usuários</th><th className="px-4 py-3">Resultado</th><th className="px-4 py-3">Envios</th><th className="px-4 py-3">Duração</th></tr></thead>
+                <tbody className="divide-y divide-indigo-50 bg-white">
+                  {(notificationSummary?.recent || []).map((run) => <tr key={run.id} className="align-top"><td className="px-4 py-3 font-bold text-slate-900">{formatDateTime(run.createdAt)}<p className="mt-1 text-xs font-medium text-slate-500">{run.dateKey || "-"}</p></td><td className="px-4 py-3 text-slate-600">{run.totalUsersRead}<p className="mt-1 text-xs">{run.freeUsers} grátis · {run.vipUsers} VIP</p></td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${run.errors ? "bg-red-50 text-red-700 ring-red-100" : "bg-emerald-50 text-emerald-700 ring-emerald-100"}`}>{run.processed} OK · {run.errors} erro(s)</span><p className="mt-2 text-xs text-slate-500">{run.skipped} ignorado(s)</p></td><td className="px-4 py-3 text-slate-600">{run.emailsSent} e-mail(s)<p className="mt-1 text-xs">{run.digestsSent} resumo(s) · {run.notificationsCreated} criada(s)</p></td><td className="px-4 py-3 text-slate-600">{run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : "-"}</td></tr>)}
+                  {!(notificationSummary?.recent || []).length && <tr><td className="px-4 py-6 text-center text-sm font-bold text-slate-500" colSpan={5}>Aguardando a primeira execução do cron de notificações.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section id="pesquisas" className="scroll-mt-24 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

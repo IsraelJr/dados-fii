@@ -18,7 +18,7 @@ A primeira execução cria a linha de base dos dividendos e riscos, evitando dis
 
 - Alertas de dividendos para os 3 maiores FIIs da carteira por valor financeiro.
 - Alerta de concentração por ativo a partir de 40%.
-- Resumo periódico da carteira.
+- Resumo completo da carteira enviado toda sexta-feira.
 - Central de notificações e toast persistente.
 
 ### VIP
@@ -38,7 +38,7 @@ As variáveis existentes `CRON_SECRET`, `RESEND_API_KEY` e `WALLET_EMAIL_FROM` c
 PORTFOLIO_NOTIFICATIONS_ENABLED=true
 PORTFOLIO_EMAIL_ALERTS_ENABLED=true
 PORTFOLIO_DIGEST_ENABLED=true
-PORTFOLIO_DIGEST_SCHEDULE=daily
+PORTFOLIO_DIGEST_SCHEDULE=daily # usado pelo VIP; grátis é fixo em weekly:5
 PORTFOLIO_NOTIFICATION_USER_LIMIT=100
 PORTFOLIO_NOTIFICATION_CONCURRENCY=5
 FREE_PORTFOLIO_ALERT_LIMIT=3
@@ -52,7 +52,7 @@ Os valores acima já são os padrões do código. Portanto, só precisam ser cad
 
 ## Frequência do resumo
 
-`PORTFOLIO_DIGEST_SCHEDULE` aceita:
+Para o plano grátis, o resumo é fixo em `weekly:5` (sexta-feira), mesmo que exista outra preferência no documento do usuário. Para o VIP, `PORTFOLIO_DIGEST_SCHEDULE` aceita:
 
 | Valor | Regra |
 |---|---|
