@@ -18,10 +18,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Apply source patch
+      - name: Apply source-only patch
         run: |
-          python scripts/apply_free_friday_observability.py
-          git restore HEAD -- .github/workflows/portfolio-notifications-ci.yml .github/workflows/patch-free-friday-observability.yml scripts/apply_free_friday_observability.py
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('scripts/apply_free_friday_observability.py').read_text()
+          source = source.split('# 7) CI final em Node 22')[0]
+          exec(compile(source, 'apply_free_friday_observability.py', 'exec'))
+          PY
       - name: Commit patched sources
         run: |
           git config user.name "github-actions[bot]"
