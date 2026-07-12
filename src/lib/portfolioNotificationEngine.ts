@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { logObservabilityEvent } from "@/lib/observability";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -72,6 +73,7 @@ type UserProcessResult = {
   notificationsCreated?: number;
   emailsSent?: number;
   digestSent?: boolean;
+  digestSchedule?: string;
   error?: string;
 };
 
@@ -654,7 +656,9 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       }
     }
 
-    const schedule = String(preferences.digestSchedule || process.env.PORTFOLIO_DIGEST_SCHEDULE || "daily");
+    const schedule = isVip
+      ? String(preferences.digestSchedule || process.env.PORTFOLIO_DIGEST_SCHEDULE || "daily")
+      : "weekly:5";
     const digestEnabled = preferences.digestEnabled !== false && envBoolean("PORTFOLIO_DIGEST_ENABLED", true);
     const digestDue = digestEnabled && scheduleIsDue(schedule, String(state.lastDigestDate || ""), now);
     let digestSent = false;
@@ -676,19 +680,21 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       dividendHashes: nextDividendHashes,
       riskFlags: currentRiskFlags,
       lastDigestDate: nextLastDigestDate || null,
+      digestSchedule: schedule,
       lastProcessedDate: now.dateKey,
       lastProcessedAt: adminFieldValue.serverTimestamp(),
       updatedAt: adminFieldValue.serverTimestamp(),
       createdAt: stateSnap.exists ? state.createdAt || adminFieldValue.serverTimestamp() : adminFieldValue.serverTimestamp(),
     }, { merge: true });
 
-    return { userId: doc.id, email, status: "processed", isVip, walletCount: wallet.length, notificationsCreated, emailsSent, digestSent };
+    return { userId: doc.id, email, status: "processed", isVip, walletCount: wallet.length, notificationsCreated, emailsSent, digestSent, digestSchedule: schedule };
   } catch (err: any) {
     return { userId: doc.id, status: "error", error: err.message || "Erro ao processar usuário" };
   }
 }
 
 export async function processPortfolioNotifications(options?: { limit?: number }) {
+  const startedAt = Date.now();
   if (!envBoolean("PORTFOLIO_NOTIFICATIONS_ENABLED", true)) {
     return { ok: true, disabled: true, message: "PORTFOLIO_NOTIFICATIONS_ENABLED=false" };
   }
@@ -709,16 +715,36 @@ export async function processPortfolioNotifications(options?: { limit?: number }
     acc.notificationsCreated = (acc.notificationsCreated || 0) + Number(item.notificationsCreated || 0);
     acc.emailsSent = (acc.emailsSent || 0) + Number(item.emailsSent || 0);
     acc.digestsSent = (acc.digestsSent || 0) + Number(item.digestSent ? 1 : 0);
+    acc.freeUsers = (acc.freeUsers || 0) + Number(item.isVip === false);
+    acc.vipUsers = (acc.vipUsers || 0) + Number(item.isVip === true);
     return acc;
   }, {});
 
-  await adminDb.collection("PortfolioNotificationRuns").add({
+  const durationMs = Date.now() - startedAt;
+  const runPayload = {
+    ok: Number(summary.error || 0) === 0,
     dateKey: now.dateKey,
     limit,
     totalUsersRead: snapshot.size,
+    durationMs,
     summary,
     createdAt: adminFieldValue.serverTimestamp(),
+  };
+
+  await adminDb.collection("PortfolioNotificationRuns").add(runPayload);
+  await logObservabilityEvent({
+    type: "portfolio_notifications",
+    ok: runPayload.ok,
+    statusCode: runPayload.ok ? 200 : 207,
+    source: "vercel-cron",
+    message: `Processamento de notificações: ${summary.processed || 0} processado(s), ${summary.emailsSent || 0} e-mail(s), ${summary.error || 0} erro(s).`,
+    metadata: {
+      dateKey: now.dateKey,
+      totalUsersRead: snapshot.size,
+      durationMs,
+      summary,
+    },
   });
 
-  return { ok: true, dateKey: now.dateKey, limit, totalUsersRead: snapshot.size, summary, results };
+  return { ok: runPayload.ok, dateKey: now.dateKey, limit, totalUsersRead: snapshot.size, durationMs, summary, results };
 }
