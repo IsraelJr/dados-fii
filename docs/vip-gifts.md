@@ -47,7 +47,8 @@ No documento do usuário, durante a vigência:
 - Um VIP permanente não é reduzido nem substituído.
 - O mesmo convite não pode ser aceito duas vezes.
 - Presentes pendentes não vencidos para o mesmo e-mail são reaproveitados, evitando duplicidade acidental.
-- A expiração automática roda de hora em hora.
+- As permissões principais verificam `vipUntil`, portanto o acesso termina na data configurada mesmo antes da limpeza física do documento.
+- O cron diário compatível com o plano atual faz a limpeza de `isVip` e atualiza o histórico de presentes expirados.
 
 ## Criar pelo painel
 
@@ -84,7 +85,7 @@ Todas as ações exigem e-mail e token válidos de `WalletSessions`.
 
 ## Expiração
 
-O cron chama:
+O cron diário chama:
 
 ```text
 /api/admin/expire-vip-gifts?limit=300
