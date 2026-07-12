@@ -9,21 +9,75 @@ type Result = Record<string, any> | null;
 
 type Session = {
   user: string;
-  key: string;
+  expiresAt?: string | null;
 };
 
 async function parseResponse(response: Response) {
   const json = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(json?.error || "Erro na operação.");
+  if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("admin-session-expired"));
+    }
+    throw new Error(json?.error || "Erro na operação.");
+  }
   return json;
+}
+
+function formatSessionExpiration(value?: string | null) {
+  if (!value) return "durante esta sessão";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  } catch {
+    return "horário indisponível";
+  }
 }
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [user, setUser] = useState("");
   const [key, setKey] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        const response = await fetch("/api/admin/session", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        if (!response.ok) return;
+        const json = await response.json().catch(() => ({}));
+        if (active && json?.authenticated) {
+          setSession({ user: json.user, expiresAt: json.expiresAt || null });
+        }
+      } finally {
+        if (active) setCheckingSession(false);
+      }
+    }
+
+    function expireSession() {
+      setSession(null);
+      setLoginError("Sua sessão administrativa expirou. Entre novamente.");
+    }
+
+    restoreSession();
+    window.addEventListener("admin-session-expired", expireSession);
+    return () => {
+      active = false;
+      window.removeEventListener("admin-session-expired", expireSession);
+    };
+  }, []);
 
   async function login() {
     setLoginLoading(true);
@@ -33,16 +87,37 @@ export default function AdminPage() {
       const response = await fetch("/api/admin/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ user, token: key }),
       });
       const json = await parseResponse(response);
-      setSession({ user: json.user || user, key });
+      setSession({ user: json.user || user, expiresAt: json.expiresAt || null });
       setKey("");
     } catch (err: any) {
       setLoginError(err.message || "Acesso negado.");
     } finally {
       setLoginLoading(false);
     }
+  }
+
+  async function logout() {
+    await fetch("/api/admin/session", {
+      method: "DELETE",
+      credentials: "same-origin",
+    }).catch(() => undefined);
+    setSession(null);
+    setKey("");
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="mx-auto flex min-h-[60vh] max-w-5xl items-center justify-center px-4 py-8">
+        <div className="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 font-bold text-slate-700 shadow-sm ring-1 ring-slate-200">
+          <Loader2 className="animate-spin text-indigo-600" size={20} />
+          Verificando sessão administrativa…
+        </div>
+      </main>
+    );
   }
 
   if (!session) {
@@ -61,7 +136,7 @@ export default function AdminPage() {
             </span>
             <div>
               <h1 className="text-2xl font-extrabold text-white">Login administrativo</h1>
-              <p className="mt-1 text-sm font-medium text-gray-300">Informe o usuário configurado no ambiente e a chave administrativa.</p>
+              <p className="mt-1 text-sm font-medium text-gray-300">Entre uma vez. A sessão segura permanecerá ativa por até oito horas neste navegador.</p>
             </div>
           </div>
 
@@ -77,16 +152,17 @@ export default function AdminPage() {
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 font-extrabold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
           >
             {loginLoading ? <Loader2 className="animate-spin" size={18} /> : <Lock size={18} />}
-            Entrar
+            Entrar com segurança
           </button>
 
+          <p className="mt-3 text-xs leading-5 text-gray-400">A chave é enviada somente no login e não fica armazenada no JavaScript nem no armazenamento local do navegador.</p>
           {loginError && <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm font-bold text-red-200">{loginError}</p>}
         </section>
       </main>
     );
   }
 
-  return <AdminDashboard session={session} onLogout={() => setSession(null)} />;
+  return <AdminDashboard session={session} onLogout={logout} />;
 }
 
 function AdminDashboard({ session, onLogout }: { session: Session; onLogout: () => void }) {
@@ -103,22 +179,23 @@ function AdminDashboard({ session, onLogout }: { session: Session; onLogout: () 
       />
 
       <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">Sessão ativa</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-indigo-700">Sessão segura ativa</p>
         <h2 className="mt-1 text-xl font-extrabold text-slate-900">{session.user}</h2>
+        <p className="mt-1 text-sm text-slate-500">Válida até {formatSessionExpiration(session.expiresAt)}. A chave administrativa não está exposta nesta página.</p>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <TgarIngestionCard session={session} />
-        <VipGiftCard session={session} />
-        <CreateFiiCard session={session} />
-        <PendingCard session={session} />
-        <CleanupCard session={session} />
+        <TgarIngestionCard />
+        <VipGiftCard />
+        <CreateFiiCard />
+        <PendingCard />
+        <CleanupCard />
       </div>
     </main>
   );
 }
 
-function TgarIngestionCard({ session }: { session: Session }) {
+function TgarIngestionCard() {
   const [cnpj, setCnpj] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [delayMinutes, setDelayMinutes] = useState("0");
@@ -132,8 +209,9 @@ function TgarIngestionCard({ session }: { session: Session }) {
     try {
       const response = await fetch("/api/admin/fii-ingestion/status", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
-        body: JSON.stringify({ runId: id, secret: session.key }),
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ runId: id }),
       });
       setResult(await parseResponse(response));
     } catch (err: any) {
@@ -149,8 +227,9 @@ function TgarIngestionCard({ session }: { session: Session }) {
       try {
         const response = await fetch("/api/admin/fii-ingestion/status", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
-          body: JSON.stringify({ runId, secret: session.key }),
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ runId }),
         });
         const json = await parseResponse(response);
         setResult(json);
@@ -161,7 +240,7 @@ function TgarIngestionCard({ session }: { session: Session }) {
       }
     }, 5000);
     return () => window.clearInterval(interval);
-  }, [runId, session.key]);
+  }, [runId]);
 
   async function run() {
     setLoading(true);
@@ -170,9 +249,9 @@ function TgarIngestionCard({ session }: { session: Session }) {
     try {
       const response = await fetch("/api/admin/fii-ingestion/start", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
-          secret: session.key,
           ticker: "TGAR11",
           cnpj: cnpj || undefined,
           year: Number(year || new Date().getFullYear()),
@@ -210,7 +289,7 @@ function TgarIngestionCard({ session }: { session: Session }) {
   );
 }
 
-function VipGiftCard({ session }: { session: Session }) {
+function VipGiftCard() {
   const [email, setEmail] = useState("");
   const [durationDays, setDurationDays] = useState("5");
   const [claimWindowDays, setClaimWindowDays] = useState("30");
@@ -224,14 +303,13 @@ function VipGiftCard({ session }: { session: Session }) {
     try {
       const response = await fetch("/api/admin/vip-gifts", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
-          secret: session.key,
           email,
           durationDays: Number(durationDays || 5),
           claimWindowDays: Number(claimWindowDays || 30),
           message: message || undefined,
-          createdBy: session.user,
         }),
       });
       setResult(await parseResponse(response));
@@ -256,7 +334,7 @@ function VipGiftCard({ session }: { session: Session }) {
   );
 }
 
-function CreateFiiCard({ session }: { session: Session }) {
+function CreateFiiCard() {
   const [ticker, setTicker] = useState("");
   const [segment, setSegment] = useState("");
   const [cnpj, setCnpj] = useState("");
@@ -270,8 +348,9 @@ function CreateFiiCard({ session }: { session: Session }) {
     try {
       const response = await fetch("/api/admin/create-fii", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
-        body: JSON.stringify({ ticker, segment, segmentNew: segment, cnpj, secret: session.key }),
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ ticker, segment, segmentNew: segment, cnpj }),
       });
       setResult(await parseResponse(response));
     } catch (err: any) {
@@ -294,7 +373,7 @@ function CreateFiiCard({ session }: { session: Session }) {
   );
 }
 
-function PendingCard({ session }: { session: Session }) {
+function PendingCard() {
   const [limit, setLimit] = useState("30");
   const [tickers, setTickers] = useState("");
   const [loading, setLoading] = useState(false);
@@ -307,9 +386,9 @@ function PendingCard({ session }: { session: Session }) {
     try {
       const response = await fetch("/api/admin/update-pending-dividends", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
-          secret: session.key,
           limit: Number(limit || 30),
           tickers: tickers.split(",").map((item) => item.trim().toUpperCase()).filter(Boolean),
         }),
@@ -334,7 +413,7 @@ function PendingCard({ session }: { session: Session }) {
   );
 }
 
-function CleanupCard({ session }: { session: Session }) {
+function CleanupCard() {
   const [limit, setLimit] = useState("50");
   const [cursor, setCursor] = useState("");
   const [loading, setLoading] = useState(false);
@@ -347,8 +426,9 @@ function CleanupCard({ session }: { session: Session }) {
     try {
       const response = await fetch("/api/admin/clean-fii-fields", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
-        body: JSON.stringify({ secret: session.key, limit: Number(limit || 50), cursor: cursor || undefined }),
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ limit: Number(limit || 50), cursor: cursor || undefined }),
       });
       const json = await parseResponse(response);
       setResult(json);
