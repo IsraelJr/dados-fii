@@ -4,6 +4,7 @@ import {
   assertSupportedIngestionTicker,
   getIngestionAdapterId,
   getIngestionFundConfig,
+  getKnownIngestionCnpj,
   isSupportedIngestionTicker,
   SUPPORTED_INGESTION_TICKERS,
 } from "./fiiIngestionConfig.ts";
@@ -13,6 +14,7 @@ test("FII funds reuse the traditional CVM adapter", () => {
   assert.equal(getIngestionAdapterId("TGAR11"), "cvm-fii-v2");
   assert.equal(getIngestionFundConfig("mxrf11")?.fundType, "FII");
   assert.equal(getIngestionAdapterId("MXRF11"), "cvm-fii-v2");
+  assert.equal(getKnownIngestionCnpj("MXRF11"), "97521225000125");
 });
 
 test("FIAGRO funds reuse the FIAGRO CVM adapter", () => {
