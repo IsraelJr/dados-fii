@@ -9,17 +9,23 @@ O piloto valida a descoberta, extração e normalização de dados oficiais ante
 - `publishToOfficialBase` permanece `false` durante todo o fluxo.
 - Uma falha em qualquer etapa é registrada em `FiiIngestionRuns/{runId}`.
 - Nenhum dado existente em `Fiis/TGAR11` é sobrescrito.
+- O painel administrativo usa um cookie assinado, HttpOnly e com validade padrão de oito horas.
+- A chave administrativa é usada somente no login e não fica disponível ao JavaScript.
+- O botão Sair encerra a sessão imediatamente.
+- As chaves atuais continuam aceitas em chamadas técnicas e tarefas agendadas.
 
 ## Fluxo
 
-1. O administrador dispara `/api/admin/fii-ingestion/start`.
-2. Um Vercel Workflow é iniciado imediatamente ou após o atraso informado.
-3. O CNPJ é resolvido pelo parâmetro, pelo documento `Fiis/TGAR11` ou pela variável `TGAR11_CNPJ`.
-4. O catálogo CKAN da CVM localiza o recurso anual do informe mensal.
-5. O ZIP é baixado, filtrado pelo CNPJ e normalizado.
-6. O catálogo de documentos eventuais é filtrado pelo mesmo CNPJ.
-7. A OpenAI tenta extrair dados adicionais a partir dos documentos oficiais localizados.
-8. O validador calcula cobertura e deixa o resultado pronto para revisão.
+1. O administrador entra em `/admin` uma vez.
+2. O servidor cria a sessão segura no navegador.
+3. O administrador inicia o card **Piloto de ingestão TGAR11** sem informar novamente a chave.
+4. Um Vercel Workflow é iniciado imediatamente ou após o atraso informado.
+5. O CNPJ é resolvido pelo parâmetro, pelo documento `Fiis/TGAR11` ou pela configuração do ambiente.
+6. O catálogo CKAN da CVM localiza o recurso anual do informe mensal.
+7. O ZIP é baixado, filtrado pelo CNPJ e normalizado.
+8. O catálogo de documentos eventuais é filtrado pelo mesmo CNPJ.
+9. A OpenAI tenta extrair dados adicionais a partir dos documentos oficiais localizados.
+10. O validador calcula cobertura e deixa o resultado pronto para revisão.
 
 ## Coleções
 
@@ -39,38 +45,15 @@ A página `/admin` possui o card **Piloto de ingestão TGAR11** com:
 - atraso em minutos;
 - status atualizado automaticamente.
 
+A página restaura automaticamente a sessão enquanto o cookie continuar válido.
+
 ## Disparo por API
 
-```bash
-curl -X POST https://www.dadosfii.com.br/api/admin/fii-ingestion/start \
-  -H "Content-Type: application/json" \
-  -H "x-admin-secret: $ADMIN_UPDATE_SECRET" \
-  -d '{
-    "ticker": "TGAR11",
-    "year": 2026,
-    "delayMinutes": 0
-  }'
-```
+Chamadas técnicas continuam compatíveis com o cabeçalho administrativo já utilizado pelo projeto.
 
-Consulta:
+## Configuração adicional opcional
 
-```bash
-curl -X POST https://www.dadosfii.com.br/api/admin/fii-ingestion/status \
-  -H "Content-Type: application/json" \
-  -H "x-admin-secret: $ADMIN_UPDATE_SECRET" \
-  -d '{"runId":"ID_DA_EXECUCAO"}'
-```
-
-## Variáveis
-
-```env
-ADMIN_UPDATE_SECRET=...
-CRON_SECRET=...
-FIREBASE_SERVICE_ACCOUNT_KEY=...
-OPENAI_API_KEY=...
-OPENAI_SEARCH_MODEL=gpt-4.1-mini
-TGAR11_CNPJ=... # opcional quando o CNPJ já existe no Firestore
-```
+É possível configurar uma chave exclusiva para assinar as sessões administrativas e alterar a duração padrão. Quando a chave exclusiva não existe, a aplicação usa a chave administrativa atual como fallback.
 
 O projeto precisa estar com Vercel Workflows habilitado e Fluid Compute ativo no ambiente de implantação.
 
