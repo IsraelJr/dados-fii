@@ -1,35 +1,22 @@
-name: Apply Friday Observability Patch
+name: Portfolio Notifications CI
 
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          ref: ${{ github.head_ref }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Apply source-only patch
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          source = Path('scripts/apply_free_friday_observability.py').read_text()
-          source = source.split('# 7) CI final em Node 22')[0]
-          exec(compile(source, 'apply_free_friday_observability.py', 'exec'))
-          PY
-      - name: Commit patched sources
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/lib/portfolioNotificationEngine.ts src/lib/observability.ts src/app/api/admin/observability/route.ts src/app/admin/observabilidade/page.tsx docs/portfolio-notifications.md package.json
-          git commit -m "Send free portfolio digest on Fridays and expand observability"
-          git push origin HEAD:${{ github.head_ref }}
+          node-version: 22
+          cache: npm
+      - run: npm install --silent
+      - run: npx tsc --noEmit
