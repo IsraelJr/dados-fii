@@ -1,22 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminAuthorized } from "@/lib/adminSession";
 import { adminDb } from "@/lib/firebaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function allowedSecrets() {
-  return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
-}
-
-function isAuthorized(req: NextRequest, body?: any) {
-  const secrets = allowedSecrets();
-  if (!secrets.length) return false;
-  const authorization = req.headers.get("authorization") || "";
-  const headerSecret = req.headers.get("x-admin-secret") || authorization.replace(/^Bearer\s+/i, "");
-  const querySecret = req.nextUrl.searchParams.get("secret") || "";
-  const bodySecret = String(body?.secret || "");
-  return [headerSecret, querySecret, bodySecret].some((value) => Boolean(value && secrets.includes(value)));
-}
 
 function toIso(value: any) {
   if (!value) return null;
@@ -55,26 +42,48 @@ async function readStatus(runId?: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+  }
+
   try {
     const runId = String(req.nextUrl.searchParams.get("runId") || "").trim();
     const data = await readStatus(runId || undefined);
-    if (runId && !data) return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
-    return NextResponse.json({ ok: true, run: runId ? data : undefined, runs: runId ? undefined : data }, { headers: { "Cache-Control": "no-store" } });
+    if (runId && !data) {
+      return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
+    }
+    return NextResponse.json(
+      { ok: true, run: runId ? data : undefined, runs: runId ? undefined : data },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || "Erro ao consultar execução." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error?.message || "Erro ao consultar execução." },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  if (!isAuthorized(req, body)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+  if (!isAdminAuthorized(req, body)) {
+    return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+  }
+
   try {
     const runId = String(body?.runId || "").trim();
     const data = await readStatus(runId || undefined);
-    if (runId && !data) return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
-    return NextResponse.json({ ok: true, run: runId ? data : undefined, runs: runId ? undefined : data }, { headers: { "Cache-Control": "no-store" } });
+    if (runId && !data) {
+      return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
+    }
+    return NextResponse.json(
+      { ok: true, run: runId ? data : undefined, runs: runId ? undefined : data },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error: any) {
-    return NextResponse.json({ ok: false, error: error?.message || "Erro ao consultar execução." }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error?.message || "Erro ao consultar execução." },
+      { status: 500 }
+    );
   }
 }
