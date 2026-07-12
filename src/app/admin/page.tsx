@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Loader2, Lock, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Database, Gift, Loader2, Lock, Play, Plus, RefreshCw, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 
 type Result = Record<string, any> | null;
@@ -108,11 +108,151 @@ function AdminDashboard({ session, onLogout }: { session: Session; onLogout: () 
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <TgarIngestionCard session={session} />
+        <VipGiftCard session={session} />
         <CreateFiiCard session={session} />
         <PendingCard session={session} />
         <CleanupCard session={session} />
       </div>
     </main>
+  );
+}
+
+function TgarIngestionCard({ session }: { session: Session }) {
+  const [cnpj, setCnpj] = useState("");
+  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [delayMinutes, setDelayMinutes] = useState("0");
+  const [runId, setRunId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Result>(null);
+
+  async function loadStatus(id = runId, silent = false) {
+    if (!id) return;
+    if (!silent) setLoading(true);
+    try {
+      const response = await fetch("/api/admin/fii-ingestion/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
+        body: JSON.stringify({ runId: id, secret: session.key }),
+      });
+      setResult(await parseResponse(response));
+    } catch (err: any) {
+      setResult({ error: err.message });
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!runId) return;
+    const interval = window.setInterval(async () => {
+      try {
+        const response = await fetch("/api/admin/fii-ingestion/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
+          body: JSON.stringify({ runId, secret: session.key }),
+        });
+        const json = await parseResponse(response);
+        setResult(json);
+        const status = String(json?.run?.status || "");
+        if (["completed", "failed"].includes(status)) window.clearInterval(interval);
+      } catch {
+        return;
+      }
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [runId, session.key]);
+
+  async function run() {
+    setLoading(true);
+    setResult(null);
+    setRunId("");
+    try {
+      const response = await fetch("/api/admin/fii-ingestion/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
+        body: JSON.stringify({
+          secret: session.key,
+          ticker: "TGAR11",
+          cnpj: cnpj || undefined,
+          year: Number(year || new Date().getFullYear()),
+          delayMinutes: Number(delayMinutes || 0),
+        }),
+      });
+      const json = await parseResponse(response);
+      setRunId(String(json.runId || ""));
+      setResult(json);
+    } catch (err: any) {
+      setResult({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AdminCard icon={<Database />} title="Piloto de ingestão TGAR11" description="Executa o workflow CVM em staging, sem publicar dados na coleção oficial Fiis.">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Field label="CNPJ" value={cnpj} onChange={setCnpj} placeholder="Opcional" />
+        <Field label="Ano" value={year} onChange={setYear} placeholder="2026" type="number" />
+        <Field label="Atraso em minutos" value={delayMinutes} onChange={setDelayMinutes} placeholder="0" type="number" />
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <ActionButton label="Iniciar piloto" loading={loading} onClick={run} />
+        {runId && (
+          <button type="button" onClick={() => loadStatus()} disabled={loading} className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-gray-800 px-5 py-3 font-extrabold text-gray-100 ring-1 ring-gray-700 hover:bg-gray-700 disabled:opacity-50">
+            <RefreshCw size={18} /> Atualizar status
+          </button>
+        )}
+      </div>
+      {runId && <p className="mt-3 text-xs font-bold text-indigo-200">Execução: {runId}</p>}
+      <ResultBox result={result} />
+    </AdminCard>
+  );
+}
+
+function VipGiftCard({ session }: { session: Session }) {
+  const [email, setEmail] = useState("");
+  const [durationDays, setDurationDays] = useState("5");
+  const [claimWindowDays, setClaimWindowDays] = useState("30");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<Result>(null);
+
+  async function run() {
+    setLoading(true);
+    setResult(null);
+    try {
+      const response = await fetch("/api/admin/vip-gifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-secret": session.key },
+        body: JSON.stringify({
+          secret: session.key,
+          email,
+          durationDays: Number(durationDays || 5),
+          claimWindowDays: Number(claimWindowDays || 30),
+          message: message || undefined,
+          createdBy: session.user,
+        }),
+      });
+      setResult(await parseResponse(response));
+    } catch (err: any) {
+      setResult({ error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AdminCard icon={<Gift />} title="Presentear com VIP" description="Cria um convite temporário e parametrizável, exibido em notificação e pop-up para o usuário aceitar ou ignorar.">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Field label="E-mail do usuário" value={email} onChange={setEmail} placeholder="usuario@email.com" type="email" />
+        <Field label="Dias de VIP" value={durationDays} onChange={setDurationDays} placeholder="5" type="number" />
+        <Field label="Prazo para aceitar" value={claimWindowDays} onChange={setClaimWindowDays} placeholder="30" type="number" />
+      </div>
+      <TextArea label="Mensagem opcional" value={message} onChange={setMessage} placeholder="Você ganhou alguns dias para experimentar o Premium." />
+      <ActionButton label="Enviar presente VIP" loading={loading} disabled={!email.trim()} onClick={run} />
+      <ResultBox result={result} />
+    </AdminCard>
   );
 }
 
@@ -257,6 +397,21 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="w-full rounded-xl border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
+      />
+    </label>
+  );
+}
+
+function TextArea({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
+  return (
+    <label className="mt-3 block">
+      <span className="mb-1 block text-sm font-bold text-gray-300">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        className="w-full resize-y rounded-xl border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
       />
     </label>
   );
