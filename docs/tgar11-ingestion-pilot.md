@@ -51,6 +51,42 @@ A página restaura automaticamente a sessão enquanto o cookie continuar válido
 
 Chamadas técnicas continuam compatíveis com o cabeçalho administrativo já utilizado pelo projeto.
 
+## QA manual por API
+
+Após a execução terminar com `status: completed`, o administrador pode abrir:
+
+```text
+/api/admin/fii-ingestion/qa
+```
+
+A rota seleciona automaticamente a execução concluída mais recente do TGAR11. Também aceita um identificador específico:
+
+```text
+/api/admin/fii-ingestion/qa?runId=IDENTIFICADOR
+```
+
+Para salvar o relatório de QA no documento da execução e no staging:
+
+```text
+/api/admin/fii-ingestion/qa?persist=1
+```
+
+A resposta inclui:
+
+- status e escopo da execução;
+- confirmação de bloqueio da publicação oficial;
+- contagem real e esperada de snapshots e documentos;
+- cobertura dos campos mensais;
+- consistência do CNPJ;
+- plausibilidade de datas e valores;
+- verificação das fontes oficiais;
+- situação da extração por IA;
+- score, veredito, alertas e recomendações;
+- amostras compactas para revisão;
+- `assistantReviewPayload`, pronto para copiar e enviar ao assistente.
+
+A API nunca autoriza publicação automática. Mesmo um resultado aprovado permanece bloqueado até revisão humana.
+
 ## Configuração adicional opcional
 
 É possível configurar uma chave exclusiva para assinar as sessões administrativas e alterar a duração padrão. Quando a chave exclusiva não existe, a aplicação usa a chave administrativa atual como fallback.
