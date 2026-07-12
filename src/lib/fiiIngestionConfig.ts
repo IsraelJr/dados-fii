@@ -35,6 +35,7 @@ export const FII_INGESTION_REGISTRY = {
     fundType: "FII",
     adapterId: "cvm-fii-v2",
     operational: true,
+    cnpj: "97521225000125",
     description: "Segundo FII tradicional para teste de reutilização do adaptador.",
   },
   KNCA11: {
