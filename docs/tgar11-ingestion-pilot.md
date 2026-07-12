@@ -11,6 +11,7 @@ O piloto valida a descoberta, extração e normalização de dados oficiais ante
 - Nenhum dado existente em `Fiis/TGAR11` é sobrescrito.
 - O painel administrativo usa um cookie assinado, HttpOnly e com validade padrão de oito horas.
 - A chave administrativa é usada somente no login e não fica disponível ao JavaScript.
+- O login funciona com a chave já existente; `ADMIN_USER` é opcional e serve apenas para identificar a sessão.
 - O botão Sair encerra a sessão imediatamente.
 - As chaves atuais continuam aceitas em chamadas técnicas e tarefas agendadas.
 
