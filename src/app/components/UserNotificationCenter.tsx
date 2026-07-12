@@ -8,6 +8,7 @@ const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
 const HIDDEN_TOASTS_KEY = "dados-fii-notification-toast-hidden-v1";
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
+const SESSION_CHECK_INTERVAL_MS = 2000;
 
 type NotificationSeverity = "info" | "success" | "warning" | "critical";
 type NotificationItem = {
@@ -101,15 +102,15 @@ export default function UserNotificationCenter() {
 
     try {
       const json = await request("list", { limit: 60 });
-      const nextItems = Array.isArray(json.items) ? json.items : [];
+      const nextItems: NotificationItem[] = Array.isArray(json.items) ? json.items : [];
       setItems(nextItems);
       setUnreadCount(Number(json.unreadCount || 0));
       setReady(true);
 
       const hidden = readHiddenToastIds();
-      const newestUnread = nextItems.find((item: NotificationItem) => !item.readAt && !hidden.includes(item.id));
+      const newestUnread = nextItems.find((item) => !item.readAt && !hidden.includes(item.id));
       setToastItem((current) => {
-        if (current && nextItems.some((item: NotificationItem) => item.id === current.id && !item.readAt)) return current;
+        if (current && nextItems.some((item) => item.id === current.id && !item.readAt)) return current;
         return newestUnread || null;
       });
     } catch (err: any) {
@@ -119,6 +120,7 @@ export default function UserNotificationCenter() {
         setItems([]);
         setUnreadCount(0);
         setToastItem(null);
+        setOpen(false);
       } else {
         setError(message);
       }
@@ -128,10 +130,31 @@ export default function UserNotificationCenter() {
   }, [email, sessionToken, request]);
 
   useEffect(() => {
-    const storedEmail = String(window.localStorage.getItem(EMAIL_KEY) || "").trim().toLowerCase();
-    const storedToken = String(window.localStorage.getItem(TOKEN_KEY) || "");
-    setEmail(storedEmail);
-    setSessionToken(storedToken);
+    function syncSession() {
+      const storedEmail = String(window.localStorage.getItem(EMAIL_KEY) || "").trim().toLowerCase();
+      const storedToken = String(window.localStorage.getItem(TOKEN_KEY) || "");
+      setEmail((current) => current === storedEmail ? current : storedEmail);
+      setSessionToken((current) => current === storedToken ? current : storedToken);
+
+      if (!storedEmail || !storedToken) {
+        setReady(false);
+        setItems([]);
+        setUnreadCount(0);
+        setToastItem(null);
+        setOpen(false);
+      }
+    }
+
+    syncSession();
+    const interval = window.setInterval(syncSession, SESSION_CHECK_INTERVAL_MS);
+    window.addEventListener("storage", syncSession);
+    window.addEventListener("wallet-session-updated", syncSession);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("storage", syncSession);
+      window.removeEventListener("wallet-session-updated", syncSession);
+    };
   }, []);
 
   useEffect(() => {
@@ -142,22 +165,11 @@ export default function UserNotificationCenter() {
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") loadNotifications(true);
     };
-    const onWalletSessionChanged = () => {
-      const storedEmail = String(window.localStorage.getItem(EMAIL_KEY) || "").trim().toLowerCase();
-      const storedToken = String(window.localStorage.getItem(TOKEN_KEY) || "");
-      setEmail(storedEmail);
-      setSessionToken(storedToken);
-    };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("storage", onWalletSessionChanged);
-    window.addEventListener("wallet-session-updated", onWalletSessionChanged);
-
     return () => {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("storage", onWalletSessionChanged);
-      window.removeEventListener("wallet-session-updated", onWalletSessionChanged);
     };
   }, [email, sessionToken, loadNotifications]);
 
@@ -283,7 +295,7 @@ export default function UserNotificationCenter() {
                       <p className="mt-1 line-clamp-3 text-xs font-medium leading-5 text-slate-600">{item.message}</p>
                       <p className="mt-2 text-[11px] font-bold text-slate-400">{formatDate(item.createdAt)}</p>
                     </button>
-                    <button type="button" onClick={() => dismissNotification(item)} className="shrink-0 rounded-full p-1 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100 focus:opacity-100" aria-label={`Remover notificação ${item.title}`}><X size={15} /></button>
+                    <button type="button" onClick={() => dismissNotification(item)} className="shrink-0 rounded-full p-1 text-slate-400 opacity-100 transition hover:bg-slate-100 hover:text-slate-700 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100" aria-label={`Remover notificação ${item.title}`}><X size={15} /></button>
                   </div>
                 </article>
               ))}
