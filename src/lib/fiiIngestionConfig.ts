@@ -114,12 +114,14 @@ export function getIngestionAdapterId(value: unknown): IngestionAdapterId {
   return adapterId;
 }
 
-export function listOperationalIngestionFunds() {
-  return SUPPORTED_INGESTION_TICKERS.map((ticker) => FII_INGESTION_REGISTRY[ticker]);
+export function listOperationalIngestionFunds(): IngestionFundConfig[] {
+  return SUPPORTED_INGESTION_TICKERS.map(
+    (ticker) => FII_INGESTION_REGISTRY[ticker] as IngestionFundConfig
+  );
 }
 
-export function listBlockedIngestionFunds() {
+export function listBlockedIngestionFunds(): IngestionFundConfig[] {
   return REGISTERED_INGESTION_TICKERS
-    .map((ticker) => FII_INGESTION_REGISTRY[ticker])
+    .map((ticker) => FII_INGESTION_REGISTRY[ticker] as IngestionFundConfig)
     .filter((fund) => !fund.operational);
 }
