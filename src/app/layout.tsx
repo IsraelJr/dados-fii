@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import SiteFooter from "./components/SiteFooter";
 import SiteNav from "./components/SiteNav";
 import UserNotificationCenter from "./components/UserNotificationCenter";
+import VipGiftPrompt from "./components/VipGiftPrompt";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -108,6 +109,7 @@ export default function RootLayout({
       >
         <SiteNav />
         <UserNotificationCenter />
+        <VipGiftPrompt />
         {children}
         <SiteFooter />
       </body>
