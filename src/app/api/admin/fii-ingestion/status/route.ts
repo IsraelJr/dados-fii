@@ -45,11 +45,13 @@ async function readStatus(runId?: string) {
 
   const snapshot = await adminDb
     .collection("FiiIngestionRuns")
-    .where("ticker", "==", "TGAR11")
     .orderBy("createdAt", "desc")
-    .limit(10)
+    .limit(30)
     .get();
-  return snapshot.docs.map(serialize);
+  return snapshot.docs
+    .map(serialize)
+    .filter((run) => run.ticker === "TGAR11")
+    .slice(0, 10);
 }
 
 export async function GET(req: NextRequest) {
