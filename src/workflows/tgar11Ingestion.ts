@@ -42,7 +42,13 @@ async function importMonthly(input: { runId: string; ticker: string; cnpj: strin
 
   if (input.ticker === "VGIA11") {
     const { importFiagroMonthlyData } = await import("@/lib/cvmFiagroMonthlyIngestion");
-    return importFiagroMonthlyData(input);
+    const { reconcileFiagroDailyFields } = await import("@/lib/cvmFiagroPostProcessing");
+    const monthly = await importFiagroMonthlyData(input);
+    const reconciliation = await reconcileFiagroDailyFields({
+      runId: input.runId,
+      ticker: input.ticker,
+    });
+    return { ...monthly, reconciliation };
   }
 
   const { importMonthlyCvmDataV2 } = await import("@/lib/cvmMonthlyIngestion");
