@@ -8,6 +8,9 @@ if (!admin.apps.length) {
     });
 }
 
-export const adminDb = admin.firestore();
+const firestore = admin.firestore();
+firestore.settings({ ignoreUndefinedProperties: true });
+
+export const adminDb = firestore;
 export const adminFieldValue = admin.firestore.FieldValue;
 export default admin;
