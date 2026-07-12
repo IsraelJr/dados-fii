@@ -6,6 +6,8 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { normalizeCnpj } from "@/lib/cvmIngestion";
 import {
   assertSupportedIngestionTicker,
+  getIngestionAdapterId,
+  getIngestionFundConfig,
   SUPPORTED_INGESTION_TICKERS,
 } from "@/lib/fiiIngestionConfig";
 import { fiiIngestionWorkflow } from "@/workflows/tgar11Ingestion";
@@ -48,6 +50,9 @@ export async function POST(req: NextRequest) {
     }, { status: 400 });
   }
 
+  const fundConfig = getIngestionFundConfig(ticker);
+  const fundType = fundConfig?.fundType || "FII";
+  const adapterId = getIngestionAdapterId(ticker);
   const activeRun = await findActiveRun(ticker);
   if (activeRun) {
     const data = activeRun.data() || {};
@@ -73,6 +78,8 @@ export async function POST(req: NextRequest) {
     await runRef.set({
       runId,
       ticker,
+      fundType,
+      adapterId,
       cnpj: cnpj || null,
       year,
       delayMinutes,
@@ -105,6 +112,8 @@ export async function POST(req: NextRequest) {
       runId,
       workflowRunId: workflowRun.runId,
       ticker,
+      fundType,
+      adapterId,
       year,
       delayMinutes,
       enableAi,
