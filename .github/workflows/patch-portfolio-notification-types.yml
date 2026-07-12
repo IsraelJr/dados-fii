@@ -1,0 +1,40 @@
+name: Patch Portfolio Notification Types
+
+on:
+  push:
+    branches:
+      - feature/portfolio-notifications
+    paths:
+      - '.github/workflows/patch-portfolio-notification-types.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/portfolio-notifications
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Patch Firestore transaction typing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/lib/portfolioNotificationEngine.ts')
+          text = path.read_text()
+          old = '    if (snap.exists) return;'
+          new = '    if ((snap as any).exists) return;'
+          if old not in text:
+              raise SystemExit('Target line not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit patch and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/patch-portfolio-notification-types.yml
+          git add src/lib/portfolioNotificationEngine.ts
+          git commit -m "Fix notification Firestore transaction typing"
+          git push origin HEAD:feature/portfolio-notifications

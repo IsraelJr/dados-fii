@@ -1,0 +1,50 @@
+name: Portfolio Notifications CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install --silent
+      - name: Build application
+        id: build
+        continue-on-error: true
+        shell: bash
+        run: |
+          PRIVATE_KEY="$(openssl genrsa 2048)"
+          export PRIVATE_KEY
+          export FIREBASE_SERVICE_ACCOUNT_KEY="$(node -e 'process.stdout.write(JSON.stringify({project_id:"dados-fii-ci",client_email:"ci@dados-fii-ci.iam.gserviceaccount.com",private_key:process.env.PRIVATE_KEY}))')"
+          export NEXT_PUBLIC_BASE_URL="https://www.dadosfii.com.br"
+          export NEXT_PUBLIC_FIREBASE_API_KEY="test-api-key-for-ci-build"
+          export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="dados-fii-ci.firebaseapp.com"
+          export NEXT_PUBLIC_FIREBASE_PROJECT_ID="dados-fii-ci"
+          export NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="dados-fii-ci.appspot.com"
+          export NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="123456789012"
+          export NEXT_PUBLIC_FIREBASE_APP_ID="test-app-id-for-ci-build"
+          export NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="test-measurement-id"
+          export CRON_SECRET="ci-only-secret"
+          export ADMIN_UPDATE_SECRET="ci-only-secret"
+          npm run build > build.log 2>&1
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-notifications-build-log
+          path: build.log
+          if-no-files-found: error
+      - name: Fail when build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
