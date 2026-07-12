@@ -1,0 +1,31 @@
+name: Portfolio Notifications CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build application
+        shell: bash
+        run: |
+          PRIVATE_KEY="$(openssl genrsa 2048)"
+          export PRIVATE_KEY
+          export FIREBASE_SERVICE_ACCOUNT_KEY="$(node -e 'process.stdout.write(JSON.stringify({project_id:"dados-fii-ci",client_email:"ci@dados-fii-ci.iam.gserviceaccount.com",private_key:process.env.PRIVATE_KEY}))')"
+          export NEXT_PUBLIC_BASE_URL="https://www.dadosfii.com.br"
+          export CRON_SECRET="ci-only-secret"
+          export ADMIN_UPDATE_SECRET="ci-only-secret"
+          npm run build
