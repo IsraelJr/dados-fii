@@ -25,25 +25,21 @@ async function resolveCnpj(input: FiiIngestionInput) {
 
 async function importMonthly(input: { runId: string; ticker: string; cnpj: string; year: number }) {
   "use step";
-  await updateRun(input.runId, { status: "running", currentStep: "cvm_monthly" });
   return importMonthlyCvmData(input);
 }
 
 async function importDocuments(input: { runId: string; ticker: string; cnpj: string; year: number }) {
   "use step";
-  await updateRun(input.runId, { status: "running", currentStep: "cvm_documents" });
   return importEventualDocuments({ ...input, limit: 40 });
 }
 
 async function extractDocuments(input: { runId: string; ticker: string; documents: Array<Record<string, unknown>> }) {
   "use step";
-  await updateRun(input.runId, { status: "running", currentStep: "ai_extraction" });
   return extractPilotInsights(input);
 }
 
 async function validate(input: { runId: string; ticker: string; cnpj: string; monthly: any; documents: any; ai: any }) {
   "use step";
-  await updateRun(input.runId, { status: "running", currentStep: "validation" });
   return validatePilotRun(input);
 }
 
