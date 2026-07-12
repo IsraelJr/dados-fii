@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { hasActiveVip, vipAccessSummary } from "@/lib/vipAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,7 +104,8 @@ export async function POST(req: Request) {
     const reportId = sha256(`${user.docId}:${month}:wallet-risk-report`);
     const reportSnap = await adminDb.collection(REPORT_COLLECTION).doc(reportId).get();
     const report = reportSnap.data() || {};
-    const isVip = user.data?.isVip === true;
+    const isVip = hasActiveVip(user.data);
+    const vip = vipAccessSummary(user.data);
     const credits = reportCredits(user.data);
 
     return NextResponse.json({
@@ -111,6 +113,7 @@ export async function POST(req: Request) {
       email,
       month,
       isVip,
+      vip,
       credits,
       walletCount: walletCount(user.data),
       canGenerate: isVip || credits > 0,
