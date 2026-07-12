@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { start } from "workflow/api";
+import { isAdminAuthorized, readAdminSession } from "@/lib/adminSession";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { normalizeCnpj } from "@/lib/cvmIngestion";
 import { tgar11IngestionWorkflow } from "@/workflows/tgar11Ingestion";
@@ -8,23 +9,9 @@ import { tgar11IngestionWorkflow } from "@/workflows/tgar11Ingestion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function allowedSecrets() {
-  return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
-}
-
-function isAuthorized(req: NextRequest, body?: any) {
-  const secrets = allowedSecrets();
-  if (!secrets.length) return false;
-  const authorization = req.headers.get("authorization") || "";
-  const headerSecret = req.headers.get("x-admin-secret") || authorization.replace(/^Bearer\s+/i, "");
-  const querySecret = req.nextUrl.searchParams.get("secret") || "";
-  const bodySecret = String(body?.secret || "");
-  return [headerSecret, querySecret, bodySecret].some((value) => Boolean(value && secrets.includes(value)));
-}
-
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  if (!isAuthorized(req, body)) {
+  if (!isAdminAuthorized(req, body)) {
     return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
   }
 
@@ -39,6 +26,7 @@ export async function POST(req: NextRequest) {
   const cnpj = normalizeCnpj(body?.cnpj) || undefined;
   const runId = randomUUID();
   const runRef = adminDb.collection("FiiIngestionRuns").doc(runId);
+  const session = readAdminSession(req);
 
   try {
     await runRef.set({
@@ -49,6 +37,7 @@ export async function POST(req: NextRequest) {
       delayMinutes,
       mode: "staging",
       publishToOfficialBase: false,
+      requestedBy: session?.user || "legacy-admin-secret",
       status: delayMinutes > 0 ? "scheduled" : "queued",
       currentStep: delayMinutes > 0 ? "waiting" : "queued",
       requestedAt: adminFieldValue.serverTimestamp(),
