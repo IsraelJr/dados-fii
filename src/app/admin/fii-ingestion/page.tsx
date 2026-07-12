@@ -1,13 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
-import { Database, Loader2, Play, RefreshCw, ShieldCheck } from "lucide-react";
+import { Database, Loader2, Play, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import PageHeader from "../../components/PageHeader";
+import {
+  getIngestionFundConfig,
+  listBlockedIngestionFunds,
+  listOperationalIngestionFunds,
+} from "@/lib/fiiIngestionConfig";
 
 type ApiResult = Record<string, any> | null;
 
 const RUN_STORAGE_KEY = "dados-fii-operational-ingestion-run";
-const SUPPORTED_TICKERS = ["TGAR11", "VGIA11"];
+const OPERATIONAL_FUNDS = listOperationalIngestionFunds();
+const BLOCKED_FUNDS = listBlockedIngestionFunds();
 
 async function readJson(response: Response) {
   const json = await response.json().catch(() => ({}));
@@ -16,7 +22,7 @@ async function readJson(response: Response) {
 }
 
 export default function OperationalIngestionPage() {
-  const [ticker, setTicker] = useState("VGIA11");
+  const [ticker, setTicker] = useState("MXRF11");
   const [cnpj, setCnpj] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [delayMinutes, setDelayMinutes] = useState("0");
@@ -26,6 +32,7 @@ export default function OperationalIngestionPage() {
   const [result, setResult] = useState<ApiResult>(null);
   const [error, setError] = useState("");
 
+  const selectedFund = getIngestionFundConfig(ticker);
   const runStatus = String(result?.run?.status || result?.status || "");
   const finished = ["completed", "failed"].includes(runStatus);
   const qaUrl = useMemo(() => runId
@@ -117,8 +124,8 @@ export default function OperationalIngestionPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <PageHeader
-        title="Ingestão operacional de FIIs"
-        subtitle="Coleta dados oficiais da CVM em staging, com QA e publicação oficial bloqueada."
+        title="Ingestão operacional de fundos"
+        subtitle="O tipo regulatório seleciona o adaptador correto. Toda coleta permanece em staging e a publicação oficial continua bloqueada."
         backLabel="← Voltar ao Admin"
         backHref="/admin"
       />
@@ -129,9 +136,9 @@ export default function OperationalIngestionPage() {
             <Database size={25} />
           </span>
           <div>
-            <h1 className="text-2xl font-black">Modo operacional controlado</h1>
+            <h1 className="text-2xl font-black">Template operacional por adaptador</h1>
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Somente TGAR11 e VGIA11 estão autorizados. Os registros permanecem em FiiIngestionStaging e nunca atualizam Fiis automaticamente.
+              FIIs usam o adaptador CVM FII v2 e FIAGROs usam o adaptador CVM FIAGRO v2. Tipos sem adaptador validado ficam bloqueados.
             </p>
           </div>
         </div>
@@ -141,17 +148,46 @@ export default function OperationalIngestionPage() {
             <span className="mb-1 block text-sm font-bold text-slate-300">Fundo</span>
             <select
               value={ticker}
-              onChange={(event) => setTicker(event.target.value)}
+              onChange={(event) => {
+                setTicker(event.target.value);
+                setCnpj("");
+              }}
               className="w-full rounded-xl border border-slate-700 bg-slate-900 p-3 font-bold text-white outline-none focus:border-indigo-400"
             >
-              {SUPPORTED_TICKERS.map((item) => <option key={item} value={item}>{item}</option>)}
+              {OPERATIONAL_FUNDS.map((fund) => (
+                <option key={fund.ticker} value={fund.ticker}>
+                  {fund.ticker} · {fund.fundType}
+                </option>
+              ))}
             </select>
           </label>
 
-          <Field label="CNPJ" value={cnpj} onChange={setCnpj} placeholder="Opcional se já estiver em Fiis" />
+          <Field label="CNPJ" value={cnpj} onChange={setCnpj} placeholder="Opcional se já estiver cadastrado" />
           <Field label="Ano" value={year} onChange={setYear} placeholder="2026" type="number" />
           <Field label="Atraso em minutos" value={delayMinutes} onChange={setDelayMinutes} placeholder="0" type="number" />
         </div>
+
+        {selectedFund && (
+          <div className="mt-4 rounded-2xl bg-indigo-500/10 p-4 text-sm ring-1 ring-indigo-400/20">
+            <div className="font-black text-indigo-100">
+              {selectedFund.fundType} · {selectedFund.adapterId}
+            </div>
+            <p className="mt-1 text-slate-300">{selectedFund.description}</p>
+          </div>
+        )}
+
+        {BLOCKED_FUNDS.length > 0 && (
+          <div className="mt-4 rounded-2xl bg-amber-500/10 p-4 ring-1 ring-amber-400/20">
+            <div className="flex items-center gap-2 font-black text-amber-100">
+              <ShieldAlert size={18} /> Tipos cadastrados, mas bloqueados
+            </div>
+            {BLOCKED_FUNDS.map((fund) => (
+              <p key={fund.ticker} className="mt-2 text-xs leading-5 text-amber-100/80">
+                <strong>{fund.ticker} · {fund.fundType}:</strong> {fund.blockReason}
+              </p>
+            ))}
+          </div>
+        )}
 
         <label className="mt-5 flex items-start gap-3 rounded-2xl bg-slate-900 p-4 ring-1 ring-slate-800">
           <input
@@ -163,7 +199,7 @@ export default function OperationalIngestionPage() {
           <span>
             <strong className="block text-sm">Ativar enriquecimento por IA</strong>
             <span className="mt-1 block text-xs leading-5 text-slate-400">
-              Deixe desativado enquanto a OpenAI API estiver sem créditos. A coleta estruturada da CVM funciona normalmente sem IA.
+              A coleta e o QA estruturado funcionam sem IA. Mantenha desativado durante os testes de regressão.
             </span>
           </span>
         </label>
