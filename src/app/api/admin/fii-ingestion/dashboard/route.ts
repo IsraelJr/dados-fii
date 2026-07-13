@@ -53,8 +53,8 @@ export async function GET(req: NextRequest) {
         .limit(30)
         .get()
         .catch(() => null);
-      const runs = runsQuery
-        ? runsQuery.docs.map((document) => ({ id: document.id, ...(document.data() || {}) }))
+      const runs: Record<string, any>[] = runsQuery
+        ? runsQuery.docs.map((document) => ({ id: document.id, ...(document.data() || {}) } as Record<string, any>))
         : [];
       allRuns.push(...runs);
       const latestRun = [...runs].sort((left, right) => timestampMs(right.requestedAt) - timestampMs(left.requestedAt))[0] || null;
