@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BarChart3, CheckCircle2, Crown, Database, Loader2, ShieldAlert } from "lucide-react";
 
@@ -32,10 +33,21 @@ type RegulatoryReportResponse = {
     alerts?: AlertItem[];
   };
   scores?: {
-    overall?: number;
-    dataQuality?: number;
-    stability?: number;
-    risk?: number;
+    overall?: number | null;
+    dataQuality?: number | null;
+    documentation?: number | null;
+    governanceEvidence?: number | null;
+    investorBase?: number | null;
+    patrimonial?: number | null;
+    growth?: number | null;
+    stability?: number | null;
+    liquidity?: number | null;
+    risk?: number | null;
+  };
+  scoreMeta?: {
+    methodologyVersion?: number;
+    semaphore?: string;
+    unavailableDimensions?: string[];
   };
   regulatory?: {
     source?: string | null;
@@ -49,12 +61,14 @@ type RegulatoryReportResponse = {
 };
 
 function formatNumber(value: unknown, maximumFractionDigits = 0) {
+  if (value === null || value === undefined) return "—";
   const number = Number(value);
   if (!Number.isFinite(number)) return "—";
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits }).format(number);
 }
 
 function formatCurrency(value: unknown) {
+  if (value === null || value === undefined) return "—";
   const number = Number(value);
   if (!Number.isFinite(number)) return "—";
   return new Intl.NumberFormat("pt-BR", {
@@ -66,14 +80,16 @@ function formatCurrency(value: unknown) {
 }
 
 function formatPercent(value: unknown) {
+  if (value === null || value === undefined) return "—";
   const number = Number(value);
   if (!Number.isFinite(number)) return "—";
   return `${number > 0 ? "+" : ""}${number.toFixed(2).replace(".", ",")}%`;
 }
 
 function scoreTone(value: unknown, inverse = false) {
+  if (value === null || value === undefined) return "bg-slate-100 text-slate-600 ring-slate-200";
   const score = Number(value);
-  if (!Number.isFinite(score)) return "bg-slate-100 text-slate-600";
+  if (!Number.isFinite(score)) return "bg-slate-100 text-slate-600 ring-slate-200";
   const normalized = inverse ? 100 - score : score;
   if (normalized >= 75) return "bg-emerald-50 text-emerald-700 ring-emerald-200";
   if (normalized >= 50) return "bg-amber-50 text-amber-700 ring-amber-200";
@@ -154,9 +170,7 @@ export default function FiiRegulatoryReport({ ticker }: { ticker: string }) {
     );
   }
 
-  if (state === "error" || !data?.report || !data?.scores) {
-    return null;
-  }
+  if (state === "error" || !data?.report || !data?.scores) return null;
 
   return (
     <section className="mt-5 overflow-hidden rounded-3xl bg-white text-left shadow-sm ring-1 ring-slate-200">
@@ -191,7 +205,7 @@ export default function FiiRegulatoryReport({ ticker }: { ticker: string }) {
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <Score label="Qualidade dos dados" value={data.scores.dataQuality} />
-          <Score label="Estabilidade" value={data.scores.stability} />
+          <Score label="Patrimônio" value={data.scores.patrimonial} />
           <Score label="Risco observado" value={data.scores.risk} inverse />
         </div>
 
@@ -211,22 +225,23 @@ export default function FiiRegulatoryReport({ ticker }: { ticker: string }) {
           </div>
         )}
 
-        <div className="mt-5 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="flex items-center gap-2 font-extrabold text-indigo-950"><Crown size={17} /> Relatório Premium</p>
-              <p className="mt-1 text-sm leading-6 text-indigo-800">
-                Próxima etapa: interpretação dos documentos oficiais, evolução mensal, riscos, cenários e perguntas para a gestão.
-              </p>
-            </div>
-            <span className="rounded-full bg-indigo-200 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-indigo-900">
-              Em validação
-            </span>
+        <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="flex items-center gap-2 font-extrabold text-indigo-950"><Crown size={17} /> Relatório completo</p>
+            <p className="mt-1 text-sm leading-6 text-indigo-800">
+              Veja todas as notas, timeline regulatória, documentos e pontos de atenção.
+            </p>
           </div>
+          <Link
+            href={`/fii/${normalizedTicker}/relatorio`}
+            className="inline-flex shrink-0 items-center justify-center rounded-full bg-indigo-700 px-4 py-2 text-sm font-extrabold text-white hover:bg-indigo-800"
+          >
+            Abrir relatório
+          </Link>
         </div>
 
         <p className="mt-4 text-xs leading-5 text-slate-500">
-          Fonte regulatória: {data.regulatory?.source || "base oficial revisada"} · {formatNumber(data.regulatory?.documentsCount)} documentos vinculados.
+          Fonte regulatória: {data.regulatory?.source || "base oficial revisada"} · {formatNumber(data.regulatory?.documentsCount)} documentos vinculados · metodologia v{data.scoreMeta?.methodologyVersion || 1}.
         </p>
       </div>
     </section>
