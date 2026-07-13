@@ -27,6 +27,26 @@ export type RegulatoryDataDocument = {
   publication?: Record<string, any>;
 };
 
+export type RegulatoryFundView = {
+  code: string;
+  name: string | null;
+  sector: string | null;
+  segment: string | null;
+  price: number | null;
+  lastDividend: number | null;
+  lastDividendDate: string | null;
+  regulatoryData: ReturnType<typeof normalizeRegulatoryData> | null;
+};
+
+export type RegulatoryReportResult = {
+  found: boolean;
+  ticker: string;
+  fund: RegulatoryFundView | null;
+  reportAvailable: boolean;
+  reason: string | null;
+  insights: ReturnType<typeof buildRegulatoryInsights> | null;
+};
+
 function sortMonthly(items: Array<Record<string, any>>) {
   return [...items]
     .filter((item) => String(item?.referenceDate || "").trim())
@@ -74,7 +94,11 @@ export function normalizeRegulatoryData(ticker: string, value: unknown) {
   };
 }
 
-export async function getRegulatoryFund(tickerInput: unknown) {
+export async function getRegulatoryFund(tickerInput: unknown): Promise<{
+  found: boolean;
+  ticker: string;
+  fund: RegulatoryFundView | null;
+}> {
   const ticker = normalizeIngestionTicker(tickerInput);
   if (!ticker) throw new Error("Ticker obrigatório.");
 
@@ -91,7 +115,7 @@ export async function getRegulatoryFund(tickerInput: unknown) {
     found: true,
     ticker,
     fund: {
-      code: fund.code || ticker,
+      code: String(fund.code || ticker),
       name: fund.name || fund.socialReason || regulatoryData.latestSnapshot?.fundName || null,
       sector: fund.sector || null,
       segment: fund.segment_new || fund.segment || null,
@@ -103,9 +127,19 @@ export async function getRegulatoryFund(tickerInput: unknown) {
   };
 }
 
-export async function getRegulatoryReportInput(tickerInput: unknown) {
+export async function getRegulatoryReportInput(tickerInput: unknown): Promise<RegulatoryReportResult> {
   const response = await getRegulatoryFund(tickerInput);
-  if (!response.found || !response.fund) return response;
+  if (!response.found || !response.fund) {
+    return {
+      found: false,
+      ticker: response.ticker,
+      fund: null,
+      reportAvailable: false,
+      reason: "fund_not_found",
+      insights: null,
+    };
+  }
+
   const regulatoryData = response.fund.regulatoryData;
   if (!regulatoryData) {
     return {
@@ -125,6 +159,7 @@ export async function getRegulatoryReportInput(tickerInput: unknown) {
   return {
     ...response,
     reportAvailable: true,
+    reason: null,
     insights,
   };
 }
