@@ -15,100 +15,105 @@ import { fundIngestionWorkflow } from "@/workflows/fundIngestion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const NO_STORE = { "Cache-Control": "private, no-store", "Content-Type": "application/json; charset=utf-8" };
+const LOCK_TTL_MS = 48 * 60 * 60 * 1000;
+
+function reply(payload: unknown, status = 200) {
+  return NextResponse.json(payload, { status, headers: NO_STORE });
+}
+
 function trueValue(value: unknown) {
   return value === true || value === 1 || value === "1" || value === "true";
 }
 
-async function findActiveRun(ticker: string) {
-  const snapshot = await adminDb
-    .collection("FiiIngestionRuns")
-    .orderBy("createdAt", "desc")
-    .limit(30)
-    .get();
-
-  return snapshot.docs.find((doc) => {
-    const data = doc.data() || {};
-    return data.ticker === ticker
-      && ["queued", "scheduled", "running"].includes(String(data.status || ""));
-  }) || null;
+function lockIsActive(data: Record<string, any>) {
+  const expiresAt = new Date(String(data.expiresAt || ""));
+  return Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() > Date.now();
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  if (!isAdminAuthorized(req, body)) {
-    return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
-  }
+  if (!isAdminAuthorized(req, body)) return reply({ ok: false, error: "Não autorizado." }, 401);
 
   let ticker: string;
   try {
     ticker = assertSupportedIngestionTicker(body?.ticker);
   } catch (error: any) {
-    return NextResponse.json({
+    return reply({
       ok: false,
       error: error?.message || "Ticker não autorizado.",
       supportedTickers: SUPPORTED_INGESTION_TICKERS,
-    }, { status: 400 });
+    }, 400);
   }
 
   const fundConfig = getIngestionFundConfig(ticker);
   const fundType = fundConfig?.fundType || "FII";
   const adapterId = getIngestionAdapterId(ticker);
-  const activeRun = await findActiveRun(ticker);
-  if (activeRun) {
-    const data = activeRun.data() || {};
-    return NextResponse.json({
-      ok: false,
-      error: `Já existe uma execução ativa para ${ticker}.`,
-      runId: activeRun.id,
-      status: data.status || null,
-      currentStep: data.currentStep || null,
-    }, { status: 409 });
-  }
-
   const delayMinutes = Math.min(Math.max(Number(body?.delayMinutes || 0), 0), 1440);
   const currentYear = new Date().getFullYear();
   const year = Math.min(Math.max(Number(body?.year || currentYear), 2016), currentYear);
-  const cnpj = normalizeCnpj(body?.cnpj) || undefined;
+  const rawCnpj = String(body?.cnpj || "").trim();
+  const cnpj = normalizeCnpj(rawCnpj) || undefined;
+  if (rawCnpj && !cnpj) return reply({ ok: false, error: "CNPJ informado é inválido." }, 400);
+
   const enableAi = trueValue(body?.enableAi);
   const runId = randomUUID();
   const runRef = adminDb.collection("FiiIngestionRuns").doc(runId);
+  const lockRef = adminDb.collection("FiiIngestionActiveRuns").doc(ticker);
   const session = readAdminSession(req);
+  const now = new Date();
+  const lockExpiresAt = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
 
   try {
-    await runRef.set({
-      runId,
-      ticker,
-      fundType,
-      adapterId,
-      cnpj: cnpj || null,
-      year,
-      delayMinutes,
-      enableAi,
-      mode: "operational_staging",
-      workflowVersion: 3,
-      publishToOfficialBase: false,
-      requestedBy: session?.user || "legacy-admin-secret",
-      status: delayMinutes > 0 ? "scheduled" : "queued",
-      currentStep: delayMinutes > 0 ? "waiting" : "queued",
-      requestedAt: adminFieldValue.serverTimestamp(),
-      createdAt: adminFieldValue.serverTimestamp(),
-      updatedAt: adminFieldValue.serverTimestamp(),
+    await adminDb.runTransaction(async (transaction) => {
+      const lockSnapshot = await transaction.get(lockRef);
+      if (lockSnapshot.exists) {
+        const lock = (lockSnapshot.data() || {}) as Record<string, any>;
+        if (lockIsActive(lock)) {
+          throw Object.assign(new Error(`Já existe uma execução ativa para ${ticker}.`), {
+            status: 409,
+            activeRunId: lock.runId || null,
+            activeStatus: lock.status || null,
+          });
+        }
+      }
+
+      transaction.set(runRef, {
+        runId,
+        ticker,
+        fundType,
+        adapterId,
+        cnpj: cnpj || null,
+        year,
+        delayMinutes,
+        enableAi,
+        mode: "operational_staging",
+        workflowVersion: 3,
+        publishToOfficialBase: false,
+        requestedBy: session?.user || "legacy-admin-header",
+        status: delayMinutes > 0 ? "scheduled" : "queued",
+        currentStep: delayMinutes > 0 ? "waiting" : "queued",
+        requestedAt: adminFieldValue.serverTimestamp(),
+        createdAt: adminFieldValue.serverTimestamp(),
+        updatedAt: adminFieldValue.serverTimestamp(),
+      });
+      transaction.set(lockRef, {
+        ticker,
+        runId,
+        status: delayMinutes > 0 ? "scheduled" : "queued",
+        createdAt: adminFieldValue.serverTimestamp(),
+        updatedAt: adminFieldValue.serverTimestamp(),
+        expiresAt: lockExpiresAt,
+      }, { merge: false });
     });
 
-    const workflowRun = await start(fundIngestionWorkflow, [{
-      runId,
-      ticker,
-      cnpj,
-      year,
-      delayMinutes,
-      enableAi,
-    }]);
-    await runRef.set({
-      workflowRunId: workflowRun.runId,
-      updatedAt: adminFieldValue.serverTimestamp(),
-    }, { merge: true });
+    const workflowRun = await start(fundIngestionWorkflow, [{ runId, ticker, cnpj, year, delayMinutes, enableAi }]);
+    await Promise.all([
+      runRef.set({ workflowRunId: workflowRun.runId, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true }),
+      lockRef.set({ workflowRunId: workflowRun.runId, status: delayMinutes > 0 ? "scheduled" : "queued", updatedAt: adminFieldValue.serverTimestamp() }, { merge: true }),
+    ]);
 
-    return NextResponse.json({
+    return reply({
       ok: true,
       runId,
       workflowRunId: workflowRun.runId,
@@ -125,18 +130,28 @@ export async function POST(req: NextRequest) {
       qaUrl: `/api/admin/fii-ingestion/operational-qa?runId=${encodeURIComponent(runId)}&persist=1`,
     });
   } catch (error: any) {
-    await runRef.set({
-      status: "failed",
-      currentStep: "start_failed",
-      error: error?.message || "Falha ao iniciar workflow.",
-      finishedAt: adminFieldValue.serverTimestamp(),
-      updatedAt: adminFieldValue.serverTimestamp(),
-    }, { merge: true }).catch(() => undefined);
+    const status = Number(error?.status) === 409 ? 409 : 500;
+    if (status !== 409) {
+      await Promise.all([
+        runRef.set({
+          status: "failed",
+          currentStep: "start_failed",
+          error: error?.message || "Falha ao iniciar workflow.",
+          finishedAt: adminFieldValue.serverTimestamp(),
+          updatedAt: adminFieldValue.serverTimestamp(),
+        }, { merge: true }).catch(() => undefined),
+        adminDb.runTransaction(async (transaction) => {
+          const lockSnapshot = await transaction.get(lockRef);
+          if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) transaction.delete(lockRef);
+        }).catch(() => undefined),
+      ]);
+    }
 
-    return NextResponse.json({
+    return reply({
       ok: false,
-      runId,
+      runId: status === 409 ? error?.activeRunId || null : runId,
+      status: status === 409 ? error?.activeStatus || null : undefined,
       error: error?.message || "Falha ao iniciar workflow.",
-    }, { status: 500 });
+    }, status);
   }
 }
