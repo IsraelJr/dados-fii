@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock3,
   FileText,
+  GitCompareArrows,
   Loader2,
   ShieldCheck,
   TrendingUp,
@@ -101,9 +102,14 @@ export default function RegulatoryReportPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
       <div className="mx-auto max-w-6xl">
-        <Link href={`/fii/${ticker}`} className="inline-flex items-center gap-2 text-sm font-bold text-indigo-700 hover:text-indigo-900">
-          <ArrowLeft size={17} /> Voltar para {ticker}
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href={`/fii/${ticker}`} className="inline-flex items-center gap-2 text-sm font-bold text-indigo-700 hover:text-indigo-900">
+            <ArrowLeft size={17} /> Voltar para {ticker}
+          </Link>
+          <Link href={`/comparador-regulatorio?tickers=${encodeURIComponent(ticker)}`} className="inline-flex items-center gap-2 rounded-xl bg-indigo-100 px-4 py-2 text-sm font-extrabold text-indigo-800 hover:bg-indigo-200">
+            <GitCompareArrows size={17} /> Comparar com outro fundo
+          </Link>
+        </div>
 
         {loading && (
           <div className="mt-8 flex items-center justify-center gap-3 rounded-3xl bg-white p-10 shadow-sm ring-1 ring-slate-200">
