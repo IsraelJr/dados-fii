@@ -11,6 +11,8 @@ export const FIAGRO_FIELD_CANDIDATES = {
   delinquentCreditValue: ["Vencidos", "TAB_VI_B_VL_DIRCRED_INAD", "TAB_VI_VL_TOTAL_INAD"],
 } as const;
 
+export type FiagroMappedField = keyof typeof FIAGRO_FIELD_CANDIDATES;
+
 export function normalizeFiagroFieldKey(value: string) {
   return value
     .normalize("NFD")
@@ -45,6 +47,15 @@ export function parseFiagroNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+export function isMeaningfulFiagroFieldValue(field: FiagroMappedField | string, value: unknown) {
+  if (value === undefined || value === null || String(value).trim() === "") return false;
+  if (field === "sharesOutstanding" || field === "vpCota") {
+    const number = parseFiagroNumber(value);
+    return number !== undefined && number > 0;
+  }
+  return true;
+}
+
 export function normalizeFiagroReferenceDate(value: unknown) {
   const text = String(value || "").trim();
   if (!text) return "";
@@ -56,11 +67,11 @@ export function normalizeFiagroReferenceDate(value: unknown) {
 }
 
 export function mapFiagroMonthlyRow(row: FiagroRawRow) {
-  const text = (field: keyof typeof FIAGRO_FIELD_CANDIDATES) => {
+  const text = (field: FiagroMappedField) => {
     const value = firstFiagroValue(row, FIAGRO_FIELD_CANDIDATES[field]);
     return value === undefined ? undefined : String(value).trim();
   };
-  const numeric = (field: keyof typeof FIAGRO_FIELD_CANDIDATES) =>
+  const numeric = (field: FiagroMappedField) =>
     parseFiagroNumber(firstFiagroValue(row, FIAGRO_FIELD_CANDIDATES[field]));
 
   return {
