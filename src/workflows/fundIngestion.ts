@@ -10,13 +10,40 @@ export type FundIngestionInput = {
   enableAi?: boolean;
 };
 
-async function updateRun(runId: string, payload: Record<string, unknown>) {
+const DEFAULT_LEASE_MINUTES = 60;
+
+function leaseExpiresAt(minutes: number) {
+  return new Date(Date.now() + Math.max(minutes, DEFAULT_LEASE_MINUTES) * 60 * 1000).toISOString();
+}
+
+async function updateRun(
+  ticker: string,
+  runId: string,
+  payload: Record<string, unknown>,
+  leaseMinutes = DEFAULT_LEASE_MINUTES
+) {
   "use step";
   const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
-  await adminDb.collection("FiiIngestionRuns").doc(runId).set({
-    ...payload,
-    updatedAt: adminFieldValue.serverTimestamp(),
-  }, { merge: true });
+  const runRef = adminDb.collection("FiiIngestionRuns").doc(runId);
+  const lockRef = adminDb.collection("FiiIngestionActiveRuns").doc(ticker);
+
+  await adminDb.runTransaction(async (transaction) => {
+    const lockSnapshot = await transaction.get(lockRef);
+    transaction.set(runRef, {
+      ...payload,
+      updatedAt: adminFieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) {
+      transaction.set(lockRef, {
+        status: payload.status || lockSnapshot.data()?.status || "running",
+        currentStep: payload.currentStep || lockSnapshot.data()?.currentStep || null,
+        heartbeatAt: adminFieldValue.serverTimestamp(),
+        updatedAt: adminFieldValue.serverTimestamp(),
+        expiresAt: leaseExpiresAt(leaseMinutes),
+      }, { merge: true });
+    }
+  });
 }
 
 async function resolveCnpj(input: FundIngestionInput) {
@@ -161,7 +188,7 @@ export async function fundIngestionWorkflow(input: FundIngestionInput) {
     }
     const enableAi = input.enableAi === true;
 
-    await updateRun(input.runId, {
+    await updateRun(ticker, input.runId, {
       status: delayMinutes > 0 ? "scheduled" : "running",
       currentStep: delayMinutes > 0 ? "waiting" : "resolve_cnpj",
       ticker,
@@ -172,22 +199,22 @@ export async function fundIngestionWorkflow(input: FundIngestionInput) {
       workflowVersion: 3,
       enableAi,
       publishToOfficialBase: false,
-    });
+    }, delayMinutes + DEFAULT_LEASE_MINUTES);
 
     if (delayMinutes > 0) await sleep(`${delayMinutes}m`);
 
-    await updateRun(input.runId, { status: "running", currentStep: "resolve_cnpj" });
+    await updateRun(ticker, input.runId, { status: "running", currentStep: "resolve_cnpj" });
     const cnpj = await resolveCnpj({ ...input, ticker, year });
-    await updateRun(input.runId, { cnpj, currentStep: "cvm_monthly" });
+    await updateRun(ticker, input.runId, { cnpj, currentStep: "cvm_monthly" });
 
     const monthly = await importMonthly({ runId: input.runId, ticker, cnpj, year, adapterId });
-    await updateRun(input.runId, { monthly, currentStep: "cvm_documents" });
+    await updateRun(ticker, input.runId, { monthly, currentStep: "cvm_documents" });
 
     const documents = await importDocuments({ runId: input.runId, ticker, cnpj, year });
-    await updateRun(input.runId, { documents, currentStep: enableAi ? "ai_extraction" : "validation" });
+    await updateRun(ticker, input.runId, { documents, currentStep: enableAi ? "ai_extraction" : "validation" });
 
     const ai = await extractDocuments({ runId: input.runId, ticker, documents: documents.documents, enabled: enableAi });
-    await updateRun(input.runId, { ai, currentStep: "validation" });
+    await updateRun(ticker, input.runId, { ai, currentStep: "validation" });
 
     const validation = await validate({ runId: input.runId, ticker, cnpj, monthly, documents, ai });
     const result = {
