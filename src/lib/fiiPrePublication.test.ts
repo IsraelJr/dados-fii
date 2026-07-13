@@ -64,3 +64,16 @@ test("array histories are compared as atomic reviewed payloads", () => {
   assert.equal(diff[0].path, "monthlyHistory");
   assert.equal(diff[0].changeType, "changed");
 });
+
+test("null existing regulatory data does not create a fake root removal", () => {
+  const diff = diffRegulatoryData(null, {
+    source: "CVM",
+    ticker: "KNCA11",
+  });
+
+  assert.deepEqual(diff.map((item) => [item.path, item.changeType]), [
+    ["source", "added"],
+    ["ticker", "added"],
+  ]);
+  assert.equal(diff.some((item) => item.path === "$root"), false);
+});
