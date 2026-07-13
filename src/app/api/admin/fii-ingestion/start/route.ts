@@ -31,6 +31,13 @@ function lockIsActive(data: Record<string, any>) {
   return Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() > Date.now();
 }
 
+function integerInRange(value: unknown, fallback: number, minimum: number, maximum: number) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) return null;
+  return parsed;
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   if (!isAdminAuthorized(req, body)) return reply({ ok: false, error: "Não autorizado." }, 401);
@@ -49,9 +56,12 @@ export async function POST(req: NextRequest) {
   const fundConfig = getIngestionFundConfig(ticker);
   const fundType = fundConfig?.fundType || "FII";
   const adapterId = getIngestionAdapterId(ticker);
-  const delayMinutes = Math.min(Math.max(Number(body?.delayMinutes || 0), 0), 1440);
   const currentYear = new Date().getFullYear();
-  const year = Math.min(Math.max(Number(body?.year || currentYear), 2016), currentYear);
+  const delayMinutes = integerInRange(body?.delayMinutes, 0, 0, 1440);
+  const year = integerInRange(body?.year, currentYear, 2016, currentYear);
+  if (delayMinutes === null) return reply({ ok: false, error: "delayMinutes deve ser um inteiro entre 0 e 1440." }, 400);
+  if (year === null) return reply({ ok: false, error: `year deve ser um inteiro entre 2016 e ${currentYear}.` }, 400);
+
   const rawCnpj = String(body?.cnpj || "").trim();
   const cnpj = normalizeCnpj(rawCnpj) || undefined;
   if (rawCnpj && !cnpj) return reply({ ok: false, error: "CNPJ informado é inválido." }, 400);
@@ -108,10 +118,18 @@ export async function POST(req: NextRequest) {
     });
 
     const workflowRun = await start(fundIngestionWorkflow, [{ runId, ticker, cnpj, year, delayMinutes, enableAi }]);
-    await Promise.all([
-      runRef.set({ workflowRunId: workflowRun.runId, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true }),
-      lockRef.set({ workflowRunId: workflowRun.runId, status: delayMinutes > 0 ? "scheduled" : "queued", updatedAt: adminFieldValue.serverTimestamp() }, { merge: true }),
-    ]);
+    await adminDb.runTransaction(async (transaction) => {
+      const lockSnapshot = await transaction.get(lockRef);
+      if (!lockSnapshot.exists || lockSnapshot.data()?.runId !== runId) {
+        throw new Error("A trava da ingestão mudou durante a inicialização do workflow.");
+      }
+      transaction.set(runRef, { workflowRunId: workflowRun.runId, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true });
+      transaction.set(lockRef, {
+        workflowRunId: workflowRun.runId,
+        status: delayMinutes > 0 ? "scheduled" : "queued",
+        updatedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
 
     return reply({
       ok: true,
