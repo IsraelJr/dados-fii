@@ -1,36 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRegulatoryReportInput } from "@/lib/regulatoryService";
+import {
+  registeredUserErrorStatus,
+  requireRegisteredUserAccess,
+} from "@/lib/registeredUserAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+function reply(payload: unknown, status = 200) {
+  return NextResponse.json(payload, {
+    status,
+    headers: {
+      "Cache-Control": "private, no-store",
+      "Content-Type": "application/json; charset=utf-8",
+    },
+  });
+}
+
+export async function GET() {
+  return reply({
+    ok: false,
+    error: "Acesso direto não permitido. Use uma sessão autenticada do site.",
+  }, 405);
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const ticker = String(req.nextUrl.searchParams.get("ticker") || "").trim();
-    if (!ticker) {
-      return NextResponse.json({ ok: false, error: "Informe o ticker." }, { status: 400 });
-    }
+    const body = await req.json().catch(() => ({} as Record<string, any>));
+    const access = await requireRegisteredUserAccess({
+      email: body?.email,
+      sessionToken: body?.sessionToken,
+    });
+    const ticker = String(body?.ticker || "").trim();
+    if (!ticker) return reply({ ok: false, error: "Informe o ticker." }, 400);
 
     const result = await getRegulatoryReportInput(ticker);
     if (!result.found) {
-      return NextResponse.json({ ok: false, found: false, ticker: result.ticker }, { status: 404 });
+      return reply({ ok: false, found: false, ticker: result.ticker }, 404);
     }
     if (!result.reportAvailable || !result.insights || !result.fund || !result.timeline) {
-      return NextResponse.json({
+      return reply({
         ok: true,
         found: true,
         ticker: result.ticker,
         reportAvailable: false,
         reason: result.reason || "regulatory_data_not_published",
+        access: { email: access.email },
       });
     }
 
-    return NextResponse.json({
+    return reply({
       ok: true,
       found: true,
       reportAvailable: true,
       tier: "free",
       ticker: result.ticker,
+      access: { email: access.email },
       fund: {
         code: result.fund.code,
         name: result.fund.name,
@@ -62,13 +88,11 @@ export async function GET(req: NextRequest) {
         groups: result.timeline.groups,
       },
       methodology: result.insights.generatedBy,
-    }, {
-      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900" },
     });
   } catch (error: any) {
-    return NextResponse.json({
+    return reply({
       ok: false,
       error: error?.message || "Erro ao gerar relatório regulatório gratuito.",
-    }, { status: 500 });
+    }, registeredUserErrorStatus(error));
   }
 }
