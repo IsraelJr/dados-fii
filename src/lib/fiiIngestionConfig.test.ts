@@ -22,6 +22,7 @@ test("FIAGRO funds reuse the FIAGRO CVM adapter", () => {
   assert.equal(getIngestionAdapterId("VGIA11"), "cvm-fiagro-v2");
   assert.equal(getIngestionFundConfig("KNCA11")?.fundType, "FIAGRO");
   assert.equal(getIngestionAdapterId("KNCA11"), "cvm-fiagro-v2");
+  assert.equal(getKnownIngestionCnpj("KNCA11"), "41745701000137");
 });
 
 test("unsupported regulatory families are blocked before collection", () => {
