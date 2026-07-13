@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { compareRegulatoryFunds } from "@/lib/regulatoryComparator";
 import { getRegulatoryReportInput } from "@/lib/regulatoryService";
 import { normalizeIngestionTicker } from "@/lib/fiiIngestionConfig";
+import {
+  registeredUserErrorStatus,
+  requireRegisteredUserAccess,
+} from "@/lib/registeredUserAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,25 +14,32 @@ function reply(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
     status,
     headers: {
-      "Cache-Control": "no-store",
+      "Cache-Control": "private, no-store",
       "Content-Type": "application/json; charset=utf-8",
     },
   });
 }
 
-function parseTickers(req: NextRequest) {
-  const repeated = req.nextUrl.searchParams.getAll("ticker");
-  const compact = String(req.nextUrl.searchParams.get("tickers") || "")
-    .split(/[\s,;|]+/)
-    .filter(Boolean);
-  return [...new Set([...repeated, ...compact]
-    .map(normalizeIngestionTicker)
-    .filter(Boolean))];
+function parseTickers(value: unknown) {
+  const raw = Array.isArray(value) ? value : String(value || "").split(/[\s,;|]+/);
+  return [...new Set(raw.map(normalizeIngestionTicker).filter(Boolean))];
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
+  return reply({
+    ok: false,
+    error: "Acesso direto não permitido. Use uma sessão autenticada do site.",
+  }, 405);
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const tickers = parseTickers(req);
+    const body = await req.json().catch(() => ({} as Record<string, any>));
+    const access = await requireRegisteredUserAccess({
+      email: body?.email,
+      sessionToken: body?.sessionToken,
+    });
+    const tickers = parseTickers(body?.tickers);
     if (tickers.length < 2) {
       return reply({ ok: false, error: "Informe de dois a cinco tickers para comparação." }, 400);
     }
@@ -60,6 +71,7 @@ export async function GET(req: NextRequest) {
 
     return reply({
       ok: true,
+      access: { email: access.email },
       requestedTickers: tickers,
       comparedTickers: comparison.funds.map((fund) => fund.ticker),
       unavailable,
@@ -67,6 +79,9 @@ export async function GET(req: NextRequest) {
       disclaimer: "Comparação regulatória determinística. Não constitui recomendação de investimento.",
     });
   } catch (error: any) {
-    return reply({ ok: false, error: error?.message || "Falha ao comparar fundos." }, 400);
+    return reply({
+      ok: false,
+      error: error?.message || "Falha ao comparar fundos.",
+    }, registeredUserErrorStatus(error));
   }
 }
