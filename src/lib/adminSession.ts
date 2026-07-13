@@ -16,20 +16,11 @@ type AdminSessionPayload = {
 };
 
 function sessionSecret() {
-  return (
-    process.env.ADMIN_SESSION_SECRET ||
-    process.env.ADMIN_UPDATE_SECRET ||
-    process.env.CRON_SECRET ||
-    ""
-  );
+  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_UPDATE_SECRET || "";
 }
 
 function firstConfiguredAdminEmail() {
-  return String(
-    process.env.ADMIN_EMAILS ||
-    process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-    ""
-  )
+  return String(process.env.ADMIN_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .find(Boolean) || "";
@@ -65,7 +56,7 @@ function safeEqual(left: string, right: string) {
 
 export function validateAdminCredentials(_userValue: unknown, tokenValue: unknown) {
   const token = String(tokenValue || "");
-  const expectedToken = process.env.ADMIN_UPDATE_SECRET || process.env.CRON_SECRET || "";
+  const expectedToken = process.env.ADMIN_UPDATE_SECRET || "";
   if (!expectedToken || !sessionSecret()) return false;
   return safeEqual(token, expectedToken);
 }
@@ -73,10 +64,7 @@ export function validateAdminCredentials(_userValue: unknown, tokenValue: unknow
 export function createAdminSessionToken() {
   const user = expectedAdminUser();
   const secret = sessionSecret();
-
-  if (!secret || !user) {
-    throw new Error("Sessão administrativa não configurada.");
-  }
+  if (!secret || !user) throw new Error("Sessão administrativa não configurada.");
 
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = issuedAt + adminSessionDurationSeconds();
@@ -88,10 +76,7 @@ export function createAdminSessionToken() {
     nonce: randomBytes(16).toString("hex"),
   };
   const encodedPayload = encode(JSON.stringify(payload));
-  return {
-    token: `${encodedPayload}.${signature(encodedPayload, secret)}`,
-    payload,
-  };
+  return { token: `${encodedPayload}.${signature(encodedPayload, secret)}`, payload };
 }
 
 export function verifyAdminSessionToken(tokenValue: unknown): AdminSessionPayload | null {
@@ -121,42 +106,45 @@ export function readAdminSession(req: NextRequest) {
   return verifyAdminSessionToken(req.cookies.get(ADMIN_SESSION_COOKIE)?.value);
 }
 
-function allowedLegacySecrets() {
-  return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(
-    (value): value is string => Boolean(value)
-  );
+function legacyHeaderSecretEnabled() {
+  return String(process.env.ADMIN_LEGACY_SECRET_ENABLED || "").trim().toLowerCase() === "true";
 }
 
-export function hasLegacyAdminSecret(req: NextRequest, body?: any) {
-  const secrets = allowedLegacySecrets();
-  if (!secrets.length) return false;
-
+export function hasLegacyAdminSecret(req: NextRequest) {
+  if (!legacyHeaderSecretEnabled()) return false;
+  const secret = process.env.ADMIN_UPDATE_SECRET || "";
+  if (!secret) return false;
   const authorization = req.headers.get("authorization") || "";
-  const headerSecret =
-    req.headers.get("x-admin-secret") || authorization.replace(/^Bearer\s+/i, "");
-  const querySecret = req.nextUrl.searchParams.get("secret") || "";
-  const bodySecret = String(body?.secret || "");
-
-  return [headerSecret, querySecret, bodySecret].some((value) =>
-    secrets.some((secret) => safeEqual(value, secret))
-  );
+  const value = req.headers.get("x-admin-secret") || authorization.replace(/^Bearer\s+/i, "");
+  return Boolean(value) && safeEqual(value, secret);
 }
 
-export function isAdminAuthorized(req: NextRequest, body?: any) {
-  return Boolean(readAdminSession(req) || hasLegacyAdminSecret(req, body));
+export function isSameOriginRequest(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  if (!origin) return true;
+  try {
+    return new URL(origin).origin === req.nextUrl.origin;
+  } catch {
+    return false;
+  }
 }
 
-export function setAdminSessionCookie(
-  response: NextResponse,
-  token: string,
-  expiresAt: number
-) {
+export function isAdminAuthorized(req: NextRequest, _body?: any) {
+  const session = readAdminSession(req);
+  if (session) {
+    const method = req.method.toUpperCase();
+    return ["GET", "HEAD", "OPTIONS"].includes(method) || isSameOriginRequest(req);
+  }
+  return hasLegacyAdminSecret(req);
+}
+
+export function setAdminSessionCookie(response: NextResponse, token: string, expiresAt: number) {
   response.cookies.set({
     name: ADMIN_SESSION_COOKIE,
     value: token,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     expires: new Date(expiresAt * 1000),
     maxAge: Math.max(expiresAt - Math.floor(Date.now() / 1000), 0),
@@ -170,7 +158,7 @@ export function clearAdminSessionCookie(response: NextResponse) {
     value: "",
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "strict",
     path: "/",
     expires: new Date(0),
     maxAge: 0,
