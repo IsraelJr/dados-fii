@@ -19,6 +19,16 @@ async function updateRun(runId: string, payload: Record<string, unknown>) {
   }, { merge: true });
 }
 
+async function releaseActiveRun(ticker: string, runId: string) {
+  "use step";
+  const { adminDb } = await import("@/lib/firebaseAdmin");
+  const lockRef = adminDb.collection("FiiIngestionActiveRuns").doc(ticker);
+  await adminDb.runTransaction(async (transaction) => {
+    const lockSnapshot = await transaction.get(lockRef);
+    if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) transaction.delete(lockRef);
+  });
+}
+
 async function resolveCnpj(input: FundIngestionInput) {
   "use step";
   const { resolvePilotCnpj } = await import("@/lib/cvmIngestion");
@@ -32,19 +42,11 @@ async function resolveCnpj(input: FundIngestionInput) {
   try {
     return await resolvePilotCnpj(ticker, fallback || undefined);
   } catch {
-    throw new Error(
-      `CNPJ não encontrado para ${ticker}. Informe no disparo, em Fiis/${ticker} ou na variável ${environmentName}.`
-    );
+    throw new Error(`CNPJ não encontrado para ${ticker}. Informe no disparo, em Fiis/${ticker} ou na variável ${environmentName}.`);
   }
 }
 
-async function importMonthly(input: {
-  runId: string;
-  ticker: string;
-  cnpj: string;
-  year: number;
-  adapterId: IngestionAdapterId;
-}) {
+async function importMonthly(input: { runId: string; ticker: string; cnpj: string; year: number; adapterId: IngestionAdapterId }) {
   "use step";
   const { runMonthlyIngestionAdapter } = await import("@/lib/fiiIngestionAdapters");
   return runMonthlyIngestionAdapter(input.adapterId, input);
@@ -63,7 +65,6 @@ async function extractDocuments(input: {
   enabled: boolean;
 }) {
   "use step";
-
   if (!input.enabled) {
     return {
       enabled: false,
@@ -79,15 +80,11 @@ async function extractDocuments(input: {
 
   try {
     const { extractPilotInsightsV2 } = await import("@/lib/cvmPilotAi");
-    return {
-      enabled: true,
-      ...await extractPilotInsightsV2(input),
-    };
+    return { enabled: true, ...await extractPilotInsightsV2(input) };
   } catch (error: any) {
     const message = String(error?.message || "Falha opcional na extração documental por IA.");
     const normalized = message.toLowerCase();
-    const errorCode = normalized.includes("insufficient_quota")
-      || normalized.includes("exceeded your current quota")
+    const errorCode = normalized.includes("insufficient_quota") || normalized.includes("exceeded your current quota")
       ? "quota_exhausted"
       : "ai_optional_failure";
 
@@ -111,7 +108,7 @@ async function validate(input: { runId: string; ticker: string; cnpj: string; mo
   return validateOperationalRun(input);
 }
 
-async function markCompleted(runId: string, result: Record<string, unknown>) {
+async function markCompleted(ticker: string, runId: string, result: Record<string, unknown>) {
   "use step";
   const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
   await adminDb.collection("FiiIngestionRuns").doc(runId).set({
@@ -121,9 +118,10 @@ async function markCompleted(runId: string, result: Record<string, unknown>) {
     finishedAt: adminFieldValue.serverTimestamp(),
     updatedAt: adminFieldValue.serverTimestamp(),
   }, { merge: true });
+  await releaseActiveRun(ticker, runId);
 }
 
-async function markFailed(runId: string, error: string) {
+async function markFailed(ticker: string, runId: string, error: string) {
   "use step";
   const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
   await adminDb.collection("FiiIngestionRuns").doc(runId).set({
@@ -133,20 +131,14 @@ async function markFailed(runId: string, error: string) {
     finishedAt: adminFieldValue.serverTimestamp(),
     updatedAt: adminFieldValue.serverTimestamp(),
   }, { merge: true });
+  await releaseActiveRun(ticker, runId);
 }
 
 export async function fundIngestionWorkflow(input: FundIngestionInput) {
   "use workflow";
 
-  const {
-    assertSupportedIngestionTicker,
-    getIngestionAdapterId,
-    getIngestionFundConfig,
-  } = await import("@/lib/fiiIngestionConfig");
-
-  if (!input.ticker) {
-    throw new Error("O ticker é obrigatório para iniciar a ingestão.");
-  }
+  const { assertSupportedIngestionTicker, getIngestionAdapterId, getIngestionFundConfig } = await import("@/lib/fiiIngestionConfig");
+  if (!input.ticker) throw new Error("O ticker é obrigatório para iniciar a ingestão.");
 
   const ticker = assertSupportedIngestionTicker(input.ticker);
   const fundConfig = getIngestionFundConfig(ticker);
@@ -182,12 +174,7 @@ export async function fundIngestionWorkflow(input: FundIngestionInput) {
     const documents = await importDocuments({ runId: input.runId, ticker, cnpj, year });
     await updateRun(input.runId, { documents, currentStep: enableAi ? "ai_extraction" : "validation" });
 
-    const ai = await extractDocuments({
-      runId: input.runId,
-      ticker,
-      documents: documents.documents,
-      enabled: enableAi,
-    });
+    const ai = await extractDocuments({ runId: input.runId, ticker, documents: documents.documents, enabled: enableAi });
     await updateRun(input.runId, { ai, currentStep: "validation" });
 
     const validation = await validate({ runId: input.runId, ticker, cnpj, monthly, documents, ai });
@@ -205,11 +192,11 @@ export async function fundIngestionWorkflow(input: FundIngestionInput) {
       ai,
       validation,
     };
-    await markCompleted(input.runId, result);
+    await markCompleted(ticker, input.runId, result);
     return result;
   } catch (error: any) {
     const message = error?.message || "Erro desconhecido no modo operacional de ingestão.";
-    await markFailed(input.runId, message);
+    await markFailed(ticker, input.runId, message);
     throw error;
   }
 }
