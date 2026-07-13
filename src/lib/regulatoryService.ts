@@ -55,6 +55,7 @@ function sortMonthly(items: Array<Record<string, any>>): RegulatoryInsightSnapsh
     .filter((item) => String(item?.referenceDate || "").trim())
     .map((item) => ({
       referenceDate: String(item.referenceDate),
+      fundName: item.fundName || null,
       netWorth: item.netWorth,
       sharesOutstanding: item.sharesOutstanding,
       numberShareholders: item.numberShareholders,
@@ -78,7 +79,9 @@ export function normalizeRegulatoryData(ticker: string, value: unknown) {
     : {} as RegulatoryDataDocument;
   const monthlyHistory = sortMonthly(Array.isArray(data.monthlyHistory) ? data.monthlyHistory : []);
   const documents = sortDocuments(Array.isArray(data.documents) ? data.documents : []);
-  const latestSnapshot = data.latestSnapshot || monthlyHistory.at(-1) || null;
+  const latestSnapshot: Record<string, any> | RegulatoryInsightSnapshot | null = data.latestSnapshot
+    || monthlyHistory.at(-1)
+    || null;
 
   return {
     source: data.source || null,
