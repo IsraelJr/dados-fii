@@ -1,5 +1,6 @@
 export type RegulatoryInsightSnapshot = {
   referenceDate: string;
+  fundName?: string | null;
   netWorth?: number | null;
   sharesOutstanding?: number | null;
   numberShareholders?: number | null;
@@ -149,6 +150,7 @@ export function buildRegulatoryInsights(input: {
   );
 
   const facts = {
+    fundName: latest?.fundName || first?.fundName || null,
     firstReferenceDate: first?.referenceDate || null,
     latestReferenceDate: latest?.referenceDate || null,
     monthsAnalyzed: history.length,
