@@ -53,14 +53,21 @@ export default function PublicationControlPage() {
       const publicationReadiness = publicationJson.readiness || null;
       setPublication(publicationReadiness);
       setProposalHash(String(publicationReadiness?.proposalHash || ""));
-      setConfirmationText("");
 
       const rollbackResponse = await fetch(
         `/api/admin/fii-ingestion/rollback?runId=${encodeURIComponent(selectedRunId)}`,
         { credentials: "same-origin", cache: "no-store" }
       );
       const rollbackJson = await readJson(rollbackResponse);
-      setRollback(rollbackJson.readiness || null);
+      const rollbackReadiness = rollbackJson.readiness || null;
+      setRollback(rollbackReadiness);
+
+      const isPublished = publicationReadiness?.publicationStatus === "published";
+      setConfirmationText(String(
+        isPublished
+          ? rollbackReadiness?.expectedConfirmation || ""
+          : publicationReadiness?.expectedConfirmation || ""
+      ));
     } catch (err: any) {
       setError(err?.message || "Não foi possível consultar a prontidão.");
     } finally {
@@ -123,7 +130,7 @@ export default function PublicationControlPage() {
     <main className="mx-auto max-w-5xl px-4 py-8">
       <PageHeader
         title="Controle de publicação regulatória"
-        subtitle="Audite hashes, backup e estado da base. Escritas só ficam disponíveis durante uma janela habilitada por variável de ambiente."
+        subtitle="No celular, o sistema carrega o hash e a confirmação automaticamente. A escrita só fica disponível durante uma janela habilitada no ambiente."
         backLabel="← Voltar à aprovação"
         backHref={runId ? `/admin/fii-ingestion/approval?runId=${encodeURIComponent(runId)}&ticker=${encodeURIComponent(publication?.ticker || "")}` : "/admin/fii-ingestion"}
       />
@@ -167,7 +174,7 @@ export default function PublicationControlPage() {
               {published
                 ? "FII_INGESTION_ROLLBACK_ENABLED não está ativo."
                 : "FII_INGESTION_PUBLICATION_ENABLED não está ativo."}
-              Nenhum clique nesta tela consegue alterar a base enquanto o sinalizador estiver desligado.
+              Nenhum toque nesta tela consegue alterar a base enquanto o sinalizador estiver desligado.
             </p>
           </div>
         )}
@@ -193,20 +200,14 @@ export default function PublicationControlPage() {
               {published ? "Rollback transacional" : "Publicação transacional"}
             </div>
             <p className="mt-2 text-sm leading-6 text-red-100/80">
-              Esta ação exige o hash completo e a frase exata abaixo. Ela continuará indisponível enquanto o ambiente não estiver habilitado.
+              O hash completo e a frase de confirmação já foram carregados pela API. Confira os dados e toque no botão apenas durante a janela autorizada.
             </p>
             <div className="mt-4 rounded-xl bg-black/30 p-3 font-mono text-sm font-black text-red-100">{expected}</div>
-            <input
-              value={confirmationText}
-              onChange={(event) => setConfirmationText(event.target.value.toUpperCase())}
-              placeholder={expected}
-              className="mt-3 w-full rounded-xl border border-red-400/30 bg-slate-950 p-3 font-black text-white outline-none focus:border-red-300"
-            />
             <button
               type="button"
               onClick={published ? rollbackPublication : publish}
               disabled={loading || !actionReady || confirmationText !== expected}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-red-700 px-5 py-3 font-extrabold hover:bg-red-600 disabled:opacity-30"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-700 px-5 py-4 text-base font-extrabold hover:bg-red-600 disabled:opacity-30 md:w-auto"
             >
               {loading ? <Loader2 className="animate-spin" size={18} /> : published ? <RotateCcw size={18} /> : <UploadCloud size={18} />}
               {published ? "Executar rollback" : "Publicar regulatoryData"}
