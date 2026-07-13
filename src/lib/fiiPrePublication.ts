@@ -127,8 +127,12 @@ function stableValue(value: unknown): unknown {
   return value;
 }
 
+export function stableRegulatoryJson(value: unknown) {
+  return JSON.stringify(stableValue(value));
+}
+
 function equalValue(left: unknown, right: unknown) {
-  return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
+  return stableRegulatoryJson(left) === stableRegulatoryJson(right);
 }
 
 function flatten(value: unknown, prefix = "", output: Record<string, unknown> = {}) {
@@ -144,13 +148,13 @@ function flatten(value: unknown, prefix = "", output: Record<string, unknown> = 
     }
     return output;
   }
-  output[prefix || "$root"] = value;
+  if (prefix) output[prefix] = value;
   return output;
 }
 
 export function diffRegulatoryData(existing: unknown, proposed: unknown) {
-  const before = flatten(existing ?? null);
-  const after = flatten(proposed ?? null);
+  const before = existing === null || existing === undefined ? {} : flatten(existing);
+  const after = proposed === null || proposed === undefined ? {} : flatten(proposed);
   const paths = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
 
   return paths
