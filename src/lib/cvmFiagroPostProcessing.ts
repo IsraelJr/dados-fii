@@ -1,4 +1,5 @@
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { isMeaningfulFiagroFieldValue } from "@/lib/fiagroFieldMapping";
 
 type RawFragment = {
   sourceKind?: string;
@@ -49,7 +50,7 @@ function numberOf(value: unknown) {
 function findCandidate(
   fragments: RawFragment[],
   fields: string[],
-  options?: { preferredKinds?: string[]; numeric?: boolean }
+  options?: { preferredKinds?: string[]; numeric?: boolean; mappedField?: string }
 ): Candidate {
   const preferredKinds = options?.preferredKinds || [];
   const ordered = [...fragments].sort((left, right) => {
@@ -65,7 +66,8 @@ function findCandidate(
     if (!raw) continue;
     const rawValue = firstValue(raw, fields);
     const value = options?.numeric ? numberOf(rawValue) : rawValue;
-    if (value !== undefined && value !== null && String(value).trim() !== "") {
+    const mappedField = options?.mappedField || fields[0] || "unknown";
+    if (isMeaningfulFiagroFieldValue(mappedField, value)) {
       return { value: value as number | string, sourceFile: fragment.sourceFile };
     }
   }
@@ -106,39 +108,53 @@ export async function reconcileFiagroMonthlyFields(input: {
     const fundName = findCandidate(fragments, [
       "Nome_Classe",
       "Nome_Subclasse",
-    ], { preferredKinds: ["fiagro_mensal", "subclasse"] });
+    ], { preferredKinds: ["fiagro_mensal", "subclasse"], mappedField: "fundName" });
     const netWorth = findCandidate(fragments, [
       "Patrimonio_Liquido",
-    ], { preferredKinds: ["fiagro_mensal"], numeric: true });
+    ], { preferredKinds: ["fiagro_mensal"], numeric: true, mappedField: "netWorth" });
     const sharesOutstanding = findCandidate(fragments, [
       "Cotas_Emitidas",
       "Numero_Cotas",
-    ], { preferredKinds: ["fiagro_mensal", "subclasse"], numeric: true });
+    ], {
+      preferredKinds: ["fiagro_mensal", "subclasse"],
+      numeric: true,
+      mappedField: "sharesOutstanding",
+    });
     const numberShareholders = findCandidate(fragments, [
       "Numero_Cotistas",
-    ], { preferredKinds: ["fiagro_mensal"], numeric: true });
+    ], { preferredKinds: ["fiagro_mensal"], numeric: true, mappedField: "numberShareholders" });
     const vpCota = findCandidate(fragments, [
       "Valor_Patrimonial_Cotas",
       "Valor_Patrimonial_Cota",
-    ], { preferredKinds: ["fiagro_mensal", "subclasse"], numeric: true });
+    ], { preferredKinds: ["fiagro_mensal", "subclasse"], numeric: true, mappedField: "vpCota" });
     const totalPortfolioValue = findCandidate(fragments, [
       "Valor_Ativo",
-    ], { preferredKinds: ["fiagro_mensal"], numeric: true });
+    ], { preferredKinds: ["fiagro_mensal"], numeric: true, mappedField: "totalPortfolioValue" });
 
-    const conflicts = Array.isArray(data.conflicts) ? [...data.conflicts] : [];
+    const conflicts: Array<Record<string, unknown>> = [];
     const crossChecks = [
-      { field: "sharesOutstanding", primary: "Cotas_Emitidas", fallback: "Numero_Cotas" },
-      { field: "vpCota", primary: "Valor_Patrimonial_Cotas", fallback: "Valor_Patrimonial_Cota" },
+      {
+        field: "sharesOutstanding",
+        primary: "Cotas_Emitidas",
+        fallback: "Numero_Cotas",
+      },
+      {
+        field: "vpCota",
+        primary: "Valor_Patrimonial_Cotas",
+        fallback: "Valor_Patrimonial_Cota",
+      },
     ];
 
     for (const check of crossChecks) {
       const primary = findCandidate(fragments, [check.primary], {
         preferredKinds: ["fiagro_mensal"],
         numeric: true,
+        mappedField: check.field,
       });
       const fallback = findCandidate(fragments, [check.fallback], {
         preferredKinds: ["subclasse"],
         numeric: true,
+        mappedField: check.field,
       });
       if (materiallyDifferent(primary.value, fallback.value)) {
         const conflict = {
