@@ -19,16 +19,6 @@ async function updateRun(runId: string, payload: Record<string, unknown>) {
   }, { merge: true });
 }
 
-async function releaseActiveRun(ticker: string, runId: string) {
-  "use step";
-  const { adminDb } = await import("@/lib/firebaseAdmin");
-  const lockRef = adminDb.collection("FiiIngestionActiveRuns").doc(ticker);
-  await adminDb.runTransaction(async (transaction) => {
-    const lockSnapshot = await transaction.get(lockRef);
-    if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) transaction.delete(lockRef);
-  });
-}
-
 async function resolveCnpj(input: FundIngestionInput) {
   "use step";
   const { resolvePilotCnpj } = await import("@/lib/cvmIngestion");
@@ -111,44 +101,66 @@ async function validate(input: { runId: string; ticker: string; cnpj: string; mo
 async function markCompleted(ticker: string, runId: string, result: Record<string, unknown>) {
   "use step";
   const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
-  await adminDb.collection("FiiIngestionRuns").doc(runId).set({
-    status: "completed",
-    currentStep: "completed",
-    result,
-    finishedAt: adminFieldValue.serverTimestamp(),
-    updatedAt: adminFieldValue.serverTimestamp(),
-  }, { merge: true });
-  await releaseActiveRun(ticker, runId);
+  const runRef = adminDb.collection("FiiIngestionRuns").doc(runId);
+  const lockRef = adminDb.collection("FiiIngestionActiveRuns").doc(ticker);
+
+  await adminDb.runTransaction(async (transaction) => {
+    const lockSnapshot = await transaction.get(lockRef);
+    transaction.set(runRef, {
+      status: "completed",
+      currentStep: "completed",
+      result,
+      finishedAt: adminFieldValue.serverTimestamp(),
+      updatedAt: adminFieldValue.serverTimestamp(),
+    }, { merge: true });
+    if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) transaction.delete(lockRef);
+  });
 }
 
 async function markFailed(ticker: string, runId: string, error: string) {
   "use step";
   const { adminDb, adminFieldValue } = await import("@/lib/firebaseAdmin");
-  await adminDb.collection("FiiIngestionRuns").doc(runId).set({
-    status: "failed",
-    currentStep: "failed",
-    error,
-    finishedAt: adminFieldValue.serverTimestamp(),
-    updatedAt: adminFieldValue.serverTimestamp(),
-  }, { merge: true });
-  await releaseActiveRun(ticker, runId);
+  const runRef = adminDb.collection("FiiIngestionRuns").doc(runId);
+  const lockRef = adminDb.collection("FiiIngestionActiveRuns").doc(ticker);
+
+  await adminDb.runTransaction(async (transaction) => {
+    const lockSnapshot = await transaction.get(lockRef);
+    transaction.set(runRef, {
+      status: "failed",
+      currentStep: "failed",
+      error,
+      finishedAt: adminFieldValue.serverTimestamp(),
+      updatedAt: adminFieldValue.serverTimestamp(),
+    }, { merge: true });
+    if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) transaction.delete(lockRef);
+  });
 }
 
 export async function fundIngestionWorkflow(input: FundIngestionInput) {
   "use workflow";
 
-  const { assertSupportedIngestionTicker, getIngestionAdapterId, getIngestionFundConfig } = await import("@/lib/fiiIngestionConfig");
-  if (!input.ticker) throw new Error("O ticker é obrigatório para iniciar a ingestão.");
-
-  const ticker = assertSupportedIngestionTicker(input.ticker);
-  const fundConfig = getIngestionFundConfig(ticker);
-  const adapterId = getIngestionAdapterId(ticker);
-  const fundType = fundConfig?.fundType || "FII";
-  const year = Number(input.year || new Date().getFullYear());
-  const delayMinutes = Math.min(Math.max(Number(input.delayMinutes || 0), 0), 1440);
-  const enableAi = input.enableAi === true;
+  const rawTicker = String(input.ticker || "").trim().toUpperCase();
+  let ticker = rawTicker;
 
   try {
+    const { assertSupportedIngestionTicker, getIngestionAdapterId, getIngestionFundConfig } = await import("@/lib/fiiIngestionConfig");
+    if (!input.runId) throw new Error("O runId é obrigatório para iniciar a ingestão.");
+    if (!rawTicker) throw new Error("O ticker é obrigatório para iniciar a ingestão.");
+
+    ticker = assertSupportedIngestionTicker(rawTicker);
+    const fundConfig = getIngestionFundConfig(ticker);
+    const adapterId = getIngestionAdapterId(ticker);
+    const fundType = fundConfig?.fundType || "FII";
+    const year = Number(input.year ?? new Date().getFullYear());
+    const delayMinutes = Number(input.delayMinutes ?? 0);
+    if (!Number.isInteger(year) || year < 2016 || year > new Date().getFullYear()) {
+      throw new Error("Ano de ingestão inválido.");
+    }
+    if (!Number.isFinite(delayMinutes) || delayMinutes < 0 || delayMinutes > 1440) {
+      throw new Error("Atraso de ingestão inválido.");
+    }
+    const enableAi = input.enableAi === true;
+
     await updateRun(input.runId, {
       status: delayMinutes > 0 ? "scheduled" : "running",
       currentStep: delayMinutes > 0 ? "waiting" : "resolve_cnpj",
@@ -196,7 +208,7 @@ export async function fundIngestionWorkflow(input: FundIngestionInput) {
     return result;
   } catch (error: any) {
     const message = error?.message || "Erro desconhecido no modo operacional de ingestão.";
-    await markFailed(ticker, input.runId, message);
+    if (input.runId && ticker) await markFailed(ticker, input.runId, message);
     throw error;
   }
 }
