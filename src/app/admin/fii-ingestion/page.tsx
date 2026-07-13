@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
-import { Database, Loader2, Play, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Database, FileDiff, Loader2, Play, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import PageHeader from "../../components/PageHeader";
 import {
   getIngestionFundConfig,
@@ -37,6 +37,9 @@ export default function OperationalIngestionPage() {
   const finished = ["completed", "failed"].includes(runStatus);
   const qaUrl = useMemo(() => runId
     ? `/api/admin/fii-ingestion/operational-qa?runId=${encodeURIComponent(runId)}&persist=1`
+    : "", [runId]);
+  const prePublicationUrl = useMemo(() => runId
+    ? `/admin/fii-ingestion/pre-publication?runId=${encodeURIComponent(runId)}`
     : "", [runId]);
 
   useEffect(() => {
@@ -232,6 +235,16 @@ export default function OperationalIngestionPage() {
           >
             <ShieldCheck size={18} /> Executar QA
           </button>
+
+          <a
+            href={prePublicationUrl || undefined}
+            aria-disabled={!runId}
+            className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-extrabold ${runId
+              ? "bg-violet-700 hover:bg-violet-600"
+              : "pointer-events-none bg-slate-800 opacity-40"}`}
+          >
+            <FileDiff size={18} /> Pré-publicação
+          </a>
         </div>
 
         {runId && (
