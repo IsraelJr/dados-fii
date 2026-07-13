@@ -6,6 +6,14 @@ export const ADMIN_SESSION_COOKIE = "dados-fii-admin-session";
 const DEFAULT_SESSION_SECONDS = 8 * 60 * 60;
 const MIN_SESSION_SECONDS = 15 * 60;
 const MAX_SESSION_SECONDS = 24 * 60 * 60;
+const CRON_PATHS = new Set([
+  "/api/admin/update-pending-dividends",
+  "/api/admin/process-portfolio-notifications",
+  "/api/admin/clean-wallet-sessions",
+  "/api/admin/update-market-benchmarks",
+  "/api/admin/monthly-wallet-snapshots",
+  "/api/admin/expire-vip-gifts",
+]);
 
 type AdminSessionPayload = {
   version: 1;
@@ -52,6 +60,11 @@ function safeEqual(left: string, right: string) {
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function bearerOrHeader(req: NextRequest, headerName: string) {
+  const authorization = req.headers.get("authorization") || "";
+  return req.headers.get(headerName) || authorization.replace(/^Bearer\s+/i, "");
 }
 
 export function validateAdminCredentials(_userValue: unknown, tokenValue: unknown) {
@@ -113,20 +126,29 @@ function legacyHeaderSecretEnabled() {
 export function hasLegacyAdminSecret(req: NextRequest) {
   if (!legacyHeaderSecretEnabled()) return false;
   const secret = process.env.ADMIN_UPDATE_SECRET || "";
-  if (!secret) return false;
-  const authorization = req.headers.get("authorization") || "";
-  const value = req.headers.get("x-admin-secret") || authorization.replace(/^Bearer\s+/i, "");
-  return Boolean(value) && safeEqual(value, secret);
+  const value = bearerOrHeader(req, "x-admin-secret");
+  return Boolean(secret && value) && safeEqual(value, secret);
+}
+
+export function isCronAuthorized(req: NextRequest) {
+  const secret = process.env.CRON_SECRET || "";
+  const value = bearerOrHeader(req, "x-cron-secret");
+  return req.method === "GET"
+    && CRON_PATHS.has(req.nextUrl.pathname)
+    && Boolean(secret && value)
+    && safeEqual(value, secret);
 }
 
 export function isSameOriginRequest(req: NextRequest) {
   const origin = req.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return new URL(origin).origin === req.nextUrl.origin;
-  } catch {
-    return false;
+  if (origin) {
+    try {
+      return new URL(origin).origin === req.nextUrl.origin;
+    } catch {
+      return false;
+    }
   }
+  return req.headers.get("sec-fetch-site") === "same-origin";
 }
 
 export function isAdminAuthorized(req: NextRequest, _body?: any) {
@@ -135,7 +157,7 @@ export function isAdminAuthorized(req: NextRequest, _body?: any) {
     const method = req.method.toUpperCase();
     return ["GET", "HEAD", "OPTIONS"].includes(method) || isSameOriginRequest(req);
   }
-  return hasLegacyAdminSecret(req);
+  return hasLegacyAdminSecret(req) || isCronAuthorized(req);
 }
 
 export function setAdminSessionCookie(response: NextResponse, token: string, expiresAt: number) {
