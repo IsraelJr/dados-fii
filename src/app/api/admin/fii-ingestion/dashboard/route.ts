@@ -19,6 +19,13 @@ function reply(payload: unknown, status = 200) {
   });
 }
 
+function timestampMs(value: any) {
+  if (!value) return 0;
+  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
+  const time = date?.getTime?.();
+  return Number.isFinite(time) ? time : 0;
+}
+
 export async function GET(req: NextRequest) {
   if (!isAdminAuthorized(req)) return reply({ ok: false, error: "Não autorizado." }, 401);
 
@@ -32,14 +39,15 @@ export async function GET(req: NextRequest) {
     const funds = await Promise.all(operational.map(async (fund, index) => {
       const official = (officialSnapshots[index]?.data() || {}) as Record<string, any>;
       const regulatoryData = official.regulatoryData || null;
-      const latestRunQuery = await adminDb.collection("FiiIngestionRuns")
+      const runsQuery = await adminDb.collection("FiiIngestionRuns")
         .where("ticker", "==", fund.ticker)
-        .orderBy("requestedAt", "desc")
-        .limit(1)
+        .limit(20)
         .get()
         .catch(() => null);
-      const latestRun = latestRunQuery && !latestRunQuery.empty
-        ? latestRunQuery.docs[0].data() || {}
+      const latestRun = runsQuery && !runsQuery.empty
+        ? runsQuery.docs
+            .map((document) => document.data() || {})
+            .sort((left, right) => timestampMs(right.requestedAt) - timestampMs(left.requestedAt))[0] || null
         : null;
 
       return {
