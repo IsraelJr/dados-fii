@@ -1,4 +1,4 @@
-import type { RegulatoryInsight, RegulatoryInsightSnapshot } from "@/lib/regulatoryInsights";
+import type { RegulatoryInsight, RegulatoryInsightSnapshot, RegulatoryScore } from "@/lib/regulatoryInsights";
 
 export type PremiumReportInput = {
   ticker: string;
@@ -18,19 +18,23 @@ export type PremiumReportInput = {
   };
   deterministicAnalysis: {
     facts: Record<string, any>;
-    scores: Record<string, number>;
+    scores: Record<string, RegulatoryScore>;
     insights: RegulatoryInsight[];
     generatedBy?: string;
+    semaphore?: string;
+    unavailableDimensions?: string[];
   };
 };
 
 function number(value: unknown, digits = 0) {
+  if (value === null || value === undefined) return "não disponível";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "não disponível";
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: digits }).format(numeric);
 }
 
 function currency(value: unknown) {
+  if (value === null || value === undefined) return "não disponível";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "não disponível";
   return new Intl.NumberFormat("pt-BR", {
@@ -41,6 +45,7 @@ function currency(value: unknown) {
 }
 
 function percent(value: unknown) {
+  if (value === null || value === undefined) return "não disponível";
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "não disponível";
   return `${numeric > 0 ? "+" : ""}${numeric.toFixed(2).replace(".", ",")}%`;
@@ -73,9 +78,6 @@ export function buildPremiumRegulatoryReport(input: PremiumReportInput) {
     ? input.deterministicAnalysis.insights
     : [];
   const regulatoryData = input.fund?.regulatoryData || null;
-  const history = Array.isArray(regulatoryData?.monthlyHistory)
-    ? regulatoryData.monthlyHistory
-    : [];
   const documents = Array.isArray(regulatoryData?.documents)
     ? regulatoryData.documents
     : [];
@@ -86,8 +88,12 @@ export function buildPremiumRegulatoryReport(input: PremiumReportInput) {
     executiveSummary: [
       `${ticker}${input.fund?.name ? ` — ${input.fund.name}` : ""}.`,
       `Foram analisadas ${number(facts.monthsAnalyzed)} competências regulatórias, de ${facts.firstReferenceDate || "data não disponível"} até ${facts.latestReferenceDate || "data não disponível"}.`,
-      `O score geral é ${number(scores.overall)}, com qualidade dos dados em ${number(scores.dataQuality)}, estabilidade em ${number(scores.stability)} e risco observado em ${number(scores.risk)}.`,
+      `O score geral é ${number(scores.overall)}, com patrimônio em ${number(scores.patrimonial)}, crescimento em ${number(scores.growth)}, documentação em ${number(scores.documentation)} e risco observado em ${number(scores.risk)}.`,
+      input.deterministicAnalysis.unavailableDimensions?.length
+        ? `Dimensões ainda não avaliadas: ${input.deterministicAnalysis.unavailableDimensions.join(", ")}.`
+        : "Todas as dimensões previstas possuem dados suficientes.",
     ].join(" "),
+    scorecard: scores,
     patrimonialTrend: {
       latestNetWorth: facts.latestNetWorth ?? null,
       netWorthChangePct: facts.netWorthChangePct ?? null,
@@ -108,7 +114,7 @@ export function buildPremiumRegulatoryReport(input: PremiumReportInput) {
       title: documentLabel(document, index),
       referenceDate: document.deliveryDate || document.referenceDate || null,
       category: document.documentType || document.category || null,
-      sourceUrl: document.sourceUrl || document.url || null,
+      sourceUrl: document.documentUrl || document.sourceUrl || document.url || null,
     })),
     bullCase: positives.length
       ? positives.map((item) => item.detail)
@@ -126,6 +132,7 @@ export function buildPremiumRegulatoryReport(input: PremiumReportInput) {
 
   const markdown = `# Relatório regulatório Premium — ${ticker}\n\n` +
     `## Resumo executivo\n${sections.executiveSummary}\n\n` +
+    `## Scorecard\n${Object.entries(scores).map(([key, value]) => `- ${key}: ${number(value)}`).join("\n")}\n\n` +
     `## Tendência patrimonial\n${sections.patrimonialTrend.interpretation}\n\n` +
     `- Patrimônio líquido: ${currency(facts.latestNetWorth)}\n` +
     `- Variação do patrimônio: ${percent(facts.netWorthChangePct)}\n` +
@@ -144,7 +151,7 @@ export function buildPremiumRegulatoryReport(input: PremiumReportInput) {
 
   return {
     ticker,
-    version: "premium-regulatory-report-v1",
+    version: "premium-regulatory-report-v2",
     generatedBy: "deterministic-regulatory-engine",
     generatedAt: new Date().toISOString(),
     source: regulatoryData?.source || null,
