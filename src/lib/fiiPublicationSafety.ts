@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { stableRegulatoryJson } from "@/lib/fiiPrePublication";
+import { stableRegulatoryJson } from "./fiiPrePublication.ts";
 
 export function hashStablePayload(value: unknown) {
   return createHash("sha256").update(stableRegulatoryJson(value)).digest("hex");
