@@ -24,6 +24,7 @@ test("VGIA11 flags the material increase in outstanding shares", () => {
   assert.ok((result.facts.sharesChangePct || 0) > 20);
   assert.ok(result.insights.some((item) => item.code === "SHARE_ISSUANCE_CHANGE"));
   assert.equal(result.scores.dataQuality, 100);
+  assert.equal(result.generatedBy, "regulatory-insights-v2");
 });
 
 test("MXRF11 identifies shareholder growth with broadly stable VP per share", () => {
@@ -37,6 +38,7 @@ test("MXRF11 identifies shareholder growth with broadly stable VP per share", ()
   assert.ok((result.facts.shareholdersChangePct || 0) > 5);
   assert.ok(Math.abs(result.facts.vpCotaChangePct || 0) < 2);
   assert.match(result.freeReport.headline, /cotistas em alta/i);
+  assert.equal(typeof result.scores.growth, "number");
 });
 
 test("KNCA11 preserves zero delinquency as a positive fact", () => {
@@ -44,13 +46,22 @@ test("KNCA11 preserves zero delinquency as a positive fact", () => {
   const result = buildRegulatoryInsights({
     ticker: fixture.ticker,
     monthlyHistory: fixture.monthly,
-    quality: { coverage: 100, conflictCount: 0, qaScore: 100 },
+    quality: { coverage: 100, conflictCount: 0, qaScore: 100, documents: 9 },
+    documents: [
+      { documentType: "RELAT GERENCIAL" },
+      { documentType: "REGUL FDO" },
+      { documentType: "SGF ANEXO" },
+    ],
   });
 
   const delinquency = result.insights.find((item) => item.code === "DELINQUENCY_STATUS");
   assert.equal(result.facts.latestDelinquentCreditValue, 0);
   assert.equal(delinquency?.severity, "positive");
   assert.equal(result.scores.dataQuality, 100);
+  assert.ok((result.scores.documentation || 0) >= 80);
+  assert.ok((result.scores.governanceEvidence || 0) >= 70);
+  assert.equal(result.scores.liquidity, null);
+  assert.ok(result.unavailableDimensions.includes("liquidity"));
 });
 
 test("structural TGAR11 fixture does not invent missing financial history", () => {
@@ -63,5 +74,7 @@ test("structural TGAR11 fixture does not invent missing financial history", () =
 
   assert.equal(result.facts.monthsAnalyzed, 0);
   assert.equal(result.facts.latestNetWorth, null);
+  assert.equal(result.scores.growth, null);
+  assert.ok(result.unavailableDimensions.includes("growth"));
   assert.ok(result.insights.some((item) => item.code === "INSUFFICIENT_HISTORY"));
 });
