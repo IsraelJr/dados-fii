@@ -76,11 +76,18 @@ export async function POST(req: NextRequest) {
         if (approval.proposalHash !== proposalHash) {
           throw new Error("Já existe aprovação para outra versão deste pacote.");
         }
+        if (!backupSnapshot.exists) {
+          throw new Error("A aprovação existe, mas o backup imutável está ausente. Publicação bloqueada; revisão manual necessária.");
+        }
+        const backup = (backupSnapshot.data() || {}) as Record<string, any>;
+        if (backup.proposalHash !== proposalHash || backup.status !== "immutable_backup_pending_publication") {
+          throw new Error("A aprovação e o backup existente não formam um estado íntegro para publicação.");
+        }
         return {
           ticker,
           proposalHash,
           alreadyApproved: true,
-          backupCreated: backupSnapshot.exists,
+          backupCreated: true,
         };
       }
 
@@ -165,7 +172,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     const message = error?.message || "Falha ao registrar aprovação humana.";
-    const status = message.includes("mudou após") ? 409 : 400;
+    const status = message.includes("mudou após") || message.includes("estado íntegro") || message.includes("backup imutável") ? 409 : 400;
     return reply({
       ok: false,
       error: message,
