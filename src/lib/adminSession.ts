@@ -14,6 +14,13 @@ const CRON_PATHS = new Set([
   "/api/admin/monthly-wallet-snapshots",
   "/api/admin/expire-vip-gifts",
 ]);
+const LEGACY_READ_ONLY_PATHS = new Set([
+  "/api/admin/fii-ingestion/status",
+  "/api/admin/fii-ingestion/adapter-health",
+  "/api/admin/fii-ingestion/dashboard",
+  "/api/admin/fii-ingestion/audit",
+  "/api/admin/fii-ingestion/post-publication-validation",
+]);
 
 type AdminSessionPayload = {
   version: 1;
@@ -24,7 +31,9 @@ type AdminSessionPayload = {
 };
 
 function sessionSecret() {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_UPDATE_SECRET || "";
+  const dedicated = process.env.ADMIN_SESSION_SECRET || "";
+  if (process.env.NODE_ENV === "production") return dedicated;
+  return dedicated || process.env.ADMIN_UPDATE_SECRET || "";
 }
 
 function firstConfiguredAdminEmail() {
@@ -77,7 +86,9 @@ export function validateAdminCredentials(_userValue: unknown, tokenValue: unknow
 export function createAdminSessionToken() {
   const user = expectedAdminUser();
   const secret = sessionSecret();
-  if (!secret || !user) throw new Error("Sessão administrativa não configurada.");
+  if (!secret || !user) {
+    throw new Error("Sessão administrativa não configurada. Defina ADMIN_SESSION_SECRET.");
+  }
 
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = issuedAt + adminSessionDurationSeconds();
@@ -125,6 +136,7 @@ function legacyHeaderSecretEnabled() {
 
 export function hasLegacyAdminSecret(req: NextRequest) {
   if (!legacyHeaderSecretEnabled()) return false;
+  if (req.method !== "GET" || !LEGACY_READ_ONLY_PATHS.has(req.nextUrl.pathname)) return false;
   const secret = process.env.ADMIN_UPDATE_SECRET || "";
   const value = bearerOrHeader(req, "x-admin-secret");
   return Boolean(secret && value) && safeEqual(value, secret);
