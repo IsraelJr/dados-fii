@@ -28,15 +28,9 @@ async function readReadiness(runId: string) {
   const backupRef = adminDb.collection("FiiIngestionBackups").doc(runId);
   const publicationRef = adminDb.collection("FiiIngestionPublications").doc(runId);
   const [prePublicationSnapshot, approvalSnapshot, backupSnapshot, publicationSnapshot] = await Promise.all([
-    prePublicationRef.get(),
-    approvalRef.get(),
-    backupRef.get(),
-    publicationRef.get(),
+    prePublicationRef.get(), approvalRef.get(), backupRef.get(), publicationRef.get(),
   ]);
-
-  if (!prePublicationSnapshot.exists) {
-    throw new Error("Pacote de pré-publicação não encontrado.");
-  }
+  if (!prePublicationSnapshot.exists) throw new Error("Pacote de pré-publicação não encontrado.");
 
   const prePublication = (prePublicationSnapshot.data() || {}) as Record<string, any>;
   const approval = (approvalSnapshot.data() || {}) as Record<string, any>;
@@ -48,6 +42,7 @@ async function readReadiness(runId: string) {
   const officialData = (officialSnapshot?.data() || {}) as Record<string, any>;
   const officialDocumentHash = hashStablePayload(officialSnapshot?.exists ? officialData : null);
   const backupHash = String(backup.originalDocumentHash || "");
+  const publishedHash = String(publication.publishedDocumentHash || "");
 
   return {
     runId,
@@ -63,8 +58,10 @@ async function readReadiness(runId: string) {
     backupExists: backupSnapshot.exists,
     publicationExists: publicationSnapshot.exists,
     officialDocumentUnchanged: Boolean(backupSnapshot.exists && backupHash && backupHash === officialDocumentHash),
+    currentOfficialMatchesPublishedHash: Boolean(publicationSnapshot.exists && publishedHash && publishedHash === officialDocumentHash),
     officialDocumentHash,
     backupOriginalDocumentHash: backupHash || null,
+    publishedDocumentHash: publishedHash || null,
     canAttemptPublication: Boolean(
       publicationWriteEnabled()
       && approvalSnapshot.exists
@@ -79,10 +76,7 @@ async function readReadiness(runId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isAdminAuthorized(req)) {
-    return reply({ ok: false, error: "Não autorizado." }, 401);
-  }
-
+  if (!isAdminAuthorized(req)) return reply({ ok: false, error: "Não autorizado." }, 401);
   try {
     const runId = String(req.nextUrl.searchParams.get("runId") || "").trim();
     if (!runId) return reply({ ok: false, error: "Informe o runId." }, 400);
@@ -94,9 +88,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as Record<string, any>));
-  if (!isAdminAuthorized(req, body)) {
-    return reply({ ok: false, error: "Não autorizado." }, 401);
-  }
+  if (!isAdminAuthorized(req, body)) return reply({ ok: false, error: "Não autorizado." }, 401);
   if (!publicationWriteEnabled()) {
     return reply({
       ok: false,
@@ -121,45 +113,40 @@ export async function POST(req: NextRequest) {
     const publishedAt = new Date().toISOString();
 
     const result = await adminDb.runTransaction(async (transaction) => {
-      const [prePublicationSnapshot, approvalSnapshot, backupSnapshot, publicationSnapshot] = await Promise.all([
-        transaction.get(prePublicationRef),
+      const prePublicationSnapshot = await transaction.get(prePublicationRef);
+      if (!prePublicationSnapshot.exists) throw new Error("Pacote de pré-publicação não encontrado.");
+      const prePublication = (prePublicationSnapshot.data() || {}) as Record<string, any>;
+      const ticker = normalizeIngestionTicker(prePublication.ticker);
+      if (!ticker) throw new Error("Ticker do pacote aprovado é inválido.");
+
+      const officialRef = adminDb.collection("Fiis").doc(ticker);
+      const [approvalSnapshot, backupSnapshot, publicationSnapshot, officialSnapshot] = await Promise.all([
         transaction.get(approvalRef),
         transaction.get(backupRef),
         transaction.get(publicationRef),
+        transaction.get(officialRef),
       ]);
-
-      if (!prePublicationSnapshot.exists || !approvalSnapshot.exists || !backupSnapshot.exists) {
-        throw new Error("Pré-publicação, aprovação ou backup obrigatório não encontrado.");
+      if (!approvalSnapshot.exists || !backupSnapshot.exists) {
+        throw new Error("Aprovação ou backup obrigatório não encontrado.");
       }
 
-      const prePublication = (prePublicationSnapshot.data() || {}) as Record<string, any>;
       const approval = (approvalSnapshot.data() || {}) as Record<string, any>;
       const backup = (backupSnapshot.data() || {}) as Record<string, any>;
-      const ticker = normalizeIngestionTicker(prePublication.ticker);
       const proposal = prePublication.proposedRegulatoryData;
       const computedProposalHash = hashStablePayload(proposal);
-      const approvedProposalHash = String(approval.proposalHash || "").toLowerCase();
-      const expectedConfirmation = normalizedConfirmation(
-        buildPublicationConfirmation(ticker, computedProposalHash)
-      );
+      const expectedConfirmation = normalizedConfirmation(buildPublicationConfirmation(ticker, computedProposalHash));
+      const officialData = (officialSnapshot.data() || {}) as Record<string, any>;
+      const currentDocumentHash = hashStablePayload(officialSnapshot.exists ? officialData : null);
 
-      if (!ticker || !proposal) throw new Error("Pacote aprovado incompleto.");
-      if (computedProposalHash !== approvedProposalHash
+      if (!proposal) throw new Error("Pacote aprovado incompleto.");
+      if (computedProposalHash !== String(approval.proposalHash || "").toLowerCase()
         || computedProposalHash !== String(prePublication.proposalHash || "").toLowerCase()
         || computedProposalHash !== String(backup.proposalHash || "").toLowerCase()) {
         throw new Error("Os hashes do pacote, aprovação e backup não coincidem.");
       }
-      if (suppliedProposalHash !== computedProposalHash) {
-        throw new Error("Informe o hash completo do pacote aprovado.");
-      }
+      if (suppliedProposalHash !== computedProposalHash) throw new Error("Informe o hash completo do pacote aprovado.");
       if (suppliedConfirmation !== expectedConfirmation) {
         throw new Error(`Digite exatamente: ${buildPublicationConfirmation(ticker, computedProposalHash)}`);
-      }
-      if (approval.status !== "approved_pending_publication_authorization") {
-        throw new Error("A aprovação humana não está no estado esperado.");
-      }
-      if (backup.status !== "immutable_backup_pending_publication") {
-        throw new Error("O backup não está pronto para publicação.");
       }
 
       if (publicationSnapshot.exists) {
@@ -167,18 +154,26 @@ export async function POST(req: NextRequest) {
         if (publication.proposalHash !== computedProposalHash) {
           throw new Error("Já existe publicação para outra versão deste runId.");
         }
+        if (String(publication.publishedDocumentHash || "") !== currentDocumentHash) {
+          throw new Error("O estado oficial divergiu da versão publicada registrada.");
+        }
         return {
           ticker,
           proposalHash: computedProposalHash,
           alreadyPublished: true,
+          writePerformedInThisRequest: false,
+          currentOfficialStateMatchesPublication: true,
           publishedAt: publication.publishedAt || null,
+          publishedDocumentHash: publication.publishedDocumentHash || null,
         };
       }
 
-      const officialRef = adminDb.collection("Fiis").doc(ticker);
-      const officialSnapshot = await transaction.get(officialRef);
-      const officialData = (officialSnapshot.data() || {}) as Record<string, any>;
-      const currentDocumentHash = hashStablePayload(officialSnapshot.exists ? officialData : null);
+      if (approval.status !== "approved_pending_publication_authorization") {
+        throw new Error("A aprovação humana não está no estado esperado.");
+      }
+      if (backup.status !== "immutable_backup_pending_publication") {
+        throw new Error("O backup não está pronto para publicação.");
+      }
       if (currentDocumentHash !== String(backup.originalDocumentHash || "")) {
         throw new Error("A base oficial mudou após o backup. Gere nova pré-publicação e aprovação.");
       }
@@ -187,22 +182,12 @@ export async function POST(req: NextRequest) {
       const publishedRegulatoryData = {
         ...proposal,
         status: "published",
-        publication: {
-          runId,
-          proposalHash: computedProposalHash,
-          publishedAt,
-          publishedBy,
-        },
+        publication: { runId, proposalHash: computedProposalHash, publishedAt, publishedBy },
       };
-      const publishedDocument = {
-        ...officialData,
-        regulatoryData: publishedRegulatoryData,
-      };
+      const publishedDocument = { ...officialData, regulatoryData: publishedRegulatoryData };
       const publishedDocumentHash = hashStablePayload(publishedDocument);
 
-      transaction.set(officialRef, {
-        regulatoryData: publishedRegulatoryData,
-      }, { merge: true });
+      transaction.set(officialRef, { regulatoryData: publishedRegulatoryData }, { merge: true });
       transaction.set(publicationRef, {
         runId,
         ticker,
@@ -220,6 +205,11 @@ export async function POST(req: NextRequest) {
         rollbackAvailable: true,
         rollbackPerformed: false,
       }, { merge: false });
+      transaction.set(backupRef, {
+        status: "immutable_backup_for_published_version",
+        publicationDocument: `FiiIngestionPublications/${runId}`,
+        publishedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: true });
       transaction.set(approvalRef, {
         status: "published",
         officialWritePerformed: true,
@@ -236,7 +226,9 @@ export async function POST(req: NextRequest) {
       }, { merge: true });
       transaction.set(runRef, {
         prePublicationStatus: "published",
-        publishToOfficialBase: true,
+        publishToOfficialBase: false,
+        publicationPerformed: true,
+        publicationStatus: "published",
         officialWritePerformed: true,
         publicationDocument: `FiiIngestionPublications/${runId}`,
         publishedAt: adminFieldValue.serverTimestamp(),
@@ -247,6 +239,8 @@ export async function POST(req: NextRequest) {
         ticker,
         proposalHash: computedProposalHash,
         alreadyPublished: false,
+        writePerformedInThisRequest: true,
+        currentOfficialStateMatchesPublication: true,
         publishedAt,
         publishedDocumentHash,
       };
@@ -256,17 +250,14 @@ export async function POST(req: NextRequest) {
       ok: true,
       runId,
       ...result,
-      officialWritePerformed: true,
+      officialWritePerformed: result.writePerformedInThisRequest,
+      officialWritePerformedHistorically: true,
       publicationStatus: "published",
       rollbackAvailable: true,
     });
   } catch (error: any) {
     const message = error?.message || "Falha na publicação transacional.";
-    const status = message.includes("mudou após") ? 409 : 400;
-    return reply({
-      ok: false,
-      error: message,
-      officialWritePerformed: false,
-    }, status);
+    const status = message.includes("mudou após") || message.includes("divergiu") ? 409 : 400;
+    return reply({ ok: false, error: message, officialWritePerformed: false }, status);
   }
 }
