@@ -18,6 +18,8 @@ export type RegulatoryInsight = {
   value?: number | null;
 };
 
+export type RegulatoryScore = number | null;
+
 function numeric(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
@@ -41,14 +43,28 @@ function trendLabel(value: number | null, stableBand = 1) {
   return "estável";
 }
 
+function scoreBand(score: number) {
+  if (score >= 80) return "green" as const;
+  if (score >= 60) return "yellow" as const;
+  return "red" as const;
+}
+
+function averageAssessed(scores: RegulatoryScore[]) {
+  const assessed = scores.filter((score): score is number => typeof score === "number" && Number.isFinite(score));
+  if (!assessed.length) return 0;
+  return clamp(assessed.reduce((total, score) => total + score, 0) / assessed.length);
+}
+
 export function buildRegulatoryInsights(input: {
   ticker: string;
   monthlyHistory: RegulatoryInsightSnapshot[];
-  quality?: { coverage?: number; conflictCount?: number; qaScore?: number } | null;
+  quality?: { coverage?: number; conflictCount?: number; qaScore?: number; documents?: number } | null;
+  documents?: Array<Record<string, any>>;
 }) {
   const history = [...(input.monthlyHistory || [])]
     .filter((item) => item?.referenceDate)
     .sort((left, right) => left.referenceDate.localeCompare(right.referenceDate));
+  const documents = Array.isArray(input.documents) ? input.documents : [];
   const first = history[0] || null;
   const latest = history.at(-1) || null;
   const netWorthChangePct = percentChange(first?.netWorth, latest?.netWorth);
@@ -59,6 +75,12 @@ export function buildRegulatoryInsights(input: {
   const coverage = numeric(input.quality?.coverage) ?? 0;
   const conflictCount = numeric(input.quality?.conflictCount) ?? 0;
   const qaScore = numeric(input.quality?.qaScore) ?? 0;
+  const documentsCount = Math.max(documents.length, numeric(input.quality?.documents) ?? 0);
+  const documentTypes = new Set(
+    documents
+      .map((document) => String(document?.documentType || document?.category || "").trim().toUpperCase())
+      .filter(Boolean)
+  );
 
   const insights: RegulatoryInsight[] = [];
 
@@ -129,6 +151,10 @@ export function buildRegulatoryInsights(input: {
   }
 
   const qualityScore = clamp((coverage * 0.45) + (qaScore * 0.45) - Math.min(conflictCount * 10, 45) + 10);
+  const documentationScore = clamp(Math.min(100, 35 + documentsCount * 5 + documentTypes.size * 5));
+  const governanceEvidenceScore = documentsCount === 0
+    ? 30
+    : clamp(45 + Math.min(documentsCount, 8) * 4 + Math.min(documentTypes.size, 5) * 5);
   const investorBaseScore = shareholdersChangePct === null
     ? 50
     : clamp(50 + shareholdersChangePct * 2.5);
@@ -137,23 +163,45 @@ export function buildRegulatoryInsights(input: {
     + (netWorthChangePct ?? 0) * 1.5
     + (vpCotaChangePct ?? 0) * 4
   );
+  const growthScore = history.length < 2
+    ? null
+    : clamp(50 + (netWorthChangePct ?? 0) * 2 + (shareholdersChangePct ?? 0) * 1.5);
   const stabilityPenalty = Math.abs(vpCotaChangePct ?? 0) * 4
     + Math.max(0, -(netWorthChangePct ?? 0)) * 2
     + (delinquentValue && delinquentValue > 0 ? 30 : 0);
   const stabilityScore = clamp(100 - stabilityPenalty);
   const riskScore = clamp(100 - ((qualityScore * 0.2) + (stabilityScore * 0.55) + (patrimonialScore * 0.25)));
-  const overallScore = clamp(
-    qualityScore * 0.25
-    + investorBaseScore * 0.2
-    + patrimonialScore * 0.3
-    + stabilityScore * 0.25
-  );
+  const liquidityScore: null = null;
+  const overallScore = averageAssessed([
+    qualityScore,
+    documentationScore,
+    governanceEvidenceScore,
+    investorBaseScore,
+    patrimonialScore,
+    growthScore,
+    stabilityScore,
+  ]);
+
+  const scores = {
+    overall: overallScore,
+    dataQuality: qualityScore,
+    documentation: documentationScore,
+    governanceEvidence: governanceEvidenceScore,
+    investorBase: investorBaseScore,
+    patrimonial: patrimonialScore,
+    growth: growthScore,
+    stability: stabilityScore,
+    liquidity: liquidityScore,
+    risk: riskScore,
+  };
 
   const facts = {
     fundName: latest?.fundName || first?.fundName || null,
     firstReferenceDate: first?.referenceDate || null,
     latestReferenceDate: latest?.referenceDate || null,
     monthsAnalyzed: history.length,
+    documentsAnalyzed: documentsCount,
+    documentTypesAnalyzed: documentTypes.size,
     netWorthChangePct,
     shareholdersChangePct,
     vpCotaChangePct,
@@ -167,16 +215,17 @@ export function buildRegulatoryInsights(input: {
 
   return {
     ticker: String(input.ticker || "").toUpperCase(),
-    generatedBy: "regulatory-insights-v1",
+    generatedBy: "regulatory-insights-v2",
+    methodologyVersion: 2,
+    semaphore: scoreBand(overallScore),
+    assessedDimensions: Object.entries(scores)
+      .filter(([, value]) => value !== null)
+      .map(([key]) => key),
+    unavailableDimensions: Object.entries(scores)
+      .filter(([, value]) => value === null)
+      .map(([key]) => key),
     facts,
-    scores: {
-      overall: overallScore,
-      dataQuality: qualityScore,
-      investorBase: investorBaseScore,
-      patrimonial: patrimonialScore,
-      stability: stabilityScore,
-      risk: riskScore,
-    },
+    scores,
     insights,
     freeReport: {
       headline: history.length >= 2
@@ -184,19 +233,17 @@ export function buildRegulatoryInsights(input: {
         : `${input.ticker}: dados regulatórios disponíveis, mas ainda sem histórico suficiente.`,
       keyMetrics: facts,
       alerts: insights.filter((item) => item.severity === "attention" || item.severity === "risk").slice(0, 3),
+      semaphore: scoreBand(overallScore),
     },
     premiumInput: {
       facts,
-      scores: {
-        overall: overallScore,
-        dataQuality: qualityScore,
-        investorBase: investorBaseScore,
-        patrimonial: patrimonialScore,
-        stability: stabilityScore,
-        risk: riskScore,
-      },
+      scores,
       insights,
-      instruction: "A IA deve interpretar somente estes fatos e os documentos oficiais anexados, sem inventar dados ausentes.",
+      semaphore: scoreBand(overallScore),
+      unavailableDimensions: Object.entries(scores)
+        .filter(([, value]) => value === null)
+        .map(([key]) => key),
+      instruction: "A IA deve interpretar somente estes fatos e os documentos oficiais anexados, sem inventar dados ausentes. Dimensões indisponíveis não podem receber nota estimada.",
     },
   };
 }
