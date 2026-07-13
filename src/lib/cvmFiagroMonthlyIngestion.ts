@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebaseAdmin";
 import { normalizeCnpj, parseDelimitedLine } from "@/lib/cvmIngestion";
 import {
   firstFiagroValue,
+  isMeaningfulFiagroFieldValue,
   mapFiagroMonthlyRow,
   normalizeFiagroFieldKey,
 } from "@/lib/fiagroFieldMapping";
@@ -171,20 +172,24 @@ function mergeSnapshots(current: FiagroSnapshot | undefined, incoming: FiagroSna
   };
 
   for (const field of scalarFields) {
+    const fieldName = String(field);
     const existingValue = current[field];
     const incomingValue = incoming[field];
-    if (valuesDiffer(existingValue, incomingValue)) {
+    const existingMeaningful = isMeaningfulFiagroFieldValue(fieldName, existingValue);
+    const incomingMeaningful = isMeaningfulFiagroFieldValue(fieldName, incomingValue);
+
+    if (existingMeaningful && incomingMeaningful && valuesDiffer(existingValue, incomingValue)) {
       merged.conflicts.push({
-        field: String(field),
+        field: fieldName,
         kept: existingValue,
         incoming: incomingValue,
         sourceFile: incoming.source.files[0] || "unknown",
       });
       continue;
     }
-    if ((existingValue === undefined || existingValue === null || existingValue === "")
-      && incomingValue !== undefined && incomingValue !== null && incomingValue !== "") {
-      (merged as Record<string, unknown>)[String(field)] = incomingValue;
+
+    if (!existingMeaningful && incomingMeaningful) {
+      (merged as Record<string, unknown>)[fieldName] = incomingValue;
     }
   }
 
