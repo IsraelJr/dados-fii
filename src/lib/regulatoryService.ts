@@ -4,6 +4,7 @@ import {
   buildRegulatoryInsights,
   type RegulatoryInsightSnapshot,
 } from "@/lib/regulatoryInsights";
+import { buildRegulatoryTimeline } from "@/lib/regulatoryTimeline";
 
 export type RegulatoryDataDocument = {
   source?: string;
@@ -48,6 +49,7 @@ export type RegulatoryReportResult = {
   reportAvailable: boolean;
   reason: string | null;
   insights: ReturnType<typeof buildRegulatoryInsights> | null;
+  timeline: ReturnType<typeof buildRegulatoryTimeline> | null;
 };
 
 function sortMonthly(items: Array<Record<string, any>>): RegulatoryInsightSnapshot[] {
@@ -152,6 +154,7 @@ export async function getRegulatoryReportInput(tickerInput: unknown): Promise<Re
       reportAvailable: false,
       reason: "fund_not_found",
       insights: null,
+      timeline: null,
     };
   }
 
@@ -162,6 +165,7 @@ export async function getRegulatoryReportInput(tickerInput: unknown): Promise<Re
       reportAvailable: false,
       reason: "regulatory_data_not_published",
       insights: null,
+      timeline: null,
     };
   }
 
@@ -169,6 +173,12 @@ export async function getRegulatoryReportInput(tickerInput: unknown): Promise<Re
     ticker: response.ticker,
     monthlyHistory: regulatoryData.monthlyHistory,
     quality: regulatoryData.quality,
+    documents: regulatoryData.documents,
+  });
+  const timeline = buildRegulatoryTimeline({
+    ticker: response.ticker,
+    monthlyHistory: regulatoryData.monthlyHistory,
+    documents: regulatoryData.documents,
   });
 
   return {
@@ -176,5 +186,6 @@ export async function getRegulatoryReportInput(tickerInput: unknown): Promise<Re
     reportAvailable: true,
     reason: null,
     insights,
+    timeline,
   };
 }
