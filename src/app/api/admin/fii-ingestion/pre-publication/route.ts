@@ -5,6 +5,7 @@ import {
   buildRegulatoryDataProposal,
   diffRegulatoryData,
 } from "@/lib/fiiPrePublication";
+import { mergeRegulatoryHistory } from "@/lib/regulatoryHistoryMerge";
 import {
   getIngestionFundConfig,
   isSupportedIngestionTicker,
@@ -89,10 +90,11 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
     const officialRef = adminDb.collection("Fiis").doc(ticker);
     const officialSnapshot = await officialRef.get();
     const officialData = (officialSnapshot.data() || {}) as Record<string, any>;
+    const existingRegulatoryData = officialData.regulatoryData || null;
     const monthly = monthlySnapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }));
     const documents = documentsSnapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }));
     const generatedAt = new Date().toISOString();
-    const proposal = buildRegulatoryDataProposal({
+    const incomingProposal = buildRegulatoryDataProposal({
       ticker,
       cnpj,
       fundType: fundConfig.fundType,
@@ -104,7 +106,32 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
       documents,
       generatedAt,
     });
-    const existingRegulatoryData = officialData.regulatoryData || null;
+    const mergedHistory = mergeRegulatoryHistory({
+      existingMonthly: Array.isArray(existingRegulatoryData?.monthlyHistory)
+        ? existingRegulatoryData.monthlyHistory
+        : [],
+      incomingMonthly: incomingProposal.monthlyHistory,
+      existingDocuments: Array.isArray(existingRegulatoryData?.documents)
+        ? existingRegulatoryData.documents
+        : [],
+      incomingDocuments: incomingProposal.documents,
+    });
+    const proposal = {
+      ...incomingProposal,
+      referenceYears: mergedHistory.years,
+      latestSnapshot: mergedHistory.latestSnapshot,
+      monthlyHistory: mergedHistory.monthlyHistory,
+      documents: mergedHistory.documents,
+      quality: {
+        ...incomingProposal.quality,
+        monthlySnapshots: mergedHistory.monthlyHistory.length,
+        documents: mergedHistory.documents.length,
+      },
+      historyMerge: {
+        mode: "incremental_idempotent",
+        ...mergedHistory.stats,
+      },
+    };
     const differences = diffRegulatoryData(existingRegulatoryData, proposal);
     const legacyFields = Object.keys(officialData)
       .filter((key) => key !== "regulatoryData")
@@ -124,6 +151,10 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
       proposedRegulatoryData: proposal,
       differences,
       protectedLegacyFields: legacyFields,
+      historyMerge: {
+        years: mergedHistory.years,
+        ...mergedHistory.stats,
+      },
       safeguards: {
         qaScore: Number(qa.score),
         qaVerdict: qa.verdict,
@@ -132,6 +163,7 @@ async function handle(req: NextRequest, body?: Record<string, any>) {
         officialWritePerformed: false,
         officialWriteEndpointAvailable: false,
         legacyFieldsWillBeOverwritten: false,
+        priorRegulatoryHistoryWillBePreserved: true,
         backupRequiredBeforePublication: true,
         rollbackRequiredBeforePublication: true,
         explicitAuthorizationRequired: true,
