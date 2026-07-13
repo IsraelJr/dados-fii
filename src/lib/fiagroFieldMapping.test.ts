@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapFiagroMonthlyRow } from "./fiagroFieldMapping.ts";
+import {
+  isMeaningfulFiagroFieldValue,
+  mapFiagroMonthlyRow,
+} from "./fiagroFieldMapping.ts";
 
 test("maps the official FIAGRO class fields used by VGIA11", () => {
   const mapped = mapFiagroMonthlyRow({
@@ -54,4 +57,12 @@ test("parses Brazilian decimal formatting when CVM changes representation", () =
   assert.equal(mapped.referenceDate, "2026-05-01");
   assert.equal(mapped.netWorth, 1027230341.97);
   assert.equal(mapped.vpCota, 9.69);
+});
+
+test("treats KNCA11 subclass zeros as unavailable, not conflicting values", () => {
+  assert.equal(isMeaningfulFiagroFieldValue("sharesOutstanding", 0), false);
+  assert.equal(isMeaningfulFiagroFieldValue("vpCota", "0.00"), false);
+  assert.equal(isMeaningfulFiagroFieldValue("sharesOutstanding", 21599919), true);
+  assert.equal(isMeaningfulFiagroFieldValue("vpCota", 100.77), true);
+  assert.equal(isMeaningfulFiagroFieldValue("delinquentCreditValue", 0), true);
 });
