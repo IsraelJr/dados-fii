@@ -24,9 +24,7 @@ function sha256(value: unknown) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as Record<string, any>));
-  if (!isAdminAuthorized(req, body)) {
-    return reply({ ok: false, error: "Não autorizado." }, 401);
-  }
+  if (!isAdminAuthorized(req, body)) return reply({ ok: false, error: "Não autorizado." }, 401);
 
   try {
     const runId = String(body?.runId || "").trim();
@@ -41,22 +39,14 @@ export async function POST(req: NextRequest) {
 
     const result = await adminDb.runTransaction(async (transaction) => {
       const prePublicationSnapshot = await transaction.get(prePublicationRef);
-      if (!prePublicationSnapshot.exists) {
-        throw new Error("Pacote de pré-publicação não encontrado.");
-      }
+      if (!prePublicationSnapshot.exists) throw new Error("Pacote de pré-publicação não encontrado.");
 
       const prePublication = (prePublicationSnapshot.data() || {}) as Record<string, any>;
       const ticker = normalizeIngestionTicker(prePublication.ticker);
       const expectedConfirmation = `APROVAR ${ticker}`;
-      if (!ticker || confirmationText !== expectedConfirmation) {
-        throw new Error(`Digite exatamente: ${expectedConfirmation}`);
-      }
-      if (prePublication.canProceedToHumanReview !== true) {
-        throw new Error("O pacote não está liberado para revisão humana.");
-      }
-      if (prePublication.canPublishToOfficialBase !== false) {
-        throw new Error("O bloqueio de publicação não pôde ser comprovado.");
-      }
+      if (!ticker || confirmationText !== expectedConfirmation) throw new Error(`Digite exatamente: ${expectedConfirmation}`);
+      if (prePublication.canProceedToHumanReview !== true) throw new Error("O pacote não está liberado para revisão humana.");
+      if (prePublication.canPublishToOfficialBase !== false) throw new Error("O bloqueio de publicação não pôde ser comprovado.");
       if (prePublication.safeguards?.qaScore !== 100
         || prePublication.safeguards?.qaVerdict !== "approved_for_human_review") {
         throw new Error("O pacote não possui QA 100 aprovado.");
@@ -64,18 +54,16 @@ export async function POST(req: NextRequest) {
 
       const officialRef = adminDb.collection("Fiis").doc(ticker);
       const [officialSnapshot, approvalSnapshot, backupSnapshot] = await Promise.all([
-        transaction.get(officialRef),
-        transaction.get(approvalRef),
-        transaction.get(backupRef),
+        transaction.get(officialRef), transaction.get(approvalRef), transaction.get(backupRef),
       ]);
       const proposal = prePublication.proposedRegulatoryData;
       const proposalHash = sha256(proposal);
+      const officialData = (officialSnapshot.data() || {}) as Record<string, any>;
+      const currentDocumentHash = sha256(officialSnapshot.exists ? officialData : null);
 
       if (approvalSnapshot.exists) {
         const approval = (approvalSnapshot.data() || {}) as Record<string, any>;
-        if (approval.proposalHash !== proposalHash) {
-          throw new Error("Já existe aprovação para outra versão deste pacote.");
-        }
+        if (approval.proposalHash !== proposalHash) throw new Error("Já existe aprovação para outra versão deste pacote.");
         if (!backupSnapshot.exists) {
           throw new Error("A aprovação existe, mas o backup imutável está ausente. Publicação bloqueada; revisão manual necessária.");
         }
@@ -83,23 +71,18 @@ export async function POST(req: NextRequest) {
         if (backup.proposalHash !== proposalHash || backup.status !== "immutable_backup_pending_publication") {
           throw new Error("A aprovação e o backup existente não formam um estado íntegro para publicação.");
         }
-        return {
-          ticker,
-          proposalHash,
-          alreadyApproved: true,
-          backupCreated: true,
-        };
+        if (String(backup.originalDocumentHash || "") !== currentDocumentHash) {
+          throw new Error("A aprovação permanece registrada, mas a base oficial mudou após o backup. Gere novo pacote.");
+        }
+        return { ticker, proposalHash, alreadyApproved: true, backupCreated: true, officialStateUnchanged: true };
       }
 
-      const officialData = (officialSnapshot.data() || {}) as Record<string, any>;
       const currentRegulatoryData = officialData.regulatoryData || null;
       const reviewedRegulatoryData = prePublication.existingRegulatoryData || null;
       if (stableRegulatoryJson(currentRegulatoryData) !== stableRegulatoryJson(reviewedRegulatoryData)) {
         throw new Error("A base oficial mudou após a pré-publicação. Gere um novo pacote para revisão.");
       }
-      if (backupSnapshot.exists) {
-        throw new Error("Já existe um backup sem aprovação correspondente. Revisão manual necessária.");
-      }
+      if (backupSnapshot.exists) throw new Error("Já existe um backup sem aprovação correspondente. Revisão manual necessária.");
 
       transaction.set(backupRef, {
         runId,
@@ -108,7 +91,7 @@ export async function POST(req: NextRequest) {
         originalDocumentExists: officialSnapshot.exists,
         originalDocument: officialSnapshot.exists ? officialData : null,
         originalRegulatoryData: currentRegulatoryData,
-        originalDocumentHash: sha256(officialSnapshot.exists ? officialData : null),
+        originalDocumentHash: currentDocumentHash,
         proposalHash,
         status: "immutable_backup_pending_publication",
         officialWritePerformed: false,
@@ -151,12 +134,7 @@ export async function POST(req: NextRequest) {
         updatedAt: adminFieldValue.serverTimestamp(),
       }, { merge: true });
 
-      return {
-        ticker,
-        proposalHash,
-        alreadyApproved: false,
-        backupCreated: true,
-      };
+      return { ticker, proposalHash, alreadyApproved: false, backupCreated: true, officialStateUnchanged: true };
     });
 
     return reply({
@@ -173,11 +151,6 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     const message = error?.message || "Falha ao registrar aprovação humana.";
     const status = message.includes("mudou após") || message.includes("estado íntegro") || message.includes("backup imutável") ? 409 : 400;
-    return reply({
-      ok: false,
-      error: message,
-      officialWritePerformed: false,
-      canPublishToOfficialBase: false,
-    }, status);
+    return reply({ ok: false, error: message, officialWritePerformed: false, canPublishToOfficialBase: false }, status);
   }
 }
