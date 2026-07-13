@@ -10,7 +10,7 @@ import {
   getIngestionFundConfig,
   SUPPORTED_INGESTION_TICKERS,
 } from "@/lib/fiiIngestionConfig";
-import { fiiIngestionWorkflow } from "@/workflows/tgar11Ingestion";
+import { fundIngestionWorkflow } from "@/workflows/fundIngestion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   let ticker: string;
   try {
-    ticker = assertSupportedIngestionTicker(body?.ticker || "TGAR11");
+    ticker = assertSupportedIngestionTicker(body?.ticker);
   } catch (error: any) {
     return NextResponse.json({
       ok: false,
@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
       delayMinutes,
       enableAi,
       mode: "operational_staging",
+      workflowVersion: 3,
       publishToOfficialBase: false,
       requestedBy: session?.user || "legacy-admin-secret",
       status: delayMinutes > 0 ? "scheduled" : "queued",
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
       updatedAt: adminFieldValue.serverTimestamp(),
     });
 
-    const workflowRun = await start(fiiIngestionWorkflow, [{
+    const workflowRun = await start(fundIngestionWorkflow, [{
       runId,
       ticker,
       cnpj,
@@ -118,6 +119,7 @@ export async function POST(req: NextRequest) {
       delayMinutes,
       enableAi,
       mode: "operational_staging",
+      workflowVersion: 3,
       status: delayMinutes > 0 ? "scheduled" : "queued",
       publishToOfficialBase: false,
       qaUrl: `/api/admin/fii-ingestion/operational-qa?runId=${encodeURIComponent(runId)}&persist=1`,
