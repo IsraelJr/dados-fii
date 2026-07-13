@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "private, no-store", "Content-Type": "application/json; charset=utf-8" };
-const LOCK_TTL_MS = 48 * 60 * 60 * 1000;
+const LOCK_LEASE_MINUTES = 60;
 
 function reply(payload: unknown, status = 200) {
   return NextResponse.json(payload, { status, headers: NO_STORE });
@@ -36,6 +36,10 @@ function integerInRange(value: unknown, fallback: number, minimum: number, maxim
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) return null;
   return parsed;
+}
+
+function leaseExpiresAt(delayMinutes = 0) {
+  return new Date(Date.now() + (delayMinutes + LOCK_LEASE_MINUTES) * 60 * 1000).toISOString();
 }
 
 export async function POST(req: NextRequest) {
@@ -71,8 +75,6 @@ export async function POST(req: NextRequest) {
   const runRef = adminDb.collection("FiiIngestionRuns").doc(runId);
   const lockRef = adminDb.collection("FiiIngestionActiveRuns").doc(ticker);
   const session = readAdminSession(req);
-  const now = new Date();
-  const lockExpiresAt = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
 
   try {
     await adminDb.runTransaction(async (transaction) => {
@@ -111,65 +113,99 @@ export async function POST(req: NextRequest) {
         ticker,
         runId,
         status: delayMinutes > 0 ? "scheduled" : "queued",
+        currentStep: delayMinutes > 0 ? "waiting" : "queued",
         createdAt: adminFieldValue.serverTimestamp(),
         updatedAt: adminFieldValue.serverTimestamp(),
-        expiresAt: lockExpiresAt,
+        heartbeatAt: adminFieldValue.serverTimestamp(),
+        expiresAt: leaseExpiresAt(delayMinutes),
       }, { merge: false });
     });
+  } catch (error: any) {
+    const status = Number(error?.status) === 409 ? 409 : 500;
+    return reply({
+      ok: false,
+      runId: status === 409 ? error?.activeRunId || null : runId,
+      status: status === 409 ? error?.activeStatus || null : undefined,
+      error: error?.message || "Falha ao reservar a execução.",
+    }, status);
+  }
 
+  let workflowRunId: string | null = null;
+  try {
     const workflowRun = await start(fundIngestionWorkflow, [{ runId, ticker, cnpj, year, delayMinutes, enableAi }]);
+    workflowRunId = workflowRun.runId;
+  } catch (error: any) {
+    await Promise.all([
+      runRef.set({
+        status: "failed",
+        currentStep: "workflow_start_failed",
+        error: error?.message || "Falha ao iniciar workflow.",
+        finishedAt: adminFieldValue.serverTimestamp(),
+        updatedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: true }).catch(() => undefined),
+      adminDb.runTransaction(async (transaction) => {
+        const lockSnapshot = await transaction.get(lockRef);
+        if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) transaction.delete(lockRef);
+      }).catch(() => undefined),
+    ]);
+    return reply({ ok: false, runId, error: error?.message || "Falha ao iniciar workflow." }, 500);
+  }
+
+  try {
     await adminDb.runTransaction(async (transaction) => {
       const lockSnapshot = await transaction.get(lockRef);
       if (!lockSnapshot.exists || lockSnapshot.data()?.runId !== runId) {
         throw new Error("A trava da ingestão mudou durante a inicialização do workflow.");
       }
-      transaction.set(runRef, { workflowRunId: workflowRun.runId, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true });
-      transaction.set(lockRef, {
-        workflowRunId: workflowRun.runId,
-        status: delayMinutes > 0 ? "scheduled" : "queued",
+      transaction.set(runRef, {
+        workflowRunId,
+        workflowStartConfirmed: true,
         updatedAt: adminFieldValue.serverTimestamp(),
       }, { merge: true });
-    });
-
-    return reply({
-      ok: true,
-      runId,
-      workflowRunId: workflowRun.runId,
-      ticker,
-      fundType,
-      adapterId,
-      year,
-      delayMinutes,
-      enableAi,
-      mode: "operational_staging",
-      workflowVersion: 3,
-      status: delayMinutes > 0 ? "scheduled" : "queued",
-      publishToOfficialBase: false,
-      qaUrl: `/api/admin/fii-ingestion/operational-qa?runId=${encodeURIComponent(runId)}&persist=1`,
+      transaction.set(lockRef, {
+        workflowRunId,
+        status: delayMinutes > 0 ? "scheduled" : "queued",
+        currentStep: delayMinutes > 0 ? "waiting" : "queued",
+        heartbeatAt: adminFieldValue.serverTimestamp(),
+        updatedAt: adminFieldValue.serverTimestamp(),
+        expiresAt: leaseExpiresAt(delayMinutes),
+      }, { merge: true });
     });
   } catch (error: any) {
-    const status = Number(error?.status) === 409 ? 409 : 500;
-    if (status !== 409) {
-      await Promise.all([
-        runRef.set({
-          status: "failed",
-          currentStep: "start_failed",
-          error: error?.message || "Falha ao iniciar workflow.",
-          finishedAt: adminFieldValue.serverTimestamp(),
-          updatedAt: adminFieldValue.serverTimestamp(),
-        }, { merge: true }).catch(() => undefined),
-        adminDb.runTransaction(async (transaction) => {
-          const lockSnapshot = await transaction.get(lockRef);
-          if (lockSnapshot.exists && lockSnapshot.data()?.runId === runId) transaction.delete(lockRef);
-        }).catch(() => undefined),
-      ]);
-    }
-
+    // O workflow já foi iniciado. O lock deve permanecer para impedir uma execução concorrente.
+    await runRef.set({
+      workflowRunId,
+      workflowStartConfirmed: true,
+      status: "workflow_started_metadata_pending",
+      currentStep: "workflow_started_metadata_pending",
+      metadataPersistenceError: error?.message || "Falha ao persistir metadados do workflow iniciado.",
+      updatedAt: adminFieldValue.serverTimestamp(),
+    }, { merge: true }).catch(() => undefined);
     return reply({
-      ok: false,
-      runId: status === 409 ? error?.activeRunId || null : runId,
-      status: status === 409 ? error?.activeStatus || null : undefined,
-      error: error?.message || "Falha ao iniciar workflow.",
-    }, status);
+      ok: true,
+      warning: "Workflow iniciado, mas os metadados ainda precisam ser reconciliados. A trava foi preservada.",
+      runId,
+      workflowRunId,
+      ticker,
+      status: "workflow_started_metadata_pending",
+      publishToOfficialBase: false,
+    }, 202);
   }
+
+  return reply({
+    ok: true,
+    runId,
+    workflowRunId,
+    ticker,
+    fundType,
+    adapterId,
+    year,
+    delayMinutes,
+    enableAi,
+    mode: "operational_staging",
+    workflowVersion: 3,
+    status: delayMinutes > 0 ? "scheduled" : "queued",
+    publishToOfficialBase: false,
+    qaUrl: `/api/admin/fii-ingestion/operational-qa?runId=${encodeURIComponent(runId)}&persist=1`,
+  });
 }
