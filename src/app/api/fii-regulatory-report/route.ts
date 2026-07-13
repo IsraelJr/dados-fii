@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     if (!result.found) {
       return NextResponse.json({ ok: false, found: false, ticker: result.ticker }, { status: 404 });
     }
-    if (!result.reportAvailable || !result.insights || !result.fund) {
+    if (!result.reportAvailable || !result.insights || !result.fund || !result.timeline) {
       return NextResponse.json({
         ok: true,
         found: true,
@@ -49,11 +49,17 @@ export async function GET(req: NextRequest) {
         publication: result.fund.regulatoryData?.publication,
       },
       report: result.insights.freeReport,
-      scores: {
-        overall: result.insights.scores.overall,
-        dataQuality: result.insights.scores.dataQuality,
-        stability: result.insights.scores.stability,
-        risk: result.insights.scores.risk,
+      scores: result.insights.scores,
+      scoreMeta: {
+        methodologyVersion: result.insights.methodologyVersion,
+        semaphore: result.insights.semaphore,
+        assessedDimensions: result.insights.assessedDimensions,
+        unavailableDimensions: result.insights.unavailableDimensions,
+      },
+      timeline: {
+        version: result.timeline.version,
+        counts: result.timeline.counts,
+        groups: result.timeline.groups,
       },
       methodology: result.insights.generatedBy,
     }, {
