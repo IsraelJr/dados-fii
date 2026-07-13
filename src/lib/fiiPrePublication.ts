@@ -33,6 +33,15 @@ function textOrNull(value: unknown) {
 }
 
 export function sanitizeRegulatoryMonthlySnapshot(item: MonthlySnapshotInput): RegulatoryMonthlySnapshot {
+  const rawSourceFiles: unknown[] = Array.isArray(item.source?.files) ? item.source.files : [];
+  const sourceFiles: string[] = Array.from(
+    new Set<string>(
+      rawSourceFiles
+        .map((value) => String(value).trim())
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
   return {
     referenceDate: String(item.referenceDate || "").trim(),
     cnpj: String(item.cnpj || "").replace(/\D/g, ""),
@@ -43,9 +52,7 @@ export function sanitizeRegulatoryMonthlySnapshot(item: MonthlySnapshotInput): R
     vpCota: finiteNumber(item.vpCota),
     totalPortfolioValue: finiteNumber(item.totalPortfolioValue),
     delinquentCreditValue: finiteNumber(item.delinquentCreditValue),
-    sourceFiles: Array.isArray(item.source?.files)
-      ? [...new Set(item.source.files.map((value: unknown) => String(value)).filter(Boolean))]
-      : [],
+    sourceFiles,
   };
 }
 
