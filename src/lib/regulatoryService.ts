@@ -1,6 +1,9 @@
 import { adminDb } from "@/lib/firebaseAdmin";
 import { normalizeIngestionTicker } from "@/lib/fiiIngestionConfig";
-import { buildRegulatoryInsights } from "@/lib/regulatoryInsights";
+import {
+  buildRegulatoryInsights,
+  type RegulatoryInsightSnapshot,
+} from "@/lib/regulatoryInsights";
 
 export type RegulatoryDataDocument = {
   source?: string;
@@ -47,10 +50,19 @@ export type RegulatoryReportResult = {
   insights: ReturnType<typeof buildRegulatoryInsights> | null;
 };
 
-function sortMonthly(items: Array<Record<string, any>>) {
+function sortMonthly(items: Array<Record<string, any>>): RegulatoryInsightSnapshot[] {
   return [...items]
     .filter((item) => String(item?.referenceDate || "").trim())
-    .sort((left, right) => String(left.referenceDate).localeCompare(String(right.referenceDate)));
+    .map((item) => ({
+      referenceDate: String(item.referenceDate),
+      netWorth: item.netWorth,
+      sharesOutstanding: item.sharesOutstanding,
+      numberShareholders: item.numberShareholders,
+      vpCota: item.vpCota,
+      totalPortfolioValue: item.totalPortfolioValue,
+      delinquentCreditValue: item.delinquentCreditValue,
+    }))
+    .sort((left, right) => left.referenceDate.localeCompare(right.referenceDate));
 }
 
 function sortDocuments(items: Array<Record<string, any>>) {
