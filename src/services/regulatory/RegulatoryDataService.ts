@@ -1,15 +1,15 @@
-import { normalizeIngestionTicker } from "@/lib/fiiIngestionConfig";
-import { buildRegulatoryInsights } from "@/lib/regulatoryInsights";
-import { buildRegulatoryTimeline } from "@/lib/regulatoryTimeline";
-import { InvalidTickerError } from "./RegulatoryErrors";
-import { RegulatoryCache, regulatoryCacheTtlMs } from "./RegulatoryCache";
-import { isPublishedRegulatoryData, normalizeFundDocument } from "./RegulatoryNormalizer";
-import type { RegulatoryRepository } from "./RegulatoryRepository";
+import { normalizeIngestionTicker } from "../../lib/fiiIngestionConfig.ts";
+import { buildRegulatoryInsights } from "../../lib/regulatoryInsights.ts";
+import { buildRegulatoryTimeline } from "../../lib/regulatoryTimeline.ts";
+import { InvalidTickerError } from "./RegulatoryErrors.ts";
+import { RegulatoryCache, regulatoryCacheTtlMs } from "./RegulatoryCache.ts";
+import { isPublishedRegulatoryData, normalizeFundDocument } from "./RegulatoryNormalizer.ts";
+import type { RegulatoryRepository } from "./RegulatoryRepository.ts";
 import type {
   RegulatoryFundResult,
   RegulatoryFundView,
   RegulatoryReportResult,
-} from "./RegulatoryTypes";
+} from "./RegulatoryTypes.ts";
 
 type RegulatoryDataServiceOptions = {
   repository?: RegulatoryRepository;
@@ -19,7 +19,7 @@ type RegulatoryDataServiceOptions = {
 function lazyFirestoreRepository(): RegulatoryRepository {
   return {
     async getFundDocument(ticker: string) {
-      const { FirestoreRegulatoryRepository } = await import("./RegulatoryRepository");
+      const { FirestoreRegulatoryRepository } = await import("./RegulatoryRepository.ts");
       return new FirestoreRegulatoryRepository().getFundDocument(ticker);
     },
   };
