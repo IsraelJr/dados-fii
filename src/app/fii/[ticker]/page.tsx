@@ -5,6 +5,8 @@ import PageHeader from "../../components/PageHeader";
 import WalletQuickAddButton from "../../components/WalletQuickAddButton";
 import FiiAlert from "../../components/FiiAlert";
 import RegulatoryTimeline from "../../components/RegulatoryTimeline";
+import FreeFundReport from "../../components/FreeFundReport";
+import AIInsightsPanel from "../../components/AIInsightsPanel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -204,11 +206,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function FiiPage({ params }: PageProps) {
   const ticker = await getTicker(params);
-  const [data, newsData, timelineData] = ticker ? await Promise.all([
+  const [data, newsData, timelineData, freeReportData] = ticker ? await Promise.all([
     fetchJson(`/api/fii?ticker=${encodeURIComponent(ticker)}`),
     fetchJson(`/api/fii-news?ticker=${encodeURIComponent(ticker)}`),
     fetchJson(`/api/fii/${encodeURIComponent(ticker)}/timeline?limit=30`),
-  ]) : [null, null, null];
+    fetchJson(`/api/fii/${encodeURIComponent(ticker)}/report/free`),
+  ]) : [null, null, null, null];
   const news: NewsItem[] = Array.isArray(newsData?.news)
     ? [...newsData.news]
       .sort((a: NewsItem, b: NewsItem) => newsTimestamp(b.publishedAt) - newsTimestamp(a.publishedAt))
@@ -318,6 +321,10 @@ export default async function FiiPage({ params }: PageProps) {
               )}
             </InfoCard>
           </section>
+
+          <FreeFundReport report={freeReportData?.report || null} />
+
+          <AIInsightsPanel ticker={ticker} />
 
           <RecentNews ticker={ticker} news={news} />
 

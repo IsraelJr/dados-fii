@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
+import { aiInsightsEngine } from "@/lib/ai/AIInsightsEngine";
 import {
   buildFiiRiskReportMessages,
   FII_RISK_REPORT_PROMPT_VERSION,
@@ -365,64 +366,6 @@ async function buildPortfolioInput(wallet: WalletItem[]) {
   };
 }
 
-async function callOpenAI(messages: ReturnType<typeof buildFiiRiskReportMessages>) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY não configurada.");
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_RISK_REPORT_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      input: messages,
-      temperature: 0.2,
-      max_output_tokens: Number(process.env.OPENAI_RISK_REPORT_MAX_OUTPUT_TOKENS || 9000),
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    let parsed: any = null;
-
-    try {
-      parsed = detail ? JSON.parse(detail) : null;
-    } catch {
-      parsed = null;
-    }
-
-    console.error("OpenAI risk report error:", response.status, detail);
-
-    if (response.status === 429 && parsed?.error?.code === "insufficient_quota") {
-      throw Object.assign(
-        new Error("A geração do relatório está temporariamente indisponível porque a chave da OpenAI está sem créditos/cota. Verifique o billing do projeto na OpenAI ou troque a OPENAI_API_KEY."),
-        { status: 503, code: "OPENAI_INSUFFICIENT_QUOTA" }
-      );
-    }
-
-    if (response.status === 429) {
-      throw Object.assign(
-        new Error("A OpenAI recusou a geração por limite de uso. Tente novamente mais tarde ou verifique os limites do projeto."),
-        { status: 503, code: "OPENAI_RATE_LIMIT" }
-      );
-    }
-
-    throw new Error("Não foi possível gerar o relatório agora.");
-  }
-
-  const payload = await response.json();
-  if (typeof payload?.output_text === "string") return payload.output_text.trim();
-
-  const texts = payload?.output
-    ?.flatMap((item: any) => item?.content || [])
-    ?.map((content: any) => content?.text)
-    ?.filter(Boolean);
-
-  return Array.isArray(texts) ? texts.join("\n").trim() : "";
-}
-
 async function reserveReport(reportRef: any, metadata: Record<string, any>) {
   await adminDb.runTransaction(async (transaction) => {
     const snap: any = await transaction.get(reportRef);
@@ -523,7 +466,14 @@ export async function POST(req: Request) {
     };
 
     const messages = buildFiiRiskReportMessages(reportInput);
-    const reportMarkdown = await callOpenAI(messages);
+    const generation = await aiInsightsEngine.generateText({
+      purpose: "wallet-risk-report",
+      promptVersion: FII_RISK_REPORT_PROMPT_VERSION,
+      input: messages,
+      model: process.env.OPENAI_RISK_REPORT_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      maxOutputTokens: Number(process.env.OPENAI_RISK_REPORT_MAX_OUTPUT_TOKENS || 9000),
+    });
+    const reportMarkdown = generation.text;
 
     if (!reportMarkdown) throw new Error("A IA retornou um relatório vazio.");
 
@@ -534,7 +484,9 @@ export async function POST(req: Request) {
       portfolio,
       portfolioHash: walletHash,
       promptVersion: FII_RISK_REPORT_PROMPT_VERSION,
-      model: process.env.OPENAI_RISK_REPORT_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      model: generation.metadata.model,
+      aiEngineVersion: generation.metadata.engineVersion,
+      aiFingerprint: generation.metadata.fingerprint,
       finishedAt: adminFieldValue.serverTimestamp(),
       updatedAt: adminFieldValue.serverTimestamp(),
     }, { merge: true });

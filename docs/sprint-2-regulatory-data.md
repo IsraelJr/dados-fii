@@ -1,6 +1,6 @@
-# Fase 2 — Sprints 2.1 a 2.6
+# Fase 2 — Sprints 2.1 a 2.8
 
-Este documento segue o `DADOS_FII_HANDOFF.md` v2.2.0. A implementação avança na ordem canônica até o Dashboard Administrativo e a Timeline Regulatória.
+Este documento segue o `DADOS_FII_HANDOFF.md` v2.3.0. A implementação avança na ordem canônica até o Relatório Gratuito e o AI Insights Engine.
 
 ## Sprint 2.1 — RegulatoryDataService
 
@@ -114,6 +114,34 @@ ticker, type, title, summary, occurredAt, publishedAt,
 url, source, documentNumber, version, metadata
 ```
 
+## Sprint 2.7 — Relatório Gratuito
+
+`GET /api/fii/{ticker}/report/free` gera um relatório determinístico e cacheável, sem IA e sem acesso direto ao Firestore. O `RegulatoryDataService` reúne o fundo publicado, os sete scores e os cinco eventos regulatórios mais recentes; o `FreeReportEngine` transforma essa base em:
+
+- identidade e indicadores essenciais;
+- scores com nota e confiança;
+- pontos favoráveis e pontos de atenção explicáveis;
+- qualidade, erros, alertas e rastreabilidade;
+- eventos regulatórios usados na leitura;
+- metodologia e avisos de uso.
+
+O relatório é derivado em tempo de leitura e nunca é gravado manualmente. A página `/fii/{ticker}` apresenta o relatório automaticamente. Conteúdo com baixa confiança é sinalizado e o relatório não produz recomendação de investimento.
+
+## Sprint 2.8 — AI Insights Engine
+
+O `AIInsightsEngine` é o único componente autorizado a chamar o provedor de IA. Ele recebe o Relatório Gratuito sanitizado e retorna um contrato estruturado com:
+
+- resumo executivo;
+- mudanças;
+- riscos;
+- oportunidades para acompanhamento;
+- alertas;
+- explicação em linguagem simples.
+
+`GET /api/fii/{ticker}/insights` gera os insights sob demanda. A implementação inclui JSON Schema estrito, versionamento do prompt, fingerprint estável, cache LRU com TTL, deduplicação de requisições simultâneas, rate limiting por origem, timeout e erros normalizados. O prompt trata textos regulatórios como dados não confiáveis, proíbe fatos inventados e não permite recomendação de compra, venda ou manutenção.
+
+A rota legada `POST /api/fii-summary` foi mantida como contrato de compatibilidade, mas agora delega ao `RegulatoryDataService` e ao AI Insights Engine. O relatório de risco da carteira também usa `AIInsightsEngine.generateText`; nenhuma API acessa OpenAI ou Perplexity diretamente.
+
 ## Variáveis de ambiente
 
 ```text
@@ -121,15 +149,22 @@ ADMIN_EMAILS=admin1@dominio.com,admin2@dominio.com
 ENABLE_SCORE_ENGINE=true
 ENABLE_SYSTEM_VALIDATION=true
 ENABLE_HEALTH_MONITOR=true
-ENABLE_AI_INSIGHTS=false
+ENABLE_AI_INSIGHTS=true
 ENABLE_REPORT_PREMIUM=false
 REGULATORY_CACHE_TTL_MS=300000
 REGULATORY_MARKET_CACHE_TTL_MS=60000
 REGULATORY_CACHE_MAX_ENTRIES=500
+AI_INSIGHTS_CACHE_TTL_MS=21600000
+AI_INSIGHTS_CACHE_MAX_ENTRIES=250
+AI_INSIGHTS_RATE_WINDOW_MS=600000
+AI_INSIGHTS_RATE_MAX_REQUESTS=30
+OPENAI_INSIGHTS_MODEL=gpt-4.1-mini
+OPENAI_INSIGHTS_MAX_OUTPUT_TOKENS=1800
+OPENAI_TIMEOUT_MS=120000
 ```
 
-Score, Health e Validation ficam ativos por padrão e aceitam opt-out explícito com `false`. Os flags de IA e Premium permanecem reservados às suas sprints canônicas.
+Os recursos aceitam opt-out explícito com `false`. `ENABLE_AI_INSIGHTS=true` requer `OPENAI_API_KEY`; o modelo pode ser substituído sem alterar APIs consumidoras. Premium permanece desabilitado até a Sprint 2.9.
 
 ## Verificação
 
-`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, publicação segura, scores, Health, Validation, os cards do Dashboard e a Timeline com cinco categorias, paginação, deduplicação e URLs seguras.
+`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, publicação segura, scores, Health, Validation, Dashboard, Timeline, Relatório Gratuito determinístico e AI Insights estruturado com reutilização de cache.

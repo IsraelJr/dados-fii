@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { aiInsightsEngine, type AIInsightsEngine } from "@/lib/ai/AIInsightsEngine";
 import { featureEnabled } from "@/lib/featureFlags";
 import { healthEngine, type HealthEngine } from "@/lib/health/HealthEngine";
 import { RegulatoryCache, positiveInt } from "@/lib/regulatory/RegulatoryCache";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/regulatory/RegulatoryTypes";
 import { validateRegulatoryFund } from "@/lib/regulatory/RegulatoryValidator";
 import { scoreEngine, type ScoreEngine } from "@/lib/scores/ScoreEngine";
+import { freeReportEngine, type FreeReportEngine } from "@/lib/reports/FreeReportEngine";
 import { ValidationRunner } from "@/lib/validation/ValidationRunner";
 import type {
   MarketQuote,
@@ -31,6 +33,8 @@ import type {
   ValidationRun,
 } from "@/types/regulatory";
 import type { RegulatoryTimelineResponse, RegulatoryTimelineType } from "@/types/timeline";
+import type { FreeFundReport } from "@/types/reports";
+import type { FundAIInsights } from "@/types/ai-insights";
 
 const FUND_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_CACHE_TTL_MS, 5 * 60_000);
 const MARKET_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_MARKET_CACHE_TTL_MS, 60_000);
@@ -59,6 +63,8 @@ export class RegulatoryDataService {
     private readonly scores: ScoreEngine = scoreEngine,
     private readonly health: HealthEngine = healthEngine,
     private readonly timeline: RegulatoryTimeline = regulatoryTimeline,
+    private readonly freeReports: FreeReportEngine = freeReportEngine,
+    private readonly aiInsights: AIInsightsEngine = aiInsightsEngine,
   ) {
     this.validationRunner = new ValidationRunner({ canonicalFrom, normalizeTicker, validateFund: validateRegulatoryFund, now: nowIso });
   }
@@ -235,6 +241,23 @@ export class RegulatoryDataService {
       cursor: options?.cursor,
       generatedAt: nowIso(),
     });
+  }
+
+  async getFreeReport(value: unknown): Promise<FreeFundReport | null> {
+    const ticker = normalizeTicker(value);
+    if (!ticker) return null;
+    const [fund, timeline] = await Promise.all([
+      this.getByTicker(ticker),
+      this.getTimeline(ticker, { limit: 5 }),
+    ]);
+    if (!fund) return null;
+    return this.freeReports.generate(fund, timeline, nowIso());
+  }
+
+  async getAIInsights(value: unknown, options?: { requestKey?: string | null }): Promise<FundAIInsights | null> {
+    const report = await this.getFreeReport(value);
+    if (!report) return null;
+    return this.aiInsights.generateFundInsights(report, { requestKey: options?.requestKey });
   }
 
   async publish(ticker: unknown, patch: Record<string, unknown>, authorization: PublicationAuthorization) {

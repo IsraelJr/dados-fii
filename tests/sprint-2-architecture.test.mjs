@@ -148,6 +148,42 @@ test("Sprint 2.6 timeline flows through RegulatoryDataService and covers five ca
   assert.match(page, /RegulatoryTimeline/);
 });
 
+test("Sprint 2.7 generates the free report through the consolidated service", () => {
+  const route = read("src/app/api/fii/[ticker]/report/free/route.ts");
+  const service = read("src/lib/regulatoryDataService.ts");
+  const engine = read("src/lib/reports/FreeReportEngine.ts");
+  const page = read("src/app/fii/[ticker]/page.tsx");
+  assert.match(route, /regulatoryDataService\.getFreeReport/);
+  assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
+  assert.match(service, /async getFreeReport/);
+  assert.match(service, /this\.freeReports\.generate/);
+  assert.match(engine, /class FreeReportEngine/);
+  assert.match(engine, /ScoreEngine/);
+  assert.match(engine, /Conteúdo informativo/);
+  assert.match(page, /FreeFundReport/);
+});
+
+test("Sprint 2.8 centralizes all provider calls in AI Insights Engine", () => {
+  const engine = read("src/lib/ai/AIInsightsEngine.ts");
+  const route = read("src/app/api/fii/[ticker]/insights/route.ts");
+  const compatibility = read("src/app/api/fii-summary/route.ts");
+  const walletReport = read("src/app/api/wallet-risk-report/route.ts");
+  const page = read("src/app/fii/[ticker]/page.tsx");
+  for (const field of ["executiveSummary", "changes", "risks", "opportunities", "alerts", "plainLanguage"]) {
+    assert.match(engine, new RegExp(field));
+  }
+  assert.match(engine, /ENABLE_AI_INSIGHTS/);
+  assert.match(engine, /RegulatoryCache/);
+  assert.match(engine, /json_schema/);
+  assert.match(route, /regulatoryDataService\.getAIInsights/);
+  assert.match(compatibility, /regulatoryDataService\.getAIInsights/);
+  assert.match(walletReport, /aiInsightsEngine\.generateText/);
+  for (const api of [route, compatibility, walletReport]) {
+    assert.doesNotMatch(api, /api\.openai\.com|api\.perplexity\.ai|OPENAI_API_KEY|PERPLEXITY_API_KEY/);
+  }
+  assert.match(page, /AIInsightsPanel/);
+});
+
 test("legacy observability no longer accepts admin secrets", () => {
   const route = read("src/app/api/admin/observability/route.ts");
   assert.doesNotMatch(route, /ADMIN_UPDATE_SECRET|CRON_SECRET|x-admin-secret|searchParams\.get\("secret"\)/);
