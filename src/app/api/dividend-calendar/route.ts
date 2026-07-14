@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebaseAdmin";
+import { regulatoryDataService } from "@/lib/regulatoryDataService";
 
 export const runtime = "nodejs";
 export const revalidate = 21600;
@@ -99,12 +99,11 @@ export async function GET(req: Request) {
     const activeWeek = activeWeekWindow(todayKey);
     const recentStartKey = addDaysKey(todayKey, -7);
 
-    const snapshot = await adminDb.collection("Fiis").limit(limit).get();
+    const funds = await regulatoryDataService.listFunds(limit, { includeMarket: false, includeScores: false });
     const events: any[] = [];
 
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data() || {};
-      const ticker = String(data.code || doc.id || "").toUpperCase();
+    funds.forEach((data) => {
+      const ticker = String(data.code || data.ticker || "").toUpperCase();
       const earnings = data[`earnings${year}`] || {};
 
       Object.entries(earnings).forEach(([month, info]: any) => {

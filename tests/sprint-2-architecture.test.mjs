@@ -5,10 +5,22 @@ import test from "node:test";
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("public FII APIs delegate persistence and merge to RegulatoryDataService", () => {
-  for (const route of ["src/app/api/fii/route.ts", "src/app/api/fii/batch/route.ts"]) {
+  for (const route of ["src/app/api/fii/route.ts", "src/app/api/fii/batch/route.ts", "src/app/api/dividend-calendar/route.ts"]) {
     const source = read(route);
     assert.match(source, /regulatoryDataService/);
     assert.doesNotMatch(source, /firebase-admin|adminDb|\.collection\(/);
+  }
+});
+
+test("legacy reports no longer read regulatory Fiis directly", () => {
+  for (const route of [
+    "src/app/api/wallet-risk-report/route.ts",
+    "src/app/api/wallet-risk-report/manual-prompt/route.ts",
+    "src/app/api/admin/missing-cnpj/route.ts",
+  ]) {
+    const source = read(route);
+    assert.match(source, /regulatoryDataService/);
+    assert.doesNotMatch(source, /\.collection\(["']Fiis["']\)/);
   }
 });
 
@@ -35,17 +47,46 @@ test("admin session uses verified Firebase identity and HttpOnly cookie", () => 
   assert.match(security, /consumeAdminRateLimit/);
 });
 
-test("regulatory foundation contains merge, cache, validation, versioning and rollback", () => {
+test("Sprint 2.1 has separate service, repository, normalizer, validator, cache and types", () => {
   const service = read("src/lib/regulatoryDataService.ts");
+  const repository = read("src/lib/regulatory/RegulatoryRepository.ts");
+  const normalizer = read("src/lib/regulatory/RegulatoryNormalizer.ts");
+  const validator = read("src/lib/regulatory/RegulatoryValidator.ts");
+  const cache = read("src/lib/regulatory/RegulatoryCache.ts");
+  const regulatoryTypes = read("src/lib/regulatory/RegulatoryTypes.ts");
   const types = read("src/types/regulatory.ts");
   assert.match(types, /"FII" \| "FIAGRO" \| "FI_INFRA"/);
-  assert.match(service, /fundCache/);
+  assert.match(service, /RegulatoryRepository/);
+  assert.match(service, /RegulatoryCache/);
+  assert.doesNotMatch(service, /firebase-admin|adminDb|\.collection\(/);
+  assert.match(repository, /adminDb/);
+  assert.match(repository, /async publish/);
+  assert.match(repository, /async rollback/);
+  assert.match(repository, /transaction\.create\(backupRef/);
+  assert.match(repository, /approvalHash/);
+  assert.match(repository, /publicationHash/);
+  assert.match(normalizer, /PROTECTED_LEGACY_FIELDS/);
+  assert.match(normalizer, /\^earnings\\d\{4\}\$/);
+  assert.match(validator, /validateRegulatoryFund/);
+  assert.match(cache, /class RegulatoryCache/);
+  assert.match(regulatoryTypes, /RegulatoryFundBackups/);
   assert.match(service, /marketPromise/);
   assert.match(service, /async publish/);
   assert.match(service, /async rollback/);
   assert.match(service, /async runValidation/);
-  assert.match(service, /RegulatoryFundVersions/);
-  assert.match(service, /RegulatoryAuditLogs/);
+});
+
+test("Sprint 2.2 exposes one ScoreEngine with every required calculated score", () => {
+  const service = read("src/lib/regulatoryDataService.ts");
+  const engine = read("src/lib/scores/ScoreEngine.ts");
+  const types = read("src/types/scores.ts");
+  assert.match(service, /ENABLE_SCORE_ENGINE/);
+  assert.match(service, /this\.scores\.calculate\(publicData\)/);
+  assert.match(engine, /class ScoreEngine/);
+  for (const score of ["risk", "dividend", "governance", "growth", "liquidity", "quality", "premium"]) {
+    assert.match(types, new RegExp(`${score}: ScoreResult`));
+  }
+  assert.doesNotMatch(engine, /firebase-admin|adminDb|\.collection\(/);
 });
 
 test("legacy observability no longer accepts admin secrets", () => {

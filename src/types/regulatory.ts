@@ -1,3 +1,5 @@
+import type { FundScores } from "@/types/scores";
+
 export const REGULATORY_SCHEMA_VERSION = 1 as const;
 
 export type FundKind = "FII" | "FIAGRO" | "FI_INFRA" | "UNKNOWN";
@@ -56,6 +58,7 @@ export type PublicFundData = Record<string, unknown> & {
     sources: RegulatorySource[];
     validation: { valid: boolean; issues: ValidationIssue[] };
   };
+  scores?: FundScores;
 };
 
 export type ValidationFundResult = {

@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { regulatoryDataService } from "@/lib/regulatoryDataService";
 import {
   buildFiiRiskReportMessages,
   FII_RISK_REPORT_PROMPT_VERSION,
@@ -271,12 +272,8 @@ async function loadUser(body: any): Promise<LoadedUser> {
   return user;
 }
 
-async function getFiiDoc(ticker: string) {
-  const direct = await adminDb.collection("Fiis").doc(ticker).get();
-  if (direct.exists) return direct.data() || {};
-
-  const query = await adminDb.collection("Fiis").where("code", "==", ticker).limit(1).get();
-  return query.empty ? {} : query.docs[0].data() || {};
+async function getFiiDoc(ticker: string): Promise<Record<string, any>> {
+  return await regulatoryDataService.getByTicker(ticker) || {};
 }
 
 async function getSheetPrices() {

@@ -1,16 +1,27 @@
 # Fase 2 — Sprints 2.1 e 2.2
 
-## Sprint 2.1 — Foundation / RegulatoryDataService
+Este documento segue o `DADOS_FII_HANDOFF.md` v2.0.0. Na ordem canônica, a Sprint 2.2 é o Score Engine; Health, Validation e Dashboard pertencem às Sprints 2.3, 2.4 e 2.5.
 
-O `RegulatoryDataService` é o ponto único de leitura e escrita dos dados de fundos usados pelas rotas `/api/fii` e `/api/fii/batch`. Ele preserva os campos legados, normaliza FII, FIAGRO e FI-Infra, combina a base `Fiis`, o overlay regulatório versionado e as cotações da planilha.
+## Sprint 2.1 — RegulatoryDataService
 
-### Precedência do merge
+O `RegulatoryDataService` é o orquestrador único dos dados regulatórios consumidos pelas APIs. A implementação foi separada nos componentes previstos no handoff:
 
-1. Base legada `Fiis` para compatibilidade com os consumidores atuais.
-2. Overlay publicado em `RegulatoryFunds/{ticker}` para dados cadastrais e regulatórios.
-3. Planilha de cotações somente para preço, abertura, variação, mínima e máxima.
+- `RegulatoryRepository`: único componente da nova camada autorizado a acessar o Firestore;
+- `RegulatoryDataService`: composição, cache, cotações, validação e scores;
+- `RegulatoryNormalizer`: ticker, FII/FIAGRO/FI-Infra, rendimentos e merge seguro;
+- `RegulatoryValidator`: ticker, tipo, CNPJ, identificação, segmento e fontes;
+- `RegulatoryCache`: cache TTL limitado com política LRU;
+- `RegulatoryTypes`: coleções, contratos de publicação, rollback e registros.
 
-Os metadados `regulatoryMeta` informam versão, fontes, resultado da validação e hit/miss do cache. O cache de fundos tem TTL padrão de 5 minutos e o de cotações, 1 minuto. Publicação e rollback invalidam imediatamente a entrada afetada.
+### Precedência e proteção do merge
+
+1. A base legada `Fiis` preserva compatibilidade com os consumidores atuais.
+2. O overlay `RegulatoryFunds/{ticker}` acrescenta dados cadastrais e regulatórios.
+3. A planilha de cotações fornece somente preço, abertura, variação, mínima e máxima.
+
+Campos de identidade operacional, timestamps, cotações e `earningsYYYY` pertencem ao pipeline legado e não podem ser sobrescritos automaticamente pelo overlay. Os metadados `regulatoryMeta` informam versão, fontes, validação e hit/miss do cache.
+
+Publicação e rollback exigem ator, aprovação humana, hash, motivo e backup imutável. Cada operação gera uma nova versão, hash de publicação e registro de auditoria. O cache do ticker é invalidado depois da transação.
 
 ### Coleções
 
@@ -19,43 +30,47 @@ Os metadados `regulatoryMeta` informam versão, fontes, resultado da validação
 | `Fiis` | Base legada lida durante a transição |
 | `RegulatoryFunds` | Estado regulatório publicado por ticker |
 | `RegulatoryFundVersions/{ticker}/versions` | Versões imutáveis e rollback |
+| `RegulatoryFundBackups/{ticker}/backups` | Backup imutável antes de publicação ou rollback |
 | `RegulatoryValidationRuns` | Histórico das validações |
 | `RegulatoryParserHealth` | Saúde consolidada de cada parser/fonte |
 | `RegulatoryAuditLogs` | Auditoria de validação, publicação e rollback |
 
-## Sprint 2.2 — Health & Admin
+## Sprint 2.2 — Score Engine
 
-Todas as rotas abaixo aceitam somente `POST`, exigem cookie de sessão HttpOnly criado a partir de um Firebase ID Token válido, e validam no servidor se o e-mail verificado pertence a `ADMIN_EMAILS`.
+Todo score é calculado pelo `ScoreEngine`; nenhuma API calcula ou persiste notas manualmente. Uma consulta de um fundo novo gera automaticamente:
 
-| Rota | Função | Limite padrão |
-|---|---|---|
-| `/api/admin/system/health` | Health Score, última validação, parsers e cache | 30/min |
-| `/api/admin/system/parser-health` | Saúde detalhada das fontes | 30/min |
-| `/api/admin/system/validation-history` | Histórico de até 50 execuções | 30/min |
-| `/api/admin/system/run-validation` | Executa e audita a validação | 3/5 min |
-| `/api/admin/session` | Login, status e logout da sessão admin | 8/5 min no login |
+- Risk;
+- Dividend;
+- Governance;
+- Growth;
+- Liquidity;
+- Quality;
+- Premium.
 
-O painel fica em `/admin/sistema`. O antigo `/admin/observabilidade` passa a usar a mesma sessão, sem enviar segredo no JavaScript, URL, header ou corpo.
+Cada resultado contém nota de 0 a 100, confiança, faixa, métricas utilizadas e explicações. Nota mais alta representa melhor condição no critério; em `Risk`, portanto, nota alta significa menor risco estimado. Dados insuficientes produzem nota neutra com baixa confiança, sem inventar valores.
 
-### Variáveis de ambiente
+O Premium é uma composição determinística: Risk 25%, Dividend 20%, Quality 20%, Governance 15%, Growth 10% e Liquidity 10%. Scores são dados derivados e ficam apenas na resposta/cache; não são gravados manualmente no Firestore.
+
+## Estruturas antecipadas
+
+As APIs e telas de Health, Validation e Admin que já existiam na branch foram preservadas com Firebase Auth, `ADMIN_EMAILS`, cookie HttpOnly e rate limiting. Elas são fundações antecipadas, mas só serão consideradas concluídas após os critérios formais das Sprints 2.3, 2.4 e 2.5.
+
+## Variáveis de ambiente
 
 ```text
 ADMIN_EMAILS=admin1@dominio.com,admin2@dominio.com
+ENABLE_SCORE_ENGINE=true
+ENABLE_SYSTEM_VALIDATION=false
+ENABLE_HEALTH_MONITOR=false
+ENABLE_AI_INSIGHTS=false
+ENABLE_REPORT_PREMIUM=false
 REGULATORY_CACHE_TTL_MS=300000
 REGULATORY_MARKET_CACHE_TTL_MS=60000
 REGULATORY_CACHE_MAX_ENTRIES=500
 ```
 
-`ADMIN_UPDATE_SECRET` e `CRON_SECRET` não autenticam os novos endpoints administrativos. Continuam disponíveis somente para rotinas legadas/cron enquanto essas rotas forem migradas separadamente.
+O Score Engine fica ativo por padrão e só é desligado quando `ENABLE_SCORE_ENGINE=false`. Os demais flags permanecem reservados às suas sprints canônicas.
 
-### Critérios de aceite cobertos
+## Verificação
 
-- Tipagem única para FII, FIAGRO e FI-Infra.
-- Merge compatível com a resposta atual das APIs de consulta.
-- Cache com TTL, limite, single-flight para a planilha e invalidação em escrita.
-- Publicação e rollback versionados com auditoria.
-- Validação de ticker, tipo, CNPJ, identificação, segmento e fonte.
-- Health Score, saúde dos parsers e histórico persistido.
-- APIs novas sem acesso direto ao Firestore.
-- Sessão HttpOnly, Firebase Auth, allowlist de e-mail, mesma origem e rate limiting.
-- Painel administrativo sem segredo exposto no cliente.
+`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre separação arquitetural, ausência de Firestore nas APIs regulatórias novas, proteção de campos legados, autorização de publicação, geração dos sete scores, limites, explicabilidade, composição Premium e ausência de mutação da entrada.
