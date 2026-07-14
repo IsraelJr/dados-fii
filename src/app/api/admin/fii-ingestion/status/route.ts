@@ -25,7 +25,15 @@ function serialize(doc: any) {
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
     finishedAt: toIso(data.finishedAt),
+    heartbeatAt: toIso(data.heartbeatAt),
   };
+}
+
+async function readActiveLock(tickerValue: unknown) {
+  const ticker = normalizeIngestionTicker(tickerValue);
+  if (!ticker || !isSupportedIngestionTicker(ticker)) return null;
+  const snapshot = await adminDb.collection("FiiIngestionActiveRuns").doc(ticker).get();
+  return snapshot.exists ? serialize(snapshot) : null;
 }
 
 async function readStatus(runId?: string, tickerValue?: string) {
@@ -60,6 +68,17 @@ function invalidTickerResponse(value: unknown) {
   }, { status: 400 });
 }
 
+async function buildResponse(runId: string, tickerValue: string) {
+  const data = await readStatus(runId || undefined, tickerValue || undefined);
+  if (runId && !data) return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
+  const lockTicker = runId ? String((data as any)?.ticker || "") : tickerValue;
+  const activeLock = await readActiveLock(lockTicker);
+  return NextResponse.json(
+    { ok: true, run: runId ? data : undefined, runs: runId ? undefined : data, activeLock },
+    { headers: { "Cache-Control": "private, no-store" } }
+  );
+}
+
 export async function GET(req: NextRequest) {
   if (!isAdminAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
@@ -70,19 +89,11 @@ export async function GET(req: NextRequest) {
     const ticker = String(req.nextUrl.searchParams.get("ticker") || "").trim();
     const invalid = invalidTickerResponse(ticker);
     if (invalid) return invalid;
-
-    const data = await readStatus(runId || undefined, ticker || undefined);
-    if (runId && !data) {
-      return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
-    }
-    return NextResponse.json(
-      { ok: true, run: runId ? data : undefined, runs: runId ? undefined : data },
-      { headers: { "Cache-Control": "no-store" } }
-    );
+    return buildResponse(runId, ticker);
   } catch (error: any) {
     return NextResponse.json(
       { ok: false, error: error?.message || "Erro ao consultar execução." },
-      { status: 500 }
+      { status: 500, headers: { "Cache-Control": "private, no-store" } }
     );
   }
 }
@@ -98,19 +109,11 @@ export async function POST(req: NextRequest) {
     const ticker = String(body?.ticker || "").trim();
     const invalid = invalidTickerResponse(ticker);
     if (invalid) return invalid;
-
-    const data = await readStatus(runId || undefined, ticker || undefined);
-    if (runId && !data) {
-      return NextResponse.json({ ok: false, error: "Execução não encontrada." }, { status: 404 });
-    }
-    return NextResponse.json(
-      { ok: true, run: runId ? data : undefined, runs: runId ? undefined : data },
-      { headers: { "Cache-Control": "no-store" } }
-    );
+    return buildResponse(runId, ticker);
   } catch (error: any) {
     return NextResponse.json(
       { ok: false, error: error?.message || "Erro ao consultar execução." },
-      { status: 500 }
+      { status: 500, headers: { "Cache-Control": "private, no-store" } }
     );
   }
 }
