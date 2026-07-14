@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminAuthorized } from "@/lib/adminSession";
-import { getLatestSystemValidation } from "@/services/system/SystemValidationService";
+import {
+  getLatestSystemValidation,
+  type SystemValidationReport,
+} from "@/services/system/SystemValidationService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type PersistedSystemValidation = SystemValidationReport & { id?: string };
 
 function reply(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
@@ -21,7 +26,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const latest = await getLatestSystemValidation();
+    const latest = await getLatestSystemValidation() as PersistedSystemValidation | null;
     return reply({
       ok: true,
       health: latest
@@ -30,7 +35,7 @@ export async function GET(req: NextRequest) {
             score: latest.score,
             summary: latest.summary,
             generatedAt: latest.generatedAt,
-            runId: latest.runId || latest.id,
+            runId: latest.runId || latest.id || null,
             version: latest.version,
           }
         : {
