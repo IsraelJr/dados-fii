@@ -4,6 +4,8 @@ function isBlocked(status: number) {
   return [400, 401, 403, 405].includes(status);
 }
 
+const sameOriginHeaders = { "Sec-Fetch-Site": "same-origin" };
+
 test.describe("Fase 1 - segurança das APIs", () => {
   test("relatórios regulatórios não são expostos por GET anônimo", async ({ request }) => {
     const report = await request.get("/api/fii-regulatory-report?ticker=KNCA11");
@@ -38,10 +40,9 @@ test.describe("Fase 1 - segurança das APIs", () => {
     expect(rollback.status()).toBe(401);
   });
 
-  test("login com chave incorreta é recusado", async ({ request, baseURL }) => {
-    const origin = new URL(baseURL || "http://127.0.0.1:3000").origin;
+  test("login com chave incorreta é recusado", async ({ request }) => {
     const response = await request.post("/api/admin/session", {
-      headers: { Origin: origin },
+      headers: sameOriginHeaders,
       data: { token: "invalid-admin-secret" },
     });
 
@@ -55,14 +56,13 @@ test.describe("Fase 1 - segurança das APIs", () => {
     expect(response.headers()["referrer-policy"]).toBeTruthy();
   });
 
-  test("sessão administrativa persiste e logout invalida cookie", async ({ page, baseURL }) => {
+  test("sessão administrativa persiste e logout invalida cookie", async ({ page }) => {
     const adminSecret = process.env.E2E_ADMIN_UPDATE_SECRET;
     test.skip(!adminSecret, "E2E_ADMIN_UPDATE_SECRET não configurado.");
 
     const client = page.context().request;
-    const origin = new URL(baseURL || "http://127.0.0.1:3000").origin;
     const login = await client.post("/api/admin/session", {
-      headers: { Origin: origin, "Sec-Fetch-Site": "same-origin" },
+      headers: sameOriginHeaders,
       data: { token: adminSecret },
     });
     expect(login.status()).toBe(200);
@@ -76,7 +76,7 @@ test.describe("Fase 1 - segurança das APIs", () => {
     expect(page.url()).toContain("/admin/fii-ingestion");
 
     const logout = await client.delete("/api/admin/session", {
-      headers: { Origin: origin, "Sec-Fetch-Site": "same-origin" },
+      headers: sameOriginHeaders,
     });
     expect(logout.status()).toBe(200);
     expect((await client.get("/api/admin/session")).status()).toBe(401);
