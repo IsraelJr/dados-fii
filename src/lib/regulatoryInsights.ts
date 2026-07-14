@@ -1,4 +1,6 @@
-import { calculateRegulatoryScores } from "../services/score/index.ts";
+import { calculateRegulatoryScores, type ScoreValue } from "../services/score/index.ts";
+
+export type RegulatoryScore = ScoreValue;
 
 export type RegulatoryInsightSnapshot = {
   referenceDate: string;
