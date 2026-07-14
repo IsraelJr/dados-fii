@@ -1,10 +1,10 @@
-import type { RegulatoryScore } from "./regulatoryInsights.ts";
+import type { ScoreValue } from "../services/score/ScoreTypes.ts";
 
 export type ComparableRegulatoryFund = {
   ticker: string;
   name?: string | null;
   segment?: string | null;
-  scores: Record<string, RegulatoryScore>;
+  scores: Record<string, ScoreValue>;
   facts: Record<string, any>;
 };
 
