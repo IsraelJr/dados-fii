@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { RegulatoryCache } from "../services/regulatory/RegulatoryCache.ts";
 import { RegulatoryDataService } from "../services/regulatory/RegulatoryDataService.ts";
-import type { RegulatoryRepository } from "../services/regulatory/RegulatoryRepository.ts";
+import type { RegulatoryRepository } from "../services/regulatory/RegulatoryRepositoryContract.ts";
 import type { RawFundDocument, RegulatoryFundView } from "../services/regulatory/RegulatoryTypes.ts";
 
 class FakeRepository implements RegulatoryRepository {
