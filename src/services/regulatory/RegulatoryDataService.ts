@@ -4,7 +4,7 @@ import { buildRegulatoryTimeline } from "../../lib/regulatoryTimeline.ts";
 import { InvalidTickerError } from "./RegulatoryErrors.ts";
 import { RegulatoryCache, regulatoryCacheTtlMs } from "./RegulatoryCache.ts";
 import { isPublishedRegulatoryData, normalizeFundDocument } from "./RegulatoryNormalizer.ts";
-import type { RegulatoryRepository } from "./RegulatoryRepository.ts";
+import type { RegulatoryRepository } from "./RegulatoryRepositoryContract.ts";
 import type {
   RegulatoryFundResult,
   RegulatoryFundView,
