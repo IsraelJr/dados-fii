@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compareRegulatoryFunds } from "@/lib/regulatoryComparator";
-import { getRegulatoryReportInput } from "@/lib/regulatoryService";
 import { normalizeIngestionTicker } from "@/lib/fiiIngestionConfig";
+import { regulatoryDataService } from "@/services/regulatory";
 import {
   registeredUserErrorStatus,
   requireRegisteredUserAccess,
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       return reply({ ok: false, error: "Compare no máximo cinco fundos por vez." }, 400);
     }
 
-    const reports = await Promise.all(tickers.map((ticker) => getRegulatoryReportInput(ticker)));
+    const reports = await regulatoryDataService.getReportInputs(tickers);
     const available = reports.filter((item) => item.reportAvailable && item.fund && item.insights);
     const unavailable = reports
       .filter((item) => !item.reportAvailable)
@@ -72,6 +72,10 @@ export async function POST(req: NextRequest) {
     return reply({
       ok: true,
       access: { email: access.email },
+      service: {
+        version: "regulatory-data-service-v1",
+        cacheHits: reports.filter((item) => item.cache.hit).length,
+      },
       requestedTickers: tickers,
       comparedTickers: comparison.funds.map((fund) => fund.ticker),
       unavailable,
