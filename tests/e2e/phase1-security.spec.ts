@@ -55,18 +55,19 @@ test.describe("Fase 1 - segurança das APIs", () => {
     expect(response.headers()["referrer-policy"]).toBeTruthy();
   });
 
-  test("sessão administrativa persiste e logout invalida cookie", async ({ request, page, baseURL }) => {
+  test("sessão administrativa persiste e logout invalida cookie", async ({ page, baseURL }) => {
     const adminSecret = process.env.E2E_ADMIN_UPDATE_SECRET;
     test.skip(!adminSecret, "E2E_ADMIN_UPDATE_SECRET não configurado.");
 
+    const client = page.context().request;
     const origin = new URL(baseURL || "http://127.0.0.1:3000").origin;
-    const login = await request.post("/api/admin/session", {
+    const login = await client.post("/api/admin/session", {
       headers: { Origin: origin, "Sec-Fetch-Site": "same-origin" },
       data: { token: adminSecret },
     });
     expect(login.status()).toBe(200);
 
-    const session = await request.get("/api/admin/session");
+    const session = await client.get("/api/admin/session");
     expect(session.status()).toBe(200);
     expect((await session.json()).authenticated).toBe(true);
 
@@ -74,10 +75,10 @@ test.describe("Fase 1 - segurança das APIs", () => {
     await page.reload();
     expect(page.url()).toContain("/admin/fii-ingestion");
 
-    const logout = await request.delete("/api/admin/session", {
+    const logout = await client.delete("/api/admin/session", {
       headers: { Origin: origin, "Sec-Fetch-Site": "same-origin" },
     });
     expect(logout.status()).toBe(200);
-    expect((await request.get("/api/admin/session")).status()).toBe(401);
+    expect((await client.get("/api/admin/session")).status()).toBe(401);
   });
 });
