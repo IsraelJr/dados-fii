@@ -6,11 +6,13 @@ type CacheEntry<T> = {
 
 export class RegulatoryCache<T> {
   private readonly entries = new Map<string, CacheEntry<T>>();
+  private readonly ttlMs: number;
+  private readonly maxEntries: number;
 
-  constructor(
-    private readonly ttlMs: number,
-    private readonly maxEntries = 100
-  ) {}
+  constructor(ttlMs: number, maxEntries = 100) {
+    this.ttlMs = ttlMs;
+    this.maxEntries = maxEntries;
+  }
 
   get(key: string) {
     const entry = this.entries.get(key);
