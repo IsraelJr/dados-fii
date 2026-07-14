@@ -9,6 +9,9 @@ export const REGULATORY_COLLECTIONS = {
   parserHealth: "RegulatoryParserHealth",
   auditLogs: "RegulatoryAuditLogs",
   timelineEvents: "RegulatoryTimelineEvents",
+  monitorRuns: "RegulatoryMonitorRuns",
+  monitorAlerts: "RegulatoryMonitorAlerts",
+  monitorLocks: "RegulatoryMonitorLocks",
 } as const;
 
 export type LegacyFundRecord = {

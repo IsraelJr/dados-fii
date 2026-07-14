@@ -1,6 +1,6 @@
-# Fase 2 — Sprints 2.1 a 2.8
+# Fase 2 — Sprints 2.1 a 2.11
 
-Este documento segue o `DADOS_FII_HANDOFF.md` v2.3.0. A implementação avança na ordem canônica até o Relatório Gratuito e o AI Insights Engine.
+Este documento segue o `DADOS_FII_HANDOFF.md` v3.0.0 e registra a implementação completa da Fase 2.
 
 ## Sprint 2.1 — RegulatoryDataService
 
@@ -35,6 +35,9 @@ Publicação e rollback exigem ator, aprovação humana, hash, motivo e backup i
 | `RegulatoryParserHealth` | Saúde consolidada de cada parser/fonte |
 | `RegulatoryAuditLogs` | Auditoria de validação, publicação e rollback |
 | `RegulatoryTimelineEvents` | Eventos e documentos normalizados da timeline |
+| `RegulatoryMonitorRuns` | Histórico auditável das execuções do monitor |
+| `RegulatoryMonitorAlerts` | Estado, deduplicação e cooldown dos alertas |
+| `RegulatoryMonitorLocks` | Lock distribuído com expiração para impedir crons sobrepostos |
 
 ## Sprint 2.2 — Score Engine
 
@@ -142,6 +145,41 @@ O `AIInsightsEngine` é o único componente autorizado a chamar o provedor de IA
 
 A rota legada `POST /api/fii-summary` foi mantida como contrato de compatibilidade, mas agora delega ao `RegulatoryDataService` e ao AI Insights Engine. O relatório de risco da carteira também usa `AIInsightsEngine.generateText`; nenhuma API acessa OpenAI ou Perplexity diretamente.
 
+## Sprint 2.9 — Relatório Premium
+
+`GET /api/fii/{ticker}/report/premium` exige Firebase Authentication e um entitlement Premium, VIP, Admin ou Preview. O `RegulatoryDataService` reúne o relatório gratuito, pares do mesmo segmento e os insights gerados exclusivamente pelo AI Insights Engine. O `PremiumReportEngine` calcula:
+
+- valuation por preço, P/VP e valor patrimonial estimado;
+- stress tests leve, moderado e severo;
+- cenários positivo, base e adverso;
+- comparativos com fundos do mesmo tipo/segmento;
+- recomendações de acompanhamento, sem ordens de compra ou venda;
+- análise IA reutilizada do contrato central.
+
+Os cálculos são determinísticos, derivados em tempo de leitura e acompanhados por metodologia e avisos. A flag `ENABLE_REPORT_PREMIUM` permanece desabilitada por padrão até a ativação comercial.
+
+## Sprint 2.10 — Observabilidade
+
+`GET /api/admin/system/observability` consolida, pelo `RegulatoryDataService`, as métricas canônicas de tempo, retries, falhas, ingestão, parser, QA e publicação. Durações, sucessos, falhas e retries da instância são instrumentados centralmente; validações e auditorias persistidas preservam o estado operacional que precisa sobreviver ao ciclo de vida serverless.
+
+O Dashboard Administrativo apresenta o snapshot de observabilidade junto com Health, Validation e histórico. Todas as rotas administrativas continuam protegidas por Firebase Authentication, e-mail autorizado, perfil Admin, mesma origem e rate limiting.
+
+## Sprint 2.11 — Monitor Automático
+
+O monitor pode ser executado por `POST /api/admin/system/run-monitor` ou pelo cron autenticado `GET /api/cron/system-monitor`. O status é consultado por `GET /api/admin/system/monitor-status` e exibido no Dashboard.
+
+Cada execução:
+
+1. adquire um lock distribuído com TTL no Firestore;
+2. avalia Health, parsers, QA e a validação mais recente;
+3. reconcilia alertas por fingerprint estável;
+4. aplica cooldown para evitar notificações repetidas;
+5. persiste o resultado e a auditoria;
+6. entrega alertas no painel, Firestore e, quando configurados, e-mail e Telegram;
+7. libera o lock mesmo quando há falha.
+
+O cron é autenticado por `CRON_SECRET`. `ENABLE_AUTOMATIC_MONITOR` fica desabilitado por padrão e deve ser habilitado somente depois da configuração das integrações de produção.
+
 ## Variáveis de ambiente
 
 ```text
@@ -151,6 +189,8 @@ ENABLE_SYSTEM_VALIDATION=true
 ENABLE_HEALTH_MONITOR=true
 ENABLE_AI_INSIGHTS=true
 ENABLE_REPORT_PREMIUM=false
+ENABLE_AUTOMATIC_MONITOR=false
+PREMIUM_PREVIEW_EMAILS=preview@dominio.com
 REGULATORY_CACHE_TTL_MS=300000
 REGULATORY_MARKET_CACHE_TTL_MS=60000
 REGULATORY_CACHE_MAX_ENTRIES=500
@@ -161,10 +201,21 @@ AI_INSIGHTS_RATE_MAX_REQUESTS=30
 OPENAI_INSIGHTS_MODEL=gpt-4.1-mini
 OPENAI_INSIGHTS_MAX_OUTPUT_TOKENS=1800
 OPENAI_TIMEOUT_MS=120000
+MONITOR_ALERT_COOLDOWN_MS=21600000
+MONITOR_ALERT_EMAILS=operacao@dominio.com
+SMTP_HOST=smtp.dominio.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=usuario
+SMTP_PASS=segredo
+SMTP_FROM=Dados FII <alertas@dominio.com>
+TELEGRAM_BOT_TOKEN=segredo
+TELEGRAM_CHAT_ID=identificador
+CRON_SECRET=segredo-aleatorio-com-pelo-menos-16-caracteres
 ```
 
-Os recursos aceitam opt-out explícito com `false`. `ENABLE_AI_INSIGHTS=true` requer `OPENAI_API_KEY`; o modelo pode ser substituído sem alterar APIs consumidoras. Premium permanece desabilitado até a Sprint 2.9.
+Os recursos aceitam opt-out explícito com `false`. `ENABLE_AI_INSIGHTS=true` requer `OPENAI_API_KEY`; o modelo pode ser substituído sem alterar APIs consumidoras. Premium e Monitor permanecem desabilitados por padrão para permitir ativação operacional controlada.
 
 ## Verificação
 
-`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, publicação segura, scores, Health, Validation, Dashboard, Timeline, Relatório Gratuito determinístico e AI Insights estruturado com reutilização de cache.
+`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, publicação segura, scores, Health, Validation, Dashboard, Timeline, relatórios Gratuito e Premium, AI Insights estruturado, Observabilidade e Monitor Automático.

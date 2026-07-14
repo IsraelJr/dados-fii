@@ -17,8 +17,9 @@ import {
   type ValidationRun,
 } from "@/types/regulatory";
 import type { TimelineRecord } from "@/types/timeline";
+import type { MonitorAlert, MonitorDelivery, MonitorRun, MonitorStatus } from "@/types/monitor";
 
-type AuditAction = "publish" | "rollback" | "validation";
+type AuditAction = "publish" | "rollback" | "validation" | "monitor";
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -267,6 +268,121 @@ export class RegulatoryRepository {
         metadata: data.metadata && typeof data.metadata === "object" ? data.metadata as Record<string, unknown> : {},
       };
     }).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  }
+
+  monitorRunId() {
+    return adminDb.collection(REGULATORY_COLLECTIONS.monitorRuns).doc().id;
+  }
+
+  async acquireMonitorLock(owner: string, ttlMs = 10 * 60_000) {
+    const ref = adminDb.collection(REGULATORY_COLLECTIONS.monitorLocks).doc("system");
+    return adminDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const current = snapshot.data() || {};
+      const expiresAt = toIso(current.expiresAt) || toIso(current.expiresAtIso);
+      const lockIsActive = snapshot.exists && expiresAt && new Date(expiresAt).getTime() > Date.now();
+      if (lockIsActive) return false;
+      const acquiredAtIso = nowIso();
+      const expiresAtIso = new Date(Date.now() + ttlMs).toISOString();
+      transaction.set(ref, {
+        owner,
+        acquiredAt: adminFieldValue.serverTimestamp(),
+        acquiredAtIso,
+        expiresAtIso,
+        updatedAt: adminFieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+  }
+
+  async releaseMonitorLock(owner: string) {
+    const ref = adminDb.collection(REGULATORY_COLLECTIONS.monitorLocks).doc("system");
+    await adminDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      if (snapshot.exists && snapshot.data()?.owner === owner) transaction.delete(ref);
+    });
+  }
+
+  async saveMonitorRun(run: MonitorRun) {
+    const batch = adminDb.batch();
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.monitorRuns).doc(run.id), {
+      ...run,
+      createdAt: adminFieldValue.serverTimestamp(),
+    });
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("monitor", run.actor, undefined, {
+      runId: run.id,
+      status: run.status,
+      totals: run.totals,
+      healthScore: run.healthScore,
+      error: run.error || null,
+    }));
+    await batch.commit();
+  }
+
+  async upsertMonitorAlert(alert: MonitorAlert, cooldownMs: number) {
+    const ref = adminDb.collection(REGULATORY_COLLECTIONS.monitorAlerts).doc(alert.fingerprint);
+    return adminDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const current = snapshot.data() || {};
+      const lastNotifiedAt = toIso(current.lastNotifiedAt) || toIso(current.lastNotifiedAtIso);
+      const lastNotifiedMs = lastNotifiedAt ? new Date(lastNotifiedAt).getTime() : 0;
+      const severityChanged = snapshot.exists && current.severity !== alert.severity;
+      const shouldNotify = !snapshot.exists || current.status === "resolved" || severityChanged || !lastNotifiedMs || Date.now() - lastNotifiedMs >= cooldownMs;
+      transaction.set(ref, {
+        ...current,
+        ...alert,
+        status: "active",
+        firstDetectedAt: current.firstDetectedAt || alert.detectedAt,
+        lastDetectedAt: alert.detectedAt,
+        occurrences: Number(current.occurrences || 0) + 1,
+        notificationCount: Number(current.notificationCount || 0),
+        updatedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: true });
+      return { shouldNotify, alert: { ...alert, status: "active" as const } };
+    });
+  }
+
+  async markMonitorAlertNotified(fingerprint: string, deliveries: MonitorDelivery[]) {
+    await adminDb.collection(REGULATORY_COLLECTIONS.monitorAlerts).doc(fingerprint).set({
+      lastNotifiedAt: adminFieldValue.serverTimestamp(),
+      lastNotifiedAtIso: nowIso(),
+      lastDeliveries: deliveries,
+      notificationCount: adminFieldValue.increment(1),
+      updatedAt: adminFieldValue.serverTimestamp(),
+    }, { merge: true });
+  }
+
+  async resolveMonitorAlerts(activeFingerprints: string[], resolvedAt = nowIso()) {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.monitorAlerts).limit(250).get();
+    const active = new Set(activeFingerprints);
+    const batch = adminDb.batch();
+    let resolved = 0;
+    for (const doc of snapshot.docs) {
+      const data = doc.data() || {};
+      if (data.status === "active" && !active.has(doc.id)) {
+        batch.set(doc.ref, { status: "resolved", resolvedAt, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true });
+        resolved += 1;
+      }
+    }
+    if (resolved) await batch.commit();
+    return resolved;
+  }
+
+  async getMonitorStatus(limit = 20): Promise<MonitorStatus> {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const [runsSnapshot, alertsSnapshot] = await Promise.all([
+      adminDb.collection(REGULATORY_COLLECTIONS.monitorRuns).orderBy("createdAt", "desc").limit(safeLimit).get(),
+      adminDb.collection(REGULATORY_COLLECTIONS.monitorAlerts).limit(250).get(),
+    ]);
+    const runs = runsSnapshot.docs.map((doc) => {
+      const data = doc.data() as MonitorRun;
+      return { ...data, id: doc.id };
+    });
+    const activeAlerts = alertsSnapshot.docs
+      .map((doc) => ({ ...(doc.data() as MonitorAlert), fingerprint: doc.id }))
+      .filter((alert) => alert.status === "active")
+      .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+    return { generatedAt: nowIso(), latestRun: runs[0] || null, activeAlerts, recentRuns: runs };
   }
 
   private auditPayload(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>) {

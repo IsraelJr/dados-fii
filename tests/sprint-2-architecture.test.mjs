@@ -184,6 +184,61 @@ test("Sprint 2.8 centralizes all provider calls in AI Insights Engine", () => {
   assert.match(page, /AIInsightsPanel/);
 });
 
+test("Sprint 2.9 Premium is protected and contains every canonical analysis", () => {
+  const route = read("src/app/api/fii/[ticker]/report/premium/route.ts");
+  const service = read("src/lib/regulatoryDataService.ts");
+  const engine = read("src/lib/reports/PremiumReportEngine.ts");
+  const security = read("src/lib/premiumSecurity.ts");
+  const page = read("src/app/fii/[ticker]/page.tsx");
+  assert.match(route, /requirePremium/);
+  assert.match(route, /regulatoryDataService\.getPremiumReport/);
+  assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
+  assert.match(service, /ENABLE_REPORT_PREMIUM/);
+  assert.match(service, /aiInsights\.generateFundInsights/);
+  for (const section of ["valuation", "stressTest", "scenarios", "comparative", "recommendations", "aiAnalysis"]) assert.match(engine, new RegExp(section));
+  assert.match(security, /verifyIdToken/);
+  assert.match(security, /isVip|isPremium/);
+  assert.match(page, /PremiumReportPanel/);
+});
+
+test("Sprint 2.10 centralizes the seven canonical observability groups", () => {
+  const route = read("src/app/api/admin/system/observability/route.ts");
+  const service = read("src/lib/regulatoryDataService.ts");
+  const engine = read("src/lib/observability/ObservabilityEngine.ts");
+  const dashboard = read("src/app/admin/sistema/page.tsx");
+  assert.match(route, /requireAdmin/);
+  assert.match(route, /regulatoryDataService\.getObservability/);
+  assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
+  assert.match(service, /observability\.track/);
+  for (const metric of ["time", "retries", "failures", "ingestion", "parser", "qa", "publication"]) assert.match(`${engine}\n${dashboard}`.toLowerCase(), new RegExp(metric));
+});
+
+test("Sprint 2.11 monitors automatically through panel, Firestore, email and Telegram", () => {
+  const runRoute = read("src/app/api/admin/system/run-monitor/route.ts");
+  const statusRoute = read("src/app/api/admin/system/monitor-status/route.ts");
+  const cronRoute = read("src/app/api/cron/system-monitor/route.ts");
+  const monitor = read("src/lib/monitor/AutomaticMonitor.ts");
+  const dispatcher = read("src/lib/monitor/AlertDispatcher.ts");
+  const repository = read("src/lib/regulatory/RegulatoryRepository.ts");
+  const regulatoryTypes = read("src/lib/regulatory/RegulatoryTypes.ts");
+  const dashboard = read("src/app/admin/sistema/page.tsx");
+  const vercel = read("vercel.json");
+  assert.match(runRoute, /requireAdmin/);
+  assert.match(statusRoute, /getMonitorStatus/);
+  assert.match(cronRoute, /CRON_SECRET/);
+  assert.match(cronRoute, /timingSafeEqual/);
+  assert.match(cronRoute, /runAutomaticMonitor/);
+  assert.match(monitor, /ENABLE_AUTOMATIC_MONITOR/);
+  assert.match(repository, /upsertMonitorAlert/);
+  assert.match(repository, /acquireMonitorLock/);
+  assert.match(regulatoryTypes, /RegulatoryMonitorLocks/);
+  assert.match(repository, /saveMonitorRun/);
+  assert.match(dispatcher, /sendMail/);
+  assert.match(dispatcher, /api\.telegram\.org/);
+  assert.match(dashboard, /Monitor Automático/);
+  assert.match(vercel, /\/api\/cron\/system-monitor/);
+});
+
 test("legacy observability no longer accepts admin secrets", () => {
   const route = read("src/app/api/admin/observability/route.ts");
   assert.doesNotMatch(route, /ADMIN_UPDATE_SECRET|CRON_SECRET|x-admin-secret|searchParams\.get\("secret"\)/);

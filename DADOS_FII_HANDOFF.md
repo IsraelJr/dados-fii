@@ -1,6 +1,6 @@
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 2.3.0  
+**Versão:** 3.0.0  
 **Data:** 14/07/2026
 
 > Este documento substitui todos os planejamentos anteriores quando houver divergência.
@@ -17,7 +17,7 @@ Sempre que houver divergência entre documentos, conversas, prompts ou planejame
 
 ### Status geral
 
-**Fase 1 concluída**
+**Fases 1 e 2 concluídas em código**
 
 Situação atual:
 
@@ -31,7 +31,7 @@ Situação atual:
 - CI validado
 - Arquitetura pronta para evolução
 
-O sistema encontra-se estável para iniciar a construção da camada de inteligência.
+A camada de inteligência, relatórios, observabilidade e monitoramento da Fase 2 está implementada no PR #6. Merge, configuração das variáveis e deploy de produção continuam sendo etapas operacionais separadas.
 
 ---
 
@@ -68,11 +68,11 @@ Todos aprovados.
 
 ## 3. Sprint atual
 
-### Sprint 2.9 — Relatório Premium
+### Encerramento da Fase 2
 
-**Objetivo:** construir o relatório Premium sobre RegulatoryDataService, ScoreEngine, Timeline e AI Insights Engine.
+**Objetivo:** revisar, integrar e publicar as Sprints 2.1 a 2.11.
 
-**Status:** próxima sprint canônica. As Sprints 2.1 a 2.8 estão implementadas no PR #6 e aguardam revisão/merge/deploy.
+**Status:** todas as Sprints da Fase 2 estão implementadas no PR #6 e aguardam revisão, merge, configuração das flags/integrações e deploy de produção.
 
 ---
 
@@ -287,7 +287,7 @@ Todo Score passa pelo ScoreEngine.
 
 **Tempo:** 2m54s
 
-**PR atual:** #6 — `Fase 2: Sprints 2.1–2.8 — Core, Relatório e IA` (draft)
+**PR atual:** #6 — `Fase 2 completa: Sprints 2.1–2.11` (draft)
 
 **Branch:** `agent/sprint-2-1-2-2-regulatory-admin`
 
@@ -319,12 +319,13 @@ Todo Score passa pelo ScoreEngine.
 - Timeline Regulatória
 - Relatório Gratuito
 - AI Insights Engine
-
-### Pendentes
-
 - Relatório Premium
 - Observabilidade
-- Monitor
+- Monitor Automático
+
+### Pendentes de código na Fase 2
+
+- Nenhum item canônico.
 
 ---
 
@@ -366,6 +367,19 @@ ENABLE_HEALTH_MONITOR
 ENABLE_AI_INSIGHTS
 ENABLE_REPORT_PREMIUM
 ENABLE_SCORE_ENGINE
+ENABLE_AUTOMATIC_MONITOR
+PREMIUM_PREVIEW_EMAILS
+MONITOR_ALERT_COOLDOWN_MS
+MONITOR_ALERT_EMAILS
+SMTP_HOST
+SMTP_PORT
+SMTP_SECURE
+SMTP_USER
+SMTP_PASS
+SMTP_FROM
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+CRON_SECRET
 ```
 
 ---
@@ -397,9 +411,9 @@ antes da produção.
 
 ### Alta prioridade
 
-- Relatório Premium
-- Observabilidade
-- Monitor Automático
+- Revisar e fazer merge do PR #6.
+- Configurar as variáveis de produção e habilitar `ENABLE_REPORT_PREMIUM` e `ENABLE_AUTOMATIC_MONITOR` quando as integrações estiverem prontas.
+- Validar o deploy, o cron e as entregas por e-mail/Telegram em produção.
 
 ### Decisões abertas
 
@@ -423,4 +437,4 @@ As seguintes decisões passam a substituir planejamentos anteriores:
 
 ## Objetivo estratégico
 
-Ao final da Fase 2, o Dados FII deverá possuir uma arquitetura orientada a serviços, com ingestão regulatória consolidada, inteligência reutilizável, observabilidade completa e capacidade de gerar relatórios gratuitos e Premium de forma consistente, auditável e escalável, preservando segurança, rastreabilidade e facilidade de evolução futura.
+Ao final da Fase 2, o Dados FII possui em código uma arquitetura orientada a serviços, com ingestão regulatória consolidada, inteligência reutilizável, observabilidade completa e capacidade de gerar relatórios gratuitos e Premium de forma consistente, auditável e escalável, preservando segurança, rastreabilidade e facilidade de evolução futura.

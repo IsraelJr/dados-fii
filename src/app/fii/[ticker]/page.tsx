@@ -7,6 +7,7 @@ import FiiAlert from "../../components/FiiAlert";
 import RegulatoryTimeline from "../../components/RegulatoryTimeline";
 import FreeFundReport from "../../components/FreeFundReport";
 import AIInsightsPanel from "../../components/AIInsightsPanel";
+import PremiumReportPanel from "../../components/PremiumReportPanel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -325,6 +326,8 @@ export default async function FiiPage({ params }: PageProps) {
           <FreeFundReport report={freeReportData?.report || null} />
 
           <AIInsightsPanel ticker={ticker} />
+
+          <PremiumReportPanel ticker={ticker} />
 
           <RecentNews ticker={ticker} news={news} />
 

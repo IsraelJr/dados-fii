@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:sprint2": "node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/sprint-2-architecture.test.mjs tests/score-engine.test.ts tests/health-validation.test.ts tests/timeline-dashboard.test.ts tests/report-ai-insights.test.ts"
+    "test:sprint2": "node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/sprint-2-architecture.test.mjs tests/score-engine.test.ts tests/health-validation.test.ts tests/timeline-dashboard.test.ts tests/report-ai-insights.test.ts tests/phase-2-completion.test.ts"
   },
   "engines": {
     "node": "22.x"
@@ -37,6 +37,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/firebase": "^2.4.32",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/twilio": "^3.19.2",

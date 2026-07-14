@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { Activity, CheckCircle2, Database, FileClock, History, Home, LogOut, RefreshCw, RotateCcw, ShieldCheck, Stethoscope, UploadCloud } from "lucide-react";
+import { Activity, BellRing, CheckCircle2, Database, FileClock, Gauge, History, Home, LogOut, PlayCircle, RefreshCw, RotateCcw, ShieldCheck, Stethoscope, UploadCloud } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import type { ParserHealth, SystemHealth, ValidationRun } from "@/types/regulatory";
+import type { SystemObservability } from "@/types/observability";
+import type { MonitorStatus } from "@/types/monitor";
 
 const INACTIVITY_MS = 60_000;
 
@@ -13,6 +15,8 @@ type DashboardData = {
   health: SystemHealth | null;
   parsers: ParserHealth[];
   history: ValidationRun[];
+  observability: SystemObservability | null;
+  monitor: MonitorStatus | null;
 };
 
 async function post<T>(url: string, body: Record<string, unknown> = {}) {
@@ -52,8 +56,9 @@ export default function AdminSystemPage() {
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
+  const [runningMonitor, setRunningMonitor] = useState(false);
   const [error, setError] = useState("");
-  const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [] });
+  const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [], observability: null, monitor: null });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blocked = useRef(false);
 
@@ -61,12 +66,14 @@ export default function AdminSystemPage() {
     setLoading(true);
     setError("");
     try {
-      const [healthPayload, parserPayload, historyPayload] = await Promise.all([
+      const [healthPayload, parserPayload, historyPayload, observabilityPayload, monitorPayload] = await Promise.all([
         get<{ health: SystemHealth }>("/api/admin/system/health"),
         get<{ parsers: ParserHealth[] }>("/api/admin/system/parser-health"),
         get<{ history: ValidationRun[] }>("/api/admin/system/validation-history?limit=20"),
+        get<{ observability: SystemObservability }>("/api/admin/system/observability"),
+        get<{ monitor: MonitorStatus }>("/api/admin/system/monitor-status"),
       ]);
-      setData({ health: healthPayload.health, parsers: parserPayload.parsers || [], history: historyPayload.history || [] });
+      setData({ health: healthPayload.health, parsers: parserPayload.parsers || [], history: historyPayload.history || [], observability: observabilityPayload.observability, monitor: monitorPayload.monitor });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível carregar o painel.");
     } finally {
@@ -103,7 +110,7 @@ export default function AdminSystemPage() {
     blocked.current = true;
     await post("/api/admin/session", { action: "logout" }).catch(() => undefined);
     setAdminEmail("");
-    setData({ health: null, parsers: [], history: [] });
+    setData({ health: null, parsers: [], history: [], observability: null, monitor: null });
     if (message) setError(message);
   }, []);
 
@@ -135,6 +142,19 @@ export default function AdminSystemPage() {
     }
   }
 
+  async function runMonitor() {
+    setRunningMonitor(true);
+    setError("");
+    try {
+      await post("/api/admin/system/run-monitor");
+      await loadDashboard();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "O monitor automático falhou.");
+    } finally {
+      setRunningMonitor(false);
+    }
+  }
+
   const latest = data.history[0] || null;
   const components = data.health?.components;
 
@@ -160,7 +180,7 @@ export default function AdminSystemPage() {
       <div className="mx-auto max-w-7xl">
         <header className="rounded-3xl bg-gradient-to-br from-indigo-800 to-blue-950 p-6 text-white shadow-lg md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Sprint 2.5 · Dashboard Administrativo</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · sessão HttpOnly · bloqueio após 1 minuto sem atividade</p></div>
+            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Fase 2 · Operação e Monitoramento</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · sessão HttpOnly · bloqueio após 1 minuto sem atividade</p></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={loadDashboard} disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-indigo-800 disabled:opacity-60"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Atualizar</button><button type="button" onClick={() => logout()} className="inline-flex items-center gap-2 rounded-full bg-red-500/20 px-4 py-2 text-sm font-extrabold text-white ring-1 ring-white/20"><LogOut size={16} /> Sair</button></div>
           </div>
         </header>
@@ -187,6 +207,29 @@ export default function AdminSystemPage() {
           </article>
 
           <article className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Cache & Score</p><h2 className="mt-2 text-2xl font-black text-slate-900">RegulatoryDataService</h2><div className="mt-5 grid gap-3 sm:grid-cols-2"><Small label="Entradas" value={data.health?.cache.entries ?? 0} /><Small label="Hit rate" value={`${data.health?.cache.funds.hitRate || 0}%`} /><Small label="TTL dos fundos" value={`${Math.round((data.health?.cache.ttlMs || 0) / 1000)}s`} /><Small label="Score Engine" value={`${components?.score.score || 0}%`} /></div></article>
+        </section>
+
+        <section className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <article className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <div className="flex items-center gap-2"><Gauge className="text-indigo-700" /><h2 className="text-2xl font-black text-slate-900">Observabilidade</h2></div>
+            <p className="mt-2 text-sm text-slate-600">Tempo, retries, falhas, ingestão, parser, QA e publicação.</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Small label="Tempo médio" value={`${data.observability?.summary.averageDurationMs || 0}ms`} />
+              <Small label="Retries" value={data.observability?.summary.retries || 0} />
+              <Small label="Falhas" value={data.observability?.summary.failures || 0} />
+              <Small label="Ingestão" value={data.observability?.ingestion.processed || 0} />
+              <Small label="Parser" value={`${data.observability?.parser.successRate || 0}%`} />
+              <Small label="QA" value={`${data.observability?.qa.healthScore || 0}%`} />
+              <Small label="Publicações" value={data.observability?.publication.publications || 0} />
+              <Small label="Rollbacks" value={data.observability?.publication.rollbacks || 0} />
+            </div>
+          </article>
+
+          <article className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BellRing size={15} /> Monitor Automático</p><h2 className="mt-2 text-2xl font-black text-slate-900">Alertas sistêmicos</h2></div><button type="button" onClick={runMonitor} disabled={runningMonitor} className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"><PlayCircle size={16} /> {runningMonitor ? "Executando…" : "Executar"}</button></div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3"><Small label="Ativos" value={data.monitor?.activeAlerts.length || 0} /><Small label="Último status" value={data.monitor?.latestRun?.status || "-"} /><Small label="Última execução" value={dateTime(data.monitor?.latestRun?.finishedAt)} /></div>
+            <div className="mt-4 space-y-2">{(data.monitor?.activeAlerts || []).slice(0, 4).map((alert) => <div key={alert.fingerprint} className={`rounded-xl p-3 text-sm ring-1 ${alert.severity === "critical" ? "bg-red-50 text-red-800 ring-red-100" : "bg-amber-50 text-amber-900 ring-amber-100"}`}><strong>{alert.title}</strong><p className="mt-1 text-xs">{alert.message}</p></div>)}{!data.monitor?.activeAlerts.length && <p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">Nenhum alerta ativo.</p>}</div>
+          </article>
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><h2 className="text-2xl font-black text-slate-900">Saúde dos parsers</h2><div className="mt-5 grid gap-4 md:grid-cols-3">{data.parsers.map((parser) => <article key={parser.parser} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between gap-3"><strong className="text-slate-900">{parser.parser}</strong><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(parser.status)}`}>{parser.status}</span></div><p className="mt-3 text-3xl font-black text-indigo-700">{parser.successRate}%</p><p className="mt-2 text-xs text-slate-500">{parser.successes} sucesso(s) · {parser.failures} falha(s)</p>{parser.lastError && <p className="mt-2 text-xs font-bold text-red-700">{parser.lastError}</p>}</article>)}</div></section>
