@@ -7,8 +7,11 @@ import type { RawFundDocument, RegulatoryFundView } from "../services/regulatory
 
 class FakeRepository implements RegulatoryRepository {
   calls = 0;
+  private readonly documents: Record<string, RawFundDocument | null>;
 
-  constructor(private readonly documents: Record<string, RawFundDocument | null>) {}
+  constructor(documents: Record<string, RawFundDocument | null>) {
+    this.documents = documents;
+  }
 
   async getFundDocument(ticker: string) {
     this.calls += 1;
