@@ -4,7 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "typecheck": "tsc --noEmit",
     "test:ingestion": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "test:phase1": "npm run test:ingestion && npm run typecheck",
+    "test:phase1:e2e": "playwright test tests/e2e",
+    "test:phase1:security": "playwright test tests/e2e/phase1-security.spec.ts",
+    "test:phase1:operational": "playwright test tests/e2e/phase1-operational.spec.ts",
     "prebuild": "npm run test:ingestion",
     "build": "next build",
     "start": "next start",
@@ -36,6 +41,7 @@
     "workflow": ">=4.0.1-beta.26 <5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.1",
     "@tailwindcss/postcss": "^4",
     "@types/firebase": "^2.4.32",
     "@types/node": "^20",
