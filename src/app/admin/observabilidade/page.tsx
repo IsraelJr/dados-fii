@@ -30,7 +30,6 @@ type ObservabilityPayload = {
 };
 
 const SESSION_TIMEOUT_MS = 60 * 1000;
-const EMAIL_KEY = "dados-fii-wallet-email";
 
 const adminLinks = [
   { href: "#observabilidade", label: "Observabilidade", icon: Eye },
@@ -39,15 +38,9 @@ const adminLinks = [
   { href: "#relatorios", label: "Relatórios", icon: FileText },
   { href: "#notificacoes", label: "Notificações", icon: BellRing },
   { href: "#eventos", label: "Eventos recentes", icon: Activity },
+  { href: "/admin/sistema", label: "Saúde regulatória", icon: ShieldCheck },
   { href: "/", label: "Voltar ao site", icon: Home },
 ];
-
-function allowedAdminEmails() {
-  return String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
@@ -133,11 +126,18 @@ export default function AdminObservabilityPage() {
   const sessionSecretRef = useRef("");
 
   useEffect(() => {
-    const email = String(window.localStorage.getItem(EMAIL_KEY) || "").trim().toLowerCase();
-    setAllowedEmail(Boolean(email && allowedAdminEmails().includes(email)));
+    fetch("/api/admin/session", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "status" }) })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Sessão admin ausente.");
+        setAllowedEmail(true);
+        setAuthenticated(true);
+        await loadData();
+      })
+      .catch(() => { setAllowedEmail(false); setAuthenticated(false); });
   }, []);
 
-  function logout(message = "Sessão admin bloqueada. Informe a senha novamente.") {
+  function logout(message = "Sessão admin bloqueada. Autentique-se novamente.") {
+    fetch("/api/admin/session", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "logout" }) }).catch(() => undefined);
     setAuthenticated(false);
     setData(null);
     setSecret("");
@@ -163,14 +163,12 @@ export default function AdminObservabilityPage() {
     };
   }, [authenticated]);
 
-  async function loadData(secretValue = secret || sessionSecretRef.current) {
-    if (!secretValue.trim()) { setError("Informe a senha admin para carregar a observabilidade."); return; }
+  async function loadData() {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/admin/observability", { method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store", body: JSON.stringify({ secret: secretValue.trim() }) });
+      const response = await fetch("/api/admin/observability", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, cache: "no-store", body: "{}" });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json?.health) throw new Error(json?.error || "Não foi possível carregar observabilidade.");
-      sessionSecretRef.current = secretValue.trim();
       setAuthenticated(true); setData(json); setSecret("");
     } catch (err: any) {
       setAuthenticated(false); setData(null); sessionSecretRef.current = ""; setError(err.message || "Não foi possível carregar observabilidade.");
@@ -188,7 +186,7 @@ export default function AdminObservabilityPage() {
   const health = data?.health;
 
   if (!allowedEmail) {
-    return <main className="mx-auto max-w-3xl px-4 py-12"><section className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200"><ShieldCheck className="mx-auto text-indigo-700" /><h1 className="mt-4 text-2xl font-black text-slate-900">Acesso admin restrito</h1><p className="mt-2 text-sm text-slate-600">Esta área só aparece para e-mails autorizados no navegador.</p><Link href="/" className="mt-5 inline-flex rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white">Voltar ao site</Link></section></main>;
+    return <main className="mx-auto max-w-3xl px-4 py-12"><section className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200"><ShieldCheck className="mx-auto text-indigo-700" /><h1 className="mt-4 text-2xl font-black text-slate-900">Acesso admin restrito</h1><p className="mt-2 text-sm text-slate-600">Crie uma sessão segura com seu e-mail verificado e autorizado.</p><Link href="/admin/sistema" className="mt-5 inline-flex rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white">Autenticar no Admin</Link></section></main>;
   }
 
   return (
@@ -204,19 +202,14 @@ export default function AdminObservabilityPage() {
             {authenticated && <p className="mt-3 text-xs font-bold text-indigo-100">Timeout de inatividade: 1 minuto. A senha não fica salva no navegador.</p>}
           </div>
 
-          {!authenticated && (
-            <div className="grid gap-2 rounded-2xl bg-white/10 p-3 ring-1 ring-white/10 sm:grid-cols-[1fr_auto] lg:min-w-[420px]">
-              <input type="password" value={secret} onChange={(event) => setSecret(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") loadData(); }} placeholder="Senha admin" className="min-h-11 rounded-xl border border-white/10 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-300" />
-              <button type="button" onClick={() => loadData()} disabled={loading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-extrabold text-indigo-800 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:bg-gray-300"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Entrar</button>
-            </div>
-          )}
+          {!authenticated && <Link href="/admin/sistema" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-extrabold text-indigo-800">Autenticar no Admin</Link>}
 
           {authenticated && <button type="button" onClick={() => loadData()} disabled={loading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-extrabold text-indigo-800 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:bg-gray-300"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Atualizar</button>}
         </div>
       </section>
 
       {error && <section className="mt-6 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800 ring-1 ring-red-100">{error}</section>}
-      {!data && !error && <section className="mt-6 rounded-2xl bg-white p-6 text-center text-sm font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">Informe a senha admin para carregar o painel.</section>}
+      {!data && !error && <section className="mt-6 rounded-2xl bg-white p-6 text-center text-sm font-bold text-slate-500 shadow-sm ring-1 ring-slate-200">Aguardando a sessão administrativa.</section>}
 
       {data && (
         <div className="mt-6 space-y-6">

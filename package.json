@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test:sprint2": "node --test tests/sprint-2-architecture.test.mjs"
   },
   "engines": {
     "node": "22.x"

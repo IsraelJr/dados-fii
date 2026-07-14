@@ -1,22 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { OBSERVABILITY_COLLECTION_NAME } from "@/lib/observability";
+import { authorizeAdminRequest } from "@/lib/adminApi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function adminSecrets() {
-  return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
-}
-
-function canRead(req: NextRequest, body?: any) {
-  const secrets = adminSecrets();
-  if (!secrets.length) return false;
-  const headerSecret = req.headers.get("x-admin-secret") || "";
-  const querySecret = req.nextUrl.searchParams.get("secret") || "";
-  const bodySecret = body?.secret || "";
-  return [headerSecret, querySecret, bodySecret].some((value) => Boolean(value && secrets.includes(value)));
-}
 
 function toIso(value: any) {
   if (!value) return null;
@@ -217,13 +205,8 @@ function json(data: unknown, status = 200) {
   return new NextResponse(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }
 
-export async function GET(req: NextRequest) {
-  if (!canRead(req)) return json({ ok: false, error: "Nao autorizado." }, 401);
-  return json(await payload());
-}
-
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  if (!canRead(req, body)) return json({ ok: false, error: "Nao autorizado." }, 401);
+  const auth = await authorizeAdminRequest(req, "observability", { limit: 30 });
+  if (auth.rejection) return auth.rejection;
   return json(await payload());
 }
