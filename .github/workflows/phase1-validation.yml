@@ -1,0 +1,124 @@
+name: Phase 1 Validation CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/app/api/admin/**"
+      - "src/app/api/fii-regulatory-*/**"
+      - "src/lib/**"
+      - "src/workflows/**"
+      - "tests/e2e/**"
+      - "playwright.config.ts"
+      - "package.json"
+      - ".github/workflows/phase1-validation.yml"
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: "URL completa do Preview da Vercel"
+        required: false
+        type: string
+      run_live_ingestion:
+        description: "Executar ingestão real controlada do MXRF11 em staging"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  static-validation:
+    name: Unit, contracts and typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --silent
+      - run: npm run test:phase1
+      - name: Dependency audit - critical production vulnerabilities
+        run: npm audit --omit=dev --audit-level=critical
+
+  local-api-security:
+    name: Local API security smoke
+    needs: static-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --silent
+      - run: npx playwright install --with-deps chromium
+      - name: Run anonymous and session security checks
+        shell: bash
+        run: |
+          PRIVATE_KEY="$(openssl genrsa 2048)"
+          export PRIVATE_KEY
+          export FIREBASE_SERVICE_ACCOUNT_KEY="$(node -e 'process.stdout.write(JSON.stringify({project_id:"dados-fii-ci",client_email:"ci@dados-fii-ci.iam.gserviceaccount.com",private_key:process.env.PRIVATE_KEY}))')"
+          export NEXT_PUBLIC_BASE_URL="http://127.0.0.1:3000"
+          export NEXT_PUBLIC_FIREBASE_API_KEY="test-api-key"
+          export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="dados-fii-ci.firebaseapp.com"
+          export NEXT_PUBLIC_FIREBASE_PROJECT_ID="dados-fii-ci"
+          export NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="dados-fii-ci.appspot.com"
+          export NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="123456789012"
+          export NEXT_PUBLIC_FIREBASE_APP_ID="test-app-id"
+          export NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="test-measurement-id"
+          export ADMIN_UPDATE_SECRET="ci-admin-login-secret"
+          export ADMIN_SESSION_SECRET="ci-admin-session-secret-with-independent-signing-key"
+          export CRON_SECRET="ci-cron-secret"
+          export FII_INGESTION_PUBLICATION_ENABLED="false"
+          export FII_INGESTION_ROLLBACK_ENABLED="false"
+          npm run test:phase1:security
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-local-security-evidence
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  preview-smoke:
+    name: Preview operational smoke
+    if: github.event_name == 'workflow_dispatch' && inputs.preview_url != ''
+    needs: static-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: preview
+    env:
+      E2E_BASE_URL: ${{ inputs.preview_url }}
+      E2E_ADMIN_UPDATE_SECRET: ${{ secrets.E2E_ADMIN_UPDATE_SECRET }}
+      E2E_VERCEL_BYPASS_TOKEN: ${{ secrets.E2E_VERCEL_BYPASS_TOKEN }}
+      E2E_RUN_LIVE_INGESTION: ${{ inputs.run_live_ingestion }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --silent
+      - run: npx playwright install --with-deps chromium
+      - name: Validate protected Preview APIs and admin session
+        run: npm run test:phase1:security
+      - name: Run controlled live ingestion smoke
+        if: inputs.run_live_ingestion
+        run: npm run test:phase1:operational
+      - name: Upload Preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-preview-evidence
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 30
