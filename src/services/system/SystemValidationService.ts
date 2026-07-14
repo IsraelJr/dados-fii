@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { listIngestionAdapters } from "@/lib/fiiIngestionAdapters";
 import { regulatoryDataService } from "@/services/regulatory";
+import { calculateRegulatoryScores } from "@/services/score";
 
 export type SystemValidationLevel = "pass" | "warn" | "fail";
 
@@ -144,6 +145,39 @@ export async function runSystemValidation(input: {
       ? `${adapters.length} adaptadores regulatórios registrados com parser consolidado.`
       : "A lista de adaptadores não atende ao contrato mínimo.",
     { adapters }
+  ));
+
+  const scoreProbe = calculateRegulatoryScores({
+    historyLength: 0,
+    coverage: 100,
+    conflictCount: 0,
+    qaScore: 100,
+    documentsCount: 0,
+    documentTypesCount: 0,
+    netWorthChangePct: null,
+    shareholdersChangePct: null,
+    vpCotaChangePct: null,
+    delinquentValue: null,
+  });
+  const scoreEngineValid = scoreProbe.version === "regulatory-score-engine-v1"
+    && scoreProbe.scores.dataQuality === 100
+    && scoreProbe.scores.growth === null
+    && scoreProbe.scores.liquidity === null
+    && scoreProbe.unavailableDimensions.includes("growth")
+    && scoreProbe.unavailableDimensions.includes("liquidity");
+  checks.push(check(
+    "score-engine-contract",
+    "Contrato do Score Engine",
+    scoreEngineValid ? "pass" : "fail",
+    10,
+    scoreEngineValid
+      ? "O motor de scores preserva metodologia versionada e não estima dimensões sem dados."
+      : "O motor de scores não atende ao contrato determinístico esperado.",
+    {
+      version: scoreProbe.version,
+      methodologyVersion: scoreProbe.methodologyVersion,
+      unavailableDimensions: scoreProbe.unavailableDimensions,
+    }
   ));
 
   try {
