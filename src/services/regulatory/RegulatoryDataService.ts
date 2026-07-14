@@ -4,10 +4,7 @@ import { buildRegulatoryTimeline } from "@/lib/regulatoryTimeline";
 import { InvalidTickerError } from "./RegulatoryErrors";
 import { RegulatoryCache, regulatoryCacheTtlMs } from "./RegulatoryCache";
 import { isPublishedRegulatoryData, normalizeFundDocument } from "./RegulatoryNormalizer";
-import {
-  FirestoreRegulatoryRepository,
-  type RegulatoryRepository,
-} from "./RegulatoryRepository";
+import type { RegulatoryRepository } from "./RegulatoryRepository";
 import type {
   RegulatoryFundResult,
   RegulatoryFundView,
@@ -19,12 +16,21 @@ type RegulatoryDataServiceOptions = {
   cache?: RegulatoryCache<RegulatoryFundView | null>;
 };
 
+function lazyFirestoreRepository(): RegulatoryRepository {
+  return {
+    async getFundDocument(ticker: string) {
+      const { FirestoreRegulatoryRepository } = await import("./RegulatoryRepository");
+      return new FirestoreRegulatoryRepository().getFundDocument(ticker);
+    },
+  };
+}
+
 export class RegulatoryDataService {
   private readonly repository: RegulatoryRepository;
   private readonly cache: RegulatoryCache<RegulatoryFundView | null>;
 
   constructor(options: RegulatoryDataServiceOptions = {}) {
-    this.repository = options.repository || new FirestoreRegulatoryRepository();
+    this.repository = options.repository || lazyFirestoreRepository();
     this.cache = options.cache || new RegulatoryCache<RegulatoryFundView | null>(regulatoryCacheTtlMs());
   }
 
