@@ -1,6 +1,6 @@
-import type { RegulatoryInsightSnapshot } from "@/lib/regulatoryInsights";
-import type { buildRegulatoryInsights } from "@/lib/regulatoryInsights";
-import type { buildRegulatoryTimeline } from "@/lib/regulatoryTimeline";
+import type { RegulatoryInsightSnapshot } from "../../lib/regulatoryInsights.ts";
+import type { buildRegulatoryInsights } from "../../lib/regulatoryInsights.ts";
+import type { buildRegulatoryTimeline } from "../../lib/regulatoryTimeline.ts";
 
 export type RegulatoryQuality = {
   monthlySnapshots: number;
