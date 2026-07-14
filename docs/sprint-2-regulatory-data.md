@@ -1,6 +1,6 @@
-# Fase 2 — Sprints 2.1 a 2.4
+# Fase 2 — Sprints 2.1 a 2.6
 
-Este documento segue o `DADOS_FII_HANDOFF.md` v2.1.0. Na ordem canônica, a Sprint 2.2 é o Score Engine, a 2.3 é Health e a 2.4 é Validation. Dashboard continua como Sprint 2.5.
+Este documento segue o `DADOS_FII_HANDOFF.md` v2.2.0. A implementação avança na ordem canônica até o Dashboard Administrativo e a Timeline Regulatória.
 
 ## Sprint 2.1 — RegulatoryDataService
 
@@ -34,6 +34,7 @@ Publicação e rollback exigem ator, aprovação humana, hash, motivo e backup i
 | `RegulatoryValidationRuns` | Histórico das validações |
 | `RegulatoryParserHealth` | Saúde consolidada de cada parser/fonte |
 | `RegulatoryAuditLogs` | Auditoria de validação, publicação e rollback |
+| `RegulatoryTimelineEvents` | Eventos e documentos normalizados da timeline |
 
 ## Sprint 2.2 — Score Engine
 
@@ -78,7 +79,40 @@ O `ValidationRunner` executa a validação regulatória, calcula cobertura por F
 
 Execuções interrompidas também geram um registro com status `failed`, erro e check auditável. Descobrir dados inválidos é resultado da validação, não falha silenciosa da API.
 
-Todas as rotas exigem Firebase Authentication, e-mail em `ADMIN_EMAILS`, perfil `admin`, cookie HttpOnly, mesma origem e rate limiting. O Dashboard existente continua uma fundação antecipada; seus critérios formais pertencem à Sprint 2.5.
+Todas as rotas exigem Firebase Authentication, e-mail em `ADMIN_EMAILS`, perfil `admin`, cookie HttpOnly, mesma origem e rate limiting.
+
+## Sprint 2.5 — Dashboard Administrativo
+
+O painel `/admin/sistema` consolida os sete cards canônicos:
+
+- Saúde;
+- Parser;
+- Firestore;
+- QA;
+- Publicação;
+- Rollback;
+- Histórico.
+
+Também mostra métricas de cache, autoteste do ScoreEngine, detalhes dos parsers, execução manual de validação e histórico persistido. O painel não acessa Firestore e consome apenas as APIs administrativas autenticadas.
+
+## Sprint 2.6 — Timeline Regulatória
+
+`GET /api/fii/{ticker}/timeline` retorna documentos, eventos, fatos relevantes, assembleias e regulamentos em ordem cronológica. A resposta aceita filtros por tipo, limite e cursor opaco.
+
+A timeline combina, pelo `RegulatoryDataService`:
+
+1. registros de `RegulatoryTimelineEvents`;
+2. arrays compatíveis existentes no overlay `RegulatoryFunds`;
+3. publicações e rollbacks da trilha `RegulatoryAuditLogs`.
+
+Os registros são normalizados, deduplicados e sanitizados. Apenas URLs HTTP/HTTPS são expostas. A página `/fii/{ticker}` mostra a timeline, contagens por categoria, fontes e estado vazio quando ainda não há evento estruturado.
+
+Contrato recomendado para novos registros:
+
+```text
+ticker, type, title, summary, occurredAt, publishedAt,
+url, source, documentNumber, version, metadata
+```
 
 ## Variáveis de ambiente
 
@@ -98,4 +132,4 @@ Score, Health e Validation ficam ativos por padrão e aceitam opt-out explícito
 
 ## Verificação
 
-`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, proteção de campos legados, publicação segura, sete scores, Health completo, métricas de cache, cobertura FII/FIAGRO, checks de validação e persistência de falhas.
+`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, publicação segura, scores, Health, Validation, os cards do Dashboard e a Timeline com cinco categorias, paginação, deduplicação e URLs seguras.

@@ -120,6 +120,34 @@ test("Sprint 2.4 has a structured Validation Runner and persisted failure path",
   assert.match(repository, /status: run\.status/);
 });
 
+test("Sprint 2.5 dashboard renders every canonical administrative card", () => {
+  const dashboard = read("src/app/admin/sistema/page.tsx");
+  for (const card of ["Saúde", "Parser", "Firestore", "QA", "Publicação", "Rollback", "Histórico"]) {
+    assert.match(dashboard, new RegExp(`title=["']${card}["']`));
+  }
+  assert.match(dashboard, /components\?\.score\.score/);
+  assert.match(dashboard, /cache\.funds\.hitRate/);
+  assert.match(dashboard, /run-validation/);
+});
+
+test("Sprint 2.6 timeline flows through RegulatoryDataService and covers five categories", () => {
+  const route = read("src/app/api/fii/[ticker]/timeline/route.ts");
+  const service = read("src/lib/regulatoryDataService.ts");
+  const repository = read("src/lib/regulatory/RegulatoryRepository.ts");
+  const timeline = read("src/lib/regulatory/RegulatoryTimeline.ts");
+  const page = read("src/app/fii/[ticker]/page.tsx");
+  assert.match(route, /export async function GET/);
+  assert.match(route, /regulatoryDataService\.getTimeline/);
+  assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
+  assert.match(service, /async getTimeline/);
+  assert.match(repository, /getTimelineRecords/);
+  assert.match(repository, /getAuditEventsForTicker/);
+  for (const type of ["document", "event", "material_fact", "assembly", "regulation"]) {
+    assert.match(timeline, new RegExp(`"${type}"`));
+  }
+  assert.match(page, /RegulatoryTimeline/);
+});
+
 test("legacy observability no longer accepts admin secrets", () => {
   const route = read("src/app/api/admin/observability/route.ts");
   assert.doesNotMatch(route, /ADMIN_UPDATE_SECRET|CRON_SECRET|x-admin-secret|searchParams\.get\("secret"\)/);

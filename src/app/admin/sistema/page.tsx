@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { Activity, AlertTriangle, CheckCircle2, Database, History, Home, LogOut, RefreshCw, ShieldCheck, Stethoscope } from "lucide-react";
+import { Activity, CheckCircle2, Database, FileClock, History, Home, LogOut, RefreshCw, RotateCcw, ShieldCheck, Stethoscope, UploadCloud } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import type { ParserHealth, SystemHealth, ValidationRun } from "@/types/regulatory";
 
@@ -136,7 +136,7 @@ export default function AdminSystemPage() {
   }
 
   const latest = data.history[0] || null;
-  const issueTotal = useMemo(() => latest ? latest.totals.errors + latest.totals.warnings : 0, [latest]);
+  const components = data.health?.components;
 
   if (!ready && !adminEmail) return <main className="grid min-h-screen place-items-center"><RefreshCw className="animate-spin text-indigo-700" /></main>;
 
@@ -160,18 +160,24 @@ export default function AdminSystemPage() {
       <div className="mx-auto max-w-7xl">
         <header className="rounded-3xl bg-gradient-to-br from-indigo-800 to-blue-950 p-6 text-white shadow-lg md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Sprints 2.3–2.4 · Health & Validation</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · sessão HttpOnly · bloqueio após 1 minuto sem atividade</p></div>
+            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Sprint 2.5 · Dashboard Administrativo</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · sessão HttpOnly · bloqueio após 1 minuto sem atividade</p></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={loadDashboard} disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-indigo-800 disabled:opacity-60"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Atualizar</button><button type="button" onClick={() => logout()} className="inline-flex items-center gap-2 rounded-full bg-red-500/20 px-4 py-2 text-sm font-extrabold text-white ring-1 ring-white/20"><LogOut size={16} /> Sair</button></div>
           </div>
         </header>
 
         {error && <div className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-800 ring-1 ring-red-100">{error}</div>}
 
-        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Metric title="Health Score" value={`${data.health?.score || 0}%`} detail={data.health?.ok ? "Base saudável" : "Atenção necessária"} icon={Stethoscope} good={Boolean(data.health?.ok)} />
-          <Metric title="Fundos validados" value={latest?.totals.processed || 0} detail={`${latest?.totals.valid || 0} válidos · ${latest?.totals.invalid || 0} inválidos`} icon={Database} good={!latest?.totals.invalid} />
-          <Metric title="Pendências" value={issueTotal} detail={`${latest?.totals.errors || 0} erros · ${latest?.totals.warnings || 0} avisos`} icon={AlertTriangle} good={!issueTotal} />
-          <Metric title="Parsers" value={`${data.parsers.filter((parser) => parser.status === "healthy").length}/${data.parsers.length}`} detail="Fontes operacionais" icon={Activity} good={data.parsers.length > 0 && data.parsers.every((parser) => parser.status === "healthy")} />
+        <section className="mt-6">
+          <div className="mb-3"><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-700">Resumo operacional</p><h2 className="mt-1 text-2xl font-black text-slate-900">Status dos sistemas</h2></div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Metric title="Saúde" value={`${data.health?.score || 0}%`} detail={data.health?.ok ? "Sistema saudável" : `Status: ${data.health?.status || "unknown"}`} icon={Stethoscope} good={Boolean(data.health?.ok)} />
+            <Metric title="Parser" value={`${components?.parser.score || 0}%`} detail={components?.parser.message || "Aguardando leitura"} icon={Activity} good={components?.parser.status === "healthy"} />
+            <Metric title="Firestore" value={`${components?.firestore.score || 0}%`} detail={components?.firestore.message || "Aguardando leitura"} icon={Database} good={components?.firestore.status === "healthy"} />
+            <Metric title="QA" value={`${components?.qa.score || 0}%`} detail={components?.qa.message || "Aguardando validação"} icon={CheckCircle2} good={components?.qa.status === "healthy"} />
+            <Metric title="Publicação" value={`${components?.publication.score || 0}%`} detail={components?.publication.message || "Nenhum evento"} icon={UploadCloud} good={components?.publication.status === "healthy"} />
+            <Metric title="Rollback" value={`${components?.rollback.score || 0}%`} detail={components?.rollback.message || "Nenhum evento"} icon={RotateCcw} good={components?.rollback.status === "healthy" || components?.rollback.status === "unknown"} />
+            <Metric title="Histórico" value={data.history.length} detail={latest ? `Última execução: ${dateTime(latest.finishedAt)}` : "Nenhuma validação registrada"} icon={FileClock} good={latest?.status === "completed"} />
+          </div>
         </section>
 
         <section className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -180,7 +186,7 @@ export default function AdminSystemPage() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3"><Small label="Última execução" value={dateTime(latest?.finishedAt)} /><Small label="Duração" value={latest ? `${(latest.durationMs / 1000).toFixed(1)}s` : "-"} /><Small label="Responsável" value={latest?.actor || "-"} /></div>
           </article>
 
-          <article className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Cache</p><h2 className="mt-2 text-2xl font-black text-slate-900">RegulatoryDataService</h2><div className="mt-5 grid gap-3"><Small label="Entradas" value={data.health?.cache.entries ?? 0} /><Small label="TTL dos fundos" value={`${Math.round((data.health?.cache.ttlMs || 0) / 1000)}s`} /><Small label="TTL das cotações" value={`${Math.round((data.health?.cache.marketTtlMs || 0) / 1000)}s`} /></div></article>
+          <article className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Cache & Score</p><h2 className="mt-2 text-2xl font-black text-slate-900">RegulatoryDataService</h2><div className="mt-5 grid gap-3 sm:grid-cols-2"><Small label="Entradas" value={data.health?.cache.entries ?? 0} /><Small label="Hit rate" value={`${data.health?.cache.funds.hitRate || 0}%`} /><Small label="TTL dos fundos" value={`${Math.round((data.health?.cache.ttlMs || 0) / 1000)}s`} /><Small label="Score Engine" value={`${components?.score.score || 0}%`} /></div></article>
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><h2 className="text-2xl font-black text-slate-900">Saúde dos parsers</h2><div className="mt-5 grid gap-4 md:grid-cols-3">{data.parsers.map((parser) => <article key={parser.parser} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between gap-3"><strong className="text-slate-900">{parser.parser}</strong><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(parser.status)}`}>{parser.status}</span></div><p className="mt-3 text-3xl font-black text-indigo-700">{parser.successRate}%</p><p className="mt-2 text-xs text-slate-500">{parser.successes} sucesso(s) · {parser.failures} falha(s)</p>{parser.lastError && <p className="mt-2 text-xs font-bold text-red-700">{parser.lastError}</p>}</article>)}</div></section>

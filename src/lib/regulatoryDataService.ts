@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { featureEnabled } from "@/lib/featureFlags";
 import { healthEngine, type HealthEngine } from "@/lib/health/HealthEngine";
 import { RegulatoryCache, positiveInt } from "@/lib/regulatory/RegulatoryCache";
+import { regulatoryTimeline, type RegulatoryTimeline } from "@/lib/regulatory/RegulatoryTimeline";
 import {
   canonicalFrom,
   marketFallback,
@@ -29,6 +30,7 @@ import type {
   SystemHealth,
   ValidationRun,
 } from "@/types/regulatory";
+import type { RegulatoryTimelineResponse, RegulatoryTimelineType } from "@/types/timeline";
 
 const FUND_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_CACHE_TTL_MS, 5 * 60_000);
 const MARKET_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_MARKET_CACHE_TTL_MS, 60_000);
@@ -56,6 +58,7 @@ export class RegulatoryDataService {
     private readonly repository: RegulatoryRepository = regulatoryRepository,
     private readonly scores: ScoreEngine = scoreEngine,
     private readonly health: HealthEngine = healthEngine,
+    private readonly timeline: RegulatoryTimeline = regulatoryTimeline,
   ) {
     this.validationRunner = new ValidationRunner({ canonicalFrom, normalizeTicker, validateFund: validateRegulatoryFund, now: nowIso });
   }
@@ -210,6 +213,28 @@ export class RegulatoryDataService {
       else errors[ticker] = "FII não encontrado";
     }
     return { requested: tickers.length, found: Object.keys(items).length, items, errors, updatedAt: nowIso() };
+  }
+
+  async getTimeline(value: unknown, options?: { types?: RegulatoryTimelineType[]; limit?: number; cursor?: string | null }): Promise<RegulatoryTimelineResponse | null> {
+    const ticker = normalizeTicker(value);
+    if (!ticker) return null;
+    const [legacy, overlay, records, auditEvents] = await Promise.all([
+      this.repository.getLegacyByTicker(ticker),
+      this.repository.getOverlayByTicker(ticker),
+      this.repository.getTimelineRecords(ticker),
+      this.repository.getAuditEventsForTicker(ticker),
+    ]);
+    if (!legacy && !overlay && !records.length && !auditEvents.length) return null;
+    return this.timeline.build({
+      ticker,
+      records,
+      overlay,
+      auditEvents,
+      types: options?.types,
+      limit: options?.limit,
+      cursor: options?.cursor,
+      generatedAt: nowIso(),
+    });
   }
 
   async publish(ticker: unknown, patch: Record<string, unknown>, authorization: PublicationAuthorization) {

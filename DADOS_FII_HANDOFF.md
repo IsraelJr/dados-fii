@@ -1,6 +1,6 @@
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 2.1.0  
+**Versão:** 2.2.0  
 **Data:** 14/07/2026
 
 > Este documento substitui todos os planejamentos anteriores quando houver divergência.
@@ -68,11 +68,11 @@ Todos aprovados.
 
 ## 3. Sprint atual
 
-### Sprint 2.5 — Dashboard Administrativo
+### Sprint 2.7 — Relatório Gratuito
 
-**Objetivo:** consolidar no painel administrativo os dados produzidos por Health e Validation.
+**Objetivo:** gerar automaticamente o relatório gratuito a partir dos serviços consolidados.
 
-**Status:** próxima sprint canônica. As Sprints 2.1 a 2.4 estão implementadas no PR #6 e aguardam revisão/merge/deploy.
+**Status:** próxima sprint canônica. As Sprints 2.1 a 2.6 estão implementadas no PR #6 e aguardam revisão/merge/deploy.
 
 ---
 
@@ -287,7 +287,7 @@ Todo Score passa pelo ScoreEngine.
 
 **Tempo:** 2m54s
 
-**PR atual:** #6 — `Fase 2: RegulatoryDataService e Score Engine` (draft)
+**PR atual:** #6 — `Fase 2: Sprints 2.1–2.6 — Core e Timeline` (draft)
 
 **Branch:** `agent/sprint-2-1-2-2-regulatory-admin`
 
@@ -315,11 +315,11 @@ Todo Score passa pelo ScoreEngine.
 - Score Engine
 - Health System
 - Validation System
+- Dashboard Administrativo
+- Timeline Regulatória
 
 ### Pendentes
 
-- Dashboard
-- Timeline
 - Relatórios
 - IA
 - Observabilidade
@@ -396,7 +396,6 @@ antes da produção.
 
 ### Alta prioridade
 
-- Dashboard Administrativo
 - Relatório Gratuito
 - AI Insights Engine
 - Relatório Premium

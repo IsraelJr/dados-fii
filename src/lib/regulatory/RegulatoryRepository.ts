@@ -16,6 +16,7 @@ import {
   type RepositoryProbe,
   type ValidationRun,
 } from "@/types/regulatory";
+import type { TimelineRecord } from "@/types/timeline";
 
 type AuditAction = "publish" | "rollback" | "validation";
 
@@ -240,6 +241,32 @@ export class RegulatoryRepository {
         metadata: data.metadata && typeof data.metadata === "object" ? data.metadata as Record<string, unknown> : {},
       };
     });
+  }
+
+  async getTimelineRecords(ticker: string, limit = 500): Promise<TimelineRecord[]> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.timelineEvents)
+      .where("ticker", "==", ticker)
+      .limit(Math.min(Math.max(limit, 1), 500))
+      .get();
+    return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, unknown> }));
+  }
+
+  async getAuditEventsForTicker(ticker: string, limit = 100): Promise<RegulatoryAuditEvent[]> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.auditLogs)
+      .where("ticker", "==", ticker)
+      .limit(Math.min(Math.max(limit, 1), 100))
+      .get();
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Record<string, unknown>;
+      return {
+        id: doc.id,
+        action: String(data.action || "unknown"),
+        actor: data.actor ? String(data.actor) : null,
+        ticker: data.ticker ? String(data.ticker) : null,
+        createdAt: toIso(data.createdAt) || toIso(data.createdAtIso),
+        metadata: data.metadata && typeof data.metadata === "object" ? data.metadata as Record<string, unknown> : {},
+      };
+    }).sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
   }
 
   private auditPayload(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>) {
