@@ -34,10 +34,18 @@ test.describe("Fase 1 - segurança das APIs", () => {
     const rollback = await request.post("/api/admin/fii-ingestion/rollback", {
       data: { runId: "invalid", proposalHash: "invalid", confirmationText: "invalid" },
     });
+    const systemHealth = await request.get("/api/admin/system/health");
+    const validationHistory = await request.get("/api/admin/system/validation-history");
+    const runValidation = await request.post("/api/admin/system/run-validation", {
+      data: { persist: false },
+    });
 
     expect(status.status()).toBe(401);
     expect(publication.status()).toBe(401);
     expect(rollback.status()).toBe(401);
+    expect(systemHealth.status()).toBe(401);
+    expect(validationHistory.status()).toBe(401);
+    expect(runValidation.status()).toBe(401);
   });
 
   test("login com chave incorreta é recusado", async ({ request }) => {
