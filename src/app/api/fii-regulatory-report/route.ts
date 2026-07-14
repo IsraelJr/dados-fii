@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
       scores: result.insights.scores,
       scoreMeta: {
         methodologyVersion: result.insights.methodologyVersion,
+        engineVersion: result.insights.scoreEngine.version,
+        engineMethodologyVersion: result.insights.scoreEngine.methodologyVersion,
         semaphore: result.insights.semaphore,
         assessedDimensions: result.insights.assessedDimensions,
         unavailableDimensions: result.insights.unavailableDimensions,
