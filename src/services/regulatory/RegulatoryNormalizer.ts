@@ -1,12 +1,12 @@
-import { normalizeIngestionTicker } from "@/lib/fiiIngestionConfig";
-import type { RegulatoryInsightSnapshot } from "@/lib/regulatoryInsights";
+import { normalizeIngestionTicker } from "../../lib/fiiIngestionConfig.ts";
+import type { RegulatoryInsightSnapshot } from "../../lib/regulatoryInsights.ts";
 import type {
   RawFundDocument,
   RawRegulatoryData,
   RegulatoryData,
   RegulatoryDocument,
   RegulatoryFundView,
-} from "./RegulatoryTypes";
+} from "./RegulatoryTypes.ts";
 
 function numberOrNull(value: unknown) {
   const parsed = Number(value);
