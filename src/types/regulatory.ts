@@ -5,6 +5,7 @@ export const REGULATORY_SCHEMA_VERSION = 1 as const;
 export type FundKind = "FII" | "FIAGRO" | "FI_INFRA" | "UNKNOWN";
 export type ValidationSeverity = "error" | "warning";
 export type ParserStatus = "healthy" | "degraded" | "down" | "unknown";
+export type HealthStatus = ParserStatus | "disabled";
 
 export type ValidationIssue = {
   code: string;
@@ -68,6 +69,14 @@ export type ValidationFundResult = {
   issues: ValidationIssue[];
 };
 
+export type ValidationCheck = {
+  id: string;
+  status: "passed" | "warning" | "failed";
+  message: string;
+  durationMs?: number;
+  metadata?: Record<string, string | number | boolean | null>;
+};
+
 export type ValidationRun = {
   id: string;
   status: "completed" | "failed";
@@ -85,6 +94,13 @@ export type ValidationRun = {
   healthScore: number;
   results: ValidationFundResult[];
   parserHealth: ParserHealth[];
+  checks: ValidationCheck[];
+  coverage: {
+    fii: number;
+    fiagro: number;
+    fiInfra: number;
+    unknown: number;
+  };
   error?: string;
 };
 
@@ -102,10 +118,63 @@ export type ParserHealth = {
 
 export type SystemHealth = {
   ok: boolean;
+  status: HealthStatus;
   score: number;
   generatedAt: string;
+  components: {
+    firestore: HealthComponent;
+    parser: HealthComponent;
+    qa: HealthComponent;
+    publication: HealthComponent;
+    rollback: HealthComponent;
+    cache: HealthComponent;
+    score: HealthComponent;
+  };
   latestValidation: Omit<ValidationRun, "results"> | null;
   parsers: ParserHealth[];
-  cache: { entries: number; ttlMs: number; marketTtlMs: number };
+  cache: {
+    entries: number;
+    ttlMs: number;
+    marketTtlMs: number;
+    funds: CacheMetrics;
+    market: CacheMetrics;
+  };
   collections: Record<string, string>;
+};
+
+export type CacheMetrics = {
+  entries: number;
+  hits: number;
+  misses: number;
+  sets: number;
+  evictions: number;
+  expired: number;
+  hitRate: number;
+  maxEntries: number;
+  ttlMs: number;
+};
+
+export type HealthComponent = {
+  status: HealthStatus;
+  score: number;
+  message: string;
+  checkedAt: string;
+  latencyMs?: number;
+  metadata?: Record<string, string | number | boolean | null>;
+};
+
+export type RepositoryProbe = {
+  ok: boolean;
+  latencyMs: number;
+  legacyFundsAvailable: boolean;
+  error?: string;
+};
+
+export type RegulatoryAuditEvent = {
+  id: string;
+  action: "publish" | "rollback" | "validation" | string;
+  actor?: string | null;
+  ticker?: string | null;
+  createdAt: string | null;
+  metadata?: Record<string, unknown>;
 };

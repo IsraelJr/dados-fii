@@ -1,4 +1,6 @@
 import { createHash } from "crypto";
+import { featureEnabled } from "@/lib/featureFlags";
+import { healthEngine, type HealthEngine } from "@/lib/health/HealthEngine";
 import { RegulatoryCache, positiveInt } from "@/lib/regulatory/RegulatoryCache";
 import {
   canonicalFrom,
@@ -20,12 +22,11 @@ import {
 } from "@/lib/regulatory/RegulatoryTypes";
 import { validateRegulatoryFund } from "@/lib/regulatory/RegulatoryValidator";
 import { scoreEngine, type ScoreEngine } from "@/lib/scores/ScoreEngine";
+import { ValidationRunner } from "@/lib/validation/ValidationRunner";
 import type {
   MarketQuote,
-  ParserHealth,
   PublicFundData,
   SystemHealth,
-  ValidationFundResult,
   ValidationRun,
 } from "@/types/regulatory";
 
@@ -35,18 +36,29 @@ const MAX_CACHE_ENTRIES = positiveInt(process.env.REGULATORY_CACHE_MAX_ENTRIES, 
 const GOOGLE_SHEET_RANGE = "A1:F400";
 
 function scoresEnabled() {
-  return process.env.ENABLE_SCORE_ENGINE !== "false";
+  return featureEnabled("ENABLE_SCORE_ENGINE");
+}
+
+export class ValidationExecutionError extends Error {
+  constructor(message: string, readonly run: ValidationRun) {
+    super(message);
+    this.name = "ValidationExecutionError";
+  }
 }
 
 export class RegulatoryDataService {
   private readonly fundCache = new RegulatoryCache<PublicFundData>(FUND_CACHE_TTL_MS, MAX_CACHE_ENTRIES);
   private readonly marketCache = new RegulatoryCache<MarketQuote[]>(MARKET_CACHE_TTL_MS, 1);
   private marketPromise: Promise<MarketQuote[]> | null = null;
+  private readonly validationRunner: ValidationRunner;
 
   constructor(
     private readonly repository: RegulatoryRepository = regulatoryRepository,
     private readonly scores: ScoreEngine = scoreEngine,
-  ) {}
+    private readonly health: HealthEngine = healthEngine,
+  ) {
+    this.validationRunner = new ValidationRunner({ canonicalFrom, normalizeTicker, validateFund: validateRegulatoryFund, now: nowIso });
+  }
 
   invalidate(ticker?: string) {
     if (ticker) this.fundCache.delete(normalizeTicker(ticker));
@@ -215,58 +227,24 @@ export class RegulatoryDataService {
   async runValidation(actor: string, options?: { limit?: number }): Promise<ValidationRun> {
     const startedAt = nowIso();
     const startedMs = Date.now();
+    const id = this.repository.validationRunId();
     const limit = Math.min(Math.max(Number(options?.limit || 400), 1), 500);
-    const [legacyRecords, overlayRecords, marketResult] = await Promise.all([
-      this.repository.listLegacy(limit),
-      this.repository.listOverlays(limit),
-      this.getMarketQuotes({ force: true }).then((items) => ({ items, error: null as string | null })).catch((error: Error) => ({ items: [] as MarketQuote[], error: error.message })),
-    ]);
-    const overlayMap = new Map(overlayRecords.map(({ id, data }) => [normalizeTicker(id || data.ticker), data]));
-    const funds = legacyRecords.map(({ id, data }) => ({ ticker: normalizeTicker(data.code || id), data })).filter((item) => item.ticker);
-    const results: ValidationFundResult[] = funds.map(({ ticker, data }) => {
-      const fund = canonicalFrom(ticker, data, overlayMap.get(ticker));
-      const issues = validateRegulatoryFund(fund);
-      return { ticker, kind: fund.kind, valid: !issues.some((issue) => issue.severity === "error"), issues };
-    });
-    const errors = results.reduce((total, item) => total + item.issues.filter((issue) => issue.severity === "error").length, 0);
-    const warnings = results.reduce((total, item) => total + item.issues.filter((issue) => issue.severity === "warning").length, 0);
-    const valid = results.filter((item) => item.valid).length;
-    const parserHealth: ParserHealth[] = [
-      this.parser("legacy-firestore", funds.length ? "healthy" : "down", funds.length, funds.length ? 0 : 1, null),
-      this.parser("regulatory-overlay", overlayRecords.length || funds.length ? "healthy" : "unknown", overlayRecords.length, 0, null),
-      this.parser("google-sheets", marketResult.error ? "down" : marketResult.items.length ? "healthy" : "degraded", marketResult.items.length, marketResult.error ? 1 : 0, marketResult.error),
-    ];
-    const dataScore = results.length ? (valid / results.length) * 80 : 0;
-    const parserScore = parserHealth.reduce((sum, parser) => sum + parser.successRate, 0) / Math.max(parserHealth.length, 1) * 0.2;
-    const run: ValidationRun = {
-      id: this.repository.validationRunId(),
-      status: "completed",
-      startedAt,
-      finishedAt: nowIso(),
-      durationMs: Date.now() - startedMs,
-      actor,
-      totals: { processed: results.length, valid, invalid: results.length - valid, errors, warnings },
-      healthScore: Math.round(Math.max(0, Math.min(100, dataScore + parserScore))),
-      results,
-      parserHealth,
-    };
-    await this.repository.saveValidationRun(run);
-    return run;
-  }
-
-  private parser(parser: string, status: ParserHealth["status"], successes: number, failures: number, error: string | null): ParserHealth {
-    const total = successes + failures;
-    return {
-      parser,
-      status,
-      successRate: total ? Math.round((successes / total) * 100) : 0,
-      successes,
-      failures,
-      lastSuccessAt: successes ? nowIso() : null,
-      lastFailureAt: failures ? nowIso() : null,
-      lastError: error,
-      updatedAt: nowIso(),
-    };
+    try {
+      const [legacyRecords, overlayRecords, market] = await Promise.all([
+        this.repository.listLegacy(limit),
+        this.repository.listOverlays(limit),
+        this.getMarketQuotes({ force: true }).then((items) => ({ items, error: null as string | null })).catch((error: Error) => ({ items: [] as MarketQuote[], error: error.message })),
+      ]);
+      const scoreProbe = scoresEnabled() ? { enabled: true, ...this.scores.healthCheck() } : { enabled: false, ok: false };
+      const run = this.validationRunner.complete({ id, actor, startedAt, startedMs, legacyRecords, overlayRecords, market, scoreProbe });
+      await this.repository.saveValidationRun(run);
+      return run;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Falha desconhecida no Validation Runner.";
+      const run = this.validationRunner.failed({ id, actor, startedAt, startedMs, error: message });
+      await this.repository.saveValidationRun(run).catch(() => undefined);
+      throw new ValidationExecutionError(message, run);
+    }
   }
 
   getValidationHistory(limit = 20) {
@@ -278,19 +256,28 @@ export class RegulatoryDataService {
   }
 
   async getSystemHealth(): Promise<SystemHealth> {
-    const [history, parsers] = await Promise.all([this.getValidationHistory(1), this.getParserHealth()]);
-    const latest = history[0] || null;
-    const score = latest?.healthScore || 0;
-    const latestValidation = latest ? Object.fromEntries(Object.entries(latest).filter(([key]) => key !== "results")) as Omit<ValidationRun, "results"> : null;
-    return {
-      ok: score >= 80 && parsers.every((parser) => parser.status !== "down"),
-      score,
+    const [firestore, history, parsers, auditEvents] = await Promise.all([
+      this.repository.probe(),
+      this.getValidationHistory(1),
+      this.getParserHealth(),
+      this.repository.getAuditEvents(50),
+    ]);
+    const scoreProbe = scoresEnabled()
+      ? { enabled: true, ...this.scores.healthCheck() }
+      : { enabled: false, ok: false, version: "disabled" };
+    return this.health.evaluate({
       generatedAt: nowIso(),
-      latestValidation,
+      firestore,
       parsers,
-      cache: { entries: this.fundCache.size, ttlMs: FUND_CACHE_TTL_MS, marketTtlMs: MARKET_CACHE_TTL_MS },
+      latestValidation: history[0] || null,
+      auditEvents,
+      fundCache: this.fundCache.stats(),
+      marketCache: this.marketCache.stats(),
+      scoreProbe,
+      ttlMs: FUND_CACHE_TTL_MS,
+      marketTtlMs: MARKET_CACHE_TTL_MS,
       collections: REGULATORY_COLLECTIONS,
-    };
+    });
   }
 
   requestFingerprint(parts: string[]) {

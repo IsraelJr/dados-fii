@@ -5,7 +5,7 @@ import { regulatoryDataService } from "@/lib/regulatoryDataService";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const auth = await authorizeAdminRequest(req, "parser-health", { limit: 30 });
   if (auth.rejection) return auth.rejection;
   try {

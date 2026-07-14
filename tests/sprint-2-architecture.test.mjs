@@ -24,15 +24,20 @@ test("legacy reports no longer read regulatory Fiis directly", () => {
   }
 });
 
-test("system admin endpoints are POST-only and have no direct Firestore access", () => {
-  for (const endpoint of ["health", "parser-health", "validation-history", "run-validation"]) {
+test("Health and Validation endpoints use canonical HTTP methods without direct Firestore", () => {
+  for (const endpoint of ["health", "parser-health", "validation-history"]) {
     const source = read(`src/app/api/admin/system/${endpoint}/route.ts`);
-    assert.match(source, /export async function POST/);
-    assert.doesNotMatch(source, /export async function GET/);
+    assert.match(source, /export async function GET/);
+    assert.doesNotMatch(source, /export async function POST/);
     assert.match(source, /authorizeAdminRequest/);
     assert.match(source, /regulatoryDataService/);
     assert.doesNotMatch(source, /firebase-admin|adminDb|\.collection\(/);
   }
+  const runner = read("src/app/api/admin/system/run-validation/route.ts");
+  assert.match(runner, /export async function POST/);
+  assert.match(runner, /ENABLE_SYSTEM_VALIDATION/);
+  assert.match(runner, /ValidationExecutionError/);
+  assert.doesNotMatch(runner, /firebase-admin|adminDb|\.collection\(/);
 });
 
 test("admin session uses verified Firebase identity and HttpOnly cookie", () => {
@@ -44,6 +49,7 @@ test("admin session uses verified Firebase identity and HttpOnly cookie", () => 
   assert.match(session, /sameSite:\s*"strict"/);
   assert.match(security, /verifySessionCookie/);
   assert.match(security, /ADMIN_EMAILS/);
+  assert.match(security, /role: "admin"/);
   assert.match(security, /consumeAdminRateLimit/);
 });
 
@@ -87,6 +93,31 @@ test("Sprint 2.2 exposes one ScoreEngine with every required calculated score", 
     assert.match(types, new RegExp(`${score}: ScoreResult`));
   }
   assert.doesNotMatch(engine, /firebase-admin|adminDb|\.collection\(/);
+});
+
+test("Sprint 2.3 health covers every canonical subsystem", () => {
+  const route = read("src/app/api/admin/system/health/route.ts");
+  const engine = read("src/lib/health/HealthEngine.ts");
+  assert.match(route, /ENABLE_HEALTH_MONITOR/);
+  for (const component of ["firestore", "parser", "qa", "publication", "rollback", "cache", "score"]) {
+    assert.match(engine, new RegExp(`\\b${component}\\b`));
+  }
+  assert.match(engine, /WEIGHTS/);
+  assert.match(engine, /latestValidation/);
+});
+
+test("Sprint 2.4 has a structured Validation Runner and persisted failure path", () => {
+  const service = read("src/lib/regulatoryDataService.ts");
+  const runner = read("src/lib/validation/ValidationRunner.ts");
+  const repository = read("src/lib/regulatory/RegulatoryRepository.ts");
+  assert.match(service, /new ValidationRunner/);
+  assert.match(service, /validationRunner\.complete/);
+  assert.match(service, /validationRunner\.failed/);
+  assert.match(runner, /fund-kind-coverage/);
+  assert.match(runner, /score-engine/);
+  assert.match(runner, /coverage/);
+  assert.match(repository, /saveValidationRun/);
+  assert.match(repository, /status: run\.status/);
 });
 
 test("legacy observability no longer accepts admin secrets", () => {

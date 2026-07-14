@@ -12,6 +12,8 @@ import {
 import {
   REGULATORY_SCHEMA_VERSION,
   type ParserHealth,
+  type RegulatoryAuditEvent,
+  type RepositoryProbe,
   type ValidationRun,
 } from "@/types/regulatory";
 
@@ -179,7 +181,7 @@ export class RegulatoryRepository {
     const batch = adminDb.batch();
     batch.set(runRef, { ...run, results: run.results.slice(0, 250), createdAt: adminFieldValue.serverTimestamp() });
     run.parserHealth.forEach((parser) => batch.set(adminDb.collection(REGULATORY_COLLECTIONS.parserHealth).doc(parser.parser), parser, { merge: true }));
-    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("validation", run.actor, undefined, { runId: run.id, totals: run.totals, healthScore: run.healthScore }));
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("validation", run.actor, undefined, { runId: run.id, status: run.status, totals: run.totals, healthScore: run.healthScore, error: run.error || null }));
     await batch.commit();
   }
 
@@ -191,13 +193,53 @@ export class RegulatoryRepository {
     const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.validationRuns).orderBy("createdAt", "desc").limit(Math.min(Math.max(limit, 1), 50)).get();
     return snapshot.docs.map((doc) => {
       const data = doc.data() as ValidationRun & { createdAt?: unknown };
-      return { ...data, id: doc.id, startedAt: toIso(data.startedAt) || data.startedAt, finishedAt: toIso(data.finishedAt) || data.finishedAt };
+      return {
+        ...data,
+        id: doc.id,
+        startedAt: toIso(data.startedAt) || data.startedAt,
+        finishedAt: toIso(data.finishedAt) || data.finishedAt,
+        checks: Array.isArray(data.checks) ? data.checks : [],
+        coverage: data.coverage || { fii: 0, fiagro: 0, fiInfra: 0, unknown: 0 },
+      };
     });
   }
 
   async getParserHealth(): Promise<ParserHealth[]> {
     const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.parserHealth).get();
     return snapshot.docs.map((doc) => ({ ...(doc.data() as ParserHealth), parser: doc.id })).sort((a, b) => a.parser.localeCompare(b.parser));
+  }
+
+  async probe(): Promise<RepositoryProbe> {
+    const startedAt = Date.now();
+    try {
+      const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.legacyFunds).limit(1).get();
+      return { ok: true, latencyMs: Date.now() - startedAt, legacyFundsAvailable: !snapshot.empty };
+    } catch (error) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - startedAt,
+        legacyFundsAvailable: false,
+        error: error instanceof Error ? error.message : "Falha desconhecida ao consultar o Firestore.",
+      };
+    }
+  }
+
+  async getAuditEvents(limit = 50): Promise<RegulatoryAuditEvent[]> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.auditLogs)
+      .orderBy("createdAt", "desc")
+      .limit(Math.min(Math.max(limit, 1), 100))
+      .get();
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Record<string, unknown>;
+      return {
+        id: doc.id,
+        action: String(data.action || "unknown"),
+        actor: data.actor ? String(data.actor) : null,
+        ticker: data.ticker ? String(data.ticker) : null,
+        createdAt: toIso(data.createdAt) || toIso(data.createdAtIso),
+        metadata: data.metadata && typeof data.metadata === "object" ? data.metadata as Record<string, unknown> : {},
+      };
+    });
   }
 
   private auditPayload(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>) {

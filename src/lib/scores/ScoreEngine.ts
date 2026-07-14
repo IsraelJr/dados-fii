@@ -209,6 +209,27 @@ export class ScoreEngine {
       premium: premiumScore(parts),
     };
   }
+
+  healthCheck() {
+    try {
+      const scores = this.calculate({
+        ticker: "HEALTH11",
+        code: "HEALTH11",
+        fundKind: "FII",
+        name: "Health Check",
+        segment: "Teste",
+        price: 100,
+        dividendYield12m: 10,
+        dailyLiquidity: 1_000_000,
+        regulatoryMeta: { currentVersion: 1, sources: [{ provider: "self-check", kind: "manual" }], validation: { valid: true, issues: [] } },
+      });
+      const required = ["risk", "dividend", "governance", "growth", "liquidity", "quality", "premium"] as const;
+      const ok = required.every((key) => Number.isFinite(scores[key].score) && scores[key].score >= 0 && scores[key].score <= 100);
+      return { ok, version: SCORE_ENGINE_VERSION, generatedScores: required.length, ...(ok ? {} : { error: "Score fora do intervalo de 0 a 100." }) };
+    } catch (error) {
+      return { ok: false, version: SCORE_ENGINE_VERSION, generatedScores: 0, error: error instanceof Error ? error.message : "Falha desconhecida no ScoreEngine." };
+    }
+  }
 }
 
 export const scoreEngine = new ScoreEngine();

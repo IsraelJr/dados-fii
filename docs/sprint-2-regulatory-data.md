@@ -1,6 +1,6 @@
-# Fase 2 — Sprints 2.1 e 2.2
+# Fase 2 — Sprints 2.1 a 2.4
 
-Este documento segue o `DADOS_FII_HANDOFF.md` v2.0.0. Na ordem canônica, a Sprint 2.2 é o Score Engine; Health, Validation e Dashboard pertencem às Sprints 2.3, 2.4 e 2.5.
+Este documento segue o `DADOS_FII_HANDOFF.md` v2.1.0. Na ordem canônica, a Sprint 2.2 é o Score Engine, a 2.3 é Health e a 2.4 é Validation. Dashboard continua como Sprint 2.5.
 
 ## Sprint 2.1 — RegulatoryDataService
 
@@ -51,17 +51,42 @@ Cada resultado contém nota de 0 a 100, confiança, faixa, métricas utilizadas 
 
 O Premium é uma composição determinística: Risk 25%, Dividend 20%, Quality 20%, Governance 15%, Growth 10% e Liquidity 10%. Scores são dados derivados e ficam apenas na resposta/cache; não são gravados manualmente no Firestore.
 
-## Estruturas antecipadas
+## Sprint 2.3 — Health System
 
-As APIs e telas de Health, Validation e Admin que já existiam na branch foram preservadas com Firebase Auth, `ADMIN_EMAILS`, cookie HttpOnly e rate limiting. Elas são fundações antecipadas, mas só serão consideradas concluídas após os critérios formais das Sprints 2.3, 2.4 e 2.5.
+`GET /api/admin/system/health` retorna um Health Score ponderado e diagnósticos independentes de:
+
+- Firestore;
+- Parser;
+- QA;
+- Publicação;
+- Rollback;
+- Cache;
+- Score Engine.
+
+Cada componente informa status, nota, mensagem, horário, metadados e, quando aplicável, latência. O Firestore é testado pelo `RegulatoryRepository`; publicação e rollback usam a trilha de auditoria; o ScoreEngine executa um autoteste; e o cache expõe hits, misses, expirações e evictions.
+
+## Sprint 2.4 — Validation System
+
+O `ValidationRunner` executa a validação regulatória, calcula cobertura por FII, FIAGRO e FI-Infra e produz checks estruturados para registros, tipos, mercado e ScoreEngine.
+
+| Método e rota | Função |
+|---|---|
+| `POST /api/admin/system/run-validation` | Executa, audita e persiste uma validação |
+| `GET /api/admin/system/validation-history?limit=20` | Retorna o histórico persistido |
+| `GET /api/admin/system/parser-health` | Retorna saúde consolidada dos parsers |
+| `GET /api/admin/system/health` | Retorna o System Health consolidado |
+
+Execuções interrompidas também geram um registro com status `failed`, erro e check auditável. Descobrir dados inválidos é resultado da validação, não falha silenciosa da API.
+
+Todas as rotas exigem Firebase Authentication, e-mail em `ADMIN_EMAILS`, perfil `admin`, cookie HttpOnly, mesma origem e rate limiting. O Dashboard existente continua uma fundação antecipada; seus critérios formais pertencem à Sprint 2.5.
 
 ## Variáveis de ambiente
 
 ```text
 ADMIN_EMAILS=admin1@dominio.com,admin2@dominio.com
 ENABLE_SCORE_ENGINE=true
-ENABLE_SYSTEM_VALIDATION=false
-ENABLE_HEALTH_MONITOR=false
+ENABLE_SYSTEM_VALIDATION=true
+ENABLE_HEALTH_MONITOR=true
 ENABLE_AI_INSIGHTS=false
 ENABLE_REPORT_PREMIUM=false
 REGULATORY_CACHE_TTL_MS=300000
@@ -69,8 +94,8 @@ REGULATORY_MARKET_CACHE_TTL_MS=60000
 REGULATORY_CACHE_MAX_ENTRIES=500
 ```
 
-O Score Engine fica ativo por padrão e só é desligado quando `ENABLE_SCORE_ENGINE=false`. Os demais flags permanecem reservados às suas sprints canônicas.
+Score, Health e Validation ficam ativos por padrão e aceitam opt-out explícito com `false`. Os flags de IA e Premium permanecem reservados às suas sprints canônicas.
 
 ## Verificação
 
-`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre separação arquitetural, ausência de Firestore nas APIs regulatórias novas, proteção de campos legados, autorização de publicação, geração dos sete scores, limites, explicabilidade, composição Premium e ausência de mutação da entrada.
+`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, proteção de campos legados, publicação segura, sete scores, Health completo, métricas de cache, cobertura FII/FIAGRO, checks de validação e persistência de falhas.

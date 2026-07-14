@@ -28,6 +28,13 @@ async function post<T>(url: string, body: Record<string, unknown> = {}) {
   return payload as T;
 }
 
+async function get<T>(url: string) {
+  const response = await fetch(url, { method: "GET", credentials: "same-origin", cache: "no-store" });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || `Falha HTTP ${response.status}`);
+  return payload as T;
+}
+
 function dateTime(value?: string | null) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
@@ -55,9 +62,9 @@ export default function AdminSystemPage() {
     setError("");
     try {
       const [healthPayload, parserPayload, historyPayload] = await Promise.all([
-        post<{ health: SystemHealth }>("/api/admin/system/health"),
-        post<{ parsers: ParserHealth[] }>("/api/admin/system/parser-health"),
-        post<{ history: ValidationRun[] }>("/api/admin/system/validation-history", { limit: 20 }),
+        get<{ health: SystemHealth }>("/api/admin/system/health"),
+        get<{ parsers: ParserHealth[] }>("/api/admin/system/parser-health"),
+        get<{ history: ValidationRun[] }>("/api/admin/system/validation-history?limit=20"),
       ]);
       setData({ health: healthPayload.health, parsers: parserPayload.parsers || [], history: historyPayload.history || [] });
     } catch (caught) {
@@ -153,7 +160,7 @@ export default function AdminSystemPage() {
       <div className="mx-auto max-w-7xl">
         <header className="rounded-3xl bg-gradient-to-br from-indigo-800 to-blue-950 p-6 text-white shadow-lg md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Sprint 2.2 · Health & Admin</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · sessão HttpOnly · bloqueio após 1 minuto sem atividade</p></div>
+            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Sprints 2.3–2.4 · Health & Validation</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · sessão HttpOnly · bloqueio após 1 minuto sem atividade</p></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={loadDashboard} disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-indigo-800 disabled:opacity-60"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Atualizar</button><button type="button" onClick={() => logout()} className="inline-flex items-center gap-2 rounded-full bg-red-500/20 px-4 py-2 text-sm font-extrabold text-white ring-1 ring-white/20"><LogOut size={16} /> Sair</button></div>
           </div>
         </header>

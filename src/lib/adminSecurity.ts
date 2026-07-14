@@ -8,7 +8,7 @@ export const ADMIN_SESSION_MAX_AGE_SECONDS = 30 * 60;
 type RateBucket = { count: number; resetsAt: number };
 const rateBuckets = new Map<string, RateBucket>();
 
-export type AdminIdentity = { uid: string; email: string };
+export type AdminIdentity = { uid: string; email: string; role: "admin" };
 export type AdminAuthorization =
   | { ok: true; identity: AdminIdentity }
   | { ok: false; status: 401 | 403 | 429; error: string; retryAfter?: number };
@@ -74,7 +74,7 @@ export async function requireAdmin(req: NextRequest, options?: { scope?: string;
     const decoded = await admin.auth().verifySessionCookie(cookie, true);
     const email = String(decoded.email || "").trim().toLowerCase();
     if (!decoded.email_verified || !isAllowedAdminEmail(email)) return { ok: false, status: 403, error: "E-mail sem autorização administrativa." };
-    return { ok: true, identity: { uid: decoded.uid, email } };
+    return { ok: true, identity: { uid: decoded.uid, email, role: "admin" } };
   } catch {
     return { ok: false, status: 401, error: "Sessão administrativa inválida ou expirada." };
   }

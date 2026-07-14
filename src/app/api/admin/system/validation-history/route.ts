@@ -5,11 +5,10 @@ import { regulatoryDataService } from "@/lib/regulatoryDataService";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const auth = await authorizeAdminRequest(req, "validation-history", { limit: 30 });
   if (auth.rejection) return auth.rejection;
-  const body = await req.json().catch(() => ({}));
-  const limit = Math.min(Math.max(Number(body?.limit || 20), 1), 50);
+  const limit = Math.min(Math.max(Number(req.nextUrl.searchParams.get("limit") || 20), 1), 50);
   try {
     const history = await regulatoryDataService.getValidationHistory(limit);
     return adminJson({ ok: true, count: history.length, history });
