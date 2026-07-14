@@ -1,10 +1,7 @@
-import { adminDb } from "@/lib/firebaseAdmin";
-import { RegulatoryRepositoryError } from "./RegulatoryErrors";
-import type { RawFundDocument } from "./RegulatoryTypes";
-
-export interface RegulatoryRepository {
-  getFundDocument(ticker: string): Promise<RawFundDocument | null>;
-}
+import { adminDb } from "../../lib/firebaseAdmin.ts";
+import { RegulatoryRepositoryError } from "./RegulatoryErrors.ts";
+import type { RegulatoryRepository } from "./RegulatoryRepositoryContract.ts";
+import type { RawFundDocument } from "./RegulatoryTypes.ts";
 
 export class FirestoreRegulatoryRepository implements RegulatoryRepository {
   async getFundDocument(ticker: string) {
