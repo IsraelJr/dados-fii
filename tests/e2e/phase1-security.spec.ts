@@ -7,23 +7,32 @@ function isBlocked(status: number) {
 const sameOriginHeaders = { "Sec-Fetch-Site": "same-origin" };
 
 test.describe("Fase 1 - segurança das APIs", () => {
-  test("relatórios regulatórios não são expostos por GET anônimo", async ({ request }) => {
+  test("relatórios e scores regulatórios não são expostos por GET anônimo", async ({ request }) => {
     const report = await request.get("/api/fii-regulatory-report?ticker=KNCA11");
     const comparator = await request.get("/api/fii-regulatory-comparator?tickers=KNCA11,MXRF11");
+    const scores = await request.get("/api/fii-regulatory-scores?ticker=KNCA11");
 
     expect(isBlocked(report.status())).toBeTruthy();
     expect(isBlocked(comparator.status())).toBeTruthy();
+    expect(isBlocked(scores.status())).toBeTruthy();
   });
 
   test("POST anônimo não recebe conteúdo regulatório", async ({ request }) => {
-    const response = await request.post("/api/fii-regulatory-report", {
+    const reportResponse = await request.post("/api/fii-regulatory-report", {
       data: { ticker: "KNCA11" },
     });
-    const body = await response.json().catch(() => ({}));
+    const scoresResponse = await request.post("/api/fii-regulatory-scores", {
+      data: { ticker: "KNCA11" },
+    });
+    const reportBody = await reportResponse.json().catch(() => ({}));
+    const scoresBody = await scoresResponse.json().catch(() => ({}));
 
-    expect(response.ok()).toBeFalsy();
-    expect(body.report).toBeUndefined();
-    expect(body.premiumInput).toBeUndefined();
+    expect(reportResponse.ok()).toBeFalsy();
+    expect(reportBody.report).toBeUndefined();
+    expect(reportBody.premiumInput).toBeUndefined();
+    expect(scoresResponse.ok()).toBeFalsy();
+    expect(scoresBody.scores).toBeUndefined();
+    expect(scoresBody.facts).toBeUndefined();
   });
 
   test("rotas administrativas rejeitam acesso sem sessão", async ({ request }) => {
