@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const LIVE_ENABLED = process.env.E2E_RUN_LIVE_INGESTION === "true";
 const ADMIN_SECRET = process.env.E2E_ADMIN_UPDATE_SECRET || "";
+const sameOriginHeaders = { "Sec-Fetch-Site": "same-origin" };
 
 async function sleep(milliseconds: number) {
   await new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -10,10 +11,8 @@ async function sleep(milliseconds: number) {
 test.describe("Fase 1 - smoke operacional controlado", () => {
   test.skip(!LIVE_ENABLED || !ADMIN_SECRET, "Smoke operacional exige E2E_RUN_LIVE_INGESTION=true e segredo administrativo.");
 
-  test("valida sessão, lock, heartbeat, QA e pré-publicação sem escrita oficial", async ({ request, baseURL }) => {
+  test("valida sessão, lock, heartbeat, QA e pré-publicação sem escrita oficial", async ({ request }) => {
     test.setTimeout(15 * 60 * 1000);
-    const origin = new URL(baseURL || "http://127.0.0.1:3000").origin;
-    const sameOriginHeaders = { Origin: origin, "Sec-Fetch-Site": "same-origin" };
 
     const login = await request.post("/api/admin/session", {
       headers: sameOriginHeaders,
