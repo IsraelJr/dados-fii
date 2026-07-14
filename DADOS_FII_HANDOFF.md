@@ -413,7 +413,7 @@ antes da produção.
 
 - Revisar e fazer merge do PR #6.
 - Configurar as variáveis de produção e habilitar `ENABLE_REPORT_PREMIUM` e `ENABLE_AUTOMATIC_MONITOR` quando as integrações estiverem prontas.
-- Validar o deploy, o cron e as entregas por e-mail/Telegram em produção.
+- Validar o deploy, o cron diário das 12:00 UTC e as entregas por e-mail/Telegram em produção.
 
 ### Decisões abertas
 

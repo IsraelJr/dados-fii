@@ -166,7 +166,7 @@ O Dashboard Administrativo apresenta o snapshot de observabilidade junto com Hea
 
 ## Sprint 2.11 — Monitor Automático
 
-O monitor pode ser executado por `POST /api/admin/system/run-monitor` ou pelo cron autenticado `GET /api/cron/system-monitor`. O status é consultado por `GET /api/admin/system/monitor-status` e exibido no Dashboard.
+O monitor pode ser executado por `POST /api/admin/system/run-monitor` ou pelo cron autenticado `GET /api/cron/system-monitor`. O status é consultado por `GET /api/admin/system/monitor-status` e exibido no Dashboard. Em produção, o cron roda diariamente às 12:00 UTC (09:00 no horário de Brasília), mantendo compatibilidade com o plano Vercel Hobby e evitando custo de upgrade apenas por frequência.
 
 Cada execução:
 

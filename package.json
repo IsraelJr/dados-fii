@@ -41,6 +41,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/twilio": "^3.19.2",
+    "@types/uuid": "^9.0.8",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
