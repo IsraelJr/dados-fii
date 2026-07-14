@@ -1,11 +1,12 @@
 export class RegulatoryServiceError extends Error {
-  constructor(
-    message: string,
-    public readonly code: string,
-    public readonly status: number
-  ) {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(message: string, code: string, status: number) {
     super(message);
     this.name = "RegulatoryServiceError";
+    this.code = code;
+    this.status = status;
   }
 }
 
