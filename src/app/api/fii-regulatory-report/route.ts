@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRegulatoryReportInput } from "@/lib/regulatoryService";
+import { regulatoryDataService } from "@/services/regulatory";
 import {
   registeredUserErrorStatus,
   requireRegisteredUserAccess,
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const ticker = String(body?.ticker || "").trim();
     if (!ticker) return reply({ ok: false, error: "Informe o ticker." }, 400);
 
-    const result = await getRegulatoryReportInput(ticker);
+    const result = await regulatoryDataService.getReportInput(ticker);
     if (!result.found) {
       return reply({ ok: false, found: false, ticker: result.ticker }, 404);
     }
@@ -57,6 +57,11 @@ export async function POST(req: NextRequest) {
       tier: "free",
       ticker: result.ticker,
       access: { email: access.email },
+      service: {
+        version: "regulatory-data-service-v1",
+        dataVersion: result.fund.regulatoryData?.dataVersion || null,
+        cacheHit: result.cache.hit,
+      },
       fund: {
         code: result.fund.code,
         name: result.fund.name,
