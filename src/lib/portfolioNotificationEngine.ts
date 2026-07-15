@@ -1,6 +1,8 @@
 import { createHash } from "crypto";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { logObservabilityEvent } from "@/lib/observability";
+import { regulatoryDataService } from "@/lib/regulatoryDataService";
+import { extractUserWallet } from "@/lib/userWallet";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -96,15 +98,6 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function tickerOf(value: unknown) {
-  return String(value || "").trim().toUpperCase();
-}
-
-function quotaOf(value: unknown) {
-  const parsed = Number(String(value ?? "0").replace(",", "."));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
 function parseCurrency(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   const raw = String(value || "").replace(/[^\d,.-]/g, "").trim();
@@ -124,44 +117,6 @@ function formatPercent(value: number) {
 
 function hash(value: string) {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function cleanWallet(value: unknown): WalletItem[] {
-  const values = Array.isArray(value)
-    ? value
-    : value && typeof value === "object"
-      ? Object.entries(value as Record<string, any>).map(([key, item]) => ({ ticker: item?.ticker || item?.code || item?.fii || item?.symbol || key, quotas: item?.quotas ?? item?.quantity ?? item?.qtd ?? item?.shares ?? item?.cotas ?? item }))
-      : [];
-
-  return values
-    .map((item: any) => ({
-      ticker: tickerOf(typeof item === "string" ? item : item?.ticker || item?.code || item?.fii || item?.symbol),
-      quotas: quotaOf(typeof item === "string" ? 1 : item?.quotas ?? item?.quantity ?? item?.qtd ?? item?.shares ?? item?.cotas),
-    }))
-    .filter((item) => /^[A-Z0-9]{4,8}11$/.test(item.ticker) && item.quotas > 0)
-    .slice(0, 120)
-    .sort((a, b) => a.ticker.localeCompare(b.ticker));
-}
-
-function extractWallet(data: any) {
-  const candidates = [
-    data?.wallet,
-    data?.wallet?.items,
-    data?.carteira,
-    data?.carteira?.items,
-    data?.carteira?.fiis,
-    data?.fiis,
-    data?.portfolio,
-    data?.portfolio?.items,
-    data?.portfolio?.fiis,
-  ];
-
-  for (const candidate of candidates) {
-    const wallet = cleanWallet(candidate);
-    if (wallet.length) return wallet;
-  }
-
-  return [];
 }
 
 function localDateParts(date = new Date()): LocalDateParts {
@@ -199,33 +154,14 @@ function isVipUser(data: any) {
 }
 
 async function loadFiiMap(tickers: string[]) {
-  const unique = Array.from(new Set(tickers.map(tickerOf).filter(Boolean)));
-  const collection = adminDb.collection("Fiis");
+  const unique = Array.from(new Set(tickers.map((ticker) => String(ticker || "").trim().toUpperCase()).filter(Boolean)));
   const map = new Map<string, any>();
-
   if (!unique.length) return map;
 
-  const directSnapshots = await adminDb.getAll(...unique.map((ticker) => collection.doc(ticker)));
-  directSnapshots.forEach((snap) => {
-    if (!snap.exists) return;
-    const data = snap.data() || {};
-    const ticker = tickerOf(data.code || snap.id);
-    if (ticker) map.set(ticker, data);
-  });
-
-  const missing = unique.filter((ticker) => !map.has(ticker));
-  const fallbacks = await Promise.all(missing.map(async (ticker) => {
-    const query = await collection.where("code", "==", ticker).limit(1).get();
-    return { ticker, doc: query.docs[0] || null };
-  }));
-
-  fallbacks.forEach(({ ticker, doc }) => {
-    if (doc) map.set(ticker, doc.data() || {});
-  });
-
+  const result = await regulatoryDataService.getMany(unique, 120);
+  Object.entries(result.items).forEach(([ticker, data]) => map.set(ticker, data));
   return map;
 }
-
 function collectDividendRecords(data: any, currentYear: number) {
   const records: DividendRecord[] = [];
 
@@ -588,7 +524,7 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
   try {
     const data = doc.data() || {};
     const email = normalizeEmail(data.email || (String(doc.id).includes("@") ? doc.id : ""));
-    const wallet = extractWallet(data);
+    const wallet = extractUserWallet(data);
     if (!isEmail(email)) return { userId: doc.id, status: "skipped", reason: "sem_email_valido" };
     if (!wallet.length) return { userId: doc.id, email, status: "skipped", reason: "carteira_vazia" };
 
