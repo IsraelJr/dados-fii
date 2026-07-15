@@ -7,6 +7,9 @@ import { extractUserWallet } from "@/lib/userWallet";
 const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DEFAULT_FREE_LIMIT = 3;
+const RISK_ENGINE_VERSION = 2;
+const RISK_ACTIVATION_BUFFER_PERCENT = 1;
+const RISK_RESOLUTION_BUFFER_PERCENT = 1;
 
 type WalletItem = { ticker: string; quotas: number };
 type DividendRecord = {
@@ -56,6 +59,16 @@ type RiskFlag = {
   threshold: number;
   severity: NotificationSeverity;
   actionUrl: string;
+};
+type StoredRisk = {
+  type: RiskFlag["type"];
+  key: string;
+  weight: number;
+  threshold: number;
+};
+type QueuedEmailNotification = {
+  ref: any;
+  input: NotificationInput;
 };
 type LocalDateParts = {
   year: number;
@@ -229,17 +242,83 @@ function severityForWeight(weight: number): NotificationSeverity {
   return "info";
 }
 
+function riskThresholds(isVip: boolean) {
+  return {
+    asset: isVip ? envNumber("VIP_ASSET_CONCENTRATION_THRESHOLD", 30) : envNumber("FREE_ASSET_CONCENTRATION_THRESHOLD", 40),
+    income: envNumber("VIP_INCOME_CONCENTRATION_THRESHOLD", 45),
+    segment: envNumber("VIP_SEGMENT_CONCENTRATION_THRESHOLD", 60),
+  };
+}
+
+function riskStableKey(type: RiskFlag["type"], key: string) {
+  return `${type}:${key}`;
+}
+
+function riskConfigurationFingerprint(isVip: boolean) {
+  const thresholds = riskThresholds(isVip);
+  return hash(JSON.stringify({ version: RISK_ENGINE_VERSION, plan: isVip ? "vip" : "free", thresholds }));
+}
+
+function parseLegacyRiskState(ids: unknown[]): Record<string, StoredRisk> {
+  return ids.reduce<Record<string, StoredRisk>>((acc, rawId) => {
+    const id = String(rawId || "");
+    const firstSeparator = id.indexOf(":");
+    const lastSeparator = id.lastIndexOf(":");
+    if (firstSeparator <= 0 || lastSeparator <= firstSeparator) return acc;
+    const type = id.slice(0, firstSeparator) as RiskFlag["type"];
+    const key = id.slice(firstSeparator + 1, lastSeparator);
+    const threshold = Number(id.slice(lastSeparator + 1));
+    if (!(["asset", "income", "segment"] as string[]).includes(type) || !key || !Number.isFinite(threshold)) return acc;
+    acc[riskStableKey(type, key)] = { type, key, threshold, weight: threshold };
+    return acc;
+  }, {});
+}
+
+function storedRiskState(state: any): Record<string, StoredRisk> {
+  if (state?.riskState && typeof state.riskState === "object" && !Array.isArray(state.riskState)) {
+    return Object.fromEntries(Object.entries(state.riskState).flatMap(([stableKey, raw]) => {
+      const item = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+      const type = String(item.type || "") as RiskFlag["type"];
+      const key = String(item.key || "");
+      const weight = Number(item.weight);
+      const threshold = Number(item.threshold);
+      if (!(["asset", "income", "segment"] as string[]).includes(type) || !key || !Number.isFinite(weight) || !Number.isFinite(threshold)) return [];
+      return [[stableKey, { type, key, weight, threshold } satisfies StoredRisk]];
+    }));
+  }
+  return parseLegacyRiskState(Array.isArray(state?.riskFlags) ? state.riskFlags : []);
+}
+
+function buildRiskWeights(positions: PortfolioPosition[], isVip: boolean) {
+  const weights: Record<string, number> = {};
+  const totalValue = positions.reduce((sum, item) => sum + item.currentValue, 0);
+  const totalIncome = positions.reduce((sum, item) => sum + item.estimatedIncome, 0);
+
+  positions.forEach((item) => {
+    weights[riskStableKey("asset", item.ticker)] = totalValue > 0 ? (item.currentValue / totalValue) * 100 : 0;
+    if (isVip && totalIncome > 0) weights[riskStableKey("income", item.ticker)] = (item.estimatedIncome / totalIncome) * 100;
+  });
+
+  if (isVip && totalValue > 0) {
+    const bySegment = new Map<string, number>();
+    positions.forEach((item) => bySegment.set(item.segment, (bySegment.get(item.segment) || 0) + item.currentValue));
+    bySegment.forEach((value, segment) => {
+      weights[riskStableKey("segment", segment)] = (value / totalValue) * 100;
+    });
+  }
+
+  return weights;
+}
+
 function buildRiskFlags(positions: PortfolioPosition[], isVip: boolean) {
   const flags: RiskFlag[] = [];
   const totalValue = positions.reduce((sum, item) => sum + item.currentValue, 0);
   const totalIncome = positions.reduce((sum, item) => sum + item.estimatedIncome, 0);
-  const assetThreshold = isVip ? envNumber("VIP_ASSET_CONCENTRATION_THRESHOLD", 30) : envNumber("FREE_ASSET_CONCENTRATION_THRESHOLD", 40);
-  const incomeThreshold = envNumber("VIP_INCOME_CONCENTRATION_THRESHOLD", 45);
-  const segmentThreshold = envNumber("VIP_SEGMENT_CONCENTRATION_THRESHOLD", 60);
+  const { asset: assetThreshold, income: incomeThreshold, segment: segmentThreshold } = riskThresholds(isVip);
 
   const assetCandidates = positions
     .map((item) => ({ item, weight: totalValue > 0 ? (item.currentValue / totalValue) * 100 : 0 }))
-    .filter(({ weight }) => weight >= assetThreshold)
+    .filter(({ weight }) => weight >= assetThreshold + RISK_ACTIVATION_BUFFER_PERCENT)
     .sort((a, b) => b.weight - a.weight);
 
   (isVip ? assetCandidates.slice(0, 3) : assetCandidates.slice(0, 1)).forEach(({ item, weight }) => {
@@ -259,7 +338,7 @@ function buildRiskFlags(positions: PortfolioPosition[], isVip: boolean) {
   if (isVip && totalIncome > 0) {
     positions
       .map((item) => ({ item, weight: (item.estimatedIncome / totalIncome) * 100 }))
-      .filter(({ weight }) => weight >= incomeThreshold)
+      .filter(({ weight }) => weight >= incomeThreshold + RISK_ACTIVATION_BUFFER_PERCENT)
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 3)
       .forEach(({ item, weight }) => {
@@ -282,7 +361,7 @@ function buildRiskFlags(positions: PortfolioPosition[], isVip: boolean) {
     positions.forEach((item) => bySegment.set(item.segment, (bySegment.get(item.segment) || 0) + item.currentValue));
     Array.from(bySegment.entries())
       .map(([segment, value]) => ({ segment, weight: (value / totalValue) * 100 }))
-      .filter(({ weight }) => weight >= segmentThreshold)
+      .filter(({ weight }) => weight >= segmentThreshold + RISK_ACTIVATION_BUFFER_PERCENT)
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 3)
       .forEach(({ segment, weight }) => {
@@ -368,26 +447,44 @@ async function createNotification(userRef: any, input: NotificationInput) {
   return { id, ref, created };
 }
 
-async function emitNotification(userRef: any, email: string, input: NotificationInput, emailEnabled: boolean) {
-  const created = await createNotification(userRef, input);
-  if (!created.created) return { created: false, emailSent: false };
+function consolidatedEmailContent(items: QueuedEmailNotification[]) {
+  const digest = items.find(({ input }) => input.type === "portfolio_digest")?.input;
+  const updates = items.filter(({ input }) => input.type !== "portfolio_digest").map(({ input }) => input);
+  const title = digest ? "Resumo da sua carteira" : "Atualizações da sua carteira";
+  const message = digest?.message || `Sua carteira teve ${updates.length} atualização(ões) nesta execução.`;
+  const subject = digest
+    ? `[Dados FII] Resumo da sua carteira${updates.length ? ` · ${updates.length} alerta(s)` : ""}`
+    : `[Dados FII] ${updates.length} atualização(ões) da sua carteira`;
+  const text = [
+    digest ? `Resumo\n${digest.message}` : "",
+    ...updates.map((input) => `${input.title}\n${input.message}`),
+  ].filter(Boolean).join("\n\n");
+  const impact = digest?.portfolioImpact || {};
+  const summaryRows = digest ? [
+    ["Patrimônio estimado", formatCurrency(Number(impact.totalValue || 0))],
+    ["Renda mensal estimada", formatCurrency(Number(impact.estimatedIncome || 0))],
+    ["Renda anunciada", formatCurrency(Number(impact.announcedIncome || 0))],
+    ["Maior posição", impact.topTicker ? `${String(impact.topTicker)} · ${formatPercent(Number(impact.topWeightPercent || 0))}` : "-"],
+  ].map(([label, value]) => `<tr><td style="padding:10px;border-bottom:1px solid #e2e8f0;color:#64748b">${escapeHtml(String(label))}</td><td style="padding:10px;border-bottom:1px solid #e2e8f0;font-weight:700;text-align:right">${escapeHtml(String(value))}</td></tr>`).join("") : "";
+  const summaryHtml = summaryRows ? `<div style="margin-top:14px;background:#fff;border-radius:16px;padding:14px;border:1px solid #e2e8f0"><table style="width:100%;border-collapse:collapse">${summaryRows}</table></div>` : "";
+  const updatesHtml = updates.length ? `<div style="margin-top:14px;background:#fff;border-radius:16px;padding:18px;border:1px solid #e2e8f0"><p style="margin:0 0 12px;font-weight:700">Atualizações desta execução</p>${updates.map((input) => `<div style="margin-top:10px;border-left:4px solid ${input.severity === "critical" ? "#dc2626" : input.severity === "warning" ? "#d97706" : input.severity === "success" ? "#059669" : "#4f46e5"};padding:10px 12px;background:#f8fafc"><p style="margin:0;font-weight:700">${escapeHtml(input.title)}</p><p style="margin:6px 0 0;color:#475569;line-height:1.5">${escapeHtml(input.message)}</p></div>`).join("")}</div>` : "";
+  const extraHtml = `${summaryHtml}${updatesHtml}`;
+  return { subject, text, html: baseEmailHtml(title, message, "/carteira", extraHtml) };
+}
 
-  let emailSent = false;
-  if (emailEnabled) {
-    const subject = input.emailSubject || `[Dados FII] ${input.title}`;
-    const text = input.emailText || `${input.title}\n\n${input.message}`;
-    const html = input.emailHtml || baseEmailHtml(input.title, input.message, input.actionUrl || "/carteira");
-    const delivery = await sendEmail(email, subject, text, html);
-    emailSent = delivery.sent;
-    await created.ref.set({
-      emailAttemptedAt: adminFieldValue.serverTimestamp(),
-      emailSentAt: delivery.sent ? adminFieldValue.serverTimestamp() : null,
-      emailProvider: delivery.provider,
-      emailError: delivery.sent ? null : delivery.error || "Envio não realizado",
-    }, { merge: true });
-  }
-
-  return { created: true, emailSent };
+async function deliverEmailBatch(email: string, items: QueuedEmailNotification[]) {
+  if (!items.length) return { sent: false, provider: "not-needed" };
+  const content = consolidatedEmailContent(items);
+  const delivery = await sendEmail(email, content.subject, content.text, content.html);
+  const batchId = hash(items.map(({ input }) => `${input.type}|${input.eventKey}`).sort().join("|"));
+  await Promise.all(items.map(({ ref }) => ref.set({
+    emailBatchId: batchId,
+    emailAttemptedAt: adminFieldValue.serverTimestamp(),
+    emailSentAt: delivery.sent ? adminFieldValue.serverTimestamp() : null,
+    emailProvider: delivery.provider,
+    emailError: delivery.sent ? null : delivery.error || "Envio não realizado",
+  }, { merge: true })));
+  return delivery;
 }
 
 function dividendHash(position: PortfolioPosition) {
@@ -507,16 +604,17 @@ function digestNotification(positions: PortfolioPosition[], isVip: boolean, date
   };
 }
 
-function resolvedRiskNotification(flagId: string, dateKey: string): NotificationInput {
-  const [, key] = flagId.split(":");
+function resolvedRiskNotification(previous: StoredRisk, currentWeight: number, threshold: number, dateKey: string): NotificationInput {
+  const stableKey = riskStableKey(previous.type, previous.key);
   return {
     type: "risk_resolved",
-    eventKey: `risk-resolved:${flagId}:${dateKey}`,
-    ticker: /^[A-Z0-9]+11$/.test(key || "") ? key : null,
-    title: "Concentração voltou ao limite",
-    message: `${key || "A concentração monitorada"} deixou de ultrapassar o limite de atenção configurado.`,
+    eventKey: `risk-resolved:${stableKey}:${dateKey}`,
+    ticker: /^[A-Z0-9]+11$/.test(previous.key) ? previous.key : null,
+    title: `${previous.key} voltou ao limite de concentração`,
+    message: `${previous.key} passou de ${formatPercent(previous.weight)} na leitura anterior para ${formatPercent(currentWeight)} agora, abaixo do limite de ${formatPercent(threshold)}. Os pesos podem mudar com as cotações mesmo sem alteração na quantidade de cotas.`,
     severity: "success",
     actionUrl: "/carteira",
+    portfolioImpact: { previousWeightPercent: previous.weight, weightPercent: currentWeight, thresholdPercent: threshold, riskType: previous.type, key: previous.key },
   };
 }
 
@@ -551,6 +649,15 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
     const riskAlertsEnabled = preferences.riskAlerts !== false;
     let notificationsCreated = 0;
     let emailsSent = 0;
+    const queuedEmails: QueuedEmailNotification[] = [];
+
+    const queueNotification = async (input: NotificationInput) => {
+      const created = await createNotification(userRef, input);
+      if (!created.created) return false;
+      notificationsCreated += 1;
+      if (emailEnabled) queuedEmails.push({ ref: created.ref, input });
+      return true;
+    };
 
     for (const position of scope) {
       const currentHash = dividendHash(position);
@@ -558,36 +665,54 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       const previousHash = previousDividendHashes[position.ticker] || "";
       nextDividendHashes[position.ticker] = currentHash;
       if (!initialized || !previousHash || previousHash === currentHash || !dividendAlertsEnabled) continue;
-      const result = await emitNotification(userRef, email, dividendNotification(position, totalEstimatedIncome, isVip), emailEnabled);
-      if (result.created) notificationsCreated += 1;
-      if (result.emailSent) emailsSent += 1;
+      await queueNotification(dividendNotification(position, totalEstimatedIncome, isVip));
     }
 
     const riskFlags = buildRiskFlags(positions, isVip);
-    const previousRiskFlags = Array.isArray(state.riskFlags) ? state.riskFlags.map(String) : [];
-    const currentRiskFlags = riskFlags.map((flag) => flag.id);
+    const thresholds = riskThresholds(isVip);
+    const riskConfiguration = riskConfigurationFingerprint(isVip);
+    const previousRiskState = storedRiskState(state);
+    const previousRiskWeights: Record<string, number> = state.riskWeights && typeof state.riskWeights === "object" ? state.riskWeights : {};
+    const currentRiskWeights = buildRiskWeights(positions, isVip);
+    const completeRiskData = positions.length === wallet.length && positions.every((position) => position.price > 0);
+    const shouldRebaselineRisk = !initialized || Number(state.riskEngineVersion || 0) !== RISK_ENGINE_VERSION || String(state.riskConfigurationFingerprint || "") !== riskConfiguration;
+    const nextRiskState: Record<string, StoredRisk> = completeRiskData ? {} : { ...previousRiskState };
 
-    if (initialized && riskAlertsEnabled) {
-      for (const flag of riskFlags.filter((item) => !previousRiskFlags.includes(item.id))) {
-        const result = await emitNotification(userRef, email, {
+    if (completeRiskData) {
+      for (const flag of riskFlags) {
+        const stableKey = riskStableKey(flag.type, flag.key);
+        const previous = previousRiskState[stableKey];
+        const previousWeight = Number(previousRiskWeights[stableKey]);
+        nextRiskState[stableKey] = { type: flag.type, key: flag.key, weight: flag.weight, threshold: flag.threshold };
+
+        if (!shouldRebaselineRisk && riskAlertsEnabled && !previous && Number.isFinite(previousWeight) && previousWeight < flag.threshold) {
+          await queueNotification({
           type: `risk_${flag.type}`,
-          eventKey: `risk:${flag.id}:${now.dateKey}`,
+          eventKey: `risk:${stableKey}:${now.dateKey}`,
           ticker: /^[A-Z0-9]+11$/.test(flag.key) ? flag.key : null,
           title: flag.title,
-          message: flag.message,
+          message: `${flag.message} Na leitura anterior, o peso era ${formatPercent(previousWeight)}. A comparação usa as mesmas quantidades de cotas com as cotações disponíveis em cada execução.`,
           severity: flag.severity,
           actionUrl: flag.actionUrl,
-          portfolioImpact: { weightPercent: flag.weight, thresholdPercent: flag.threshold, riskType: flag.type, key: flag.key },
-        }, emailEnabled);
-        if (result.created) notificationsCreated += 1;
-        if (result.emailSent) emailsSent += 1;
+          portfolioImpact: { previousWeightPercent: previousWeight, weightPercent: flag.weight, thresholdPercent: flag.threshold, riskType: flag.type, key: flag.key },
+          });
+        }
       }
 
-      if (isVip) {
-        for (const resolved of previousRiskFlags.filter((flagId: string) => !currentRiskFlags.includes(flagId))) {
-          const result = await emitNotification(userRef, email, resolvedRiskNotification(resolved, now.dateKey), emailEnabled);
-          if (result.created) notificationsCreated += 1;
-          if (result.emailSent) emailsSent += 1;
+      for (const [stableKey, previous] of Object.entries(previousRiskState)) {
+        if (nextRiskState[stableKey]) continue;
+        const currentWeight = Number(currentRiskWeights[stableKey]);
+        const threshold = thresholds[previous.type];
+        if (!Number.isFinite(currentWeight)) {
+          nextRiskState[stableKey] = previous;
+          continue;
+        }
+        if (currentWeight > threshold - RISK_RESOLUTION_BUFFER_PERCENT) {
+          nextRiskState[stableKey] = { ...previous, weight: currentWeight, threshold };
+          continue;
+        }
+        if (!shouldRebaselineRisk && riskAlertsEnabled && isVip) {
+          await queueNotification(resolvedRiskNotification(previous, currentWeight, threshold, now.dateKey));
         }
       }
     }
@@ -601,11 +726,14 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
     let nextLastDigestDate = String(state.lastDigestDate || "");
 
     if (digestDue) {
-      const result = await emitNotification(userRef, email, digestNotification(positions, isVip, now.dateKey), emailEnabled);
-      if (result.created) notificationsCreated += 1;
-      if (result.emailSent) emailsSent += 1;
-      digestSent = result.emailSent;
+      await queueNotification(digestNotification(positions, isVip, now.dateKey));
       nextLastDigestDate = now.dateKey;
+    }
+
+    if (emailEnabled && queuedEmails.length) {
+      const delivery = await deliverEmailBatch(email, queuedEmails);
+      emailsSent = delivery.sent ? 1 : 0;
+      digestSent = Boolean(delivery.sent && queuedEmails.some(({ input }) => input.type === "portfolio_digest"));
     }
 
     await stateRef.set({
@@ -614,7 +742,12 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       walletCount: wallet.length,
       alertScopeCount: scope.length,
       dividendHashes: nextDividendHashes,
-      riskFlags: currentRiskFlags,
+      riskEngineVersion: RISK_ENGINE_VERSION,
+      riskConfigurationFingerprint: riskConfiguration,
+      riskDataComplete: completeRiskData,
+      riskState: nextRiskState,
+      riskWeights: completeRiskData ? currentRiskWeights : previousRiskWeights,
+      riskFlags: Object.values(nextRiskState).map((item) => `${item.type}:${item.key}:${item.threshold}`),
       lastDigestDate: nextLastDigestDate || null,
       digestSchedule: schedule,
       lastProcessedDate: now.dateKey,

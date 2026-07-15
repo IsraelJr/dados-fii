@@ -8,7 +8,8 @@ O novo processamento não utiliza nem altera o `monitor.js` legado. Ele roda por
 2. Às 11:30 UTC, `/api/admin/process-portfolio-notifications` lê as carteiras salvas no Firestore.
 3. O serviço identifica novos dividendos, mudanças de concentração e a necessidade de envio do resumo da carteira.
 4. Cada evento recebe uma chave determinística e é salvo em `User/{userId}/Notifications`, impedindo duplicidade.
-5. Os e-mails são enviados pela Resend e os mesmos eventos aparecem na central de notificações do site.
+5. Os eventos da mesma execução continuam separados na central de notificações, mas são consolidados em um único e-mail por usuário.
+6. O e-mail é enviado pela Resend com o resumo e todas as atualizações geradas naquela execução.
 
 A primeira execução cria a linha de base dos dividendos e riscos, evitando disparar alertas antigos em massa. O resumo do dia pode ser enviado normalmente nessa primeira execução.
 
@@ -90,6 +91,12 @@ A preferência global pode ser substituída individualmente no documento do usu�
 - Cada notificação usa um identificador derivado do tipo e da chave do evento.
 - O e-mail só é tentado depois de a notificação ser criada com sucesso.
 - Alertas de concentração são emitidos quando o limite é cruzado, e não todos os dias.
+- O estado de concentração usa uma identidade estável por tipo e ativo/segmento; o limite não faz parte dessa identidade.
+- Cada execução guarda o percentual calculado. O e-mail informa o percentual anterior, o atual e o limite comparado.
+- A primeira execução da versão atual, mudanças de plano/limites e dados incompletos apenas recriam a linha de base, sem avisos contraditórios.
+- A ativação e a resolução usam margem de 1 ponto percentual para reduzir alertas causados por oscilação próxima ao limite.
+- A quantidade de cotas pode permanecer igual e o peso mudar com as cotações; essa origem é explicitada no alerta.
+- Uma execução envia no máximo um e-mail por usuário, ainda que gere resumo, dividendos e vários alertas.
 
 ## Coleções criadas
 
