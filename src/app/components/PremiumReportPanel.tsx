@@ -7,9 +7,29 @@ import { auth } from "@/lib/firebase";
 import type { PremiumFundReport } from "@/types/premium-report";
 
 type PremiumResponse = { ok?: boolean; report?: PremiumFundReport; error?: string; access?: { plan?: string } };
+type WalletItem = { ticker?: string; quotas?: number; quantity?: number };
+const WALLET_STORAGE_KEY = "dados-fii-wallet-v1";
 
-function value(number: number | null, suffix = "") {
-  return number === null ? "-" : `${number.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}${suffix}`;
+function value(number: number | null, suffix = "", digits = 2) {
+  return number === null ? "-" : `${number.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits })}${suffix}`;
+}
+
+function currency(number: number | null) {
+  return number === null ? "-" : number.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function signedCurrency(number: number | null) {
+  if (number === null) return "-";
+  return `${number > 0 ? "+" : ""}${currency(number)}`;
+}
+
+function wallet() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WALLET_STORAGE_KEY) || "[]") as WalletItem[];
+    return Array.isArray(parsed) ? parsed.map((item) => ({ ticker: item.ticker, quotas: item.quotas || item.quantity })) : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function PremiumReportPanel({ ticker }: { ticker: string }) {
@@ -19,7 +39,7 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => onAuthStateChanged(auth, setUser), []);
+  useEffect(() => auth ? onAuthStateChanged(auth, setUser) : undefined, []);
 
   async function generate() {
     if (!user) {
@@ -31,7 +51,9 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
     try {
       const token = await user.getIdToken();
       const response = await fetch(`/api/fii/${encodeURIComponent(ticker)}/report/premium`, {
-        headers: { Authorization: `Bearer ${token}` },
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ holdings: wallet() }),
         cache: "no-store",
       });
       const payload = await response.json().catch(() => ({})) as PremiumResponse;
@@ -61,23 +83,29 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
       {report && (
         <div className="mt-6 space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PremiumMetric label="Plano" content={plan.toUpperCase()} />
-            <PremiumMetric label="P/VP" content={value(report.valuation.pvp)} />
-            <PremiumMetric label="Ágio/desconto" content={value(report.valuation.premiumDiscountPercent, "%")} />
-            <PremiumMetric label="Percentil entre pares" content={value(report.comparative.percentile, "%")} />
+            <PremiumMetric label="Plano" content={plan.toUpperCase()} description="Tipo de acesso usado para gerar este relatório." />
+            <PremiumMetric label="P/VP" content={value(report.valuation.pvp)} description="Preço da cota dividido pelo valor patrimonial por cota." />
+            <PremiumMetric label="Ágio/desconto" content={value(report.valuation.premiumDiscountPercent, "%")} description="Positivo indica preço acima do VP; negativo indica preço abaixo do VP." />
+            <PremiumMetric label="Percentil entre pares" content={report.comparative.percentile === null ? "Amostra insuficiente" : value(report.comparative.percentile, "%")} description="Posição da nota composta diante de fundos comparáveis; não mede retorno futuro." />
           </div>
 
-          <PremiumSection title="Leitura de valuation"><p>{report.valuation.explanation}</p><p className="mt-2 text-xs text-slate-500">VP/cota estimado: {value(report.valuation.estimatedNavPerShare)}</p></PremiumSection>
+          <PremiumSection title="Leitura de valuation"><p>{report.valuation.explanation}</p><p className="mt-2 text-xs text-slate-500">VP/cota estimado: {value(report.valuation.estimatedNavPerShare)}</p><p className="mt-3"><strong>Na prática:</strong> ágio ou desconto não muda o valor da carteira sozinho; mostra quanto o preço se afastou do patrimônio contábil. O peso da posição indica quanto essa avaliação merece atenção.</p></PremiumSection>
+
+          <PremiumSection title="Impacto na sua carteira">
+            <p>{report.portfolioImpact.summary}</p>
+            {report.portfolioImpact.available ? <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><PortfolioMetric label="Cotas" content={value(report.portfolioImpact.holdingQuotas, "", 0)} /><PortfolioMetric label="Valor da posição" content={currency(report.portfolioImpact.currentPositionValue)} /><PortfolioMetric label="Renda mensal estimada" content={currency(report.portfolioImpact.estimatedMonthlyIncome)} /><PortfolioMetric label="Peso na carteira" content={value(report.portfolioImpact.portfolioWeightPercent, "%")} /></div> : <p className="mt-3 rounded-xl bg-white p-3 text-sm ring-1 ring-amber-200">Adicione este fundo à carteira neste navegador para ver o efeito em reais.</p>}
+            {!!report.portfolioImpact.totalHoldings && <p className="mt-3 text-xs text-slate-500">Cobertura de cotações: {report.portfolioImpact.coveredHoldings} de {report.portfolioImpact.totalHoldings} posições.</p>}
+          </PremiumSection>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            {report.stressTest.map((item) => <PremiumSection key={item.id} title={item.label}><p>Preço: {value(item.stressedPrice)} · Rendimento: {value(item.stressedMonthlyDividend)}</p><p className="mt-2">Yield anualizado: {value(item.annualizedYieldPercent, "%")} · Score estimado: {value(item.estimatedScore, "/100")}</p></PremiumSection>)}
+            {report.stressTest.map((item) => { const impact = report.portfolioImpact.stressTests.find((entry) => entry.id === item.id); return <PremiumSection key={item.id} title={item.label}><p>{item.explanation}</p><p className="mt-3"><strong>Hipótese:</strong> preço {value(item.priceShockPercent, "%", 0)} e rendimento {value(item.dividendShockPercent, "%", 0)}.</p><p className="mt-2">Preço por cota: {currency(item.stressedPrice)} · rendimento por cota: {value(item.stressedMonthlyDividend, "", 3)}</p>{impact && <PortfolioProjection impact={impact} />}</PremiumSection>; })}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            {report.scenarios.map((scenario) => <PremiumSection key={scenario.id} title={scenario.label}><ul>{scenario.assumptions.map((assumption) => <li key={assumption}>• {assumption}</li>)}</ul><p className="mt-2">Preço sensível: {value(scenario.projectedPrice)} · DY anualizado: {value(scenario.projectedAnnualizedYieldPercent, "%")}</p></PremiumSection>)}
+            {report.scenarios.map((scenario) => { const impact = report.portfolioImpact.scenarios.find((entry) => entry.id === scenario.id); return <PremiumSection key={scenario.id} title={scenario.label}><p>{scenario.explanation}</p><p className="mt-3 font-bold text-slate-900">Hipóteses da simulação</p><ul className="mt-1">{scenario.assumptions.map((assumption) => <li key={assumption}>• {assumption}</li>)}</ul><p className="mt-2">Preço por cota: {currency(scenario.projectedPrice)} · DY anualizado: {value(scenario.projectedAnnualizedYieldPercent, "%")}</p>{impact && <PortfolioProjection impact={impact} />}</PremiumSection>; })}
           </div>
 
-          <PremiumSection title={`Comparativo — ${report.comparative.peerGroup}`}><p>{report.comparative.peerCount} fundo(s) comparável(is). Nota composta atual: {value(report.comparative.current.premium, "/100")} · média dos pares: {value(report.comparative.peerAverage.premium, "/100")}.</p></PremiumSection>
+          <PremiumSection title={`Comparativo — ${report.comparative.peerGroup}`}><p>{report.comparative.explanation}</p><p className="mt-3">Nota composta atual: {value(report.comparative.current.premium, "/100")} · média dos pares: {value(report.comparative.peerAverage.premium, "/100")}.</p><p className="mt-3 font-bold text-slate-900">Impacto na carteira</p><p className="mt-1">O percentil não altera o patrimônio. Ele apenas contextualiza a nota; sua relevância cresce quando este fundo tem peso elevado na carteira.</p></PremiumSection>
 
           <PremiumSection title="Plano de acompanhamento"><div className="space-y-3">{report.recommendations.map((item, index) => <div key={`${item.category}-${index}`} className="rounded-xl bg-white p-3 ring-1 ring-amber-200"><p className="text-xs font-extrabold uppercase text-amber-700">{item.priority} · {item.category}</p><p className="mt-1 font-bold text-slate-900">{item.action}</p><p className="mt-1 text-xs text-slate-500">Gatilho: {item.trigger}</p></div>)}</div></PremiumSection>
 
@@ -90,8 +118,16 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
   );
 }
 
-function PremiumMetric({ label, content }: { label: string; content: string }) {
-  return <div className="rounded-2xl bg-slate-950 p-4 text-white"><p className="text-xs font-bold uppercase text-amber-300">{label}</p><p className="mt-2 text-xl font-black">{content}</p></div>;
+function PremiumMetric({ label, content, description }: { label: string; content: string; description: string }) {
+  return <div className="rounded-2xl bg-slate-950 p-4 text-white"><p className="text-xs font-bold uppercase text-amber-300">{label}</p><p className="mt-2 text-xl font-black">{content}</p><p className="mt-2 text-xs leading-5 text-slate-300">{description}</p></div>;
+}
+
+function PortfolioMetric({ label, content }: { label: string; content: string }) {
+  return <div className="rounded-xl bg-white p-3 ring-1 ring-amber-200"><p className="text-xs font-bold uppercase text-amber-700">{label}</p><p className="mt-1 font-black text-slate-900">{content}</p></div>;
+}
+
+function PortfolioProjection({ impact }: { impact: PremiumFundReport["portfolioImpact"]["scenarios"][number] }) {
+  return <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-amber-200"><p className="font-bold text-slate-900">Na sua carteira</p><p className="mt-1">Valor da posição: {currency(impact.projectedPositionValue)} ({signedCurrency(impact.positionValueChange)}).</p><p>Renda mensal estimada: {currency(impact.projectedMonthlyIncome)} ({signedCurrency(impact.monthlyIncomeChange)}).</p></div>;
 }
 
 function PremiumSection({ title, children }: { title: string; children: React.ReactNode }) {

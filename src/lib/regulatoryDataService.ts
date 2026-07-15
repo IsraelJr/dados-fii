@@ -27,7 +27,7 @@ import {
 import { validateRegulatoryFund } from "@/lib/regulatory/RegulatoryValidator";
 import { scoreEngine, type ScoreEngine } from "@/lib/scores/ScoreEngine";
 import { freeReportEngine, type FreeReportEngine } from "@/lib/reports/FreeReportEngine";
-import { premiumReportEngine, PremiumReportError, type PremiumReportEngine } from "@/lib/reports/PremiumReportEngine";
+import { premiumReportEngine, PremiumReportError, type PremiumPortfolioHolding, type PremiumReportEngine } from "@/lib/reports/PremiumReportEngine";
 import { observabilityEngine, type ObservabilityEngine } from "@/lib/observability/ObservabilityEngine";
 import { automaticMonitor, type AutomaticMonitor } from "@/lib/monitor/AutomaticMonitor";
 import { ValidationRunner } from "@/lib/validation/ValidationRunner";
@@ -308,18 +308,31 @@ export class RegulatoryDataService {
     });
   }
 
-  async getPremiumReport(value: unknown, options?: { requestKey?: string | null }): Promise<PremiumFundReport | null> {
+  async getPremiumReport(value: unknown, options?: { requestKey?: string | null; holdings?: Array<{ ticker: string; quotas: number }> }): Promise<PremiumFundReport | null> {
     if (!featureEnabled("ENABLE_REPORT_PREMIUM")) {
       throw new PremiumReportError("Relatório Premium está desabilitado.", "PREMIUM_REPORT_DISABLED", 503);
     }
     return this.observability.track("report.premium", async () => {
       const freeReport = await this.getFreeReport(value);
       if (!freeReport) return null;
-      const [peers, aiAnalysis] = await Promise.all([
+      const holdingMap = new Map<string, number>();
+      for (const item of options?.holdings || []) {
+        const ticker = normalizeTicker(item.ticker);
+        const quotas = Number(item.quotas);
+        if (ticker && Number.isFinite(quotas) && quotas > 0) holdingMap.set(ticker, quotas);
+        if (holdingMap.size >= 120) break;
+      }
+      const holdings = Array.from(holdingMap, ([ticker, quotas]) => ({ ticker, quotas }));
+      const [peers, aiAnalysis, portfolioData] = await Promise.all([
         this.listFunds(500, { includeMarket: false, includeScores: true }),
         this.aiInsights.generateFundInsights(freeReport, { requestKey: options?.requestKey }),
+        holdings.length ? this.getMany(holdings.map((item) => item.ticker), 120) : Promise.resolve(null),
       ]);
-      return this.premiumReports.generate(freeReport, peers, aiAnalysis, nowIso());
+      const portfolioHoldings: PremiumPortfolioHolding[] = holdings.map((item) => ({
+        ...item,
+        fund: portfolioData?.items[item.ticker] || null,
+      }));
+      return this.premiumReports.generate(freeReport, peers, aiAnalysis, nowIso(), portfolioHoldings);
     });
   }
 
