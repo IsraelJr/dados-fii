@@ -243,6 +243,26 @@ test("Sprint 2.11 monitors automatically through panel, Firestore, email and Tel
   assert.match(vercel, /\/api\/cron\/system-monitor/);
 });
 
+test("portfolio notifications use the canonical wallet and current regulatory quotes", () => {
+  const engine = read("src/lib/portfolioNotificationEngine.ts");
+  assert.match(engine, /extractUserWallet/);
+  assert.match(engine, /regulatoryDataService\.getMany/);
+  assert.doesNotMatch(engine, /\.collection\(["']Fiis["']\)/);
+  assert.doesNotMatch(engine, /function extractWallet|function cleanWallet/);
+});
+
+test("FII quotes have two decimal places and wallet sync follows the page header", () => {
+  const fiiPage = read("src/app/fii/[ticker]/page.tsx");
+  const walletPage = read("src/app/carteira/page.tsx");
+  const walletLayout = read("src/app/carteira/layout.tsx");
+  assert.match(fiiPage, /function formatQuote/);
+  for (const field of ["data.price", "data.opening", "data.minimum || data.min", "data.maximum || data.max"]) {
+    assert.match(fiiPage, new RegExp(`formatQuote\\(${field.replace(/[.]/g, "\\.")}\\)`));
+  }
+  assert.ok(walletPage.indexOf("<PageHeader") < walletPage.indexOf("<WalletEmailVerifiedSync"));
+  assert.doesNotMatch(walletLayout, /WalletEmailVerifiedSync/);
+});
+
 test("legacy observability no longer accepts admin secrets", () => {
   const route = read("src/app/api/admin/observability/route.ts");
   assert.doesNotMatch(route, /ADMIN_UPDATE_SECRET|CRON_SECRET|x-admin-secret|searchParams\.get\("secret"\)/);
