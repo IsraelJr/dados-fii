@@ -10,8 +10,8 @@ import type {
 } from "@/types/ai-insights";
 import type { FreeFundReport } from "@/types/reports";
 
-export const AI_INSIGHTS_ENGINE_VERSION = "2.0.0";
-export const FUND_INSIGHTS_PROMPT_VERSION = "fund-insights-v2";
+export const AI_INSIGHTS_ENGINE_VERSION = "2.1.0";
+export const FUND_INSIGHTS_PROMPT_VERSION = "fund-insights-v3";
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const CACHE_TTL_MS = positiveInt(process.env.AI_INSIGHTS_CACHE_TTL_MS, 6 * 60 * 60_000);
@@ -91,17 +91,28 @@ function describesInternalDataGap(value: unknown) {
   return registrationField.test(text) && missing.test(text);
 }
 
+function describesRegistrationAsGovernanceStrength(value: unknown) {
+  const text = limitedText(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const positiveGovernance = /governanca.{0,100}(?:forte|boa|solida|excelente|adequada)/.test(text);
+  const registrationBasis = /gestor|administrador|identificad|cadastr|dados? sem erros?|validac|fontes? rastreav/.test(text);
+  return positiveGovernance && registrationBasis;
+}
+
+function unsupportedInsight(value: unknown) {
+  return describesInternalDataGap(value) || describesRegistrationAsGovernanceStrength(value);
+}
+
 function stringList(value: unknown, maxItems = 6) {
   return (Array.isArray(value) ? value : [])
     .map((item) => limitedText(item))
-    .filter((item) => item && !describesInternalDataGap(item))
+    .filter((item) => item && !unsupportedInsight(item))
     .slice(0, maxItems);
 }
 
 function narrative(value: unknown, maxLength = 1200) {
   const text = limitedText(value, maxLength);
   if (!text) return "";
-  const safeSentences = text.split(/(?<=[.!?])\s+/).filter((sentence) => !describesInternalDataGap(sentence));
+  const safeSentences = text.split(/(?<=[.!?])\s+/).filter((sentence) => !unsupportedInsight(sentence));
   return limitedText(safeSentences.join(" "), maxLength);
 }
 
@@ -155,18 +166,22 @@ function safeFundInput(report: FreeFundReport) {
       score: score.score,
       confidence: score.confidence,
       level: score.level,
-      reasons: score.reasons.slice(0, 3).map((item) => limitedText(item)).filter((item) => !describesInternalDataGap(item)),
+      reasons: score.reasons.slice(0, 3).map((item) => limitedText(item)).filter((item) => !unsupportedInsight(item)),
     }]];
   })) : null;
   const attentionPoints = report.attentionPoints
     .filter((item) => item.category !== "Qualidade" && (item.confidence === null || item.confidence === undefined || item.confidence >= 35))
-    .filter((item) => !describesInternalDataGap(`${item.title}. ${item.detail}`))
+    .filter((item) => !unsupportedInsight(`${item.title}. ${item.detail}`))
     .slice(0, 5)
     .map(({ category, title, detail, score, confidence }) => ({ category, title, detail: limitedText(detail), score, confidence }));
   return compactValue({
     reportVersion: report.reportVersion,
     ticker: report.ticker,
-    identity: report.identity,
+    identity: {
+      name: report.identity.name,
+      fundKind: report.identity.fundKind,
+      segment: report.identity.segment,
+    },
     market: report.market,
     analysis: report.analysis,
     scores,
@@ -311,6 +326,8 @@ export class AIInsightsEngine {
               "Escreva em português brasileiro simples, objetivo e auditável.",
               "Não invente fatos nem consulte memória externa.",
               "Nunca transforme campo ausente, dado cadastral incompleto ou score omitido em risco do fundo, governança fraca, baixa transparência, alerta ou oportunidade; simplesmente omita a conclusão sem evidência.",
+              "A simples identificação de gestor, administrador, CNPJ, fontes ou dados sem erros não demonstra governança forte e nunca deve ser apresentada como qualidade de governança.",
+              "Só avalie governança quando o JSON trouxer score confiável baseado em evidências objetivas, como sanções, incidentes, auditoria, participação em assembleias ou divulgação de partes relacionadas.",
               "Priorize relações calculadas que não sejam mera repetição de um campo: valuation versus distribuição sobre o VP, tendência e volatilidade dos dividendos, cortes, liquidez, scores confiáveis e eventos regulatórios recentes.",
               "Riscos, oportunidades e alertas devem citar valores e combinar ao menos dois indicadores disponíveis, ou decorrer de um evento regulatório documentado.",
               "Preencha mudanças somente quando houver comparação histórica ou evento real no JSON; caso contrário, retorne a lista vazia.",

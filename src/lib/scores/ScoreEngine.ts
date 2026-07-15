@@ -1,7 +1,7 @@
-import type { PublicFundData, ValidationIssue } from "../../types/regulatory";
+import type { PublicFundData } from "../../types/regulatory";
 import type { FundScores, ScoreLevel, ScoreMetric, ScoreResult } from "../../types/scores";
 
-export const SCORE_ENGINE_VERSION = "1.0.0";
+export const SCORE_ENGINE_VERSION = "1.1.0";
 
 type NumericRecord = Record<string, unknown>;
 
@@ -39,6 +39,13 @@ function firstValue(data: NumericRecord, keys: string[]) {
   for (const key of keys) {
     const value = data[key];
     if (value !== null && value !== undefined && value !== "") return value;
+  }
+  return null;
+}
+
+function firstBoolean(data: NumericRecord, keys: string[]) {
+  for (const key of keys) {
+    if (typeof data[key] === "boolean") return data[key] as boolean;
   }
   return null;
 }
@@ -105,22 +112,30 @@ function dividendScore(data: NumericRecord): ScoreResult {
 }
 
 function governanceScore(data: NumericRecord): ScoreResult {
-  const meta = data.regulatoryMeta && typeof data.regulatoryMeta === "object" ? data.regulatoryMeta as NumericRecord : {};
-  const validation = meta.validation && typeof meta.validation === "object" ? meta.validation as NumericRecord : {};
-  const issues = Array.isArray(validation.issues) ? validation.issues as ValidationIssue[] : [];
-  const sources = Array.isArray(meta.sources) ? meta.sources.length : 0;
-  const manager = firstValue(data, ["manager", "gestor", "management"]);
-  const administrator = firstValue(data, ["administrator", "administrador", "admin"]);
-  const version = numberValue(meta.currentVersion) || 0;
-  const available = Number(Boolean(manager)) + Number(Boolean(administrator)) + Number(sources > 0) + Number(Boolean(validation.valid));
-  const errors = issues.filter((item) => item.severity === "error").length;
-  const warnings = issues.filter((item) => item.severity === "warning").length;
-  const score = 35 + Number(Boolean(manager)) * 15 + Number(Boolean(administrator)) * 15 + Math.min(15, sources * 5) + Number(version > 0) * 10 - errors * 20 - warnings * 4;
-  return result(score, available, 4, [
-    manager ? "Gestor identificado." : "Gestor não identificado.",
-    administrator ? "Administrador identificado." : "Administrador não identificado.",
-    `${sources} fonte(s) rastreável(is); ${errors} erro(s) e ${warnings} alerta(s) de validação.`,
-  ], { sources, currentVersion: version, validationErrors: errors, validationWarnings: warnings });
+  const sanctions = firstNumber(data, ["regulatorySanctions12m", "governanceSanctions12m", "sancoesRegulatorias12m"]);
+  const incidents = firstNumber(data, ["governanceIncidents12m", "governanceControversies12m", "incidentesGovernanca12m"]);
+  const assemblyParticipation = firstNumber(data, ["assemblyParticipationPercent", "shareholderMeetingParticipation", "participacaoAssembleias"]);
+  const unqualifiedAudit = firstBoolean(data, ["independentAuditUnqualified", "unqualifiedAuditOpinion", "auditoriaSemRessalvas"]);
+  const relatedPartyDisclosure = firstBoolean(data, ["relatedPartyDisclosure", "relatedPartiesDisclosed", "divulgacaoPartesRelacionadas"]);
+  const available = [sanctions, incidents, assemblyParticipation, unqualifiedAudit, relatedPartyDisclosure]
+    .filter((item) => item !== null).length;
+  const metrics = { sanctions, incidents, assemblyParticipation, unqualifiedAudit, relatedPartyDisclosure };
+  if (!available) return result(50, 0, 5, [
+    "Gestor e administrador identificados são dados cadastrais e não qualificam a governança.",
+    "Sem evidências objetivas de governança; aplicada nota neutra.",
+  ], metrics);
+
+  let score = 50;
+  if (sanctions !== null) score += sanctions === 0 ? 15 : -Math.min(45, sanctions * 15);
+  if (incidents !== null) score += incidents === 0 ? 15 : -Math.min(35, incidents * 12);
+  if (assemblyParticipation !== null) score += assemblyParticipation >= 30 ? 10 : assemblyParticipation >= 10 ? 3 : -8;
+  if (unqualifiedAudit !== null) score += unqualifiedAudit ? 10 : -15;
+  if (relatedPartyDisclosure !== null) score += relatedPartyDisclosure ? 10 : -10;
+  return result(score, available, 5, [
+    sanctions !== null ? `${sanctions} sanção(ões) regulatória(s) informada(s) em 12 meses.` : "Sanções regulatórias não avaliadas.",
+    incidents !== null ? `${incidents} incidente(s) de governança informado(s) em 12 meses.` : "Incidentes de governança não avaliados.",
+    assemblyParticipation !== null ? `Participação em assembleias considerada: ${assemblyParticipation.toFixed(1)}%.` : "Participação em assembleias não avaliada.",
+  ], metrics);
 }
 
 function growthScore(data: NumericRecord): ScoreResult {

@@ -47,6 +47,17 @@ test("penalizes objectively riskier inputs", () => {
   assert.ok(riskier < safer);
 });
 
+test("does not reward governance for merely identifying manager and administrator", () => {
+  const engine = new ScoreEngine();
+  const identified = engine.calculate(sample).governance;
+  const withoutRegistration = engine.calculate({ ...sample, manager: "", administrator: "" }).governance;
+  assert.equal(identified.score, 50);
+  assert.equal(identified.confidence, 0);
+  assert.equal(identified.score, withoutRegistration.score);
+  assert.equal(identified.confidence, withoutRegistration.confidence);
+  assert.match(identified.reasons.join(" "), /dados cadastrais e não qualificam/i);
+});
+
 test("premium is the documented weighted composition", () => {
   const scores = new ScoreEngine().calculate(sample);
   const expected = Math.round(
