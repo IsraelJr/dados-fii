@@ -1,7 +1,12 @@
 export type OfficialFundReference = {
   ticker: string;
   cnpj: string;
-  vpCota: number;
+  corporateName?: string;
+  manager?: string;
+  managerCnpj?: string;
+  administrator?: string;
+  administratorCnpj?: string;
+  vpCota?: number;
   referenceDate: string;
   sourceName: string;
   sourceUrl: string;
@@ -16,6 +21,18 @@ const OFFICIAL_FUND_REFERENCES: Record<string, OfficialFundReference> = {
     sourceName: "Relatório de Gestão VGIA11 — maio de 2026",
     sourceUrl: "https://valorainvest.com.br/wp-content/uploads/2026/07/Relatorio-de-Gestao-VGIA11-Maio-2026.pdf",
   },
+  MXRF11: {
+    ticker: "MXRF11",
+    cnpj: "97.521.225/0001-25",
+    corporateName: "MAXI RENDA FUNDO DE INVESTIMENTO IMOBILIÁRIO - FII - RESPONSABILIDADE LIMITADA",
+    manager: "XP VISTA ASSET MANAGEMENT LTDA.",
+    managerCnpj: "16.789.525/0001-98",
+    administrator: "BTG PACTUAL SERVIÇOS FINANCEIROS S/A DTVM",
+    administratorCnpj: "59.281.253/0001-23",
+    referenceDate: "2026-07-15",
+    sourceName: "Cadastro de Fundos CVM — registro_fundo.csv",
+    sourceUrl: "https://dados.cvm.gov.br/dataset/fi-cad",
+  },
 };
 
 function tickerOf(value: unknown) {
@@ -24,6 +41,10 @@ function tickerOf(value: unknown) {
 
 function validCnpj(value: unknown) {
   return String(value || "").replace(/\D/g, "").length === 14;
+}
+
+function filledText(value: unknown) {
+  return String(value || "").trim().length > 1;
 }
 
 function numberOf(value: unknown) {
@@ -74,11 +95,19 @@ export function applyOfficialFundReference(value: unknown, input: Record<string,
   ]);
   const existingPvp = price > 0 && existingVpCota > 0 ? price / existingVpCota : 0;
   const inconsistentValuation = !existingVpCota || (price > 0 && (existingPvp < 0.1 || existingPvp > 10));
-  const useOfficialValuation = !hasNewerValuation(input, reference.referenceDate) && inconsistentValuation;
+  const useOfficialValuation = reference.vpCota !== undefined
+    && !hasNewerValuation(input, reference.referenceDate)
+    && inconsistentValuation;
 
   return {
     ...input,
     cnpj: validCnpj(input.cnpj) ? input.cnpj : reference.cnpj,
+    ...(!filledText(input.socialReason) && reference.corporateName ? { socialReason: reference.corporateName } : {}),
+    ...(!filledText(input.corporateName) && reference.corporateName ? { corporateName: reference.corporateName } : {}),
+    ...(!filledText(input.manager) && reference.manager ? { manager: reference.manager } : {}),
+    ...(!validCnpj(input.managerCnpj) && reference.managerCnpj ? { managerCnpj: reference.managerCnpj } : {}),
+    ...(!filledText(input.administrator) && reference.administrator ? { administrator: reference.administrator } : {}),
+    ...(!validCnpj(input.administratorCnpj) && reference.administratorCnpj ? { administratorCnpj: reference.administratorCnpj } : {}),
     ...(useOfficialValuation ? {
       vpCota: reference.vpCota,
       valorPatrimonialPorCota: reference.vpCota,
