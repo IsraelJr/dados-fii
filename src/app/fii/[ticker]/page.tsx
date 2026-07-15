@@ -8,6 +8,8 @@ import RegulatoryTimeline from "../../components/RegulatoryTimeline";
 import FreeFundReport from "../../components/FreeFundReport";
 import AIInsightsPanel from "../../components/AIInsightsPanel";
 import PremiumReportPanel from "../../components/PremiumReportPanel";
+import PortfolioRegulatoryIntelligence from "../../components/PortfolioRegulatoryIntelligence";
+import { plausiblePvpValue } from "@/lib/fiiDerivedData";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -227,7 +229,8 @@ export default async function FiiPage({ params }: PageProps) {
   const opening = parseCurrency(data?.opening);
   const dailyVariation = getDailyVariation(data?.variation, price, opening);
   const equityValuePerShare = parseNumber(data?.equityValuePerShare);
-  const pvp = parseNumber(data?.pvp) || (price && equityValuePerShare ? price / equityValuePerShare : 0);
+  const calculatedPvp = price && equityValuePerShare ? price / equityValuePerShare : 0;
+  const pvp = plausiblePvpValue(data?.pvp) || plausiblePvpValue(calculatedPvp) || 0;
   const agioDiscount = getAgioDiscount(price, equityValuePerShare);
   const monthlyYield = price > 0 && lastDividendValue > 0 ? (lastDividendValue / price) * 100 : 0;
   const segment = data?.segment_new || data?.segment || "Sem segmento";
@@ -326,6 +329,8 @@ export default async function FiiPage({ params }: PageProps) {
           <FreeFundReport report={freeReportData?.report || null} />
 
           <AIInsightsPanel ticker={ticker} />
+
+          <PortfolioRegulatoryIntelligence focusTicker={ticker} />
 
           <PremiumReportPanel ticker={ticker} />
 
