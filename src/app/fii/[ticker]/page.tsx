@@ -116,10 +116,34 @@ function getVariationTone(value: unknown): MetricTone {
   return "gray";
 }
 
-function getAgioDiscount(price: number, equityValuePerShare: number) {
-  if (!price || !equityValuePerShare) return null;
-  const result = ((price - equityValuePerShare) / equityValuePerShare) * 100;
-  return Number.isFinite(result) ? result : null;
+function getEquityValuePerShare(data: any, price: number) {
+  const directValues = [
+    data?.equityValuePerShare,
+    data?.vpCota,
+    data?.valorPatrimonialPorCota,
+    data?.bookValuePerShare,
+    data?.valuation?.vpCota,
+  ];
+  for (const value of directValues) {
+    const parsed = parseNumber(value);
+    if (parsed > 0) return parsed;
+  }
+
+  const netWorth = parseCurrency(data?.netWorth || data?.equityValue || data?.patrimonioLiquido || data?.patrimony);
+  const shares = parseNumber(data?.numberShares || data?.sharesOutstanding || data?.quotasIssued || data?.cotasEmitidas);
+  if (netWorth > 0 && shares > 0) return netWorth / shares;
+
+  const informedPvp = plausiblePvpValue(data?.pvp) || plausiblePvpValue(data?.valuation?.pvp) || 0;
+  return price > 0 && informedPvp > 0 ? price / informedPvp : 0;
+}
+
+function getAgioDiscount(price: number, equityValuePerShare: number, pvp: number) {
+  if (price > 0 && equityValuePerShare > 0) {
+    const result = ((price - equityValuePerShare) / equityValuePerShare) * 100;
+    return Number.isFinite(result) ? result : null;
+  }
+  const safePvp = plausiblePvpValue(pvp);
+  return safePvp === undefined ? null : (safePvp - 1) * 100;
 }
 
 function getDailyVariation(variation: unknown, price: number, opening: number) {
@@ -239,10 +263,10 @@ export default async function FiiPage({ params }: PageProps) {
   const price = parseCurrency(data?.price);
   const opening = parseCurrency(data?.opening);
   const dailyVariation = getDailyVariation(data?.variation, price, opening);
-  const equityValuePerShare = parseNumber(data?.equityValuePerShare);
+  const equityValuePerShare = getEquityValuePerShare(data, price);
   const calculatedPvp = price && equityValuePerShare ? price / equityValuePerShare : 0;
-  const pvp = plausiblePvpValue(data?.pvp) || plausiblePvpValue(calculatedPvp) || 0;
-  const agioDiscount = getAgioDiscount(price, equityValuePerShare);
+  const pvp = plausiblePvpValue(data?.pvp) || plausiblePvpValue(data?.valuation?.pvp) || plausiblePvpValue(calculatedPvp) || 0;
+  const agioDiscount = getAgioDiscount(price, equityValuePerShare, pvp);
   const monthlyYield = price > 0 && lastDividendValue > 0 ? (lastDividendValue / price) * 100 : 0;
   const segment = data?.segment_new || data?.segment || "Sem segmento";
   const socialReason = data?.socialReason || data?.name || data?.razao_social || "Dados cadastrais não informados.";
