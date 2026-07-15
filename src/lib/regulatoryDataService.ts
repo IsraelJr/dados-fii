@@ -29,6 +29,12 @@ import { premiumReportEngine, PremiumReportError, type PremiumReportEngine } fro
 import { observabilityEngine, type ObservabilityEngine } from "@/lib/observability/ObservabilityEngine";
 import { automaticMonitor, type AutomaticMonitor } from "@/lib/monitor/AutomaticMonitor";
 import { ValidationRunner } from "@/lib/validation/ValidationRunner";
+import { dataCoverageEngine, type DataCoverageEngine } from "@/lib/dataCoverage/DataCoverageEngine";
+import { deriveFiiRiskData, plausiblePvpValue } from "@/lib/fiiDerivedData";
+import {
+  portfolioRegulatoryIntelligenceEngine,
+  type PortfolioRegulatoryIntelligenceEngine,
+} from "@/lib/portfolio/PortfolioRegulatoryIntelligenceEngine";
 import type {
   MarketQuote,
   PublicFundData,
@@ -41,6 +47,8 @@ import type { FundAIInsights } from "@/types/ai-insights";
 import type { PremiumFundReport } from "@/types/premium-report";
 import type { SystemObservability } from "@/types/observability";
 import type { MonitorRun, MonitorStatus } from "@/types/monitor";
+import type { DataCoverageAudit } from "@/types/data-coverage";
+import type { PortfolioHoldingInput, PortfolioRegulatoryIntelligence } from "@/types/portfolio-regulatory-intelligence";
 
 const FUND_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_CACHE_TTL_MS, 5 * 60_000);
 const MARKET_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_MARKET_CACHE_TTL_MS, 60_000);
@@ -61,6 +69,7 @@ export class ValidationExecutionError extends Error {
 export class RegulatoryDataService {
   private readonly fundCache = new RegulatoryCache<PublicFundData>(FUND_CACHE_TTL_MS, MAX_CACHE_ENTRIES);
   private readonly marketCache = new RegulatoryCache<MarketQuote[]>(MARKET_CACHE_TTL_MS, 1);
+  private readonly portfolioIntelligenceCache = new RegulatoryCache<PortfolioRegulatoryIntelligence>(2 * 60_000, 100);
   private marketPromise: Promise<MarketQuote[]> | null = null;
   private readonly validationRunner: ValidationRunner;
 
@@ -74,6 +83,8 @@ export class RegulatoryDataService {
     private readonly premiumReports: PremiumReportEngine = premiumReportEngine,
     private readonly observability: ObservabilityEngine = observabilityEngine,
     private readonly monitor: AutomaticMonitor = automaticMonitor,
+    private readonly dataCoverage: DataCoverageEngine = dataCoverageEngine,
+    private readonly portfolioIntelligence: PortfolioRegulatoryIntelligenceEngine = portfolioRegulatoryIntelligenceEngine,
   ) {
     this.validationRunner = new ValidationRunner({ canonicalFrom, normalizeTicker, validateFund: validateRegulatoryFund, now: nowIso });
   }
@@ -81,6 +92,7 @@ export class RegulatoryDataService {
   invalidate(ticker?: string) {
     if (ticker) this.fundCache.delete(normalizeTicker(ticker));
     else this.fundCache.clear();
+    this.portfolioIntelligenceCache.clear();
   }
 
   async getMarketQuotes(options?: { force?: boolean }) {
@@ -142,10 +154,15 @@ export class RegulatoryDataService {
     const canonical = canonicalFrom(ticker, legacy, overlay);
     const issues = validateRegulatoryFund(canonical);
     const publicOverlay = Object.fromEntries(Object.entries(safeRegulatoryOverlay(overlay)).filter(([key]) => key !== "sources"));
-    const publicData = {
+    const baseData = {
       ...legacy,
       ...publicOverlay,
       ...(quote || marketFallback(ticker)),
+    };
+    const derivedData = deriveFiiRiskData(baseData);
+    const publicData = {
+      ...baseData,
+      ...derivedData,
       code: ticker,
       ticker,
       fundKind: canonical.kind,
@@ -165,6 +182,16 @@ export class RegulatoryDataService {
         validation: { valid: !issues.some((issue) => issue.severity === "error"), issues },
       },
     } as PublicFundData;
+    const safePvp = plausiblePvpValue(publicData.pvp);
+    if (safePvp === undefined) delete publicData.pvp;
+    else publicData.pvp = safePvp;
+    if (publicData.valuation && typeof publicData.valuation === "object" && !Array.isArray(publicData.valuation)) {
+      const valuation = { ...(publicData.valuation as Record<string, unknown>) };
+      const valuationPvp = plausiblePvpValue(valuation.pvp);
+      if (valuationPvp === undefined) delete valuation.pvp;
+      else valuation.pvp = valuationPvp;
+      publicData.valuation = valuation;
+    }
     if (includeScores && scoresEnabled()) publicData.scores = this.scores.calculate(publicData);
     return publicData;
   }
@@ -264,6 +291,59 @@ export class RegulatoryDataService {
         cursor: options?.cursor,
         generatedAt: nowIso(),
       });
+    });
+  }
+
+  async getPortfolioRegulatoryIntelligence(
+    input: PortfolioHoldingInput[],
+    options?: { sinceDays?: number; bypassCache?: boolean },
+  ): Promise<PortfolioRegulatoryIntelligence | null> {
+    return this.observability.track("portfolio.regulatory-intelligence", async () => {
+      const holdings = Array.from(new Map((Array.isArray(input) ? input : []).flatMap((item) => {
+        const ticker = normalizeTicker(item?.ticker);
+        if (!ticker) return [];
+        const quantity = Number(item.quantity);
+        const weight = Number(item.weight);
+        return [[ticker, {
+          ticker,
+          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : undefined,
+          weight: Number.isFinite(weight) && weight > 0 ? Math.min(weight, 100) : undefined,
+        } satisfies PortfolioHoldingInput] as const];
+      })).values()).slice(0, 30);
+      if (!holdings.length) return null;
+
+      const sinceDays = Math.min(Math.max(Math.floor(Number(options?.sinceDays || 90)), 1), 365);
+      const cacheKey = this.requestFingerprint([
+        "portfolio-regulatory-intelligence-v1",
+        String(sinceDays),
+        JSON.stringify(holdings),
+      ]);
+      const cached = options?.bypassCache ? null : this.portfolioIntelligenceCache.get(cacheKey);
+      if (cached) return cached;
+
+      const tickers = holdings.map((holding) => holding.ticker);
+      const [funds, recordsByTicker, auditsByTicker] = await Promise.all([
+        this.getMany(tickers, 30),
+        this.repository.getTimelineRecordsForTickers(tickers),
+        this.repository.getAuditEventsForTickers(tickers),
+      ]);
+      const generatedAt = nowIso();
+      const since = new Date(new Date(generatedAt).getTime() - sinceDays * 86_400_000).toISOString();
+      const enriched = holdings.map((holding) => {
+        const fund = funds.items[holding.ticker] || null;
+        const timeline = this.timeline.build({
+          ticker: holding.ticker,
+          records: recordsByTicker.get(holding.ticker) || [],
+          overlay: fund as RegulatoryOverlay | null,
+          auditEvents: auditsByTicker.get(holding.ticker) || [],
+          limit: 100,
+          generatedAt,
+        });
+        return { ...holding, fund, timeline };
+      });
+      const result = this.portfolioIntelligence.build({ holdings: enriched, generatedAt, since });
+      this.portfolioIntelligenceCache.set(cacheKey, result);
+      return result;
     });
   }
 
@@ -385,6 +465,34 @@ export class RegulatoryDataService {
 
   getParserHealth() {
     return this.repository.getParserHealth();
+  }
+
+  async runDataCoverageAudit(
+    actor: string,
+    options?: { limit?: number; mode?: DataCoverageAudit["mode"] },
+  ): Promise<DataCoverageAudit> {
+    return this.observability.track("qa.data-coverage", async () => {
+      const limit = Math.min(Math.max(Math.floor(Number(options?.limit || 500)), 1), 2_000);
+      const mode = options?.mode === "derived-preview" ? "derived-preview" : "raw";
+      const funds = await this.listFunds(limit, { includeMarket: true, includeScores: false });
+      const records = funds.map((fund) => ({
+        id: fund.ticker,
+        data: mode === "derived-preview" ? { ...fund, ...deriveFiiRiskData(fund) } : fund,
+      }));
+      const audit = this.dataCoverage.audit(records, {
+        id: this.repository.dataCoverageAuditId(),
+        actor,
+        generatedAt: nowIso(),
+        mode,
+        limit: options?.limit ? limit : null,
+      });
+      await this.repository.saveDataCoverageAudit(audit);
+      return audit;
+    });
+  }
+
+  getLatestDataCoverageAudit() {
+    return this.repository.getLatestDataCoverageAudit();
   }
 
   async getSystemHealth(): Promise<SystemHealth> {
