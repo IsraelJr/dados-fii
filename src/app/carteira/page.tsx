@@ -22,6 +22,7 @@ import {
 import PageHeader from "../components/PageHeader";
 import WalletRiskReportCard from "../components/WalletRiskReportCard";
 import AppToast from "../components/AppToast";
+import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
 
 type WalletItem = { ticker: string; quotas: number };
 type LoadedFii = WalletItem & { data?: any; error?: string };
@@ -524,6 +525,7 @@ export default function WalletPage() {
         action={<Link href="/calendario-dividendos-fiis" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">Calendário público</Link>}
       />
 
+      <WalletEmailVerifiedSync />
       <DailyWalletPanel insights={insights} firstPayment={firstPayment} />
       <WalletRiskReportCard walletCount={items.length} />
       <AttentionSection insights={insights} updatingMissing={updatingMissing} updateMissingDividends={updateMissingDividends} />
