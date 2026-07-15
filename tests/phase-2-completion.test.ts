@@ -86,9 +86,39 @@ test("Premium report contains valuation, stress, scenarios, peers, actions and A
   assert.equal(report.stressTest.length, 3);
   assert.equal(report.scenarios.length, 3);
   assert.equal(report.comparative.peerCount, 1);
+  assert.equal(report.comparative.percentile, null);
+  assert.equal(report.comparative.sampleReliable, false);
+  assert.match(report.comparative.explanation, /pelo menos 5/i);
+  assert.equal(report.portfolioImpact.available, false);
+  assert.ok(report.scenarios.every((item) => item.explanation.length > 40));
   assert.ok(report.recommendations.some((item) => item.category === "valuation"));
+  assert.ok(!report.recommendations.some((item) => item.category === "governança"));
+  assert.doesNotMatch(report.recommendations.map((item) => item.action).join(" "), /completar evidências/i);
   assert.equal(report.aiAnalysis.executiveSummary, "Resumo estruturado.");
   assert.match(report.disclaimer.join(" "), /não constitui recomendação/i);
+});
+
+test("Premium report translates scenarios and percentile into the user's portfolio", () => {
+  const peers = Array.from({ length: 5 }, (_, index) => publicFund(`PAR${index}11`, "Logística", 1));
+  const target = publicFund();
+  const other = { ...publicFund("OUTR11"), price: 20 };
+  const report = new PremiumReportEngine().generate(freeReport(), peers, ai(), now, [
+    { ticker: "TEST11", quotas: 10, fund: target },
+    { ticker: "OUTR11", quotas: 10, fund: other },
+  ]);
+
+  assert.equal(report.comparative.percentile, 100);
+  assert.equal(report.comparative.sampleReliable, true);
+  assert.match(report.comparative.explanation, /não mede rentabilidade futura/i);
+  assert.equal(report.portfolioImpact.available, true);
+  assert.equal(report.portfolioImpact.currentPositionValue, 800);
+  assert.equal(report.portfolioImpact.portfolioValue, 1000);
+  assert.equal(report.portfolioImpact.portfolioWeightPercent, 80);
+  const adverse = report.portfolioImpact.scenarios.find((item) => item.id === "adverse");
+  assert.equal(adverse?.projectedPositionValue, 680);
+  assert.equal(adverse?.positionValueChange, -120);
+  assert.equal(adverse?.projectedMonthlyIncome, 6.4);
+  assert.equal(adverse?.monthlyIncomeChange, -1.6);
 });
 
 test("valuation ignores corrupted derived fields and recovers P/VP from equity and shares", () => {
