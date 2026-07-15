@@ -43,15 +43,14 @@ export default function FreeFundReport({ report }: { report: FreeFundReportData 
 
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-indigo-100 md:p-7">
-      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+      <div>
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-indigo-600">Relatório gratuito automático</p>
+          <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-indigo-600">Relatório</p>
           <h2 className="mt-2 text-2xl font-black text-slate-900">Leitura consolidada de {report.ticker}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Dados regulatórios, qualidade, scores e eventos recentes reunidos sem edição manual e sem uso de IA.
           </p>
         </div>
-        <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">v{report.reportVersion}</span>
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
