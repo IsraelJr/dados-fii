@@ -9,6 +9,19 @@ type DividendEntry = {
 
 export type DividendYear = Record<string, DividendEntry>;
 
+export type StatusInvestMarketIndicators = {
+  dailyLiquidity?: number;
+  liquidity?: number;
+  dailyLiquidityUnit?: "BRL/day";
+  dailyLiquidityWindowDays?: number;
+  numberShares?: number;
+  numberCotistas?: number;
+  numberShareholders?: number;
+  marketData?: Record<string, string | number>;
+  marketDataSource?: "StatusInvest";
+  marketDataUpdatedAt?: string;
+};
+
 function parseBrazilianNumber(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   const raw = String(value || "").replace(/R\$|%|\s/g, "").trim();
@@ -96,20 +109,20 @@ function metricAfterLabel(text: string, labels: string[], options?: { currencyRe
   return undefined;
 }
 
-export function parseStatusInvestMarketIndicators(text: string, sourceUrl: string, updatedAt: string) {
+export function parseStatusInvestMarketIndicators(text: string, sourceUrl: string, updatedAt: string): StatusInvestMarketIndicators {
   const dailyLiquidity = metricAfterLabel(text, ["Liquidez média diária", "Liquidez Diária", "Volume médio diário", "Volume diário médio"], { currencyRequired: true });
   const numberShares = metricAfterLabel(text, ["Cotas emitidas", "Número de cotas", "Nº de cotas", "Total de cotas"]);
   const numberShareholders = metricAfterLabel(text, ["Número de cotistas", "Nº de cotistas", "Cotistas"]);
   if (!dailyLiquidity && !numberShares && !numberShareholders) return {};
   const values = {
-    ...(dailyLiquidity ? { dailyLiquidity, liquidity: dailyLiquidity, dailyLiquidityUnit: "BRL/day", dailyLiquidityWindowDays: 30 } : {}),
+    ...(dailyLiquidity ? { dailyLiquidity, liquidity: dailyLiquidity, dailyLiquidityUnit: "BRL/day" as const, dailyLiquidityWindowDays: 30 } : {}),
     ...(numberShares ? { numberShares } : {}),
     ...(numberShareholders ? { numberCotistas: numberShareholders, numberShareholders } : {}),
   };
   return {
     ...values,
     marketData: { ...values, source: "StatusInvest", sourceUrl, updatedAt },
-    marketDataSource: "StatusInvest",
+    marketDataSource: "StatusInvest" as const,
     marketDataUpdatedAt: updatedAt,
   };
 }
