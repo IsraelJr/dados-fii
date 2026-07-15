@@ -256,9 +256,10 @@ test("FII quotes have two decimal places and wallet sync follows the page header
   const walletPage = read("src/app/carteira/page.tsx");
   const walletLayout = read("src/app/carteira/layout.tsx");
   assert.match(fiiPage, /function formatQuote/);
-  for (const field of ["data.price", "data.opening", "data.minimum || data.min", "data.maximum || data.max"]) {
-    assert.match(fiiPage, new RegExp(`formatQuote\\(${field.replace(/[.]/g, "\\.")}\\)`));
-  }
+  assert.match(fiiPage, /formatQuote\(data\.price\)/);
+  assert.match(fiiPage, /formatQuote\(data\.opening\)/);
+  assert.match(fiiPage, /formatQuote\(data\.minimum \|\| data\.min\)/);
+  assert.match(fiiPage, /formatQuote\(data\.maximum \|\| data\.max\)/);
   assert.ok(walletPage.indexOf("<PageHeader") < walletPage.indexOf("<WalletEmailVerifiedSync"));
   assert.doesNotMatch(walletLayout, /WalletEmailVerifiedSync/);
 });
