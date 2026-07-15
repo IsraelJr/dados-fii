@@ -10,6 +10,8 @@ import { ScoreEngine } from "../src/lib/scores/ScoreEngine.ts";
 import { ObservabilityEngine } from "../src/lib/observability/ObservabilityEngine.ts";
 // @ts-expect-error Native strip-types requires explicit extension.
 import { evaluateMonitorAlerts } from "../src/lib/monitor/MonitorRules.ts";
+// @ts-expect-error Native strip-types requires explicit extension.
+import { deriveFiiRiskData } from "../src/lib/fiiDerivedData.ts";
 import type { FundAIInsights } from "../src/types/ai-insights.ts";
 import type { PublicFundData, SystemHealth, ValidationRun } from "../src/types/regulatory.ts";
 
@@ -85,6 +87,23 @@ test("Premium report contains valuation, stress, scenarios, peers, actions and A
   assert.ok(report.recommendations.some((item) => item.category === "valuation"));
   assert.equal(report.aiAnalysis.executiveSummary, "Resumo estruturado.");
   assert.match(report.disclaimer.join(" "), /não constitui recomendação/i);
+});
+
+test("valuation ignores corrupted derived fields and recovers P/VP from equity and shares", () => {
+  const derived = deriveFiiRiskData({
+    price: "R$ 9,72",
+    pvp: 1_812_047_861.05,
+    vpCota: 0,
+    netWorth: 2.3,
+    equityValue: "R$ 4.111.884.081",
+    numberShares: 437_325_297,
+  });
+  assert.equal(derived.netWorth, 4_111_884_081);
+  assert.equal(derived.vpCota, 9.4023);
+  assert.equal(derived.pvp, 1.0338);
+
+  const report = new FreeReportEngine().generate(publicFund("MXRF11", "Recebíveis", 1_812_047_861.05), null, now);
+  assert.equal(report.market.pvp, null);
 });
 
 test("Observability aggregates duration, retries, failures and canonical subsystems", async () => {

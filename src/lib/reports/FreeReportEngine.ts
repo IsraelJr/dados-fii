@@ -2,6 +2,7 @@ import type { PublicFundData, ValidationIssue } from "../../types/regulatory";
 import type { FreeFundReport, FreeReportSignal } from "../../types/reports";
 import type { FundScores, ScoreResult } from "../../types/scores";
 import type { RegulatoryTimelineResponse } from "../../types/timeline";
+import { plausiblePvpValue } from "../fiiDerivedData";
 
 export const FREE_REPORT_VERSION = "1.0.0";
 
@@ -43,6 +44,14 @@ function firstNumber(data: Data, keys: string[]) {
   for (const key of keys) {
     const parsed = numberValue(data[key]);
     if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function firstPvp(data: Data, keys: string[]) {
+  for (const key of keys) {
+    const parsed = plausiblePvpValue(data[key]);
+    if (parsed !== undefined) return parsed;
   }
   return null;
 }
@@ -151,7 +160,7 @@ export class FreeReportEngine {
         price: typeof data.price === "string" || typeof data.price === "number" ? data.price : null,
         variation: typeof data.variation === "string" || typeof data.variation === "number" ? data.variation : null,
         dividendYield: firstNumber(data, ["dividendYield12m", "dy12m", "dividendYield", "dy"]),
-        pvp: firstNumber(data, ["pvp", "p_vp", "pvpa", "priceToBook"]),
+        pvp: firstPvp(data, ["pvp", "p_vp", "pvpa", "priceToBook"]),
         lastDividend: dividend.value,
         lastDividendReference: dividend.reference,
       },

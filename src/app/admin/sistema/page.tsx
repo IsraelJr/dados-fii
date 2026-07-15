@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { Activity, BellRing, CheckCircle2, Database, FileClock, Gauge, History, Home, LogOut, PlayCircle, RefreshCw, RotateCcw, ShieldCheck, Stethoscope, UploadCloud } from "lucide-react";
+import { onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
+import { Activity, BellRing, CheckCircle2, Database, FileClock, Gauge, History, Home, LogIn, LogOut, MailCheck, PlayCircle, RefreshCw, RotateCcw, ShieldCheck, Stethoscope, UploadCloud } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import type { ParserHealth, SystemHealth, ValidationRun } from "@/types/regulatory";
 import type { SystemObservability } from "@/types/observability";
@@ -50,9 +50,20 @@ function statusStyle(status: ParserHealth["status"]) {
   return "bg-red-50 text-red-700 ring-red-100";
 }
 
+function loginError(error: unknown) {
+  const code = String((error as { code?: unknown })?.code || "");
+  if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") return "E-mail ou senha incorretos.";
+  if (code === "auth/too-many-requests") return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+  if (code === "auth/network-request-failed") return "Não foi possível conectar. Verifique sua internet e tente novamente.";
+  return error instanceof Error ? error.message : "Não foi possível entrar no painel.";
+}
+
 export default function AdminSystemPage() {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [adminEmail, setAdminEmail] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
@@ -129,6 +140,50 @@ export default function AdminSystemPage() {
     };
   }, [adminEmail, logout]);
 
+  async function loginAdmin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (!auth) {
+      setError("O login está temporariamente indisponível. Verifique a configuração do Firebase.");
+      return;
+    }
+    setSigningIn(true);
+    blocked.current = false;
+    try {
+      const credential = await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      setFirebaseUser(credential.user);
+      if (!credential.user.emailVerified) {
+        setError("Seu e-mail ainda não foi confirmado. Envie a confirmação abaixo e tente novamente.");
+        return;
+      }
+      await createSession(credential.user);
+      setLoginPassword("");
+    } catch (caught) {
+      setError(loginError(caught));
+    } finally {
+      setSigningIn(false);
+    }
+  }
+
+  async function resendVerification() {
+    if (!firebaseUser) return;
+    setError("");
+    try {
+      await sendEmailVerification(firebaseUser);
+      setError("Enviamos um e-mail de confirmação. Abra o link recebido e depois volte para entrar.");
+    } catch (caught) {
+      setError(loginError(caught));
+    }
+  }
+
+  async function changeAccount() {
+    await logout();
+    if (auth) await signOut(auth).catch(() => undefined);
+    setFirebaseUser(null);
+    setLoginPassword("");
+    blocked.current = false;
+  }
+
   async function runValidation() {
     setRunning(true);
     setError("");
@@ -165,10 +220,36 @@ export default function AdminSystemPage() {
       <main className="mx-auto grid min-h-screen max-w-3xl place-items-center px-4 py-12">
         <section className="w-full rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
           <ShieldCheck className="mx-auto text-indigo-700" size={42} />
-          <h1 className="mt-4 text-3xl font-black text-slate-900">Admin protegido</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">Entre no Dados FII com um e-mail verificado e cadastrado em <code>ADMIN_EMAILS</code>. A sessão administrativa será criada em cookie HttpOnly.</p>
-          {firebaseUser && <button type="button" onClick={() => { blocked.current = false; createSession(firebaseUser); }} className="mt-6 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white">Validar acesso de {firebaseUser.email}</button>}
-          {!firebaseUser && <Link href="/" className="mt-6 inline-flex items-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white"><Home size={16} /> Entrar no site</Link>}
+          <h1 className="mt-4 text-3xl font-black text-slate-900">Acesso administrativo</h1>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">Entre com a conta autorizada para administrar o Dados FII. Por segurança, o e-mail precisa estar confirmado.</p>
+
+          {!firebaseUser ? (
+            <form onSubmit={loginAdmin} className="mx-auto mt-6 max-w-md space-y-4 text-left">
+              <label className="block text-sm font-bold text-slate-700">E-mail
+                <input type="email" autoComplete="email" required value={loginEmail} onChange={(event) => setLoginEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" placeholder="seu@email.com" />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">Senha
+                <input type="password" autoComplete="current-password" required value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" placeholder="Sua senha" />
+              </label>
+              <button type="submit" disabled={signingIn} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><LogIn size={17} /> {signingIn ? "Entrando…" : "Entrar no painel"}</button>
+            </form>
+          ) : (
+            <div className="mx-auto mt-6 max-w-md rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200">
+              <p className="text-sm text-slate-600">Conta conectada</p>
+              <p className="mt-1 font-extrabold text-slate-900">{firebaseUser.email}</p>
+              <div className="mt-4 flex flex-col gap-2">
+                {firebaseUser.emailVerified ? (
+                  <button type="button" onClick={() => { blocked.current = false; createSession(firebaseUser).catch((caught) => setError(loginError(caught))); }} className="rounded-xl bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white">Acessar painel</button>
+                ) : (
+                  <button type="button" onClick={resendVerification} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white"><MailCheck size={17} /> Enviar confirmação por e-mail</button>
+                )}
+                <button type="button" onClick={changeAccount} className="rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-slate-700 ring-1 ring-slate-300">Usar outra conta</button>
+              </div>
+            </div>
+          )}
+
+          <p className="mt-5 text-xs leading-5 text-slate-500">Somente contas previamente autorizadas conseguem abrir o painel.</p>
+          <Link href="/" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-indigo-700"><Home size={16} /> Voltar ao site</Link>
           {error && <p className="mt-5 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
         </section>
       </main>
@@ -180,7 +261,7 @@ export default function AdminSystemPage() {
       <div className="mx-auto max-w-7xl">
         <header className="rounded-3xl bg-gradient-to-br from-indigo-800 to-blue-950 p-6 text-white shadow-lg md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Fase 2 · Operação e Monitoramento</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · sessão HttpOnly · bloqueio após 1 minuto sem atividade</p></div>
+            <div><p className="text-xs font-extrabold uppercase tracking-widest text-indigo-200">Operação e monitoramento</p><h1 className="mt-3 text-3xl font-black md:text-5xl">Saúde dos dados regulatórios</h1><p className="mt-3 text-sm text-indigo-100">{adminEmail} · acesso protegido · saída automática após 1 minuto sem atividade</p></div>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={loadDashboard} disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-indigo-800 disabled:opacity-60"><RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Atualizar</button><button type="button" onClick={() => logout()} className="inline-flex items-center gap-2 rounded-full bg-red-500/20 px-4 py-2 text-sm font-extrabold text-white ring-1 ring-white/20"><LogOut size={16} /> Sair</button></div>
           </div>
         </header>

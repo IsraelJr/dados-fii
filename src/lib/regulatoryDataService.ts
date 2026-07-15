@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { aiInsightsEngine, type AIInsightsEngine } from "@/lib/ai/AIInsightsEngine";
 import { featureEnabled } from "@/lib/featureFlags";
+import { deriveFiiRiskData, plausiblePvpValue } from "@/lib/fiiDerivedData";
 import { healthEngine, type HealthEngine } from "@/lib/health/HealthEngine";
 import { RegulatoryCache, positiveInt } from "@/lib/regulatory/RegulatoryCache";
 import { regulatoryTimeline, type RegulatoryTimeline } from "@/lib/regulatory/RegulatoryTimeline";
@@ -142,10 +143,15 @@ export class RegulatoryDataService {
     const canonical = canonicalFrom(ticker, legacy, overlay);
     const issues = validateRegulatoryFund(canonical);
     const publicOverlay = Object.fromEntries(Object.entries(safeRegulatoryOverlay(overlay)).filter(([key]) => key !== "sources"));
-    const publicData = {
+    const baseData = {
       ...legacy,
       ...publicOverlay,
       ...(quote || marketFallback(ticker)),
+    };
+    const derivedData = deriveFiiRiskData(baseData);
+    const publicData = {
+      ...baseData,
+      ...derivedData,
       code: ticker,
       ticker,
       fundKind: canonical.kind,
@@ -165,6 +171,16 @@ export class RegulatoryDataService {
         validation: { valid: !issues.some((issue) => issue.severity === "error"), issues },
       },
     } as PublicFundData;
+    const safePvp = plausiblePvpValue(publicData.pvp);
+    if (safePvp === undefined) delete publicData.pvp;
+    else publicData.pvp = safePvp;
+    if (publicData.valuation && typeof publicData.valuation === "object" && !Array.isArray(publicData.valuation)) {
+      const valuation = { ...(publicData.valuation as Record<string, unknown>) };
+      const valuationPvp = plausiblePvpValue(valuation.pvp);
+      if (valuationPvp === undefined) delete valuation.pvp;
+      else valuation.pvp = valuationPvp;
+      publicData.valuation = valuation;
+    }
     if (includeScores && scoresEnabled()) publicData.scores = this.scores.calculate(publicData);
     return publicData;
   }

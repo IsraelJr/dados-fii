@@ -70,6 +70,14 @@ function firstNumber(data: any, paths: string[]) {
   return undefined;
 }
 
+function firstPlausibleNumber(data: any, paths: string[], predicate: (value: number) => boolean) {
+  for (const path of paths) {
+    const value = positiveNumberOf(valueAtPath(data, path));
+    if (value !== undefined && predicate(value)) return value;
+  }
+  return undefined;
+}
+
 function parseDateBR(value: unknown) {
   const text = cleanText(value);
   const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -102,6 +110,11 @@ function removeUndefinedFields<T>(value: T): T {
 
 function isPlausiblePvp(value?: number) {
   return Boolean(value && value >= MIN_PVP && value <= MAX_PVP);
+}
+
+export function plausiblePvpValue(value: unknown) {
+  const parsed = positiveNumberOf(value);
+  return parsed !== undefined && isPlausiblePvp(parsed) ? parsed : undefined;
 }
 
 function isPlausibleVpCota(value?: number) {
@@ -231,21 +244,25 @@ function buildDividendSummary(data: any, price?: number) {
 }
 
 function buildValuation(data: any, price?: number) {
-  const rawNetWorth = firstNumber(data, ["netWorth", "equityValue", "patrimonioLiquido", "patrimony", "equity", "patrimonio", "valuation.netWorth"]);
+  const netWorthPaths = ["netWorth", "equityValue", "patrimonioLiquido", "patrimony", "equity", "patrimonio", "valuation.netWorth"];
+  const vpCotaPaths = ["valorPatrimonialPorCota", "vpCota", "vpa", "bookValuePerShare", "valuation.vpCota"];
+  const pvpPaths = ["pvp", "p_vp", "pvpa", "priceToBook", "valuation.pvp"];
+  const marketCapPaths = ["marketCap", "valorMercado", "marketData.marketCap", "valuation.marketCap"];
+  const rawNetWorth = firstNumber(data, netWorthPaths);
   const numberShares = firstNumber(data, ["numberShares", "sharesOutstanding", "numberOfShares", "quotasIssued", "issuedQuotas", "cotasEmitidas", "numeroCotas", "marketData.numberShares"]);
-  const directVpCota = firstNumber(data, ["valorPatrimonialPorCota", "vpCota", "vpa", "bookValuePerShare", "valuation.vpCota"]);
-  const directPvp = firstNumber(data, ["pvp", "p_vp", "pvpa", "priceToBook", "valuation.pvp"]);
-  const directMarketCap = firstNumber(data, ["marketCap", "valorMercado", "marketData.marketCap", "valuation.marketCap"]);
+  const directVpCota = firstNumber(data, vpCotaPaths);
+  const directPvp = firstNumber(data, pvpPaths);
+  const directMarketCap = firstNumber(data, marketCapPaths);
 
   const notes: string[] = [];
-  const pvpInput = isPlausiblePvp(directPvp) ? directPvp : undefined;
-  const vpCotaInput = isPlausibleVpCota(directVpCota) ? directVpCota : undefined;
-  const validatedNetWorth = validateAggregateWithShares(rawNetWorth, numberShares);
+  const pvpInput = firstPlausibleNumber(data, pvpPaths, isPlausiblePvp);
+  const vpCotaInput = firstPlausibleNumber(data, vpCotaPaths, isPlausibleVpCota);
+  const validatedNetWorth = firstPlausibleNumber(data, netWorthPaths, (value) => Boolean(validateAggregateWithShares(value, numberShares)));
   const impliedVpCota = price && pvpInput ? price / pvpInput : undefined;
   const vpCota = vpCotaInput || (validatedNetWorth && numberShares ? validatedNetWorth / numberShares : undefined) || (isPlausibleVpCota(impliedVpCota) ? impliedVpCota : undefined);
   const pvp = pvpInput || (price && vpCota ? price / vpCota : undefined);
   const calculatedMarketCap = price && numberShares ? price * numberShares : undefined;
-  const validatedDirectMarketCap = validateAggregateWithShares(directMarketCap, numberShares);
+  const validatedDirectMarketCap = firstPlausibleNumber(data, marketCapPaths, (value) => Boolean(validateAggregateWithShares(value, numberShares)));
   const marketCap = calculatedMarketCap || validatedDirectMarketCap;
   const impliedNetWorth = vpCota && numberShares ? vpCota * numberShares : undefined;
   const netWorth = validatedNetWorth || (isPlausibleAggregate(impliedNetWorth) ? impliedNetWorth : undefined);

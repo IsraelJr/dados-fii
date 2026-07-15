@@ -43,6 +43,7 @@ test("Health and Validation endpoints use canonical HTTP methods without direct 
 test("admin session uses verified Firebase identity and HttpOnly cookie", () => {
   const session = read("src/app/api/admin/session/route.ts");
   const security = read("src/lib/adminSecurity.ts");
+  const dashboard = read("src/app/admin/sistema/page.tsx");
   assert.match(session, /verifyIdToken/);
   assert.match(session, /createSessionCookie/);
   assert.match(session, /httpOnly:\s*true/);
@@ -51,6 +52,9 @@ test("admin session uses verified Firebase identity and HttpOnly cookie", () => 
   assert.match(security, /ADMIN_EMAILS/);
   assert.match(security, /role: "admin"/);
   assert.match(security, /consumeAdminRateLimit/);
+  assert.match(dashboard, /signInWithEmailAndPassword/);
+  assert.match(dashboard, /Entrar no painel/);
+  assert.doesNotMatch(dashboard, /cadastrado em <code>ADMIN_EMAILS|sessão HttpOnly/);
 });
 
 test("Sprint 2.1 has separate service, repository, normalizer, validator, cache and types", () => {
