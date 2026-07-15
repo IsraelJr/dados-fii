@@ -11,7 +11,9 @@ import { ObservabilityEngine } from "../src/lib/observability/ObservabilityEngin
 // @ts-expect-error Native strip-types requires explicit extension.
 import { evaluateMonitorAlerts } from "../src/lib/monitor/MonitorRules.ts";
 // @ts-expect-error Native strip-types requires explicit extension.
-import { deriveFiiRiskData } from "../src/lib/fiiDerivedData.ts";
+import { calculatePremiumDiscountPercent, deriveFiiRiskData } from "../src/lib/fiiDerivedData.ts";
+// @ts-expect-error Native strip-types requires explicit extension.
+import { applyOfficialFundReference } from "../src/lib/regulatory/OfficialFundReferences.ts";
 import type { FundAIInsights } from "../src/types/ai-insights.ts";
 import type { PublicFundData, SystemHealth, ValidationRun } from "../src/types/regulatory.ts";
 
@@ -104,6 +106,20 @@ test("valuation ignores corrupted derived fields and recovers P/VP from equity a
 
   const report = new FreeReportEngine().generate(publicFund("MXRF11", "Recebíveis", 1_812_047_861.05), null, now);
   assert.equal(report.market.pvp, null);
+});
+
+test("VGIA11 uses the official reference and rejects the inconsistent legacy P/VP", () => {
+  const corrected = applyOfficialFundReference("VGIA11", {
+    price: 9.58,
+    pvp: 0.05,
+    equityValuePerShare: 203.79,
+  });
+  const derived = deriveFiiRiskData(corrected);
+
+  assert.equal(corrected.cnpj, "41.081.088/0001-09");
+  assert.equal(derived.vpCota, 9.5);
+  assert.equal(derived.pvp, 1.0084);
+  assert.equal(calculatePremiumDiscountPercent(9.58, derived.vpCota), 0.8421);
 });
 
 test("Observability aggregates duration, retries, failures and canonical subsystems", async () => {

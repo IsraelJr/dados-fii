@@ -8,7 +8,7 @@ import RegulatoryTimeline from "../../components/RegulatoryTimeline";
 import FreeFundReport from "../../components/FreeFundReport";
 import AIInsightsPanel from "../../components/AIInsightsPanel";
 import PremiumReportPanel from "../../components/PremiumReportPanel";
-import { plausiblePvpValue } from "@/lib/fiiDerivedData";
+import { calculatePremiumDiscountPercent, plausiblePvpValue } from "@/lib/fiiDerivedData";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -118,32 +118,33 @@ function getVariationTone(value: unknown): MetricTone {
 
 function getEquityValuePerShare(data: any, price: number) {
   const directValues = [
-    data?.equityValuePerShare,
     data?.vpCota,
+    data?.valuation?.vpCota,
     data?.valorPatrimonialPorCota,
     data?.bookValuePerShare,
-    data?.valuation?.vpCota,
+    data?.equityValuePerShare,
   ];
   for (const value of directValues) {
     const parsed = parseNumber(value);
-    if (parsed > 0) return parsed;
+    if (parsed > 0 && (!price || plausiblePvpValue(price / parsed) !== undefined)) return parsed;
   }
 
   const netWorth = parseCurrency(data?.netWorth || data?.equityValue || data?.patrimonioLiquido || data?.patrimony);
   const shares = parseNumber(data?.numberShares || data?.sharesOutstanding || data?.quotasIssued || data?.cotasEmitidas);
-  if (netWorth > 0 && shares > 0) return netWorth / shares;
+  if (netWorth > 0 && shares > 0) {
+    const calculated = netWorth / shares;
+    if (!price || plausiblePvpValue(price / calculated) !== undefined) return calculated;
+  }
 
   const informedPvp = plausiblePvpValue(data?.pvp) || plausiblePvpValue(data?.valuation?.pvp) || 0;
   return price > 0 && informedPvp > 0 ? price / informedPvp : 0;
 }
 
 function getAgioDiscount(price: number, equityValuePerShare: number, pvp: number) {
-  if (price > 0 && equityValuePerShare > 0) {
-    const result = ((price - equityValuePerShare) / equityValuePerShare) * 100;
-    return Number.isFinite(result) ? result : null;
-  }
+  const calculated = calculatePremiumDiscountPercent(price, equityValuePerShare);
+  if (calculated !== undefined) return calculated;
   const safePvp = plausiblePvpValue(pvp);
-  return safePvp === undefined ? null : (safePvp - 1) * 100;
+  return safePvp === undefined ? null : Number(((safePvp - 1) * 100).toFixed(4));
 }
 
 function getDailyVariation(variation: unknown, price: number, opening: number) {
@@ -265,7 +266,7 @@ export default async function FiiPage({ params }: PageProps) {
   const dailyVariation = getDailyVariation(data?.variation, price, opening);
   const equityValuePerShare = getEquityValuePerShare(data, price);
   const calculatedPvp = price && equityValuePerShare ? price / equityValuePerShare : 0;
-  const pvp = plausiblePvpValue(data?.pvp) || plausiblePvpValue(data?.valuation?.pvp) || plausiblePvpValue(calculatedPvp) || 0;
+  const pvp = plausiblePvpValue(calculatedPvp) || plausiblePvpValue(data?.pvp) || plausiblePvpValue(data?.valuation?.pvp) || 0;
   const agioDiscount = getAgioDiscount(price, equityValuePerShare, pvp);
   const monthlyYield = price > 0 && lastDividendValue > 0 ? (lastDividendValue / price) * 100 : 0;
   const segment = data?.segment_new || data?.segment || "Sem segmento";
@@ -331,7 +332,7 @@ export default async function FiiPage({ params }: PageProps) {
             <MetricCard
               title="Ágio/desconto"
               value={agioDiscount === null ? "-" : formatPercent(agioDiscount, 3)}
-              description={agioDiscount === null ? "Valor patrimonial por cota não informado." : "Preço atual versus valor patrimonial por cota."}
+              description={agioDiscount === null ? "Valor patrimonial por cota não informado." : "Preço atual versus VP por cota. Verde indica desconto; vermelho indica ágio."}
               tone={agioDiscount === null ? "gray" : agioDiscount <= 0 ? "green" : "red"}
             />
             <MetricCard title="Último rendimento" value={formatDividend(lastDividend?.info?.earnings)} description={lastDividend ? MONTHS_PTBR[lastDividend.month] || lastDividend.month : "Sem rendimento no ano."} tone="green" />

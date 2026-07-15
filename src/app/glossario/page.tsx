@@ -17,6 +17,7 @@ const groups = [
       { id: "preco-cota", term: "Preço da cota", text: "É o valor negociado de uma cota na bolsa. O preço muda conforme oferta, demanda, juros, risco percebido e expectativa de renda futura." },
       { id: "cotas", term: "Total de cotas emitidas", text: "Mostra quantas cotas existem no fundo. Esse número não é a quantidade que o investidor tem; é o total de cotas do fundo no mercado." },
       { id: "p-vp", term: "P/VP", text: "Relação entre preço de mercado e valor patrimonial por cota. Abaixo de 1 pode indicar desconto; acima de 1 pode indicar prêmio. Não deve ser usado sozinho." },
+      { id: "agio-desconto", term: "Ágio / desconto", text: "Compara o preço atual com o valor patrimonial por cota: (preço ÷ VP por cota − 1) × 100. Resultado acima de 0% é ágio; no Dados FII aparece em vermelho porque a cota está mais cara em relação ao patrimônio. Resultado abaixo de 0% é desconto; aparece em verde. Em 0%, preço e VP por cota estão em paridade. A cor ajuda na leitura, mas ágio não significa automaticamente investimento ruim e desconto não garante oportunidade." },
       { id: "valor-patrimonial", term: "Valor patrimonial", text: "Estimativa contábil do patrimônio do fundo. Ajuda na leitura de preço, mas depende da qualidade e atualização das avaliações dos ativos." },
       { id: "valor-mercado", term: "Valor de mercado", text: "É o preço atual da cota multiplicado pelo total de cotas emitidas. Não é a mesma coisa que patrimônio líquido." },
     ],

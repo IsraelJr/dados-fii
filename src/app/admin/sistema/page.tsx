@@ -68,6 +68,8 @@ export default function AdminSystemPage() {
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [runningMonitor, setRunningMonitor] = useState(false);
+  const [publishingReference, setPublishingReference] = useState(false);
+  const [referenceMessage, setReferenceMessage] = useState("");
   const [error, setError] = useState("");
   const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [], observability: null, monitor: null });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -210,6 +212,21 @@ export default function AdminSystemPage() {
     }
   }
 
+  async function publishVgiaReference() {
+    setPublishingReference(true);
+    setError("");
+    setReferenceMessage("");
+    try {
+      await post("/api/admin/official-fund-reference", { ticker: "VGIA11" });
+      setReferenceMessage("Referência oficial do VGIA11 publicada com backup, aprovação e auditoria.");
+      await loadDashboard();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível publicar a referência oficial do VGIA11.");
+    } finally {
+      setPublishingReference(false);
+    }
+  }
+
   const latest = data.history[0] || null;
   const components = data.health?.components;
 
@@ -311,6 +328,14 @@ export default function AdminSystemPage() {
             <div className="mt-5 grid gap-3 sm:grid-cols-3"><Small label="Ativos" value={data.monitor?.activeAlerts.length || 0} /><Small label="Último status" value={data.monitor?.latestRun?.status || "-"} /><Small label="Última execução" value={dateTime(data.monitor?.latestRun?.finishedAt)} /></div>
             <div className="mt-4 space-y-2">{(data.monitor?.activeAlerts || []).slice(0, 4).map((alert) => <div key={alert.fingerprint} className={`rounded-xl p-3 text-sm ring-1 ${alert.severity === "critical" ? "bg-red-50 text-red-800 ring-red-100" : "bg-amber-50 text-amber-900 ring-amber-100"}`}><strong>{alert.title}</strong><p className="mt-1 text-xs">{alert.message}</p></div>)}{!data.monitor?.activeAlerts.length && <p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">Nenhum alerta ativo.</p>}</div>
           </article>
+        </section>
+
+        <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div><p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Referência oficial</p><h2 className="mt-2 text-2xl font-black text-slate-900">VGIA11</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Publica na base regulatória o CNPJ 41.081.088/0001-09 e o VP por cota de R$ 9,50 do relatório oficial de maio/2026. A operação cria backup, versão e registro de auditoria.</p></div>
+            <button type="button" onClick={publishVgiaReference} disabled={publishingReference} className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><UploadCloud size={16} /> {publishingReference ? "Publicando…" : "Publicar referência"}</button>
+          </div>
+          {referenceMessage && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100">{referenceMessage}</p>}
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><h2 className="text-2xl font-black text-slate-900">Saúde dos parsers</h2><div className="mt-5 grid gap-4 md:grid-cols-3">{data.parsers.map((parser) => <article key={parser.parser} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between gap-3"><strong className="text-slate-900">{parser.parser}</strong><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(parser.status)}`}>{parser.status}</span></div><p className="mt-3 text-3xl font-black text-indigo-700">{parser.successRate}%</p><p className="mt-2 text-xs text-slate-500">{parser.successes} sucesso(s) · {parser.failures} falha(s)</p>{parser.lastError && <p className="mt-2 text-xs font-bold text-red-700">{parser.lastError}</p>}</article>)}</div></section>
