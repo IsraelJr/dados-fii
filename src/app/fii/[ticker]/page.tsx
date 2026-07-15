@@ -8,7 +8,6 @@ import RegulatoryTimeline from "../../components/RegulatoryTimeline";
 import FreeFundReport from "../../components/FreeFundReport";
 import AIInsightsPanel from "../../components/AIInsightsPanel";
 import PremiumReportPanel from "../../components/PremiumReportPanel";
-import PortfolioRegulatoryIntelligence from "../../components/PortfolioRegulatoryIntelligence";
 import { plausiblePvpValue } from "@/lib/fiiDerivedData";
 
 export const runtime = "nodejs";
@@ -329,8 +328,6 @@ export default async function FiiPage({ params }: PageProps) {
           <FreeFundReport report={freeReportData?.report || null} />
 
           <AIInsightsPanel ticker={ticker} />
-
-          <PortfolioRegulatoryIntelligence focusTicker={ticker} />
 
           <PremiumReportPanel ticker={ticker} />
 
