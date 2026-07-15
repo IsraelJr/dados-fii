@@ -113,6 +113,7 @@ test("ValidationRunner records FII/FIAGRO coverage and structured checks", () =>
   assert.deepEqual(run.coverage, { fii: 1, fiagro: 1, fiInfra: 0, unknown: 0 });
   assert.equal(run.checks.length, 4);
   assert.ok(run.checks.every((item) => item.status === "passed"));
+  assert.equal("metadata" in run.checks[3], false);
 });
 
 test("ValidationRunner produces an auditable failed run", () => {
