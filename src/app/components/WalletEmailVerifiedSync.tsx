@@ -39,6 +39,7 @@ const TOKEN_KEY = "dados-fii-wallet-session";
 const CLOUD_LOAD_CACHE_KEY = "dados-fii-wallet-cloud-load-cache-v1";
 const SNAPSHOT_HYDRATION_KEY = "dados-fii-wallet-snapshots-hydrated-v1";
 const AUTO_CLOUD_LOAD_TTL_MS = 12 * 60 * 60 * 1000;
+const AUTO_SAVE_DELAY_MS = 5 * 1000;
 
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -188,7 +189,7 @@ export default function WalletEmailVerifiedSync() {
     tokenRef.current = storedToken;
     walletRef.current = initialWallet;
     setWallet(initialWallet);
-    lastSavedSignature.current = walletSignature(initialWallet);
+    lastSavedSignature.current = storedToken ? "" : walletSignature(initialWallet);
 
     const interval = window.setInterval(() => {
       const latestWallet = readWallet();
@@ -273,7 +274,10 @@ export default function WalletEmailVerifiedSync() {
     if (!isEmail(cleanEmail) || !currentToken) return false;
 
     const signature = walletSignature(currentWallet);
-    if (signature === lastSavedSignature.current) return true;
+    if (signature === lastSavedSignature.current) {
+      if (!options?.silent) setMessage("Carteira já está sincronizada.");
+      return true;
+    }
 
     if (options?.silent) setAutoSaving(true);
     else setLoading(true);
@@ -362,7 +366,7 @@ export default function WalletEmailVerifiedSync() {
     setMessage("Alterações serão salvas automaticamente.");
     const timeout = window.setTimeout(() => {
       saveCurrentWallet({ silent: true });
-    }, 120000);
+    }, AUTO_SAVE_DELAY_MS);
 
     return () => window.clearTimeout(timeout);
   }, [email, token, wallet]);
@@ -453,6 +457,7 @@ export default function WalletEmailVerifiedSync() {
       const json = await callApi({ action: "verify-code", email: cleanEmail, code: pin.trim() });
       window.localStorage.setItem(EMAIL_KEY, cleanEmail);
       window.localStorage.setItem(TOKEN_KEY, json.sessionToken);
+      lastSavedSignature.current = "";
       setToken(json.sessionToken);
       emailRef.current = cleanEmail;
       tokenRef.current = json.sessionToken;
@@ -531,12 +536,12 @@ export default function WalletEmailVerifiedSync() {
             <div className="grid min-w-0 w-full gap-2 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={sendCode}
-                disabled={loading || hasSession}
+                onClick={hasSession ? () => saveCurrentWallet() : sendCode}
+                disabled={loading || autoSaving}
                 className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
               >
-                {loading ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Mail className="shrink-0" size={16} />}
-                <span className="whitespace-nowrap">Enviar código</span>
+                {loading || autoSaving ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Mail className="shrink-0" size={16} />}
+                <span className="whitespace-nowrap">{hasSession ? "Sincronizar agora" : "Enviar código"}</span>
               </button>
               <button
                 type="button"
