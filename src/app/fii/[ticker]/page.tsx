@@ -331,7 +331,7 @@ export default async function FiiPage({ params }: PageProps) {
           <section className="grid gap-4 md:grid-cols-3">
             <MetricCard
               title="Ágio/desconto"
-              value={agioDiscount === null ? "-" : formatPercent(agioDiscount, 3)}
+              value={agioDiscount === null ? "-" : formatPercent(agioDiscount, 2)}
               description={agioDiscount === null ? "Valor patrimonial por cota não informado." : "Preço atual versus VP por cota. Verde indica desconto; vermelho indica ágio."}
               tone={agioDiscount === null ? "gray" : agioDiscount <= 0 ? "green" : "red"}
             />
