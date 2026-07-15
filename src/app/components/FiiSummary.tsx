@@ -70,22 +70,6 @@ function SummaryCard({ icon, label, value, glossaryHref }: { icon: ReactNode; la
     );
 }
 
-function formatDateTime(value?: string | null) {
-    if (!value) return "";
-
-    try {
-        return new Intl.DateTimeFormat("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        }).format(new Date(value));
-    } catch {
-        return "";
-    }
-}
-
 export default function FiiSummary({
     data,
     getCurrentYearDividends,
@@ -97,9 +81,6 @@ export default function FiiSummary({
     const currentMonthKey = monthsOrder[new Date().getMonth()];
     const currentYearData = data?.[`earnings${currentYear}`] || {};
     const isCurrentMonthMissing = !currentYearData?.[currentMonthKey];
-    const updatedAt = formatDateTime(data?.marketDataUpdatedAt);
-    const priceSource = data?.dataSources?.price || data?.marketDataSource || "Fonte do preço não informada";
-    const fundSource = data?.dataSources?.fund || data?.fundDataSource || "Fonte cadastral/dividendos não informada";
 
     const earningsYearData =
         data?.[`earnings${currentYear}`] ||
@@ -168,16 +149,6 @@ export default function FiiSummary({
                     value={data.segment_new || data.segment || "N/A"}
                     glossaryHref="/glossario#segmentos"
                 />
-            </div>
-
-            <div className="mt-4 rounded-xl bg-gray-800/80 p-4 text-xs leading-5 text-gray-300 ring-1 ring-white/5">
-                <p className="font-extrabold uppercase tracking-wide text-gray-400">Transparência dos dados</p>
-                <p className="mt-2"><strong className="text-gray-200">Preço:</strong> {priceSource}</p>
-                <p><strong className="text-gray-200">Dados do fundo/dividendos:</strong> {fundSource}</p>
-                {updatedAt && <p><strong className="text-gray-200">Última consulta:</strong> {updatedAt}</p>}
-                <Link href="/fontes-dos-dados" className="mt-2 inline-flex font-bold text-indigo-300 hover:text-indigo-100">
-                    Entender fontes e limitações
-                </Link>
             </div>
 
             {data?.code && <AddToWalletButton ticker={data.code} />}

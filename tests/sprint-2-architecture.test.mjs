@@ -272,6 +272,18 @@ test("verified wallet sessions synchronize the current local portfolio promptly"
   assert.match(sync, /Sincronizar agora/);
 });
 
+test("FII detail derives agio or discount from legacy and canonical patrimonial fields", () => {
+  const page = read("src/app/fii/[ticker]/page.tsx");
+  const homeSummary = read("src/app/components/FiiSummary.tsx");
+  assert.match(page, /function getEquityValuePerShare/);
+  for (const alias of ["equityValuePerShare", "vpCota", "valorPatrimonialPorCota", "bookValuePerShare"]) {
+    assert.match(page, new RegExp(alias));
+  }
+  assert.match(page, /netWorth \/ shares/);
+  assert.match(page, /\(safePvp - 1\) \* 100/);
+  assert.doesNotMatch(homeSummary, /Transparência dos dados|Entender fontes e limitações/);
+});
+
 test("legacy observability no longer accepts admin secrets", () => {
   const route = read("src/app/api/admin/observability/route.ts");
   assert.doesNotMatch(route, /ADMIN_UPDATE_SECRET|CRON_SECRET|x-admin-secret|searchParams\.get\("secret"\)/);
