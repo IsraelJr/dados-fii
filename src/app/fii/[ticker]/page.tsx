@@ -67,6 +67,18 @@ function parseCurrency(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatQuote(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-";
+  const parsed = parseCurrency(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "-";
+  return parsed.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function parseNumber(value: unknown) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
 
@@ -278,15 +290,15 @@ export default async function FiiPage({ params }: PageProps) {
       {data && (
         <div className="space-y-6">
           <section className="grid gap-4 md:grid-cols-4">
-            <MetricCard title="Preço atual" value={data.price || "-"} tone="indigo" />
-            <MetricCard title="Abertura" value={data.opening || "-"} tone="gray" />
+            <MetricCard title="Preço atual" value={formatQuote(data.price)} tone="indigo" />
+            <MetricCard title="Abertura" value={formatQuote(data.opening)} tone="gray" />
             <MetricCard title="Variação do dia" value={formatPercent(dailyVariation)} tone={getVariationTone(dailyVariation)} />
             <MetricCard title="Segmento" value={segment} tone="indigo" />
           </section>
 
           <section className="grid gap-4 md:grid-cols-4">
-            <MetricCard title="Mínima" value={data.minimum || data.min || "-"} tone="yellow" />
-            <MetricCard title="Máxima" value={data.maximum || data.max || "-"} tone="green" />
+            <MetricCard title="Mínima" value={formatQuote(data.minimum || data.min)} tone="yellow" />
+            <MetricCard title="Máxima" value={formatQuote(data.maximum || data.max)} tone="green" />
             <MetricCard title="DY" value={data.dividendYield ? formatPercent(data.dividendYield) : "-"} tone="green" />
             <MetricCard title="P/VP" value={formatPvp(pvp)} tone="yellow" />
           </section>
