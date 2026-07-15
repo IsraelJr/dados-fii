@@ -32,6 +32,26 @@ export type FreeFundReport = {
     lastDividend: number | null;
     lastDividendReference: string | null;
   };
+  analysis: {
+    valuation: {
+      premiumDiscountPercent: number | null;
+      position: "premium" | "discount" | "near_nav" | "unknown";
+      annualizedDistributionOnNavPercent: number | null;
+    };
+    income: {
+      observations: number;
+      latest: number | null;
+      average3m: number | null;
+      previousAverage3m: number | null;
+      changeVsPrevious3mPercent: number | null;
+      minimum12m: number | null;
+      maximum12m: number | null;
+      volatilityPercent: number | null;
+      cuts12m: number;
+      annualizedYieldFromLatestPercent: number | null;
+      trend: "rising" | "falling" | "stable" | "unknown";
+    };
+  };
   scores: FundScores | null;
   highlights: FreeReportSignal[];
   attentionPoints: FreeReportSignal[];
