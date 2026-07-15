@@ -89,7 +89,7 @@ test("AI Insights Engine returns the six canonical groups and reuses identical i
         executiveSummary: "Resumo executivo baseado apenas nos dados.",
         changes: ["Um fato relevante foi registrado."],
         risks: ["Ausência do CNPJ oferece risco de transparência.", "Ágio e rendimento devem ser avaliados em conjunto."],
-        opportunities: ["Acompanhar a consistência dos rendimentos."],
+        opportunities: ["Governança é forte, com gestores e administrador identificados e dados sem erros.", "Acompanhar a consistência dos rendimentos."],
         alerts: ["Revisar novos documentos regulatórios."],
         plainLanguage: "O fundo tem dados úteis, mas ainda exige acompanhamento.",
       }),
@@ -106,11 +106,13 @@ test("AI Insights Engine returns the six canonical groups and reuses identical i
   assert.equal(first.risks.length, 1);
   assert.equal(first.opportunities.length, 1);
   assert.equal(first.alerts.length, 1);
-  assert.equal(first.metadata.promptVersion, "fund-insights-v2");
+  assert.equal(first.metadata.promptVersion, "fund-insights-v3");
   assert.match(requestBody, /premiumDiscountPercent/);
   assert.match(requestBody, /changeVsPrevious3mPercent/);
   assert.doesNotMatch(requestBody, /dataQuality/);
   assert.doesNotMatch(first.risks.join(" "), /CNPJ|transparência/i);
+  assert.equal(first.opportunities.length, 1);
+  assert.doesNotMatch(first.opportunities.join(" "), /governança é forte|gestor|administrador/i);
   assert.deepEqual(first.sources, [{ provider: "CVM", kind: "regulatory" }]);
   assert.ok(first.plainLanguage);
 });
@@ -148,6 +150,7 @@ test("AI Insights omits internal registration gaps and zero-confidence scores fr
   await engine.generateFundInsights(incomplete);
   assert.doesNotMatch(body, /dataQuality|CNPJ não informado|Dados de risco insuficientes|Confiança do cálculo: 0%/i);
   assert.doesNotMatch(body, /"cnpj":null|"manager":null|"administrator":null/);
+  assert.doesNotMatch(body, /"cnpj":|"manager":|"administrator":/);
 });
 
 test("AI Insights Engine centralizes generic text generation for legacy reports", async () => {
