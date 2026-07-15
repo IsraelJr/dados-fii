@@ -4,6 +4,7 @@ import { featureEnabled } from "@/lib/featureFlags";
 import { deriveFiiRiskData, plausiblePvpValue } from "@/lib/fiiDerivedData";
 import { healthEngine, type HealthEngine } from "@/lib/health/HealthEngine";
 import { RegulatoryCache, positiveInt } from "@/lib/regulatory/RegulatoryCache";
+import { applyOfficialFundReference, getOfficialFundReference } from "@/lib/regulatory/OfficialFundReferences";
 import { regulatoryTimeline, type RegulatoryTimeline } from "@/lib/regulatory/RegulatoryTimeline";
 import {
   canonicalFrom,
@@ -140,14 +141,15 @@ export class RegulatoryDataService {
     includeScores = true,
   ) {
     const legacy = normalizeDividendFields(legacyRecord?.data || {});
-    const canonical = canonicalFrom(ticker, legacy, overlay);
-    const issues = validateRegulatoryFund(canonical);
     const publicOverlay = Object.fromEntries(Object.entries(safeRegulatoryOverlay(overlay)).filter(([key]) => key !== "sources"));
-    const baseData = {
+    const baseData = applyOfficialFundReference(ticker, {
       ...legacy,
       ...publicOverlay,
       ...(quote || marketFallback(ticker)),
-    };
+    });
+    const officialReference = getOfficialFundReference(ticker);
+    const canonical = canonicalFrom(ticker, baseData, overlay);
+    const issues = validateRegulatoryFund(canonical);
     const derivedData = deriveFiiRiskData(baseData);
     const publicData = {
       ...baseData,
@@ -167,7 +169,9 @@ export class RegulatoryDataService {
         schemaVersion: canonical.schemaVersion,
         currentVersion: canonical.currentVersion,
         cache: "miss" as const,
-        sources: canonical.sources.concat(quote ? [source("Planilha de cotações Dados FII", "market", nowIso())] : []),
+        sources: canonical.sources
+          .concat(officialReference ? [source("Valora Investimentos — relatório oficial do VGIA11", "regulatory", officialReference.referenceDate)] : [])
+          .concat(quote ? [source("Planilha de cotações Dados FII", "market", nowIso())] : []),
         validation: { valid: !issues.some((issue) => issue.severity === "error"), issues },
       },
     } as PublicFundData;
@@ -359,6 +363,30 @@ export class RegulatoryDataService {
       const result = await this.repository.publish(ticker, patch, authorization);
       this.invalidate(String(ticker));
       return result;
+    });
+  }
+
+  async publishOfficialFundReference(tickerInput: unknown, actor: string) {
+    const ticker = normalizeTicker(tickerInput);
+    const reference = getOfficialFundReference(ticker);
+    if (!reference) throw new Error("Não existe referência oficial cadastrada para este fundo.");
+    const approvedAt = nowIso();
+    const approvalHash = createHash("sha256")
+      .update([ticker, actor, approvedAt, reference.sourceUrl, String(reference.vpCota), reference.cnpj].join(":"), "utf8")
+      .digest("hex");
+    return this.publish(ticker, {
+      cnpj: reference.cnpj,
+      vpCota: reference.vpCota,
+      valorPatrimonialPorCota: reference.vpCota,
+      valuationReferenceDate: reference.referenceDate,
+      valuationSource: reference.sourceUrl,
+      sources: [source("Valora Investimentos — relatório oficial do VGIA11", "regulatory", approvedAt)],
+    }, {
+      actor,
+      approvalHash,
+      approvedAt,
+      backupId: `official-${ticker}-${Date.now()}`,
+      reason: `Publicação da referência oficial de ${ticker}: CNPJ e VP por cota.`,
     });
   }
 
