@@ -44,7 +44,7 @@ function parser(now: string, name: string, status: ParserHealth["status"], succe
 }
 
 function check(id: string, status: ValidationCheck["status"], message: string, metadata?: ValidationCheck["metadata"]): ValidationCheck {
-  return { id, status, message, metadata };
+  return metadata ? { id, status, message, metadata } : { id, status, message };
 }
 
 export class ValidationRunner {
