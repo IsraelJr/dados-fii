@@ -12,6 +12,7 @@ export const REGULATORY_COLLECTIONS = {
   monitorRuns: "RegulatoryMonitorRuns",
   monitorAlerts: "RegulatoryMonitorAlerts",
   monitorLocks: "RegulatoryMonitorLocks",
+  indexCompositions: "RegulatoryIndexCompositions",
 } as const;
 
 export type LegacyFundRecord = {

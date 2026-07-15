@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "@/lib/market/StatusInvestParser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function tickerOf(value: unknown) {
   return String(value || "").trim().toUpperCase();
@@ -77,34 +76,6 @@ function extractTitle(html: string, ticker: string) {
   return title || ticker;
 }
 
-function parseDividends(text: string, year: number) {
-  const output: Record<string, any> = {};
-  const parts = text.split("Rendimento ").slice(1);
-
-  for (const part of parts) {
-    const tokens = part.trim().split(" ");
-    const dateWith = tokens[0];
-    const paymentDate = tokens[1];
-    const value = tokens[2];
-
-    if (!dateWith || !paymentDate || !value) continue;
-    if (!paymentDate.includes(`/${year}`)) continue;
-
-    const [, month] = paymentDate.match(/\d{2}\/(\d{2})\/\d{4}/) || [];
-    const monthName = MONTHS[Number(month) - 1];
-    if (!monthName) continue;
-
-    output[monthName] = {
-      payment_date: paymentDate,
-      date_with: dateWith,
-      earnings: value.startsWith("R$") ? value : `R$ ${value}`,
-      price_date_with: "R$ 0,0",
-    };
-  }
-
-  return output;
-}
-
 async function getStatusInvestData(ticker: string) {
   const code = ticker.toLowerCase();
   const urls = [
@@ -142,7 +113,8 @@ async function getStatusInvestData(ticker: string) {
 
     const cnpj = text.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/)?.[0] || "";
     const year = currentYear();
-    const earnings = parseDividends(text, year);
+    const earnings = parseStatusInvestDividends(text, year);
+    const marketIndicators = parseStatusInvestMarketIndicators(text, item.url, new Date().toISOString());
 
     return {
       sourceUrl: item.url,
@@ -151,6 +123,7 @@ async function getStatusInvestData(ticker: string) {
       cnpj,
       earningsYear: year,
       earnings,
+      marketIndicators,
     };
   }
 
@@ -208,6 +181,7 @@ export async function POST(req: NextRequest) {
       segment_new: textOf(body.segment_new || body.segmentNew || body.segment) || fetched.assetType,
       cnpj: textOf(body.cnpj) || fetched.cnpj,
       [field]: fetched.earnings,
+      ...fetched.marketIndicators,
       statusInvestUrl: fetched.sourceUrl,
       assetType: fetched.assetType,
       created_in: now,

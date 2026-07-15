@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { DIVIDEND_MONTHS, mergeDividendYear, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "@/lib/market/StatusInvestParser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS: string[] = [...DIVIDEND_MONTHS];
 
 function clean(html: string) {
   return String(html || "")
@@ -80,35 +81,6 @@ async function getHtml(ticker: string) {
   throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
 }
 
-function parseDividends(text: string, year: number) {
-  const output: Record<string, any> = {};
-  const parts = text.split("Rendimento ").slice(1);
-
-  for (const part of parts) {
-    const tokens = part.trim().split(" ");
-    const dateWith = tokens[0];
-    const paymentDate = tokens[1];
-    const value = tokens[2];
-
-    if (!dateWith || !paymentDate || !value) continue;
-    if (!paymentDate.includes(`/${year}`)) continue;
-
-    const pieces = paymentDate.split("/");
-    const month = Number(pieces[1]);
-    const monthName = MONTHS[month - 1];
-    if (!monthName) continue;
-
-    output[monthName] = {
-      payment_date: paymentDate,
-      date_with: dateWith,
-      earnings: value.startsWith("R$") ? value : `R$ ${value}`,
-      price_date_with: "R$ 0,0",
-    };
-  }
-
-  return output;
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -122,7 +94,7 @@ export async function POST(req: NextRequest) {
     const doc = await getDoc(ticker);
     const previous = doc.data() || {};
     const page = await getHtml(ticker);
-    const fetched = parseDividends(page.text, year);
+    const fetched = parseStatusInvestDividends(page.text, year);
     const months = Object.keys(fetched).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
 
     if (!months.length) {
@@ -131,13 +103,15 @@ export async function POST(req: NextRequest) {
 
     const field = `earnings${year}`;
     const previousYear = previous[field] || {};
-    const merged = { ...previousYear, ...fetched };
+    const merged = mergeDividendYear(previousYear, fetched);
+    const marketIndicators = parseStatusInvestMarketIndicators(page.text, page.url, new Date().toISOString());
     const mergedMonths = Object.keys(merged).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
 
     await adminDb.collection("Fiis_Backup").doc(ticker).set({ ...previous, backup_date: adminFieldValue.serverTimestamp(), backup_reason: "update-one-dividend" }, { merge: false });
 
     await doc.ref.set({
       [field]: merged,
+      ...marketIndicators,
       modified_in: adminFieldValue.serverTimestamp(),
     }, { merge: true });
 

@@ -77,3 +77,9 @@ test("does not mutate regulatory input", () => {
   new ScoreEngine().calculate(input);
   assert.deepEqual(input, before);
 });
+
+test("rejects implausible daily liquidity caused by parser labels", () => {
+  const score = new ScoreEngine().calculate({ dailyLiquidity: 30 }).liquidity;
+  assert.equal(score.metrics.dailyLiquidity, null);
+  assert.doesNotMatch(score.reasons.join(" "), /R\$ 30/);
+});

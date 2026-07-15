@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { DIVIDEND_MONTHS, mergeDividendYear, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "@/lib/market/StatusInvestParser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS: string[] = [...DIVIDEND_MONTHS];
 const TIME_ZONE = "America/Sao_Paulo";
 const STATE_DOC = "PendingDividendUpdateState";
 
@@ -113,34 +114,6 @@ async function getStatusInvestPage(ticker: string) {
   throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
 }
 
-function parseDividends(text: string, year: number) {
-  const output: Record<string, any> = {};
-  const parts = text.split("Rendimento ").slice(1);
-
-  for (const part of parts) {
-    const tokens = part.trim().split(" ");
-    const dateWith = tokens[0];
-    const paymentDate = tokens[1];
-    const value = tokens[2];
-
-    if (!dateWith || !paymentDate || !value) continue;
-    if (!paymentDate.includes(`/${year}`)) continue;
-
-    const [, month] = paymentDate.match(/\d{2}\/(\d{2})\/\d{4}/) || [];
-    const monthName = MONTHS[Number(month) - 1];
-    if (!monthName) continue;
-
-    output[monthName] = {
-      payment_date: paymentDate,
-      date_with: dateWith,
-      earnings: value.startsWith("R$") ? value : `R$ ${value}`,
-      price_date_with: "R$ 0,0",
-    };
-  }
-
-  return output;
-}
-
 function rotateDocs(docs: any[], limit: number, cursor?: string) {
   if (!docs.length) return [];
   const ordered = [...docs].sort((a, b) => String(a.id).localeCompare(String(b.id)));
@@ -161,19 +134,22 @@ async function updateDocDividends(doc: any, ticker: string): Promise<UpdateResul
     const field = `earnings${year}`;
     const previousYear = previous[field] || {};
 
-    if (previousYear?.[monthKey]) {
+    const storedLiquidity = Number(previous.dailyLiquidity || previous.liquidity || 0);
+    const storedBasePrice = Number(String(previousYear?.[monthKey]?.price_date_with || "").replace("R$", "").replace(/\./g, "").replace(",", ".").trim());
+    if (previousYear?.[monthKey] && storedLiquidity >= 1_000 && storedBasePrice > 0) {
       return { ticker, status: "skipped", fetchedMonths: Object.keys(previousYear) };
     }
 
     const page = await getStatusInvestPage(ticker);
-    const fetched = parseDividends(page.text, year);
+    const fetched = parseStatusInvestDividends(page.text, year);
     const fetchedMonths = Object.keys(fetched).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
 
     if (!fetchedMonths.length) {
       return { ticker, status: "still_missing", fetchedMonths: [] };
     }
 
-    const merged = { ...previousYear, ...fetched };
+    const merged = mergeDividendYear(previousYear, fetched);
+    const marketIndicators = parseStatusInvestMarketIndicators(page.text, page.url, new Date().toISOString());
 
     await adminDb.collection("Fiis_Backup").doc(`${ticker}_${Date.now()}`).set({
       ...previous,
@@ -183,6 +159,7 @@ async function updateDocDividends(doc: any, ticker: string): Promise<UpdateResul
 
     await doc.ref.set({
       [field]: merged,
+      ...marketIndicators,
       modified_in: adminFieldValue.serverTimestamp(),
     }, { merge: true });
 

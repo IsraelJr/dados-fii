@@ -30,6 +30,7 @@ import { freeReportEngine, type FreeReportEngine } from "@/lib/reports/FreeRepor
 import { premiumReportEngine, PremiumReportError, type PremiumPortfolioHolding, type PremiumReportEngine } from "@/lib/reports/PremiumReportEngine";
 import { observabilityEngine, type ObservabilityEngine } from "@/lib/observability/ObservabilityEngine";
 import { automaticMonitor, type AutomaticMonitor } from "@/lib/monitor/AutomaticMonitor";
+import { fetchIfixComposition, ifixMembership } from "@/lib/indexes/IfixComposition";
 import { ValidationRunner } from "@/lib/validation/ValidationRunner";
 import type {
   MarketQuote,
@@ -43,6 +44,7 @@ import type { FundAIInsights } from "@/types/ai-insights";
 import type { PremiumFundReport } from "@/types/premium-report";
 import type { SystemObservability } from "@/types/observability";
 import type { MonitorRun, MonitorStatus } from "@/types/monitor";
+import type { IfixComposition } from "@/types/indexes";
 
 const FUND_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_CACHE_TTL_MS, 5 * 60_000);
 const MARKET_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_MARKET_CACHE_TTL_MS, 60_000);
@@ -63,6 +65,7 @@ export class ValidationExecutionError extends Error {
 export class RegulatoryDataService {
   private readonly fundCache = new RegulatoryCache<PublicFundData>(FUND_CACHE_TTL_MS, MAX_CACHE_ENTRIES);
   private readonly marketCache = new RegulatoryCache<MarketQuote[]>(MARKET_CACHE_TTL_MS, 1);
+  private readonly indexCache = new RegulatoryCache<IfixComposition>(24 * 60 * 60_000, 4);
   private marketPromise: Promise<MarketQuote[]> | null = null;
   private readonly validationRunner: ValidationRunner;
 
@@ -139,6 +142,7 @@ export class RegulatoryDataService {
     overlay: RegulatoryOverlay | null,
     quote: MarketQuote | null,
     includeScores = true,
+    ifixCompositionData: IfixComposition | null = null,
   ) {
     const legacy = normalizeDividendFields(legacyRecord?.data || {});
     const publicOverlay = Object.fromEntries(Object.entries(safeRegulatoryOverlay(overlay)).filter(([key]) => key !== "sources"));
@@ -149,6 +153,7 @@ export class RegulatoryDataService {
     });
     const officialReference = getOfficialFundReference(ticker);
     const canonical = canonicalFrom(ticker, baseData, overlay);
+    const membership = ifixMembership(ticker, canonical.kind, ifixCompositionData);
     const issues = validateRegulatoryFund(canonical);
     const derivedData = deriveFiiRiskData(baseData);
     const publicData = {
@@ -157,6 +162,8 @@ export class RegulatoryDataService {
       code: ticker,
       ticker,
       fundKind: canonical.kind,
+      isIFIX: membership.status === "member",
+      ifixMembership: membership,
       dataSources: {
         price: quote ? "Planilha de cotações Dados FII" : "Preço indisponível",
         fund: legacyRecord ? "Base interna Dados FII" : "Dados cadastrais/dividendos indisponíveis",
@@ -201,15 +208,16 @@ export class RegulatoryDataService {
         return withMarketQuote(cached, cachedQuote, "hit");
       }
 
-      const [legacyRecord, overlay, quotes] = await Promise.all([
+      const [legacyRecord, overlay, quotes, ifixCompositionData] = await Promise.all([
         this.repository.getLegacyByTicker(ticker),
         this.repository.getOverlayByTicker(ticker),
         options && "marketQuote" in options ? Promise.resolve([]) : this.getMarketQuotes(),
+        this.getIfixComposition(),
       ]);
       const quote = options && "marketQuote" in options ? options.marketQuote : quotes.find((item) => item.code === ticker) || null;
       if (!legacyRecord && !overlay && !quote) return null;
 
-      const publicData = this.composePublicData(ticker, legacyRecord, overlay, quote || null);
+      const publicData = this.composePublicData(ticker, legacyRecord, overlay, quote || null, true, ifixCompositionData);
       this.fundCache.set(ticker, publicData);
       return publicData;
     });
@@ -217,10 +225,11 @@ export class RegulatoryDataService {
 
   async listFunds(limit = 500, options?: { includeMarket?: boolean; includeScores?: boolean }) {
     const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 2_000);
-    const [legacyRecords, overlayRecords, quotes] = await Promise.all([
+    const [legacyRecords, overlayRecords, quotes, ifixCompositionData] = await Promise.all([
       this.repository.listLegacy(safeLimit),
       this.repository.listOverlays(safeLimit),
       options?.includeMarket === false ? Promise.resolve([] as MarketQuote[]) : this.getMarketQuotes(),
+      this.getIfixComposition(),
     ]);
     const legacyMap = new Map(legacyRecords.map((record) => [normalizeTicker(record.data.code || record.id), record]));
     const overlayMap = new Map(overlayRecords.map((record) => [normalizeTicker(record.data.ticker || record.id), record.data]));
@@ -232,7 +241,24 @@ export class RegulatoryDataService {
       overlayMap.get(ticker) || null,
       quoteMap.get(ticker) || null,
       options?.includeScores !== false,
+      ifixCompositionData,
     ));
+  }
+
+  async getIfixComposition(options?: { force?: boolean }) {
+    const cached = options?.force ? null : this.indexCache.get("IFIX");
+    if (cached) return cached;
+    const composition = await this.repository.getIndexComposition("IFIX");
+    if (composition) this.indexCache.set("IFIX", composition);
+    return composition;
+  }
+
+  async syncIfixComposition(actor: string) {
+    const composition = await fetchIfixComposition();
+    await this.repository.saveIndexComposition(composition, actor);
+    this.indexCache.set("IFIX", composition);
+    this.invalidate();
+    return composition;
   }
 
   async listMissingCnpj(limit: number, cursor?: string) {
@@ -323,16 +349,17 @@ export class RegulatoryDataService {
         if (holdingMap.size >= 120) break;
       }
       const holdings = Array.from(holdingMap, ([ticker, quotas]) => ({ ticker, quotas }));
-      const [peers, aiAnalysis, portfolioData] = await Promise.all([
+      const [peers, portfolioData] = await Promise.all([
         this.listFunds(500, { includeMarket: false, includeScores: true }),
-        this.aiInsights.generateFundInsights(freeReport, { requestKey: options?.requestKey }),
         holdings.length ? this.getMany(holdings.map((item) => item.ticker), 120) : Promise.resolve(null),
       ]);
       const portfolioHoldings: PremiumPortfolioHolding[] = holdings.map((item) => ({
         ...item,
         fund: portfolioData?.items[item.ticker] || null,
       }));
-      return this.premiumReports.generate(freeReport, peers, aiAnalysis, nowIso(), portfolioHoldings);
+      const draft = this.premiumReports.prepare(freeReport, peers, nowIso(), portfolioHoldings);
+      const aiAnalysis = await this.aiInsights.generatePremiumInsights(draft, { requestKey: options?.requestKey });
+      return this.premiumReports.complete(draft, aiAnalysis);
     });
   }
 

@@ -156,6 +156,14 @@ function getDailyVariation(variation: unknown, price: number, opening: number) {
   return Number.isFinite(calculated) ? calculated : apiVariation;
 }
 
+function ifixLabel(data: any) {
+  const status = data?.ifixMembership?.status;
+  if (status === "member") return "Sim";
+  if (status === "not_member") return "Não";
+  if (status === "not_applicable") return "Não se aplica";
+  return "Atualização pendente";
+}
+
 function getYearData(data: any) {
   const year = new Date().getFullYear();
   return {
@@ -268,7 +276,9 @@ export default async function FiiPage({ params }: PageProps) {
   const calculatedPvp = price && equityValuePerShare ? price / equityValuePerShare : 0;
   const pvp = plausiblePvpValue(calculatedPvp) || plausiblePvpValue(data?.pvp) || plausiblePvpValue(data?.valuation?.pvp) || 0;
   const agioDiscount = getAgioDiscount(price, equityValuePerShare, pvp);
-  const monthlyYield = price > 0 && lastDividendValue > 0 ? (lastDividendValue / price) * 100 : 0;
+  const priceOnDateWith = parseCurrency(lastDividend?.info?.price_date_with);
+  const yieldOnDateWith = priceOnDateWith > 0 && lastDividendValue > 0 ? (lastDividendValue / priceOnDateWith) * 100 : 0;
+  const yieldOnCurrentPrice = price > 0 && lastDividendValue > 0 ? (lastDividendValue / price) * 100 : 0;
   const segment = data?.segment_new || data?.segment || "Sem segmento";
   const socialReason = data?.socialReason || data?.name || data?.razao_social || "Dados cadastrais não informados.";
 
@@ -290,7 +300,7 @@ export default async function FiiPage({ params }: PageProps) {
         <p className="mt-2 text-sm leading-6 text-slate-600">
           A página do {ticker} reúne informações para acompanhamento do fundo imobiliário, incluindo cotação,
           abertura, variação do dia, mínima, máxima, dividend yield, P/VP, ágio ou desconto, último rendimento,
-          yield mensal, próximo pagamento, histórico de rendimentos e notícias recentes relacionadas ao FII.
+          yield na data-com, yield sobre o preço atual, próximo pagamento, histórico de rendimentos e notícias recentes relacionadas ao FII.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/calendario-dividendos-fiis" className="rounded-full bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
@@ -328,7 +338,7 @@ export default async function FiiPage({ params }: PageProps) {
             <MetricCard title="P/VP" value={formatPvp(pvp)} tone="yellow" />
           </section>
 
-          <section className="grid gap-4 md:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-4">
             <MetricCard
               title="Ágio/desconto"
               value={agioDiscount === null ? "-" : formatPercent(agioDiscount, 2)}
@@ -336,7 +346,8 @@ export default async function FiiPage({ params }: PageProps) {
               tone={agioDiscount === null ? "gray" : agioDiscount <= 0 ? "green" : "red"}
             />
             <MetricCard title="Último rendimento" value={formatDividend(lastDividend?.info?.earnings)} description={lastDividend ? MONTHS_PTBR[lastDividend.month] || lastDividend.month : "Sem rendimento no ano."} tone="green" />
-            <MetricCard title="Yield mensal" value={monthlyYield ? `${monthlyYield.toFixed(2).replace(".", ",")}%` : "-"} description="Último rendimento dividido pelo preço atual." tone="yellow" />
+            <MetricCard title="Yield na data-com" value={yieldOnDateWith ? formatPercent(yieldOnDateWith) : "-"} description={yieldOnDateWith ? `Usa a cotação-base de ${lastDividend?.info?.date_with || "data-com"}.` : "A cotação da data-com ainda não está disponível."} tone="yellow" />
+            <MetricCard title="Yield sobre preço atual" value={yieldOnCurrentPrice ? formatPercent(yieldOnCurrentPrice) : "-"} description="Compara o último rendimento com a cotação atual; muda quando o preço muda." tone="yellow" />
           </section>
 
           <section className="grid gap-4 md:grid-cols-[1fr_1fr]">
@@ -345,7 +356,7 @@ export default async function FiiPage({ params }: PageProps) {
               <InfoLine label="Razão social" value={socialReason} />
               <InfoLine label="CNPJ" value={data.cnpj || "Não informado"} />
               <InfoLine label="Segmento" value={segment} />
-              <InfoLine label="IFIX" value={data.isIFIX ? "Sim" : "Não informado"} />
+              <InfoLine label="IFIX" value={ifixLabel(data)} />
             </InfoCard>
 
             <InfoCard title="Próximo pagamento">

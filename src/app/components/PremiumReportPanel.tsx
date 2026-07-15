@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { Crown, LockKeyhole, RefreshCw } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { productPlanLabel } from "@/lib/productPlans";
 import type { PremiumFundReport } from "@/types/premium-report";
 
 type PremiumResponse = { ok?: boolean; report?: PremiumFundReport; error?: string; access?: { plan?: string } };
@@ -43,7 +44,7 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
 
   async function generate() {
     if (!user) {
-      setError("Entre na sua conta Premium/VIP para gerar o relatório.");
+      setError("Entre na sua conta Premium ou Super Premium para gerar o relatório.");
       return;
     }
     setLoading(true);
@@ -83,7 +84,7 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
       {report && (
         <div className="mt-6 space-y-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PremiumMetric label="Plano" content={plan.toUpperCase()} description="Tipo de acesso usado para gerar este relatório." />
+            <PremiumMetric label="Plano" content={productPlanLabel(plan)} description="Plano comercial que dá acesso a este relatório." />
             <PremiumMetric label="P/VP" content={value(report.valuation.pvp)} description="Preço da cota dividido pelo valor patrimonial por cota." />
             <PremiumMetric label="Ágio/desconto" content={value(report.valuation.premiumDiscountPercent, "%")} description="Positivo indica preço acima do VP; negativo indica preço abaixo do VP." />
             <PremiumMetric label="Percentil entre pares" content={report.comparative.percentile === null ? "Amostra insuficiente" : value(report.comparative.percentile, "%")} description="Posição da nota composta diante de fundos comparáveis; não mede retorno futuro." />
@@ -109,7 +110,19 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
 
           <PremiumSection title="Plano de acompanhamento"><div className="space-y-3">{report.recommendations.map((item, index) => <div key={`${item.category}-${index}`} className="rounded-xl bg-white p-3 ring-1 ring-amber-200"><p className="text-xs font-extrabold uppercase text-amber-700">{item.priority} · {item.category}</p><p className="mt-1 font-bold text-slate-900">{item.action}</p><p className="mt-1 text-xs text-slate-500">Gatilho: {item.trigger}</p></div>)}</div></PremiumSection>
 
-          <PremiumSection title="Análise do AI Insights Engine"><p>{report.aiAnalysis.executiveSummary}</p><p className="mt-3 font-bold text-slate-900">Em linguagem simples</p><p className="mt-1">{report.aiAnalysis.plainLanguage}</p></PremiumSection>
+          <PremiumSection title="Análise exclusiva do relatório Premium">
+            <p>{report.aiAnalysis.executiveSummary}</p>
+            <p className="mt-4 font-bold text-slate-900">O que esta análise acrescenta</p>
+            <p className="mt-1">{report.aiAnalysis.differentiatedInsight}</p>
+            <p className="mt-4 font-bold text-slate-900">Impacto na sua carteira</p>
+            <p className="mt-1">{report.aiAnalysis.portfolioReading}</p>
+            <p className="mt-4 font-bold text-slate-900">Contexto entre pares</p>
+            <p className="mt-1">{report.aiAnalysis.peerReading}</p>
+            <p className="mt-4 font-bold text-slate-900">Gatilhos objetivos para acompanhar</p>
+            <ul className="mt-1 space-y-1">{report.aiAnalysis.monitoringTriggers.map((item) => <li key={item}>• {item}</li>)}</ul>
+            <p className="mt-4 font-bold text-slate-900">Em linguagem simples</p>
+            <p className="mt-1">{report.aiAnalysis.plainLanguage}</p>
+          </PremiumSection>
 
           <div className="text-xs leading-5 text-slate-500">{report.disclaimer.map((item) => <p key={item}>• {item}</p>)}</div>
         </div>

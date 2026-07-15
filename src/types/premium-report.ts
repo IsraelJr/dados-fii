@@ -1,4 +1,4 @@
-import type { FundAIInsights } from "@/types/ai-insights";
+import type { PremiumAIInsights } from "@/types/ai-insights";
 import type { FreeFundReport } from "@/types/reports";
 import type { FundScores } from "@/types/scores";
 
@@ -84,7 +84,7 @@ export type PremiumFundReport = {
   comparative: PremiumComparative;
   portfolioImpact: PremiumPortfolioImpact;
   recommendations: PremiumRecommendation[];
-  aiAnalysis: FundAIInsights;
+  aiAnalysis: PremiumAIInsights;
   methodology: string[];
   disclaimer: string[];
 };

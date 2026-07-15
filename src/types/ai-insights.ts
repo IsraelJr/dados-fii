@@ -22,6 +22,18 @@ export type FundAIInsights = AIInsightsContent & {
   metadata: AIInsightsMetadata;
 };
 
+export type PremiumAIInsights = {
+  ticker: string;
+  executiveSummary: string;
+  differentiatedInsight: string;
+  portfolioReading: string;
+  peerReading: string;
+  monitoringTriggers: string[];
+  plainLanguage: string;
+  sources: Array<{ provider: string; kind: string }>;
+  metadata: AIInsightsMetadata;
+};
+
 export type AITextMessage = {
   role: "system" | "user" | "assistant";
   content: string;

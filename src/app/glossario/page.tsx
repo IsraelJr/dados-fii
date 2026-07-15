@@ -19,6 +19,7 @@ const groups = [
       { id: "p-vp", term: "P/VP", text: "Relação entre preço de mercado e valor patrimonial por cota. Abaixo de 1 pode indicar desconto; acima de 1 pode indicar prêmio. Não deve ser usado sozinho." },
       { id: "agio-desconto", term: "Ágio / desconto", text: "Compara o preço atual com o valor patrimonial por cota: (preço ÷ VP por cota − 1) × 100. Resultado acima de 0% é ágio; no Dados FII aparece em vermelho porque a cota está mais cara em relação ao patrimônio. Resultado abaixo de 0% é desconto; aparece em verde. Em 0%, preço e VP por cota estão em paridade. A cor ajuda na leitura, mas ágio não significa automaticamente investimento ruim e desconto não garante oportunidade." },
       { id: "valor-patrimonial", term: "Valor patrimonial", text: "Estimativa contábil do patrimônio do fundo. Ajuda na leitura de preço, mas depende da qualidade e atualização das avaliações dos ativos." },
+      { id: "vp-cota-nav", term: "VP por cota (ou NAV por cota)", text: "É o patrimônio líquido do fundo dividido pelo número de cotas. NAV é a sigla em inglês para valor patrimonial líquido. No Dados FII usamos VP por cota, que é a forma mais simples em português. Ele não é a cotação da bolsa e pode ter uma data de referência diferente do preço atual." },
       { id: "valor-mercado", term: "Valor de mercado", text: "É o preço atual da cota multiplicado pelo total de cotas emitidas. Não é a mesma coisa que patrimônio líquido." },
     ],
   },
@@ -28,6 +29,8 @@ const groups = [
     items: [
       { id: "dividendos-dy", term: "Dividendos e DY", text: "Dividendos são os rendimentos distribuídos pelo fundo. DY, ou dividend yield, compara esses rendimentos com o preço da cota. DY alto pode ser oportunidade ou sinal de risco." },
       { id: "data-com-data-ex", term: "Data com e data ex", text: "Data com é o último dia para ter direito ao próximo rendimento. Na data ex, quem compra a cota já não recebe aquele pagamento específico." },
+      { id: "yield-data-com", term: "Yield na data-com", text: "Divide o rendimento anunciado pela cotação-base da data-com. Mostra a taxa daquele evento no momento em que o direito ao pagamento foi definido e permite uma comparação histórica mais coerente." },
+      { id: "yield-preco-atual", term: "Yield sobre o preço atual", text: "Divide o último rendimento pelo preço atual da cota. É uma referência para quem olha o ativo hoje, mas varia com a cotação e não representa exatamente a taxa obtida na data em que o dividendo foi anunciado." },
       { id: "recorrencia", term: "Recorrência dos rendimentos", text: "Avalia se o fundo distribui renda de forma estável ou irregular. Para renda passiva, consistência costuma ser tão importante quanto DY alto." },
       { id: "risco-corte", term: "Risco de corte de dividendos", text: "É o risco de o fundo reduzir a renda paga por cota. Pode acontecer por vacância, inadimplência, queda de resultado, renegociação de contratos ou eventos de crédito." },
       { id: "concentracao-renda", term: "Concentração da renda", text: "Mostra se poucos FIIs respondem por grande parte dos dividendos da carteira. Quando a renda é concentrada, um corte em um ativo pesa mais no bolso do investidor." },

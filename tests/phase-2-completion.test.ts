@@ -14,7 +14,7 @@ import { evaluateMonitorAlerts } from "../src/lib/monitor/MonitorRules.ts";
 import { calculatePremiumDiscountPercent, deriveFiiRiskData } from "../src/lib/fiiDerivedData.ts";
 // @ts-expect-error Native strip-types requires explicit extension.
 import { applyOfficialFundReference } from "../src/lib/regulatory/OfficialFundReferences.ts";
-import type { FundAIInsights } from "../src/types/ai-insights.ts";
+import type { PremiumAIInsights } from "../src/types/ai-insights.ts";
 import type { PublicFundData, SystemHealth, ValidationRun } from "../src/types/regulatory.ts";
 
 const now = "2026-07-14T18:00:00.000Z";
@@ -42,11 +42,15 @@ function freeReport() {
   return new FreeReportEngine().generate(publicFund(), null, now);
 }
 
-function ai(): FundAIInsights {
+function ai(): PremiumAIInsights {
   return {
     ticker: "TEST11",
     executiveSummary: "Resumo estruturado.",
-    changes: [], risks: [], opportunities: [], alerts: [], plainLanguage: "Explicação simples.",
+    differentiatedInsight: "Leitura combinada.",
+    portfolioReading: "Impacto da posição.",
+    peerReading: "Contexto da amostra.",
+    monitoringTriggers: ["Acompanhar a variação do rendimento."],
+    plainLanguage: "Explicação simples.",
     sources: [{ provider: "CVM", kind: "regulatory" }],
     metadata: { engineVersion: "1", promptVersion: "1", model: "test", fingerprint: "abc", generatedAt: now, cached: false },
   };

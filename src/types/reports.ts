@@ -31,6 +31,10 @@ export type FreeFundReport = {
     pvp: number | null;
     lastDividend: number | null;
     lastDividendReference: string | null;
+    lastDividendDateWith: string | null;
+    lastDividendPriceDateWith: number | null;
+    lastDividendYieldOnDateWithPercent: number | null;
+    lastDividendYieldOnCurrentPricePercent: number | null;
   };
   analysis: {
     valuation: {
