@@ -24,8 +24,7 @@ export default function RegulatoryTimeline({ timeline }: { timeline: RegulatoryT
     <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-widest text-indigo-300">Sprint 2.6</p>
-          <h2 className="mt-2 text-xl font-extrabold text-white">Timeline regulatória</h2>
+          <h2 className="text-xl font-extrabold text-white">Timeline regulatória</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-300">Documentos, eventos, fatos relevantes, assembleias e regulamentos consolidados em ordem cronológica.</p>
         </div>
         {timeline && <span className="rounded-full bg-gray-800 px-3 py-1.5 text-xs font-bold text-gray-300 ring-1 ring-white/10">{timeline.total} registro(s)</span>}
