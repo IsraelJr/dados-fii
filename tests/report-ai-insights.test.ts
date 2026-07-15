@@ -21,9 +21,14 @@ function fund(): PublicFundData {
     manager: "Gestora",
     administrator: "Administradora",
     price: "R$ 100,00",
+    pvp: 1.03,
     dividendYield12m: 11,
     dailyLiquidity: 2_000_000,
     earnings2026: {
+      February: { earnings: "0,90", payment_date: "15/03/2026" },
+      March: { earnings: "1,00", payment_date: "15/04/2026" },
+      April: { earnings: "0,95", payment_date: "15/05/2026" },
+      May: { earnings: "1,05", payment_date: "15/06/2026" },
       June: { earnings: "1,00", payment_date: "15/07/2026" },
       July: { earnings: "1,10", payment_date: "15/08/2026" },
     },
@@ -58,6 +63,13 @@ test("free report is deterministic and consolidates score, quality and timeline 
   assert.equal(first.ticker, "TGAR11");
   assert.equal(first.market.lastDividend, 1.1);
   assert.equal(first.market.lastDividendReference, "Julho/2026");
+  assert.equal(first.analysis.valuation.premiumDiscountPercent, 3);
+  assert.equal(first.analysis.valuation.annualizedDistributionOnNavPercent, 13.6);
+  assert.equal(first.analysis.income.observations, 6);
+  assert.equal(first.analysis.income.average3m, 1.05);
+  assert.equal(first.analysis.income.previousAverage3m, 0.95);
+  assert.equal(first.analysis.income.changeVsPrevious3mPercent, 10.53);
+  assert.equal(first.analysis.income.trend, "rising");
   assert.equal(first.scores?.premium.reasons[0], "Nota composta calculada exclusivamente pelo ScoreEngine.");
   assert.equal(first.dataQuality.validationValid, true);
   assert.equal(first.recentEvents[0].type, "material_fact");
@@ -68,13 +80,15 @@ test("AI Insights Engine returns the six canonical groups and reuses identical i
   process.env.ENABLE_AI_INSIGHTS = "true";
   process.env.OPENAI_API_KEY = "test-key";
   let calls = 0;
-  const fetcher = async () => {
+  let requestBody = "";
+  const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
     calls += 1;
+    requestBody = String(init?.body || "");
     return new Response(JSON.stringify({
       output_text: JSON.stringify({
         executiveSummary: "Resumo executivo baseado apenas nos dados.",
         changes: ["Um fato relevante foi registrado."],
-        risks: ["Há métricas com confiança limitada."],
+        risks: ["Ausência do CNPJ oferece risco de transparência.", "Ágio e rendimento devem ser avaliados em conjunto."],
         opportunities: ["Acompanhar a consistência dos rendimentos."],
         alerts: ["Revisar novos documentos regulatórios."],
         plainLanguage: "O fundo tem dados úteis, mas ainda exige acompanhamento.",
@@ -92,8 +106,48 @@ test("AI Insights Engine returns the six canonical groups and reuses identical i
   assert.equal(first.risks.length, 1);
   assert.equal(first.opportunities.length, 1);
   assert.equal(first.alerts.length, 1);
+  assert.equal(first.metadata.promptVersion, "fund-insights-v2");
+  assert.match(requestBody, /premiumDiscountPercent/);
+  assert.match(requestBody, /changeVsPrevious3mPercent/);
+  assert.doesNotMatch(requestBody, /dataQuality/);
+  assert.doesNotMatch(first.risks.join(" "), /CNPJ|transparência/i);
   assert.deepEqual(first.sources, [{ provider: "CVM", kind: "regulatory" }]);
   assert.ok(first.plainLanguage);
+});
+
+test("AI Insights omits internal registration gaps and zero-confidence scores from the model input", async () => {
+  process.env.ENABLE_AI_INSIGHTS = "true";
+  process.env.OPENAI_API_KEY = "test-key";
+  const incomplete = report();
+  incomplete.identity.cnpj = null;
+  incomplete.identity.manager = null;
+  incomplete.identity.administrator = null;
+  incomplete.attentionPoints = [{
+    category: "Qualidade",
+    title: "Dado regulatório incompleto",
+    detail: "CNPJ não informado.",
+    level: "fair",
+  }, {
+    category: "Risco",
+    title: "Risco: 0/100",
+    detail: "Dados de risco insuficientes. Confiança do cálculo: 0%.",
+    level: "critical",
+    score: 0,
+    confidence: 0,
+  }];
+  if (incomplete.scores) incomplete.scores.risk = { score: 0, confidence: 0, level: "critical", reasons: ["Dados insuficientes."], metrics: {} };
+  let body = "";
+  const engine = new AIInsightsEngine(async (_input, init) => {
+    body = String(init?.body || "");
+    return new Response(JSON.stringify({ output_text: JSON.stringify({
+      executiveSummary: "A tendência recente de rendimentos foi avaliada com os dados confirmados.",
+      changes: [], risks: [], opportunities: [], alerts: [],
+      plainLanguage: "A leitura usa apenas indicadores com evidência disponível.",
+    }) }), { status: 200 });
+  });
+  await engine.generateFundInsights(incomplete);
+  assert.doesNotMatch(body, /dataQuality|CNPJ não informado|Dados de risco insuficientes|Confiança do cálculo: 0%/i);
+  assert.doesNotMatch(body, /"cnpj":null|"manager":null|"administrator":null/);
 });
 
 test("AI Insights Engine centralizes generic text generation for legacy reports", async () => {

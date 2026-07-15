@@ -170,7 +170,7 @@ export class RegulatoryDataService {
         currentVersion: canonical.currentVersion,
         cache: "miss" as const,
         sources: canonical.sources
-          .concat(officialReference ? [source("Valora Investimentos — relatório oficial do VGIA11", "regulatory", officialReference.referenceDate)] : [])
+          .concat(officialReference ? [source(officialReference.sourceName, "regulatory", officialReference.referenceDate)] : [])
           .concat(quote ? [source("Planilha de cotações Dados FII", "market", nowIso())] : []),
         validation: { valid: !issues.some((issue) => issue.severity === "error"), issues },
       },
@@ -309,7 +309,7 @@ export class RegulatoryDataService {
   }
 
   async getPremiumReport(value: unknown, options?: { requestKey?: string | null }): Promise<PremiumFundReport | null> {
-    if (!featureEnabled("ENABLE_REPORT_PREMIUM", false)) {
+    if (!featureEnabled("ENABLE_REPORT_PREMIUM")) {
       throw new PremiumReportError("Relatório Premium está desabilitado.", "PREMIUM_REPORT_DISABLED", 503);
     }
     return this.observability.track("report.premium", async () => {
@@ -371,22 +371,30 @@ export class RegulatoryDataService {
     const reference = getOfficialFundReference(ticker);
     if (!reference) throw new Error("Não existe referência oficial cadastrada para este fundo.");
     const approvedAt = nowIso();
-    const approvalHash = createHash("sha256")
-      .update([ticker, actor, approvedAt, reference.sourceUrl, String(reference.vpCota), reference.cnpj].join(":"), "utf8")
-      .digest("hex");
-    return this.publish(ticker, {
+    const patch = {
       cnpj: reference.cnpj,
-      vpCota: reference.vpCota,
-      valorPatrimonialPorCota: reference.vpCota,
-      valuationReferenceDate: reference.referenceDate,
-      valuationSource: reference.sourceUrl,
-      sources: [source("Valora Investimentos — relatório oficial do VGIA11", "regulatory", approvedAt)],
-    }, {
+      ...(reference.corporateName ? { socialReason: reference.corporateName, corporateName: reference.corporateName } : {}),
+      ...(reference.manager ? { manager: reference.manager } : {}),
+      ...(reference.managerCnpj ? { managerCnpj: reference.managerCnpj } : {}),
+      ...(reference.administrator ? { administrator: reference.administrator } : {}),
+      ...(reference.administratorCnpj ? { administratorCnpj: reference.administratorCnpj } : {}),
+      ...(reference.vpCota !== undefined ? {
+        vpCota: reference.vpCota,
+        valorPatrimonialPorCota: reference.vpCota,
+        valuationReferenceDate: reference.referenceDate,
+        valuationSource: reference.sourceUrl,
+      } : {}),
+      sources: [source(reference.sourceName, "regulatory", approvedAt)],
+    };
+    const approvalHash = createHash("sha256")
+      .update([ticker, actor, approvedAt, reference.sourceUrl, JSON.stringify(patch)].join(":"), "utf8")
+      .digest("hex");
+    return this.publish(ticker, patch, {
       actor,
       approvalHash,
       approvedAt,
       backupId: `official-${ticker}-${Date.now()}`,
-      reason: `Publicação da referência oficial de ${ticker}: CNPJ e VP por cota.`,
+      reason: `Publicação dos dados oficiais disponíveis de ${ticker}.`,
     });
   }
 

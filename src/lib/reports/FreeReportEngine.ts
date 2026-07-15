@@ -65,19 +65,86 @@ function firstText(data: Data, keys: string[]) {
 }
 
 function lastDividend(data: Data) {
-  const years = Object.keys(data)
-    .filter((key) => /^earnings\d{4}$/.test(key) && data[key] && typeof data[key] === "object" && !Array.isArray(data[key]))
-    .sort((a, b) => Number(b.slice(-4)) - Number(a.slice(-4)));
+  const item = dividendSeries(data).at(-1);
+  if (item) return { value: item.value, reference: `${MONTHS_PT[item.month] || item.month}/${item.year}` };
+  return { value: null, reference: null };
+}
 
-  for (const yearKey of years) {
-    const entries = data[yearKey] as Data;
-    const ordered = Object.entries(entries).sort(([a], [b]) => MONTHS.indexOf(b) - MONTHS.indexOf(a));
-    for (const [month, item] of ordered) {
+function round(value: number, digits = 2) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function average(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+function dividendSeries(data: Data) {
+  const result: Array<{ year: number; month: string; value: number }> = [];
+  for (const [yearKey, yearValue] of Object.entries(data)) {
+    const match = yearKey.match(/^earnings(\d{4})$/);
+    if (!match || !yearValue || typeof yearValue !== "object" || Array.isArray(yearValue)) continue;
+    for (const [month, item] of Object.entries(yearValue as Data)) {
       const value = item && typeof item === "object" ? numberValue((item as Data).earnings) : numberValue(item);
-      if (value !== null && value > 0) return { value, reference: `${MONTHS_PT[month] || month}/${yearKey.slice(-4)}` };
+      if (value !== null && value > 0) result.push({ year: Number(match[1]), month, value });
     }
   }
-  return { value: null, reference: null };
+  return result.sort((a, b) => a.year - b.year || MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
+}
+
+function derivedAnalysis(data: Data, pvp: number | null) {
+  const values = dividendSeries(data).slice(-12).map((item) => item.value);
+  const latest3 = values.slice(-3);
+  const previous3 = values.slice(-6, -3);
+  const average3m = average(latest3);
+  const previousAverage3m = average(previous3);
+  const changeVsPrevious3mPercent = average3m !== null && previousAverage3m !== null && previousAverage3m > 0
+    ? round(((average3m / previousAverage3m) - 1) * 100)
+    : null;
+  const trend = changeVsPrevious3mPercent === null
+    ? "unknown" as const
+    : changeVsPrevious3mPercent > 5
+      ? "rising" as const
+      : changeVsPrevious3mPercent < -5
+        ? "falling" as const
+        : "stable" as const;
+  const mean = average(values);
+  const standardDeviation = mean !== null && values.length > 1
+    ? Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length)
+    : null;
+  const price = numberValue(data.price);
+  const latest = values.at(-1) ?? null;
+  const annualizedYieldFromLatestPercent = latest !== null && price !== null && price > 0
+    ? round((latest * 12 / price) * 100)
+    : null;
+  const premiumDiscountPercent = pvp === null ? null : round((pvp - 1) * 100, 4);
+  let cuts12m = 0;
+  values.forEach((value, index) => {
+    if (index > 0 && value < values[index - 1] * 0.85) cuts12m += 1;
+  });
+
+  return {
+    valuation: {
+      premiumDiscountPercent,
+      position: pvp === null ? "unknown" as const : pvp > 1.02 ? "premium" as const : pvp < 0.98 ? "discount" as const : "near_nav" as const,
+      annualizedDistributionOnNavPercent: annualizedYieldFromLatestPercent !== null && pvp !== null
+        ? round(annualizedYieldFromLatestPercent * pvp)
+        : null,
+    },
+    income: {
+      observations: values.length,
+      latest,
+      average3m: average3m === null ? null : round(average3m, 6),
+      previousAverage3m: previousAverage3m === null ? null : round(previousAverage3m, 6),
+      changeVsPrevious3mPercent,
+      minimum12m: values.length ? Math.min(...values) : null,
+      maximum12m: values.length ? Math.max(...values) : null,
+      volatilityPercent: standardDeviation !== null && mean !== null && mean > 0 ? round((standardDeviation / mean) * 100) : null,
+      cuts12m,
+      annualizedYieldFromLatestPercent,
+      trend,
+    },
+  };
 }
 
 function signal(category: string, score: ScoreResult, detail?: string): FreeReportSignal {
@@ -141,6 +208,7 @@ export class FreeReportEngine {
     const sources = Array.isArray(fund.regulatoryMeta?.sources) ? fund.regulatoryMeta.sources : [];
     const scores = fund.scores || null;
     const dividend = lastDividend(data);
+    const pvp = firstPvp(data, ["pvp", "p_vp", "pvpa", "priceToBook"]);
     const validationValid = Boolean(fund.regulatoryMeta?.validation?.valid);
 
     return {
@@ -160,10 +228,11 @@ export class FreeReportEngine {
         price: typeof data.price === "string" || typeof data.price === "number" ? data.price : null,
         variation: typeof data.variation === "string" || typeof data.variation === "number" ? data.variation : null,
         dividendYield: firstNumber(data, ["dividendYield12m", "dy12m", "dividendYield", "dy"]),
-        pvp: firstPvp(data, ["pvp", "p_vp", "pvpa", "priceToBook"]),
+        pvp,
         lastDividend: dividend.value,
         lastDividendReference: dividend.reference,
       },
+      analysis: derivedAnalysis(data, pvp),
       scores,
       highlights: buildHighlights(scores, validationValid, sources.length),
       attentionPoints: buildAttentionPoints(scores, issues),

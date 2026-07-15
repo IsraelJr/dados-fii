@@ -68,7 +68,7 @@ export default function AdminSystemPage() {
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [runningMonitor, setRunningMonitor] = useState(false);
-  const [publishingReference, setPublishingReference] = useState(false);
+  const [publishingReference, setPublishingReference] = useState("");
   const [referenceMessage, setReferenceMessage] = useState("");
   const [error, setError] = useState("");
   const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [], observability: null, monitor: null });
@@ -212,18 +212,18 @@ export default function AdminSystemPage() {
     }
   }
 
-  async function publishVgiaReference() {
-    setPublishingReference(true);
+  async function publishOfficialReference(ticker: "VGIA11" | "MXRF11") {
+    setPublishingReference(ticker);
     setError("");
     setReferenceMessage("");
     try {
-      await post("/api/admin/official-fund-reference", { ticker: "VGIA11" });
-      setReferenceMessage("Referência oficial do VGIA11 publicada com backup, aprovação e auditoria.");
+      await post("/api/admin/official-fund-reference", { ticker });
+      setReferenceMessage(`Dados oficiais do ${ticker} publicados com backup, aprovação e auditoria.`);
       await loadDashboard();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Não foi possível publicar a referência oficial do VGIA11.");
+      setError(caught instanceof Error ? caught.message : `Não foi possível publicar os dados oficiais do ${ticker}.`);
     } finally {
-      setPublishingReference(false);
+      setPublishingReference("");
     }
   }
 
@@ -331,9 +331,10 @@ export default function AdminSystemPage() {
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Referência oficial</p><h2 className="mt-2 text-2xl font-black text-slate-900">VGIA11</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Publica na base regulatória o CNPJ 41.081.088/0001-09 e o VP por cota de R$ 9,50 do relatório oficial de maio/2026. A operação cria backup, versão e registro de auditoria.</p></div>
-            <button type="button" onClick={publishVgiaReference} disabled={publishingReference} className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><UploadCloud size={16} /> {publishingReference ? "Publicando…" : "Publicar referência"}</button>
+          <div><p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Dados oficiais</p><h2 className="mt-2 text-2xl font-black text-slate-900">Publicação cadastral</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Grava os dados confirmados na base regulatória com backup, versão, aprovação e registro de auditoria.</p></div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="font-black text-slate-900">VGIA11</h3><p className="mt-2 text-sm text-slate-600">CNPJ e VP por cota do relatório oficial de maio/2026.</p><button type="button" onClick={() => publishOfficialReference("VGIA11")} disabled={Boolean(publishingReference)} className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><UploadCloud size={16} /> {publishingReference === "VGIA11" ? "Publicando…" : "Publicar VGIA11"}</button></article>
+            <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="font-black text-slate-900">MXRF11</h3><p className="mt-2 text-sm text-slate-600">CNPJ, razão social, gestor e administrador do cadastro oficial da CVM.</p><button type="button" onClick={() => publishOfficialReference("MXRF11")} disabled={Boolean(publishingReference)} className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><UploadCloud size={16} /> {publishingReference === "MXRF11" ? "Publicando…" : "Publicar MXRF11"}</button></article>
           </div>
           {referenceMessage && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100">{referenceMessage}</p>}
         </section>

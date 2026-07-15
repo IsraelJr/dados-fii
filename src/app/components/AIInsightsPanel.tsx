@@ -54,7 +54,7 @@ export default function AIInsightsPanel({ ticker }: { ticker: string }) {
           </div>
           <InsightSection title="Em linguagem simples" text={insights.plainLanguage} />
           <p className="text-xs leading-5 text-slate-400">
-            Gerado pelo AI Insights Engine · prompt {insights.metadata.promptVersion} · {insights.metadata.cached ? "resultado reutilizado do cache" : "nova geração"}. Conteúdo informativo, sem recomendação de investimento.
+            Conteúdo informativo, sem recomendação de investimento.
           </p>
         </div>
       )}
