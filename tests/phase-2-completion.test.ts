@@ -122,6 +122,17 @@ test("VGIA11 uses the official reference and rejects the inconsistent legacy P/V
   assert.equal(calculatePremiumDiscountPercent(9.58, derived.vpCota), 0.8421);
 });
 
+test("MXRF11 receives the official CVM registration without overwriting valid market valuation", () => {
+  const corrected = applyOfficialFundReference("MXRF11", { price: 10.5, pvp: 1.03273 });
+
+  assert.equal(corrected.cnpj, "97.521.225/0001-25");
+  assert.equal(corrected.corporateName, "MAXI RENDA FUNDO DE INVESTIMENTO IMOBILIÁRIO - FII - RESPONSABILIDADE LIMITADA");
+  assert.equal(corrected.manager, "XP VISTA ASSET MANAGEMENT LTDA.");
+  assert.equal(corrected.administrator, "BTG PACTUAL SERVIÇOS FINANCEIROS S/A DTVM");
+  assert.equal(corrected.pvp, 1.03273);
+  assert.equal(corrected.vpCota, undefined);
+});
+
 test("Observability aggregates duration, retries, failures and canonical subsystems", async () => {
   const engine = new ObservabilityEngine();
   await engine.track("regulatory.read", async () => "ok");
