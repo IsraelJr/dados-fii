@@ -43,6 +43,7 @@ test("Health and Validation endpoints use canonical HTTP methods without direct 
 test("admin session uses verified Firebase identity and HttpOnly cookie", () => {
   const session = read("src/app/api/admin/session/route.ts");
   const security = read("src/lib/adminSecurity.ts");
+  const dashboard = read("src/app/admin/sistema/page.tsx");
   assert.match(session, /verifyIdToken/);
   assert.match(session, /createSessionCookie/);
   assert.match(session, /httpOnly:\s*true/);
@@ -51,6 +52,23 @@ test("admin session uses verified Firebase identity and HttpOnly cookie", () => 
   assert.match(security, /ADMIN_EMAILS/);
   assert.match(security, /role: "admin"/);
   assert.match(security, /consumeAdminRateLimit/);
+  assert.match(dashboard, /signInWithEmailAndPassword/);
+  assert.match(dashboard, /Entrar no painel/);
+  assert.doesNotMatch(dashboard, /cadastrado em <code>ADMIN_EMAILS|sessão HttpOnly/);
+});
+
+test("Firebase Admin can compile without parsing an absent service account", () => {
+  const source = read("src/lib/firebaseAdmin.ts");
+  assert.match(source, /applicationDefault/);
+  assert.match(source, /FIREBASE_SERVICE_ACCOUNT_KEY\?\.trim/);
+  assert.doesNotMatch(source, /JSON\.parse\(process\.env\.FIREBASE_SERVICE_ACCOUNT_KEY!/);
+});
+
+test("Firebase client defers Auth and Firestore when public build variables are absent", () => {
+  const source = read("src/lib/firebase.ts");
+  assert.match(source, /const configured = Boolean/);
+  assert.match(source, /app \? getAuth\(app\) : null/);
+  assert.match(source, /app \? getFirestore\(app\) : null/);
 });
 
 test("Sprint 2.1 has separate service, repository, normalizer, validator, cache and types", () => {
@@ -244,4 +262,33 @@ test("legacy observability no longer accepts admin secrets", () => {
   assert.doesNotMatch(route, /ADMIN_UPDATE_SECRET|CRON_SECRET|x-admin-secret|searchParams\.get\("secret"\)/);
   assert.doesNotMatch(route, /export async function GET/);
   assert.match(route, /authorizeAdminRequest/);
+});
+
+test("data coverage audit is secured and delegates Firestore access to RegulatoryDataService", () => {
+  const route = read("src/app/api/admin/audit-fii-data/route.ts");
+  const derived = read("src/app/api/admin/audit-fii-data-derived/route.ts");
+  const engine = read("src/lib/dataCoverage/DataCoverageEngine.ts");
+  for (const source of [route, derived]) {
+    assert.match(source, /authorizeAdminRequest/);
+    assert.match(source, /regulatoryDataService/);
+    assert.doesNotMatch(source, /firebase-admin|adminDb|\.collection\(/);
+  }
+  assert.match(engine, /COVERAGE_READY_THRESHOLD/);
+  assert.match(engine, /profileCoverage/);
+  assert.doesNotMatch(engine, /firebase-admin|adminDb|\.collection\(/);
+});
+
+test("portfolio regulatory intelligence is reusable, rate limited and has no direct persistence or AI call", () => {
+  const route = read("src/app/api/portfolio/regulatory-intelligence/route.ts");
+  const service = read("src/lib/regulatoryDataService.ts");
+  const engine = read("src/lib/portfolio/PortfolioRegulatoryIntelligenceEngine.ts");
+  const page = read("src/app/fii/[ticker]/page.tsx");
+  assert.match(route, /consumeAdminRateLimit/);
+  assert.match(route, /ENABLE_PORTFOLIO_REGULATORY_INTELLIGENCE/);
+  assert.match(route, /regulatoryDataService\.getPortfolioRegulatoryIntelligence/);
+  assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
+  assert.match(service, /async getPortfolioRegulatoryIntelligence/);
+  assert.match(engine, /class PortfolioRegulatoryIntelligenceEngine/);
+  assert.doesNotMatch(engine, /OpenAI|firebase-admin|adminDb|\.collection\(/);
+  assert.match(page, /PortfolioRegulatoryIntelligence/);
 });
