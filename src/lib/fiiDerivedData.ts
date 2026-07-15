@@ -15,7 +15,7 @@ const MONTHS = [
 
 const MIN_AGGREGATE_VALUE = 1_000_000;
 const MAX_PVP = 10;
-const MIN_PVP = 0.01;
+const MIN_PVP = 0.1;
 const MIN_VP_COTA = 0.01;
 const MAX_VP_COTA = 100_000;
 
@@ -121,16 +121,35 @@ function isPlausibleVpCota(value?: number) {
   return Boolean(value && value >= MIN_VP_COTA && value <= MAX_VP_COTA);
 }
 
+function isPlausibleVpCotaForPrice(value?: number, price?: number) {
+  if (!isPlausibleVpCota(value)) return false;
+  return !price || isPlausiblePvp(price / value!);
+}
+
+function approximatelyEqual(left?: number, right?: number, tolerance = 0.15) {
+  if (!left || !right) return false;
+  return Math.abs(left - right) / Math.max(Math.abs(left), Math.abs(right)) <= tolerance;
+}
+
+export function calculatePremiumDiscountPercent(priceValue: unknown, vpCotaValue: unknown) {
+  const price = positiveNumberOf(priceValue);
+  const vpCota = positiveNumberOf(vpCotaValue);
+  if (!price || !vpCota) return undefined;
+  const pvp = price / vpCota;
+  if (!isPlausiblePvp(pvp)) return undefined;
+  return round((pvp - 1) * 100, 4);
+}
+
 function isPlausibleAggregate(value?: number) {
   return Boolean(value && value >= MIN_AGGREGATE_VALUE);
 }
 
-function validateAggregateWithShares(value?: number, shares?: number) {
+function validateAggregateWithShares(value?: number, shares?: number, price?: number) {
   if (!isPlausibleAggregate(value)) return undefined;
   if (!shares) return value;
 
   const vpCota = value! / shares;
-  return isPlausibleVpCota(vpCota) ? value : undefined;
+  return isPlausibleVpCotaForPrice(vpCota, price) ? value : undefined;
 }
 
 function classifySector(data: any) {
@@ -256,11 +275,16 @@ function buildValuation(data: any, price?: number) {
 
   const notes: string[] = [];
   const pvpInput = firstPlausibleNumber(data, pvpPaths, isPlausiblePvp);
-  const vpCotaInput = firstPlausibleNumber(data, vpCotaPaths, isPlausibleVpCota);
-  const validatedNetWorth = firstPlausibleNumber(data, netWorthPaths, (value) => Boolean(validateAggregateWithShares(value, numberShares)));
+  const vpCotaInput = firstPlausibleNumber(data, vpCotaPaths, (value) => isPlausibleVpCotaForPrice(value, price));
+  const validatedNetWorth = firstPlausibleNumber(data, netWorthPaths, (value) => Boolean(validateAggregateWithShares(value, numberShares, price)));
+  const calculatedVpCota = validatedNetWorth && numberShares ? validatedNetWorth / numberShares : undefined;
   const impliedVpCota = price && pvpInput ? price / pvpInput : undefined;
-  const vpCota = vpCotaInput || (validatedNetWorth && numberShares ? validatedNetWorth / numberShares : undefined) || (isPlausibleVpCota(impliedVpCota) ? impliedVpCota : undefined);
-  const pvp = pvpInput || (price && vpCota ? price / vpCota : undefined);
+  const vpCota = vpCotaInput || calculatedVpCota || (isPlausibleVpCotaForPrice(impliedVpCota, price) ? impliedVpCota : undefined);
+  const calculatedPvp = price && vpCota ? price / vpCota : undefined;
+  const pvpInputConsistent = !calculatedPvp || approximatelyEqual(pvpInput, calculatedPvp);
+  const pvp = calculatedPvp && isPlausiblePvp(calculatedPvp)
+    ? calculatedPvp
+    : pvpInputConsistent ? pvpInput : undefined;
   const calculatedMarketCap = price && numberShares ? price * numberShares : undefined;
   const validatedDirectMarketCap = firstPlausibleNumber(data, marketCapPaths, (value) => Boolean(validateAggregateWithShares(value, numberShares)));
   const marketCap = calculatedMarketCap || validatedDirectMarketCap;
@@ -276,6 +300,9 @@ function buildValuation(data: any, price?: number) {
   if (directPvp && !pvpInput) {
     notes.push("P/VP bruto ignorado por faixa incompatível.");
   }
+  if (pvpInput && calculatedPvp && !pvpInputConsistent) {
+    notes.push("P/VP informado ignorado por incompatibilidade com preço e VP por cota.");
+  }
   if (directVpCota && !vpCotaInput) {
     notes.push("VP por cota bruto ignorado por faixa incompatível.");
   }
@@ -289,8 +316,8 @@ function buildValuation(data: any, price?: number) {
     dataQuality: {
       marketCapSource: calculatedMarketCap ? "calculado por preço atual x cotas emitidas" : validatedDirectMarketCap ? "informado e validado" : undefined,
       netWorthSource: validatedNetWorth ? "informado e validado" : impliedNetWorth && isPlausibleAggregate(impliedNetWorth) ? "estimado a partir de VP/cota ou P/VP" : undefined,
-      vpCotaSource: vpCotaInput ? "informado" : validatedNetWorth && numberShares ? "calculado por patrimônio líquido / cotas emitidas" : impliedVpCota && isPlausibleVpCota(impliedVpCota) ? "estimado por preço / P/VP" : undefined,
-      pvpSource: pvpInput ? "informado" : price && vpCota ? "calculado por preço / VP por cota" : undefined,
+      vpCotaSource: vpCotaInput ? "informado" : validatedNetWorth && numberShares ? "calculado por patrimônio líquido / cotas emitidas" : impliedVpCota && isPlausibleVpCotaForPrice(impliedVpCota, price) ? "estimado por preço / P/VP" : undefined,
+      pvpSource: calculatedPvp && isPlausiblePvp(calculatedPvp) ? "calculado por preço / VP por cota" : pvpInputConsistent && pvpInput ? "informado" : undefined,
       notes: notes.length ? notes : undefined,
     },
   });
