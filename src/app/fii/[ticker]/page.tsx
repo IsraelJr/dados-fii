@@ -4,6 +4,10 @@ import { ExternalLink, Newspaper } from "lucide-react";
 import PageHeader from "../../components/PageHeader";
 import WalletQuickAddButton from "../../components/WalletQuickAddButton";
 import FiiAlert from "../../components/FiiAlert";
+import RegulatoryTimeline from "../../components/RegulatoryTimeline";
+import FreeFundReport from "../../components/FreeFundReport";
+import AIInsightsPanel from "../../components/AIInsightsPanel";
+import PremiumReportPanel from "../../components/PremiumReportPanel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -203,8 +207,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function FiiPage({ params }: PageProps) {
   const ticker = await getTicker(params);
-  const data = ticker ? await fetchJson(`/api/fii?ticker=${encodeURIComponent(ticker)}`) : null;
-  const newsData = ticker ? await fetchJson(`/api/fii-news?ticker=${encodeURIComponent(ticker)}`) : null;
+  const [data, newsData, timelineData, freeReportData] = ticker ? await Promise.all([
+    fetchJson(`/api/fii?ticker=${encodeURIComponent(ticker)}`),
+    fetchJson(`/api/fii-news?ticker=${encodeURIComponent(ticker)}`),
+    fetchJson(`/api/fii/${encodeURIComponent(ticker)}/timeline?limit=30`),
+    fetchJson(`/api/fii/${encodeURIComponent(ticker)}/report/free`),
+  ]) : [null, null, null, null];
   const news: NewsItem[] = Array.isArray(newsData?.news)
     ? [...newsData.news]
       .sort((a: NewsItem, b: NewsItem) => newsTimestamp(b.publishedAt) - newsTimestamp(a.publishedAt))
@@ -315,7 +323,15 @@ export default async function FiiPage({ params }: PageProps) {
             </InfoCard>
           </section>
 
+          <FreeFundReport report={freeReportData?.report || null} />
+
+          <AIInsightsPanel ticker={ticker} />
+
+          <PremiumReportPanel ticker={ticker} />
+
           <RecentNews ticker={ticker} news={news} />
+
+          <RegulatoryTimeline timeline={timelineData?.timeline || null} />
 
           <section className="rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
             <div className="mb-4">

@@ -1,55 +1,37 @@
-// app/api/fii-summary/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { AIInsightsError } from "@/lib/ai/AIInsightsEngine";
+import { regulatoryDataService } from "@/lib/regulatoryDataService";
 
-export async function POST(req: NextRequest) {
-  const { ticker } = await req.json();
-  const rawPrompt = process.env.PERPLEXITY_PROMPT_ABOUT_FII ?? "";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
+function requestKey(request: NextRequest) {
+  return request.headers.get("cf-connecting-ip")
+    || request.headers.get("x-real-ip")
+    || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || null;
+}
+
+export async function POST(request: NextRequest) {
   try {
-    if (!ticker) {
-      return NextResponse.json({ error: "Ticker não fornecido" }, { status: 400 });
-    }
+    const body = await request.json().catch(() => ({}));
+    const ticker = String(body?.ticker || "").trim().toUpperCase();
+    if (!ticker) return NextResponse.json({ error: "Ticker não fornecido" }, { status: 400 });
+    const insights = await regulatoryDataService.getAIInsights(ticker, { requestKey: requestKey(request) });
+    if (!insights) return NextResponse.json({ error: "Fundo não encontrado" }, { status: 404 });
 
-    const prompt = rawPrompt ? rawPrompt.replace("{ticker}", ticker) : ticker;
-
-    // Chamada para Perplexity
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "sonar-pro",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }),
+    return NextResponse.json({
+      ticker: insights.ticker,
+      summary: insights.executiveSummary,
+      sources: insights.sources.map((source) => source.provider),
+      insights,
+      engine: "AIInsightsEngine",
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Erro Perplexity: ${response.status} - ${errText}`);
+  } catch (error) {
+    if (error instanceof AIInsightsError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
-
-    const data = await response.json();
-    // console.log("Resposta do Perplexity:", JSON.stringify(data, null, 2));
-
-    let summary = "Sem resumo disponível";
-
-    if (data?.choices?.[0]?.message?.content) {
-      summary = (data?.choices?.[0]?.message?.content ?? summary).replace(/\[\d+\]/g, "");
-    }
-
-    let sources = data?.choices?.[0]?.citations ?? [];
-
-    return NextResponse.json({ ticker, summary, sources });
-
-  } catch (err: any) {
-    console.error(`Erro ao buscar resumo do FII: ${ticker}`, err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("FII summary compatibility error", error instanceof Error ? error.message : "unknown");
+    return NextResponse.json({ error: "Não foi possível gerar o resumo do FII." }, { status: 500 });
   }
 }
