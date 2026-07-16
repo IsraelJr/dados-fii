@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Native strip-types requires explicit extension.
-import { mergeDividendYear, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "../src/lib/market/StatusInvestParser.ts";
+import { mergeDividendYear, needsStatusInvestEnrichment, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "../src/lib/market/StatusInvestParser.ts";
 // @ts-expect-error Native strip-types requires explicit extension.
 import { ifixMembership, parseIfixComposition } from "../src/lib/indexes/IfixComposition.ts";
 // @ts-expect-error Native strip-types requires explicit extension.
@@ -23,6 +23,11 @@ test("dividend merge preserves a valid historical data-com price", () => {
   });
   assert.equal(merged.June.price_date_with, "R$ 9,77");
   assert.equal(merged.June.earnings, "R$ 0,13");
+});
+
+test("daily job reprocesses filled months when liquidity or data-com price is invalid", () => {
+  assert.equal(needsStatusInvestEnrichment({ dailyLiquidity: 30, earnings2026: { July: { payment_date: "17/07/2026", date_with: "10/07/2026", earnings: "R$ 0,13" } } }, 2026, "July"), true);
+  assert.equal(needsStatusInvestEnrichment({ dailyLiquidity: 1_599_186.55, earnings2026: { July: { payment_date: "17/07/2026", date_with: "10/07/2026", earnings: "R$ 0,13", price_date_with: "R$ 9,81" } } }, 2026, "July"), false);
 });
 
 test("IFIX composition produces explicit yes, no and not-applicable states", () => {
