@@ -1,6 +1,6 @@
 # Fase 2 — Sprints 2.1 a 2.11
 
-Este documento segue o `DADOS_FII_HANDOFF.md` v3.0.0 e registra a implementação completa da Fase 2.
+Este documento segue o handoff canônico e registra a implementação da Fase 2. Implementação funcional isolada não é mais tratada como aceite final: também são obrigatórios o gate global de qualidade, o backfill de Produção e o double check pós-carga descritos em `docs/data-quality-hardening.md`.
 
 ## Sprint 2.1 — RegulatoryDataService
 
@@ -38,6 +38,9 @@ Publicação e rollback exigem ator, aprovação humana, hash, motivo e backup i
 | `RegulatoryMonitorRuns` | Histórico auditável das execuções do monitor |
 | `RegulatoryMonitorAlerts` | Estado, deduplicação e cooldown dos alertas |
 | `RegulatoryMonitorLocks` | Lock distribuído com expiração para impedir crons sobrepostos |
+| `RegulatoryCatalogRuns` | Prévia imutável, hashes, métricas e plano normalizado em chunks |
+| `RegulatoryCatalogAudits` | Double check de cobertura, duplicidade, faltantes e ciclo de vida |
+| `RegulatoryCatalogDirectory/current` | Diretório materializado dos fundos ativos para listagens econômicas |
 
 ## Sprint 2.2 — Score Engine
 
@@ -190,6 +193,7 @@ ENABLE_HEALTH_MONITOR=true
 ENABLE_AI_INSIGHTS=true
 ENABLE_REPORT_PREMIUM=false
 ENABLE_AUTOMATIC_MONITOR=false
+ENABLE_PORTFOLIO_REGULATORY_INTELLIGENCE=true
 PREMIUM_PREVIEW_EMAILS=preview@dominio.com
 REGULATORY_CACHE_TTL_MS=300000
 REGULATORY_MARKET_CACHE_TTL_MS=60000
@@ -216,6 +220,21 @@ CRON_SECRET=segredo-aleatorio-com-pelo-menos-16-caracteres
 
 Os recursos aceitam opt-out explícito com `false`. `ENABLE_AI_INSIGHTS=true` requer `OPENAI_API_KEY`; o modelo pode ser substituído sem alterar APIs consumidoras. Premium e Monitor permanecem desabilitados por padrão para permitir ativação operacional controlada.
 
+## Continuidade — início da Fase 3
+
+A continuidade pós-Fase 2 começou em duas trilhas simultâneas:
+
+1. **Data Coverage Hardening:** contratos canônicos de campos comuns, tijolo, papel, FIAGRO e FI-Infra; auditoria real e `derived-preview`; cobertura por perfil; prioridades de backfill; e readiness objetivo por funcionalidade (`ready`, `beta`, `blocked`). A execução protegida ocorre por `POST /api/admin/audit-fii-data`; `GET` retorna a última auditoria. O painel `/admin/sistema` permite executar e inspecionar a linha de base sem acesso direto ao Firestore.
+2. **Inteligência regulatória da carteira:** `POST /api/portfolio/regulatory-intelligence` recebe até 30 posições, consulta fundos e timelines exclusivamente pelo `RegulatoryDataService` e classifica os eventos por tipo, termos de risco/oportunidade, recência e peso estimado na carteira. A classificação é determinística, cacheada, limitada por origem e não chama IA. A página de cada fundo mostra o impacto quando existe uma carteira local.
+
+As auditorias são persistidas em `FiiDataAudits` e também geram evento em `RegulatoryAuditLogs`. Os campos específicos de tijolo ou crédito somente entram no denominador dos perfis compatíveis, eliminando a distorção anterior que penalizava todo o universo pela ausência de dados não aplicáveis.
+
+Critérios operacionais:
+
+- `>= 85%` de cobertura essencial: funcionalidade pronta;
+- `70% a 84,9%`: beta com confiança visível e backfill;
+- `< 70%`: enriquecer a base antes da interface definitiva.
+
 ## Verificação
 
-`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, publicação segura, scores, Health, Validation, Dashboard, Timeline, relatórios Gratuito e Premium, AI Insights estruturado, Observabilidade e Monitor Automático.
+`npm run typecheck` valida os contratos TypeScript. `npm run test:sprint2` cobre arquitetura regulatória, publicação segura, scores, Health, Validation, Dashboard, Timeline, relatórios Gratuito e Premium, AI Insights estruturado, Observabilidade, Monitor Automático, contratos de cobertura e inteligência regulatória da carteira.

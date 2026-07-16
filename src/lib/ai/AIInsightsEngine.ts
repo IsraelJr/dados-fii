@@ -211,8 +211,16 @@ function safeFundInput(report: FreeFundReport) {
     identity: {
       name: report.identity.name,
       fundKind: report.identity.fundKind,
+      sector: report.identity.sector,
       segment: report.identity.segment,
+      regulatoryClassification: report.identity.regulatoryClassification,
+      managementType: report.identity.managementType,
+      targetAudience: report.identity.targetAudience,
+      condominiumForm: report.identity.condominiumForm,
+      exclusive: report.identity.exclusive,
+      isFundOfFunds: report.identity.isFundOfFunds,
     },
+    fundamentals: report.fundamentals,
     market: {
       price: report.market.price,
       variation: report.market.variation,
@@ -267,6 +275,7 @@ function safePremiumInput(report: PremiumReportDraft) {
     monitoringPlan: report.recommendations,
     fundEvidence: {
       identity: report.freeReport.identity,
+      fundamentals: report.freeReport.fundamentals,
       market: free.market,
       analysis: free.analysis,
       scores: free.scores,
@@ -411,6 +420,7 @@ export class AIInsightsEngine {
               "Riscos, oportunidades e alertas devem citar valores e combinar ao menos dois indicadores disponíveis, ou decorrer de um evento regulatório documentado.",
               "Preencha mudanças somente quando houver comparação histórica ou evento real no JSON; caso contrário, retorne a lista vazia.",
               "Não repita métricas isoladas nem escreva observações genéricas sobre insuficiência de dados.",
+              "Na composição de cotistas, PF e PJ são quantidades de contas, não percentuais do patrimônio; não trate uma maioria de contas como concentração de capital.",
               "Oportunidade significa ponto favorável para acompanhamento, não recomendação de investimento.",
               "Não recomende compra, venda ou manutenção de ativos.",
               "Nunca use a sigla NAV; escreva VP por cota e diferencie o yield do último evento, o yield sobre a cotação atual e o dividend yield acumulado em 12 meses.",

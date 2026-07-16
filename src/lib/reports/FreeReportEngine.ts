@@ -2,9 +2,10 @@ import type { PublicFundData, ValidationIssue } from "../../types/regulatory";
 import type { FreeFundReport, FreeReportSignal } from "../../types/reports";
 import type { FundScores, ScoreResult } from "../../types/scores";
 import type { RegulatoryTimelineResponse } from "../../types/timeline";
+import type { CatalogInvestorComposition } from "../../types/fund-catalog";
 import { plausiblePvpValue } from "../fiiDerivedData";
 
-export const FREE_REPORT_VERSION = "1.1.0";
+export const FREE_REPORT_VERSION = "1.2.0";
 
 const SCORE_LABELS: Record<Exclude<keyof FundScores, "engineVersion" | "generatedAt">, string> = {
   risk: "Risco",
@@ -24,6 +25,11 @@ const MONTHS_PT: Record<string, string> = {
 
 type Data = Record<string, unknown>;
 type ScoreKey = Exclude<keyof FundScores, "engineVersion" | "generatedAt">;
+const LEGAL_ENTITY_CATEGORY_KEYS = [
+  "nonFinancial", "commercialBanks", "brokersAndDistributors", "otherFinancial", "nonResidents", "openPension",
+  "closedPension", "publicPension", "insurersAndReinsurers", "capitalizationAndLeasing", "realEstateFunds", "otherFunds",
+  "distributors", "other",
+] as const satisfies ReadonlyArray<keyof CatalogInvestorComposition["legalEntityCategories"]>;
 
 function text(value: unknown) {
   const normalized = String(value || "").trim();
@@ -62,6 +68,47 @@ function firstText(data: Data, keys: string[]) {
     if (parsed) return parsed;
   }
   return null;
+}
+
+function booleanValue(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["true", "sim", "s", "1"].includes(normalized)) return true;
+  if (["false", "não", "nao", "n", "0"].includes(normalized)) return false;
+  return null;
+}
+
+function fundamentals(data: Data) {
+  const composition = data.investorComposition && typeof data.investorComposition === "object" && !Array.isArray(data.investorComposition)
+    ? data.investorComposition as Data : null;
+  const totalAccounts = composition ? numberValue(composition.totalAccounts) : null;
+  const individualAccounts = composition ? numberValue(composition.individualAccounts) : null;
+  const legalEntityAccounts = composition ? numberValue(composition.legalEntityAccounts) : null;
+  const largest = composition?.largestLegalEntityHolder && typeof composition.largestLegalEntityHolder === "object"
+    ? composition.largestLegalEntityHolder as Data : null;
+  const categories = composition?.legalEntityCategories && typeof composition.legalEntityCategories === "object"
+    && !Array.isArray(composition.legalEntityCategories) ? composition.legalEntityCategories as Data : null;
+  const legalEntityCategories: CatalogInvestorComposition["legalEntityCategories"] | null = categories
+    ? Object.fromEntries(LEGAL_ENTITY_CATEGORY_KEYS.map((key) => [key, numberValue(categories[key])])) as CatalogInvestorComposition["legalEntityCategories"]
+    : null;
+  return {
+    netWorth: firstNumber(data, ["netWorth", "patrimonioLiquido", "equityValue"]),
+    issuedShares: firstNumber(data, ["numberShares", "issuedShares", "cotasEmitidas"]),
+    navPerShare: firstNumber(data, ["vpCota", "valorPatrimonialPorCota", "navPerShare"]),
+    referenceDate: firstText(data, ["valuationReferenceDate", "catalogUpdatedAt"]),
+    investors: totalAccounts !== null ? {
+      totalAccounts,
+      individualAccounts,
+      individualPercent: composition ? numberValue(composition.individualPercent) : null,
+      legalEntityAccounts: legalEntityAccounts ?? (individualAccounts !== null ? Math.max(totalAccounts - individualAccounts, 0) : null),
+      legalEntityPercent: composition ? numberValue(composition.legalEntityPercent) : null,
+      legalEntityCategories,
+      largestLegalEntityHolder: largest && text(largest.name) ? {
+        name: text(largest.name)!,
+        ownershipPercent: numberValue(largest.ownershipPercent),
+      } : null,
+    } : null,
+  };
 }
 
 function lastDividend(data: Data) {
@@ -232,10 +279,18 @@ export class FreeReportEngine {
         corporateName: firstText(data, ["socialReason", "corporateName", "razaoSocial", "razao_social"]),
         cnpj: firstText(data, ["cnpj", "CNPJ"]),
         fundKind: fund.fundKind,
+        sector: firstText(data, ["sector"]),
         segment: firstText(data, ["segment_new", "segment", "segmento", "sector"]),
+        regulatoryClassification: firstText(data, ["regulatoryClassification"]),
+        managementType: firstText(data, ["managementType"]),
+        targetAudience: firstText(data, ["targetAudience"]),
+        condominiumForm: firstText(data, ["condominiumForm"]),
+        exclusive: booleanValue(data.exclusive),
+        isFundOfFunds: booleanValue(data.isFundOfFunds),
         manager: firstText(data, ["manager", "gestor", "management"]),
         administrator: firstText(data, ["administrator", "administrador", "admin"]),
       },
+      fundamentals: fundamentals(data),
       market: {
         price: typeof data.price === "string" || typeof data.price === "number" ? data.price : null,
         variation: typeof data.variation === "string" || typeof data.variation === "number" ? data.variation : null,

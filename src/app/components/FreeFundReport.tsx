@@ -10,15 +10,46 @@ const SCORE_NAMES = {
   premium: "Nota composta",
 } as const;
 
+const INVESTOR_CATEGORY_NAMES: Record<string, string> = {
+  nonFinancial: "Empresas não financeiras",
+  commercialBanks: "Bancos comerciais",
+  brokersAndDistributors: "Corretoras e distribuidoras",
+  otherFinancial: "Outras instituições financeiras",
+  nonResidents: "Investidores não residentes",
+  openPension: "Previdência aberta",
+  closedPension: "Previdência fechada",
+  publicPension: "Regimes próprios de previdência",
+  insurersAndReinsurers: "Seguradoras e resseguradoras",
+  capitalizationAndLeasing: "Capitalização e arrendamento",
+  realEstateFunds: "Outros FIIs",
+  otherFunds: "Outros fundos",
+  distributors: "Distribuidores",
+  other: "Outras categorias",
+};
+
 function formatNumber(value: number | null, suffix = "") {
   if (value === null) return "Não informado";
   return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}${suffix}`;
+}
+
+function formatCurrency(value: number | null) {
+  if (value === null) return "Não informado";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(value);
+}
+
+function formatInteger(value: number | null) {
+  if (value === null) return "Não informado";
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(value);
 }
 
 function formatDate(value: string | null) {
   if (!value) return "Data não informada";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(date);
+}
+
+function formatYesNo(value: boolean | null) {
+  return value === null ? "Não informado" : value ? "Sim" : "Não";
 }
 
 function SignalList({ items, empty }: { items: FreeReportSignal[]; empty: string }) {
@@ -40,6 +71,9 @@ export default function FreeFundReport({ report }: { report: FreeFundReportData 
   const scoreEntries = report.scores
     ? (Object.keys(SCORE_NAMES) as Array<keyof typeof SCORE_NAMES>).map((key) => ({ key, label: SCORE_NAMES[key], value: report.scores?.[key] }))
     : [];
+  const investorCategories = Object.entries(report.fundamentals.investors?.legalEntityCategories || {})
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)
+    .sort((left, right) => right[1] - left[1]);
 
   return (
     <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-indigo-100 md:p-7">
@@ -58,6 +92,46 @@ export default function FreeFundReport({ report }: { report: FreeFundReportData 
         <ReportMetric label="Segmento" value={report.identity.segment || "Não informado"} />
         <ReportMetric label="DY" value={formatNumber(report.market.dividendYield, "%")} />
         <ReportMetric label="P/VP" value={formatNumber(report.market.pvp)} />
+      </div>
+
+      <div className="mt-6 rounded-2xl bg-indigo-50/60 p-4 ring-1 ring-indigo-100">
+        <h3 className="text-lg font-extrabold text-indigo-950">Cadastro e estrutura do fundo</h3>
+        <p className="mt-1 text-sm leading-5 text-indigo-900">Quantidades de PF e PJ representam contas de cotistas, não a participação de cada grupo no patrimônio.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ReportMetric label="CNPJ" value={report.identity.cnpj || "Não informado"} />
+          <ReportMetric label="Razão social" value={report.identity.corporateName || report.identity.name} />
+          <ReportMetric label="Setor" value={report.identity.sector || "Não informado"} />
+          <ReportMetric label="Segmento / estratégia" value={report.identity.segment || "Não informado"} />
+          <ReportMetric label="Gestor" value={report.identity.manager || "Não informado"} />
+          <ReportMetric label="Administrador" value={report.identity.administrator || "Não informado"} />
+          <ReportMetric label="Público-alvo" value={report.identity.targetAudience || "Não informado"} />
+          <ReportMetric label="Forma do condomínio" value={report.identity.condominiumForm || "Não informado"} />
+          <ReportMetric label="Classificação CVM" value={report.identity.regulatoryClassification || "Não informada"} />
+          <ReportMetric label="Tipo de gestão" value={report.identity.managementType || "Não informado"} />
+          <ReportMetric label="Fundo exclusivo" value={formatYesNo(report.identity.exclusive)} />
+          <ReportMetric label="Fundo de fundos" value={formatYesNo(report.identity.isFundOfFunds)} />
+          <ReportMetric label="Patrimônio líquido" value={formatCurrency(report.fundamentals.netWorth)} />
+          <ReportMetric label="Cotas emitidas" value={formatInteger(report.fundamentals.issuedShares)} />
+          <ReportMetric label="Total de cotistas" value={formatInteger(report.fundamentals.investors?.totalAccounts ?? null)} />
+          <ReportMetric label="VP por cota" value={formatCurrency(report.fundamentals.navPerShare)} />
+          <ReportMetric label="Cotistas PF" value={report.fundamentals.investors ? `${formatInteger(report.fundamentals.investors.individualAccounts)} · ${formatNumber(report.fundamentals.investors.individualPercent, "%")}` : "Não informado"} />
+          <ReportMetric label="Cotistas PJ e outros não-PF" value={report.fundamentals.investors ? `${formatInteger(report.fundamentals.investors.legalEntityAccounts)} · ${formatNumber(report.fundamentals.investors.legalEntityPercent, "%")}` : "Não informado"} />
+          <ReportMetric label="Maior cotista PJ" value={report.fundamentals.investors?.largestLegalEntityHolder?.name || "Não divulgado em fonte estruturada"} />
+          <ReportMetric label="Referência cadastral" value={formatDate(report.fundamentals.referenceDate)} />
+        </div>
+        {!!investorCategories.length && (
+          <div className="mt-4 rounded-2xl bg-white/70 p-4 ring-1 ring-indigo-100">
+            <p className="text-sm font-extrabold text-indigo-950">Detalhamento das contas não-PF informado à CVM</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {investorCategories.map(([key, value]) => (
+                <div key={key} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200">
+                  <span>{INVESTOR_CATEGORY_NAMES[key] || key}</span>
+                  <strong>{formatInteger(value)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {!!scoreEntries.length && (

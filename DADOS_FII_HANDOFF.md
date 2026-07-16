@@ -1,7 +1,7 @@
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 3.0.0  
-**Data:** 14/07/2026
+**Versão:** 4.0.0  
+**Data:** 16/07/2026
 
 > Este documento substitui todos os planejamentos anteriores quando houver divergência.
 
@@ -17,7 +17,7 @@ Sempre que houver divergência entre documentos, conversas, prompts ou planejame
 
 ### Status geral
 
-**Fases 1 e 2 concluídas em código**
+**Fases 1 e 2 implementadas; aceite global reaberto pelo gate de qualidade de dados**
 
 Situação atual:
 
@@ -28,10 +28,11 @@ Situação atual:
 - Backup imutável
 - Aprovação humana
 - QA operacional
-- CI validado
-- Arquitetura pronta para evolução
+- CI existente
+- Arquitetura de serviços pronta para evolução
+- Catálogo normalizado B3/CVM implementado e auditado localmente
 
-A camada de inteligência, relatórios, observabilidade e monitoramento da Fase 2 está implementada no PR #6. Merge, configuração das variáveis e deploy de produção continuam sendo etapas operacionais separadas.
+A avaliação anterior foi otimista ao considerar componentes funcionais e alguns fundos sentinela como prova de conclusão. A partir desta versão, uma fase só recebe aceite total depois de cobertura integral do universo aplicável, deploy, carga protegida, double check pós-carga e homologação de relatórios/IA. O código do hardening está pronto, mas a carga e a auditoria final de Produção ainda estão pendentes.
 
 ---
 
@@ -68,11 +69,24 @@ Todos aprovados.
 
 ## 3. Sprint atual
 
-### Encerramento da Fase 2
+### Gate transversal — Data Quality Hardening
 
-**Objetivo:** revisar, integrar e publicar as Sprints 2.1 a 2.11.
+**Objetivo:** normalizar, conciliar, completar e auditar o catálogo inteiro antes de encerrar as Fases 1 e 2.
 
-**Status:** todas as Sprints da Fase 2 estão implementadas no PR #6 e aguardam revisão, merge, configuração das flags/integrações e deploy de produção.
+**Status:** código e auditoria externa local concluídos; integração, deploy, aplicação administrativa e double check de Produção pendentes.
+
+**Auditoria de 16/07/2026:**
+
+- 511/511 candidatos B3 conciliados com cadastro CVM;
+- zero CNPJ duplicado entre ativos;
+- 504/504 fundos ativos com cadastro básico completo;
+- 491/502 fundos aplicáveis com indicadores essenciais completos (97,81%);
+- 11 exceções essenciais atribuídas a ausência nos layouts estruturados, sem zeros inventados;
+- HGPO11 identificado para inativação por ausência B3 + liquidação CVM;
+- sete tickers presentes na B3 e em liquidação preservados em revisão;
+- três divergências históricas de ISIN preservadas para revisão sem trocar CNPJ.
+
+Detalhes, fontes, contrato, custos e procedimento: `docs/data-quality-hardening.md`.
 
 ---
 
@@ -283,19 +297,13 @@ Todo Score passa pelo ScoreEngine.
 
 **CI:** configurado
 
-**Última execução conhecida antes das Sprints 2.3–2.4:** Success
-
-**Tempo:** 2m54s
-
-**PR atual:** #6 — `Fase 2 completa: Sprints 2.1–2.11` (draft)
-
-**Branch:** `agent/sprint-2-1-2-2-regulatory-admin`
+O commit, PR e resultado de CI desta entrega de qualidade devem ser registrados aqui depois da publicação. Nenhum estado local é prova de deploy.
 
 ---
 
 ## 8. Funcionalidades
 
-### Concluídas
+### Implementadas e existentes em Produção antes do hardening
 
 - Parser
 - QA
@@ -309,7 +317,7 @@ Todo Score passa pelo ScoreEngine.
 - Staging
 - Produção
 
-### Implementadas no PR #6, pendentes de merge/deploy
+### Componentes funcionais da Fase 2
 
 - RegulatoryDataService
 - Score Engine
@@ -323,9 +331,14 @@ Todo Score passa pelo ScoreEngine.
 - Observabilidade
 - Monitor Automático
 
-### Pendentes de código na Fase 2
+### Pendências para aceite total
 
-- Nenhum item canônico.
+- integrar e publicar o catálogo normalizado;
+- aplicar a prévia em Produção com aprovação e hash;
+- executar o double check pós-carga;
+- confirmar as exceções essenciais no Admin;
+- homologar relatórios, scores e IA em amostra estratificada;
+- reavaliar formalmente o aceite das Fases 1 e 2.
 
 ---
 
@@ -368,6 +381,7 @@ ENABLE_AI_INSIGHTS
 ENABLE_REPORT_PREMIUM
 ENABLE_SCORE_ENGINE
 ENABLE_AUTOMATIC_MONITOR
+ENABLE_PORTFOLIO_REGULATORY_INTELLIGENCE
 PREMIUM_PREVIEW_EMAILS
 MONITOR_ALERT_COOLDOWN_MS
 MONITOR_ALERT_EMAILS
@@ -405,15 +419,21 @@ Todo parser novo deve homologar, no mínimo:
 
 antes da produção.
 
+Além dos sentinelas, todo fechamento de fase exige auditoria do universo completo aplicável, 100% de conciliação de identidade, 100% de cadastro básico dos ativos, zero duplicidade de CNPJ e lista explícita das lacunas externas. Ver `docs/data-quality-hardening.md`.
+
 ---
 
 ## 12. Pendências
 
 ### Alta prioridade
 
-- Revisar e fazer merge do PR #6.
-- Configurar as variáveis de produção e habilitar `ENABLE_REPORT_PREMIUM` e `ENABLE_AUTOMATIC_MONITOR` quando as integrações estiverem prontas.
-- Validar o deploy, o cron diário das 12:00 UTC e as entregas por e-mail/Telegram em produção.
+- integrar o Data Quality Hardening ao branch principal e validar o CI;
+- confirmar o deploy de Produção;
+- gerar a prévia do catálogo no Admin e revisar 511/511, inativações e exceções;
+- aplicar a carga protegida por hash e backup;
+- executar o double check pós-carga;
+- homologar relatório gratuito, Premium, scores e IA com fundos de tipos e níveis de completude diferentes;
+- manter as 11 exceções essenciais visíveis e acompanhar novas competências CVM para preenchimento futuro.
 
 ### Decisões abertas
 
@@ -432,9 +452,12 @@ As seguintes decisões passam a substituir planejamentos anteriores:
 3. ScoreEngine único substitui cálculos independentes por API.
 4. Dashboard Administrativo com Health Score substitui o uso do GitHub Actions como principal mecanismo operacional para validações rotineiras.
 5. Arquitetura baseada em serviços reutilizáveis substitui implementações específicas por endpoint.
+6. Cobertura parcial ou homologação por poucos fundos não autoriza mais declarar uma fase totalmente concluída.
+7. Quantidade de cotas, patrimônio e cotistas são snapshots datados, não campos cadastrais fixos.
+8. A ausência de dado externo é `null` com aviso; nunca zero, risco do fundo ou inferência negativa da IA.
 
 ---
 
 ## Objetivo estratégico
 
-Ao final da Fase 2, o Dados FII possui em código uma arquitetura orientada a serviços, com ingestão regulatória consolidada, inteligência reutilizável, observabilidade completa e capacidade de gerar relatórios gratuitos e Premium de forma consistente, auditável e escalável, preservando segurança, rastreabilidade e facilidade de evolução futura.
+O objetivo da Fase 2 permanece uma arquitetura orientada a serviços, com ingestão regulatória consolidada, inteligência reutilizável, observabilidade e relatórios consistentes. O aceite total só ocorrerá quando essa capacidade estiver comprovada em Produção sobre todo o universo aplicável, com qualidade, rastreabilidade e exceções documentadas.

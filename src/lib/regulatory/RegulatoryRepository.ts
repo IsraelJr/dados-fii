@@ -19,8 +19,16 @@ import {
 import type { TimelineRecord } from "@/types/timeline";
 import type { MonitorAlert, MonitorDelivery, MonitorRun, MonitorStatus } from "@/types/monitor";
 import type { IfixComposition } from "@/types/indexes";
+import type {
+  CanonicalFundCatalogEntry,
+  FundCatalogAudit,
+  FundCatalogBuildResult,
+  FundCatalogDirectory,
+  FundCatalogPlanItem,
+  FundCatalogRun,
+} from "@/types/fund-catalog";
 
-type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync";
+type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync" | "catalog-preview" | "catalog-apply" | "catalog-audit";
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -73,6 +81,213 @@ export class RegulatoryRepository {
   async listOverlays(limit: number): Promise<Array<{ id: string; data: RegulatoryOverlay }>> {
     const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.funds).limit(limit).get();
     return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() as RegulatoryOverlay }));
+  }
+
+  async listCatalogEntries(limit = 2_000): Promise<CanonicalFundCatalogEntry[]> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.funds).limit(Math.min(Math.max(limit, 1), 2_000)).get();
+    return snapshot.docs.flatMap((doc) => {
+      const catalog = doc.data()?.catalog;
+      return catalog && typeof catalog === "object" ? [catalog as CanonicalFundCatalogEntry] : [];
+    });
+  }
+
+  async saveCatalogPreview(result: FundCatalogBuildResult) {
+    const runRef = adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc(result.run.id);
+    const latestRef = adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc("latest");
+    const batch = adminDb.batch();
+    batch.set(runRef, { ...result.run, updatedAt: adminFieldValue.serverTimestamp() }, { merge: false });
+    batch.set(latestRef, { ...result.run, updatedAt: adminFieldValue.serverTimestamp() }, { merge: false });
+    for (let index = 0; index < result.items.length; index += 40) {
+      const chunkIndex = Math.floor(index / 40);
+      batch.set(runRef.collection("chunks").doc(String(chunkIndex).padStart(3, "0")), {
+        index: chunkIndex,
+        items: result.items.slice(index, index + 40),
+      }, { merge: false });
+    }
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("catalog-preview", result.run.actor, undefined, {
+      runId: result.run.id,
+      planHash: result.run.planHash,
+      sourceHash: result.run.sourceHash,
+      totals: result.run.totals,
+      coverage: result.run.coverage,
+      safeToApply: result.run.safety.safeToApply,
+    }));
+    await batch.commit();
+    return result.run;
+  }
+
+  async getCatalogRun(runId = "latest"): Promise<FundCatalogRun | null> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc(runId).get();
+    return snapshot.exists ? snapshot.data() as FundCatalogRun : null;
+  }
+
+  async failCatalogRun(runId: string, error: string, actor: string) {
+    const failedAt = nowIso();
+    const payload = { status: "failed", failedAt, error: error.slice(0, 1_000), failedBy: actor, updatedAt: adminFieldValue.serverTimestamp() };
+    const batch = adminDb.batch();
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc(runId), payload, { merge: true });
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc("latest"), payload, { merge: true });
+    await batch.commit();
+  }
+
+  async getLatestCatalogAudit(): Promise<FundCatalogAudit | null> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.catalogAudits).doc("latest").get();
+    return snapshot.exists ? snapshot.data() as FundCatalogAudit : null;
+  }
+
+  async getCatalogDirectory(): Promise<FundCatalogDirectory | null> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.catalogDirectory).doc("current").get();
+    return snapshot.exists ? snapshot.data() as FundCatalogDirectory : null;
+  }
+
+  async saveCatalogDirectory(entries: CanonicalFundCatalogEntry[], runId: string, generatedAt: string, actor: string) {
+    const items = entries
+      .filter((entry) => entry.lifecycle.status === "active")
+      .map((entry) => ({
+        ticker: entry.ticker,
+        name: entry.identity.tradeName || entry.identity.legalName,
+        legalName: entry.identity.legalName,
+        kind: entry.identity.kind,
+        sector: entry.classification.sector,
+        segment: entry.classification.segment,
+        status: entry.lifecycle.status,
+      }))
+      .sort((left, right) => left.ticker.localeCompare(right.ticker));
+    const directory: FundCatalogDirectory = {
+      schemaVersion: 2,
+      runId,
+      generatedAt,
+      total: items.length,
+      items,
+    };
+    if (Buffer.byteLength(JSON.stringify(directory), "utf8") > 900_000) {
+      throw new Error("Diretório público excedeu o limite operacional seguro do Firestore.");
+    }
+    await adminDb.collection(REGULATORY_COLLECTIONS.catalogDirectory).doc("current").set({
+      ...directory,
+      updatedAt: adminFieldValue.serverTimestamp(),
+      updatedBy: actor,
+    }, { merge: false });
+    return directory;
+  }
+
+  private async getCatalogPlanItems(runId: string) {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc(runId).collection("chunks").get();
+    return snapshot.docs
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .flatMap((doc) => Array.isArray(doc.data()?.items) ? doc.data().items as FundCatalogPlanItem[] : []);
+  }
+
+  async applyCatalogRun(runId: string, approvalHash: string, actor: string) {
+    if (!/^catalog-[A-Za-z0-9-]{12,80}$/.test(runId)) throw new Error("Identificador da prévia inválido.");
+    if (!/^[a-f0-9]{64}$/i.test(approvalHash)) throw new Error("Hash de aprovação inválido.");
+    const runRef = adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc(runId);
+    const runSnapshot = await runRef.get();
+    if (!runSnapshot.exists) throw new Error("Prévia do catálogo não encontrada.");
+    const run = runSnapshot.data() as FundCatalogRun;
+    if (run.status === "applied") return run;
+    if (!run.safety.safeToApply) throw new Error(`Aplicação bloqueada: ${run.safety.blockers.join(" ")}`);
+    if (run.approvalHash !== approvalHash) throw new Error("A prévia mudou ou o hash de aprovação não corresponde ao plano.");
+    const items = await this.getCatalogPlanItems(runId);
+    const calculatedPlanHash = contentHash(items.map((item) => ({ ticker: item.ticker, action: item.action, contentHash: item.catalog.contentHash })));
+    if (calculatedPlanHash !== run.planHash) throw new Error("Integridade da prévia inválida; gere uma nova análise antes de aplicar.");
+    if (!run.safety.destructiveChangesAllowed && items.some((item) => item.action === "inactivate")) throw new Error("A prévia contém inativações sem cobertura suficiente para uma alteração destrutiva.");
+
+    await runRef.set({ status: "applying", appliedItems: 0, applyingAt: adminFieldValue.serverTimestamp(), applyingBy: actor }, { merge: true });
+    let processed = 0;
+    let changed = 0;
+    for (let offset = 0; offset < items.length; offset += 40) {
+      const group = items.slice(offset, offset + 40);
+      const currentRefs = group.map((item) => adminDb.collection(REGULATORY_COLLECTIONS.funds).doc(item.ticker));
+      const currentSnapshots = currentRefs.length ? await adminDb.getAll(...currentRefs) : [];
+      const backupRefs = group.map((item) => adminDb.collection(REGULATORY_COLLECTIONS.backups).doc(item.ticker).collection("backups").doc(`catalog-${runId}`));
+      const backupSnapshots = backupRefs.length ? await adminDb.getAll(...backupRefs) : [];
+      const batch = adminDb.batch();
+      for (let index = 0; index < group.length; index += 1) {
+        const item = group[index];
+        const currentSnapshot = currentSnapshots[index];
+        const current = currentSnapshot?.data() || {};
+        const currentCatalog = current.catalog as CanonicalFundCatalogEntry | undefined;
+        if (currentCatalog?.contentHash === item.catalog.contentHash) continue;
+        if (backupSnapshots[index]?.exists) throw new Error(`Backup ${item.ticker} já existe sem a versão esperada; aplicação interrompida para revisão.`);
+        const nextVersion = Number(current.currentVersion || 0) + 1;
+        const versionId = `v${String(nextVersion).padStart(6, "0")}`;
+        const versionRef = adminDb.collection(REGULATORY_COLLECTIONS.versions).doc(item.ticker).collection("versions").doc(versionId);
+        const publicationHash = contentHash({ runId, planHash: run.planHash, ticker: item.ticker, contentHash: item.catalog.contentHash, approvalHash });
+        const next = {
+          ...current,
+          ticker: item.ticker,
+          code: item.ticker,
+          schemaVersion: item.catalog.schemaVersion,
+          currentVersion: nextVersion,
+          catalog: item.catalog,
+          catalogRunId: runId,
+          publishedAt: adminFieldValue.serverTimestamp(),
+          publishedBy: actor,
+          approvalHash,
+          approvedAt: nowIso(),
+          backupId: `catalog-${runId}`,
+          publicationHash,
+        };
+        batch.create(backupRefs[index], {
+          ticker: item.ticker,
+          state: current,
+          stateHash: contentHash(current),
+          createdAt: adminFieldValue.serverTimestamp(),
+          createdAtIso: nowIso(),
+          createdBy: actor,
+          immutable: true,
+          operation: "catalog-sync",
+          runId,
+        });
+        batch.set(versionRef, { ...next, versionId, createdAt: adminFieldValue.serverTimestamp(), createdBy: actor, reason: item.reasons.join(" ") }, { merge: false });
+        batch.set(currentRefs[index], next, { merge: false });
+        changed += 1;
+      }
+      processed += group.length;
+      batch.set(runRef, { status: "applying", appliedItems: processed, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true });
+      await batch.commit();
+    }
+    const appliedAt = nowIso();
+    const completed: FundCatalogRun = { ...run, status: "applied", appliedAt, appliedItems: processed, verifiedAt: null };
+    const finalBatch = adminDb.batch();
+    finalBatch.set(runRef, { ...completed, changedItems: changed, updatedAt: adminFieldValue.serverTimestamp() }, { merge: true });
+    finalBatch.set(adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc("latest"), { ...completed, changedItems: changed, updatedAt: adminFieldValue.serverTimestamp() }, { merge: false });
+    finalBatch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("catalog-apply", actor, undefined, {
+      runId,
+      planHash: run.planHash,
+      approvalHash,
+      plannedItems: items.length,
+      changedItems: changed,
+      coverage: run.coverage,
+    }));
+    await finalBatch.commit();
+    return completed;
+  }
+
+  async saveCatalogAudit(audit: FundCatalogAudit, actor: string) {
+    const id = `${audit.generatedAt.replace(/\D/g, "").slice(0, 17)}-${String(audit.runId || "manual").slice(-12)}`;
+    const batch = adminDb.batch();
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.catalogAudits).doc(id), { ...audit, createdAt: adminFieldValue.serverTimestamp(), actor }, { merge: false });
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.catalogAudits).doc("latest"), { ...audit, createdAt: adminFieldValue.serverTimestamp(), actor }, { merge: false });
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("catalog-audit", actor, undefined, {
+      runId: audit.runId,
+      totalCatalogDocuments: audit.totalCatalogDocuments,
+      activeDocuments: audit.activeDocuments,
+      basicCoveragePercent: audit.basicCoveragePercent,
+      essentialCoveragePercent: audit.essentialCoveragePercent,
+      acceptanceMet: audit.acceptanceMet,
+    }));
+    await batch.commit();
+    return audit;
+  }
+
+  async markCatalogRunVerified(runId: string, verifiedAt: string, actor: string) {
+    const payload = { verifiedAt, verifiedBy: actor, updatedAt: adminFieldValue.serverTimestamp() };
+    const batch = adminDb.batch();
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc(runId), payload, { merge: true });
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.catalogRuns).doc("latest"), payload, { merge: true });
+    await batch.commit();
   }
 
   async getIndexComposition(index = "IFIX"): Promise<IfixComposition | null> {
