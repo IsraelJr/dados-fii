@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Native strip-types requires explicit extension.
-import { mergeDividendYear, needsStatusInvestEnrichment, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "../src/lib/market/StatusInvestParser.ts";
+import { confirmedDailyLiquidity, hasTrustedLiquidityProvenance, mergeDividendYear, needsStatusInvestEnrichment, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "../src/lib/market/StatusInvestParser.ts";
 // @ts-expect-error Native strip-types requires explicit extension.
 import { ifixMembership, parseIfixComposition } from "../src/lib/indexes/IfixComposition.ts";
 // @ts-expect-error Native strip-types requires explicit extension.
@@ -27,7 +27,29 @@ test("dividend merge preserves a valid historical data-com price", () => {
 
 test("daily job reprocesses filled months when liquidity or data-com price is invalid", () => {
   assert.equal(needsStatusInvestEnrichment({ dailyLiquidity: 30, earnings2026: { July: { payment_date: "17/07/2026", date_with: "10/07/2026", earnings: "R$ 0,13" } } }, 2026, "July"), true);
-  assert.equal(needsStatusInvestEnrichment({ dailyLiquidity: 1_599_186.55, earnings2026: { July: { payment_date: "17/07/2026", date_with: "10/07/2026", earnings: "R$ 0,13", price_date_with: "R$ 9,81" } } }, 2026, "July"), false);
+  assert.equal(needsStatusInvestEnrichment({
+    dailyLiquidity: 1_599_186.55,
+    dailyLiquidityUnit: "BRL/day",
+    marketDataSource: "StatusInvest",
+    marketDataUpdatedAt: "2026-07-16T09:00:00.000Z",
+    marketData: { dailyLiquidity: 1_599_186.55, dailyLiquidityUnit: "BRL/day", source: "StatusInvest", updatedAt: "2026-07-16T09:00:00.000Z" },
+    earnings2026: { July: { payment_date: "17/07/2026", date_with: "10/07/2026", earnings: "R$ 0,13", price_date_with: "R$ 9,81" } },
+  }, 2026, "July"), false);
+});
+
+test("low liquidity is accepted only when value, unit, source and date were internalized together", () => {
+  const confirmed = {
+    dailyLiquidity: 500,
+    dailyLiquidityUnit: "BRL/day",
+    marketDataSource: "StatusInvest",
+    marketDataUpdatedAt: "2026-07-16T09:00:00.000Z",
+    marketData: { dailyLiquidity: 500, dailyLiquidityUnit: "BRL/day", source: "StatusInvest", updatedAt: "2026-07-16T09:00:00.000Z" },
+    earnings2026: { July: { payment_date: "17/07/2026", date_with: "10/07/2026", earnings: "R$ 0,13", price_date_with: "R$ 9,81" } },
+  };
+  assert.equal(hasTrustedLiquidityProvenance(confirmed), true);
+  assert.equal(confirmedDailyLiquidity(confirmed), 500);
+  assert.equal(needsStatusInvestEnrichment(confirmed, 2026, "July"), false);
+  assert.equal(confirmedDailyLiquidity({ dailyLiquidity: 30 }), null);
 });
 
 test("IFIX composition produces explicit yes, no and not-applicable states", () => {

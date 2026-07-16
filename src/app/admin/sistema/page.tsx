@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
-import { Activity, BellRing, CheckCircle2, Database, FileClock, Gauge, History, Home, LogIn, LogOut, MailCheck, PlayCircle, RefreshCw, RotateCcw, ShieldCheck, Stethoscope, UploadCloud } from "lucide-react";
+import { Activity, BarChart3, BellRing, CheckCircle2, Database, FileClock, Gauge, History, Home, LogIn, LogOut, MailCheck, PlayCircle, RefreshCw, RotateCcw, ShieldCheck, Stethoscope, UploadCloud } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import type { ParserHealth, SystemHealth, ValidationRun } from "@/types/regulatory";
 import type { SystemObservability } from "@/types/observability";
@@ -17,6 +17,15 @@ type DashboardData = {
   history: ValidationRun[];
   observability: SystemObservability | null;
   monitor: MonitorStatus | null;
+  ifix: IfixSummary | null;
+};
+
+type IfixSummary = {
+  index: "IFIX";
+  referenceDate: string;
+  fetchedAt: string;
+  source: string;
+  total: number;
 };
 
 async function post<T>(url: string, body: Record<string, unknown> = {}) {
@@ -68,10 +77,12 @@ export default function AdminSystemPage() {
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [runningMonitor, setRunningMonitor] = useState(false);
+  const [runningIfix, setRunningIfix] = useState(false);
+  const [ifixMessage, setIfixMessage] = useState("");
   const [publishingReference, setPublishingReference] = useState("");
   const [referenceMessage, setReferenceMessage] = useState("");
   const [error, setError] = useState("");
-  const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [], observability: null, monitor: null });
+  const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [], observability: null, monitor: null, ifix: null });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blocked = useRef(false);
 
@@ -79,14 +90,15 @@ export default function AdminSystemPage() {
     setLoading(true);
     setError("");
     try {
-      const [healthPayload, parserPayload, historyPayload, observabilityPayload, monitorPayload] = await Promise.all([
+      const [healthPayload, parserPayload, historyPayload, observabilityPayload, monitorPayload, ifixPayload] = await Promise.all([
         get<{ health: SystemHealth }>("/api/admin/system/health"),
         get<{ parsers: ParserHealth[] }>("/api/admin/system/parser-health"),
         get<{ history: ValidationRun[] }>("/api/admin/system/validation-history?limit=20"),
         get<{ observability: SystemObservability }>("/api/admin/system/observability"),
         get<{ monitor: MonitorStatus }>("/api/admin/system/monitor-status"),
+        get<{ composition: IfixSummary | null }>("/api/admin/system/ifix"),
       ]);
-      setData({ health: healthPayload.health, parsers: parserPayload.parsers || [], history: historyPayload.history || [], observability: observabilityPayload.observability, monitor: monitorPayload.monitor });
+      setData({ health: healthPayload.health, parsers: parserPayload.parsers || [], history: historyPayload.history || [], observability: observabilityPayload.observability, monitor: monitorPayload.monitor, ifix: ifixPayload.composition });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível carregar o painel.");
     } finally {
@@ -123,7 +135,7 @@ export default function AdminSystemPage() {
     blocked.current = true;
     await post("/api/admin/session", { action: "logout" }).catch(() => undefined);
     setAdminEmail("");
-    setData({ health: null, parsers: [], history: [], observability: null, monitor: null });
+    setData({ health: null, parsers: [], history: [], observability: null, monitor: null, ifix: null });
     if (message) setError(message);
   }, []);
 
@@ -209,6 +221,23 @@ export default function AdminSystemPage() {
       setError(caught instanceof Error ? caught.message : "O monitor automático falhou.");
     } finally {
       setRunningMonitor(false);
+    }
+  }
+
+  async function runIfixSync() {
+    setRunningIfix(true);
+    setError("");
+    setIfixMessage("");
+    try {
+      const payload = await post<{ sync: { changed: boolean; composition: IfixSummary } }>("/api/admin/system/ifix");
+      setIfixMessage(payload.sync.changed
+        ? "A composição oficial do IFIX foi atualizada e internalizada."
+        : "Consulta concluída: a composição oficial já estava atualizada.");
+      await loadDashboard();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível atualizar a composição do IFIX.");
+    } finally {
+      setRunningIfix(false);
     }
   }
 
@@ -328,6 +357,15 @@ export default function AdminSystemPage() {
             <div className="mt-5 grid gap-3 sm:grid-cols-3"><Small label="Ativos" value={data.monitor?.activeAlerts.length || 0} /><Small label="Último status" value={data.monitor?.latestRun?.status || "-"} /><Small label="Última execução" value={dateTime(data.monitor?.latestRun?.finishedAt)} /></div>
             <div className="mt-4 space-y-2">{(data.monitor?.activeAlerts || []).slice(0, 4).map((alert) => <div key={alert.fingerprint} className={`rounded-xl p-3 text-sm ring-1 ${alert.severity === "critical" ? "bg-red-50 text-red-800 ring-red-100" : "bg-amber-50 text-amber-900 ring-amber-100"}`}><strong>{alert.title}</strong><p className="mt-1 text-xs">{alert.message}</p></div>)}{!data.monitor?.activeAlerts.length && <p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">Nenhum alerta ativo.</p>}</div>
           </article>
+        </section>
+
+        <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div><p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BarChart3 size={15} /> Índice oficial · B3</p><h2 className="mt-2 text-2xl font-black text-slate-900">Composição do IFIX</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">A consulta automática ocorre na primeira semana de janeiro, maio e setembro, quando a carteira do índice costuma ser revista. Você também pode consultar agora; a base só é alterada se a composição tiver mudado.</p></div>
+            <button type="button" onClick={runIfixSync} disabled={runningIfix} className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><RefreshCw size={16} className={runningIfix ? "animate-spin" : ""} /> {runningIfix ? "Consultando B3…" : "Atualizar IFIX agora"}</button>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3"><Small label="Data de referência" value={data.ifix?.referenceDate || "-"} /><Small label="Fundos no índice" value={data.ifix?.total || 0} /><Small label="Última consulta" value={dateTime(data.ifix?.fetchedAt)} /></div>
+          {ifixMessage && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100">{ifixMessage}</p>}
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">

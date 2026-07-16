@@ -83,3 +83,19 @@ test("rejects implausible daily liquidity caused by parser labels", () => {
   assert.equal(score.metrics.dailyLiquidity, null);
   assert.doesNotMatch(score.reasons.join(" "), /R\$ 30/);
 });
+
+test("accepts a genuinely low daily liquidity when provenance was internalized", () => {
+  const score = new ScoreEngine().calculate({
+    dailyLiquidity: 500,
+    dailyLiquidityUnit: "BRL/day",
+    marketDataSource: "StatusInvest",
+    marketDataUpdatedAt: "2026-07-16T09:00:00.000Z",
+    marketData: {
+      dailyLiquidity: 500,
+      dailyLiquidityUnit: "BRL/day",
+      source: "StatusInvest",
+      updatedAt: "2026-07-16T09:00:00.000Z",
+    },
+  }).liquidity;
+  assert.equal(score.metrics.dailyLiquidity, 500);
+});
