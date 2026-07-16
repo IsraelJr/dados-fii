@@ -255,10 +255,10 @@ export class RegulatoryDataService {
 
   async syncIfixComposition(actor: string) {
     const composition = await fetchIfixComposition();
-    await this.repository.saveIndexComposition(composition, actor);
+    const persistence = await this.repository.saveIndexComposition(composition, actor);
     this.indexCache.set("IFIX", composition);
-    this.invalidate();
-    return composition;
+    if (persistence.changed) this.invalidate();
+    return { composition, ...persistence };
   }
 
   async listMissingCnpj(limit: number, cursor?: string) {

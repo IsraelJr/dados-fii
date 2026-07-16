@@ -22,6 +22,32 @@ export type StatusInvestMarketIndicators = {
   marketDataUpdatedAt?: string;
 };
 
+function marketDataOf(data: Record<string, unknown>) {
+  return data.marketData && typeof data.marketData === "object" && !Array.isArray(data.marketData)
+    ? data.marketData as Record<string, unknown>
+    : {};
+}
+
+export function hasTrustedLiquidityProvenance(data: Record<string, unknown>) {
+  const marketData = marketDataOf(data);
+  const liquidity = parseBrazilianNumber(data.dailyLiquidity ?? data.liquidity);
+  const recordedLiquidity = parseBrazilianNumber(marketData.dailyLiquidity);
+  const source = String(data.marketDataSource || marketData.source || "").trim();
+  const unit = String(data.dailyLiquidityUnit || marketData.dailyLiquidityUnit || "").trim();
+  const updatedAt = String(data.marketDataUpdatedAt || marketData.updatedAt || "").trim();
+  return liquidity !== null && liquidity > 0
+    && recordedLiquidity !== null
+    && Math.abs(recordedLiquidity - liquidity) < 0.01
+    && Boolean(source && updatedAt && unit === "BRL/day");
+}
+
+export function confirmedDailyLiquidity(data: Record<string, unknown>) {
+  const liquidity = parseBrazilianNumber(data.dailyLiquidity ?? data.liquidity);
+  if (liquidity === null || liquidity <= 0) return null;
+  if (liquidity >= 1_000 || hasTrustedLiquidityProvenance(data)) return liquidity;
+  return null;
+}
+
 function parseBrazilianNumber(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   const raw = String(value || "").replace(/R\$|%|\s/g, "").trim();
@@ -99,9 +125,8 @@ export function needsStatusInvestEnrichment(data: Record<string, unknown>, year:
   const yearData = data[`earnings${year}`];
   const entries = yearData && typeof yearData === "object" && !Array.isArray(yearData) ? yearData as Record<string, DividendEntry> : {};
   const current = entries[month];
-  const liquidity = parseBrazilianNumber(data.dailyLiquidity ?? data.liquidity);
   const basePrice = parseBrazilianNumber(current?.price_date_with);
-  return !current || liquidity === null || liquidity < 1_000 || basePrice === null || basePrice <= 0;
+  return !current || !hasTrustedLiquidityProvenance(data) || basePrice === null || basePrice <= 0;
 }
 
 function metricAfterLabel(text: string, labels: string[], options?: { currencyRequired?: boolean }) {

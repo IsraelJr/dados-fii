@@ -81,9 +81,26 @@ export class RegulatoryRepository {
   }
 
   async saveIndexComposition(composition: IfixComposition, actor: string) {
+    const compositionHash = contentHash({
+      index: composition.index,
+      referenceDate: composition.referenceDate,
+      constituents: [...composition.constituents].sort((a, b) => a.ticker.localeCompare(b.ticker)),
+    });
+    const compositionRef = adminDb.collection(REGULATORY_COLLECTIONS.indexCompositions).doc(composition.index);
+    const currentSnapshot = await compositionRef.get();
+    const current = currentSnapshot.data() as (IfixComposition & { compositionHash?: string }) | undefined;
+    const currentHash = current?.compositionHash || (current ? contentHash({
+      index: current.index,
+      referenceDate: current.referenceDate,
+      constituents: [...(current.constituents || [])].sort((a, b) => a.ticker.localeCompare(b.ticker)),
+    }) : null);
+    if (currentHash === compositionHash) {
+      return { changed: false, compositionHash, previousReferenceDate: current?.referenceDate || null };
+    }
     const batch = adminDb.batch();
-    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.indexCompositions).doc(composition.index), {
+    batch.set(compositionRef, {
       ...composition,
+      compositionHash,
       updatedAt: adminFieldValue.serverTimestamp(),
       updatedBy: actor,
     }, { merge: false });
@@ -92,8 +109,10 @@ export class RegulatoryRepository {
       referenceDate: composition.referenceDate,
       constituents: composition.total,
       source: composition.source,
+      compositionHash,
     }));
     await batch.commit();
+    return { changed: true, compositionHash, previousReferenceDate: current?.referenceDate || null };
   }
 
   async publish(tickerInput: unknown, patch: Record<string, unknown>, authorization: PublicationAuthorization) {

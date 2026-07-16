@@ -1,5 +1,6 @@
 import type { PublicFundData } from "../../types/regulatory";
 import type { FundScores, ScoreLevel, ScoreMetric, ScoreResult } from "../../types/scores";
+import { confirmedDailyLiquidity } from "../market/StatusInvestParser";
 
 export const SCORE_ENGINE_VERSION = "1.2.0";
 
@@ -170,7 +171,7 @@ function growthScore(data: NumericRecord): ScoreResult {
 }
 
 function liquidityScore(data: NumericRecord): ScoreResult {
-  const daily = firstDailyLiquidity(data, ["averageDailyLiquidity", "dailyLiquidity", "liquidezMediaDiaria", "liquidity"]);
+  const daily = confirmedDailyLiquidity(data) ?? firstDailyLiquidity(data, ["averageDailyLiquidity", "dailyLiquidity", "liquidezMediaDiaria", "liquidity"]);
   const marketCap = firstNumber(data, ["marketCap", "valorDeMercado", "marketValue"]);
   const holders = firstNumber(data, ["shareholders", "holders", "cotistas"]);
   const available = [daily, marketCap, holders].filter((item) => item !== null).length;
