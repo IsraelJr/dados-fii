@@ -65,6 +65,8 @@ test("IFIX composition produces explicit yes, no and not-applicable states", () 
 test("commercial plan is independent from the admin role", () => {
   assert.equal(paidPlanFromRecord({ isPremium: true }), "premium");
   assert.equal(paidPlanFromRecord({ plan: "vip", subscriptionStatus: "active" }), "super_premium");
+  assert.equal(paidPlanFromRecord({ isVIP: true }), "super_premium");
+  assert.equal(paidPlanFromRecord({ plan: "pro" }), "super_premium");
   assert.equal(productPlanLabel("super_premium"), "Super Premium");
   assert.equal(productPlanLabel("free"), "Grátis");
 });

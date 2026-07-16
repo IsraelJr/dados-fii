@@ -13,7 +13,7 @@ export function paidPlanFromRecord(data: Record<string, unknown>): PaidProductPl
   const status = String(subscription.status || data.subscriptionStatus || "").trim().toLowerCase();
   const active = !status || ["active", "trialing", "paid"].includes(status);
   if (!active) return null;
-  if (data.isVip === true || ["vip", "super_premium", "superpremium"].includes(plan)) return "super_premium";
+  if (data.isVip === true || data.isVIP === true || ["vip", "pro", "super_premium", "superpremium"].includes(plan)) return "super_premium";
   if (data.isPremium === true || data.premium === true || plan === "premium") return "premium";
   return null;
 }

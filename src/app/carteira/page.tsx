@@ -23,6 +23,7 @@ import PageHeader from "../components/PageHeader";
 import WalletRiskReportCard from "../components/WalletRiskReportCard";
 import AppToast from "../components/AppToast";
 import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
+import PortfolioNotificationPreferences from "../components/PortfolioNotificationPreferences";
 
 type WalletItem = { ticker: string; quotas: number };
 type LoadedFii = WalletItem & { data?: any; error?: string };
@@ -526,6 +527,7 @@ export default function WalletPage() {
       />
 
       <WalletEmailVerifiedSync />
+      <PortfolioNotificationPreferences />
       <DailyWalletPanel insights={insights} firstPayment={firstPayment} />
       <WalletRiskReportCard walletCount={items.length} />
       <AttentionSection insights={insights} updatingMissing={updatingMissing} updateMissingDividends={updateMissingDividends} />

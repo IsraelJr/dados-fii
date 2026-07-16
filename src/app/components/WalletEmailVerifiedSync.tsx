@@ -457,6 +457,7 @@ export default function WalletEmailVerifiedSync() {
       const json = await callApi({ action: "verify-code", email: cleanEmail, code: pin.trim() });
       window.localStorage.setItem(EMAIL_KEY, cleanEmail);
       window.localStorage.setItem(TOKEN_KEY, json.sessionToken);
+      window.dispatchEvent(new Event("dados-fii-wallet-session-updated"));
       lastSavedSignature.current = "";
       setToken(json.sessionToken);
       emailRef.current = cleanEmail;
