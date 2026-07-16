@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
-import { DIVIDEND_MONTHS, mergeDividendYear, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "@/lib/market/StatusInvestParser";
+import { DIVIDEND_MONTHS, mergeDividendYear, needsStatusInvestEnrichment, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "@/lib/market/StatusInvestParser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,9 +134,7 @@ async function updateDocDividends(doc: any, ticker: string): Promise<UpdateResul
     const field = `earnings${year}`;
     const previousYear = previous[field] || {};
 
-    const storedLiquidity = Number(previous.dailyLiquidity || previous.liquidity || 0);
-    const storedBasePrice = Number(String(previousYear?.[monthKey]?.price_date_with || "").replace("R$", "").replace(/\./g, "").replace(",", ".").trim());
-    if (previousYear?.[monthKey] && storedLiquidity >= 1_000 && storedBasePrice > 0) {
+    if (!needsStatusInvestEnrichment(previous, year, monthKey)) {
       return { ticker, status: "skipped", fetchedMonths: Object.keys(previousYear) };
     }
 
@@ -176,7 +174,6 @@ async function updateDocDividends(doc: any, ticker: string): Promise<UpdateResul
 async function runPendingUpdate(limit: number, tickersFilter?: string[], cursorOverride?: string) {
   const year = currentYear();
   const monthKey = currentMonthKey();
-  const field = `earnings${year}`;
   const normalizedFilter = Array.isArray(tickersFilter)
     ? tickersFilter.map(tickerOf).filter(Boolean)
     : [];
@@ -192,7 +189,7 @@ async function runPendingUpdate(limit: number, tickersFilter?: string[], cursorO
     const ticker = tickerOf(data.code || doc.id);
     if (!ticker) return false;
     if (normalizedFilter.length && !normalizedFilter.includes(ticker)) return false;
-    return !data?.[field]?.[monthKey];
+    return needsStatusInvestEnrichment(data, year, monthKey);
   });
 
   const pending = useCursor ? rotateDocs(pendingAll, limit, cursor) : pendingAll.slice(0, limit);

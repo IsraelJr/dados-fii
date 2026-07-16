@@ -95,6 +95,15 @@ export function mergeDividendYear(previous: unknown, fetched: DividendYear): Div
   return merged;
 }
 
+export function needsStatusInvestEnrichment(data: Record<string, unknown>, year: number, month: string) {
+  const yearData = data[`earnings${year}`];
+  const entries = yearData && typeof yearData === "object" && !Array.isArray(yearData) ? yearData as Record<string, DividendEntry> : {};
+  const current = entries[month];
+  const liquidity = parseBrazilianNumber(data.dailyLiquidity ?? data.liquidity);
+  const basePrice = parseBrazilianNumber(current?.price_date_with);
+  return !current || liquidity === null || liquidity < 1_000 || basePrice === null || basePrice <= 0;
+}
+
 function metricAfterLabel(text: string, labels: string[], options?: { currencyRequired?: boolean }) {
   for (const label of labels) {
     const index = text.toLocaleLowerCase("pt-BR").indexOf(label.toLocaleLowerCase("pt-BR"));
