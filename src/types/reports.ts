@@ -1,6 +1,7 @@
 import type { RegulatorySource } from "@/types/regulatory";
 import type { FundScores, ScoreLevel } from "@/types/scores";
 import type { RegulatoryTimelineItem } from "@/types/timeline";
+import type { CatalogInvestorComposition } from "@/types/fund-catalog";
 
 export type FreeReportSignal = {
   category: string;
@@ -20,9 +21,31 @@ export type FreeFundReport = {
     corporateName: string | null;
     cnpj: string | null;
     fundKind: string;
+    sector: string | null;
     segment: string | null;
+    regulatoryClassification: string | null;
+    managementType: string | null;
+    targetAudience: string | null;
+    condominiumForm: string | null;
+    exclusive: boolean | null;
+    isFundOfFunds: boolean | null;
     manager: string | null;
     administrator: string | null;
+  };
+  fundamentals: {
+    netWorth: number | null;
+    issuedShares: number | null;
+    navPerShare: number | null;
+    referenceDate: string | null;
+    investors: {
+      totalAccounts: number;
+      individualAccounts: number | null;
+      individualPercent: number | null;
+      legalEntityAccounts: number | null;
+      legalEntityPercent: number | null;
+      legalEntityCategories: CatalogInvestorComposition["legalEntityCategories"] | null;
+      largestLegalEntityHolder: { name: string; ownershipPercent: number | null } | null;
+    } | null;
   };
   market: {
     price: string | number | null;

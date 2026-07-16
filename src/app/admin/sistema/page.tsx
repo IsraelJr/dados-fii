@@ -8,6 +8,7 @@ import { auth } from "@/lib/firebase";
 import type { ParserHealth, SystemHealth, ValidationRun } from "@/types/regulatory";
 import type { SystemObservability } from "@/types/observability";
 import type { MonitorStatus } from "@/types/monitor";
+import type { FundCatalogAudit, FundCatalogRun } from "@/types/fund-catalog";
 
 const INACTIVITY_MS = 60_000;
 
@@ -18,6 +19,7 @@ type DashboardData = {
   observability: SystemObservability | null;
   monitor: MonitorStatus | null;
   ifix: IfixSummary | null;
+  catalog: { run: FundCatalogRun | null; audit: FundCatalogAudit | null };
 };
 
 type IfixSummary = {
@@ -78,11 +80,11 @@ export default function AdminSystemPage() {
   const [running, setRunning] = useState(false);
   const [runningMonitor, setRunningMonitor] = useState(false);
   const [runningIfix, setRunningIfix] = useState(false);
+  const [runningCatalog, setRunningCatalog] = useState<"preview" | "apply" | "audit" | "">("");
+  const [catalogMessage, setCatalogMessage] = useState("");
   const [ifixMessage, setIfixMessage] = useState("");
-  const [publishingReference, setPublishingReference] = useState("");
-  const [referenceMessage, setReferenceMessage] = useState("");
   const [error, setError] = useState("");
-  const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [], observability: null, monitor: null, ifix: null });
+  const [data, setData] = useState<DashboardData>({ health: null, parsers: [], history: [], observability: null, monitor: null, ifix: null, catalog: { run: null, audit: null } });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blocked = useRef(false);
 
@@ -90,15 +92,16 @@ export default function AdminSystemPage() {
     setLoading(true);
     setError("");
     try {
-      const [healthPayload, parserPayload, historyPayload, observabilityPayload, monitorPayload, ifixPayload] = await Promise.all([
+      const [healthPayload, parserPayload, historyPayload, observabilityPayload, monitorPayload, ifixPayload, catalogPayload] = await Promise.all([
         get<{ health: SystemHealth }>("/api/admin/system/health"),
         get<{ parsers: ParserHealth[] }>("/api/admin/system/parser-health"),
         get<{ history: ValidationRun[] }>("/api/admin/system/validation-history?limit=20"),
         get<{ observability: SystemObservability }>("/api/admin/system/observability"),
         get<{ monitor: MonitorStatus }>("/api/admin/system/monitor-status"),
         get<{ composition: IfixSummary | null }>("/api/admin/system/ifix"),
+        get<{ run: FundCatalogRun | null; audit: FundCatalogAudit | null }>("/api/admin/system/fund-catalog"),
       ]);
-      setData({ health: healthPayload.health, parsers: parserPayload.parsers || [], history: historyPayload.history || [], observability: observabilityPayload.observability, monitor: monitorPayload.monitor, ifix: ifixPayload.composition });
+      setData({ health: healthPayload.health, parsers: parserPayload.parsers || [], history: historyPayload.history || [], observability: observabilityPayload.observability, monitor: monitorPayload.monitor, ifix: ifixPayload.composition, catalog: { run: catalogPayload.run, audit: catalogPayload.audit } });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível carregar o painel.");
     } finally {
@@ -123,11 +126,11 @@ export default function AdminSystemPage() {
       })
       .catch(() => undefined)
       .finally(() => { if (active) setReady(true); });
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = auth ? onAuthStateChanged(auth, (user) => {
       if (!active) return;
       setFirebaseUser(user);
       if (user && !adminEmail && !blocked.current) createSession(user).catch((caught) => setError(caught instanceof Error ? caught.message : "Acesso administrativo negado."));
-    });
+    }) : () => undefined;
     return () => { active = false; unsubscribe(); };
   }, [adminEmail, createSession, loadDashboard]);
 
@@ -135,7 +138,7 @@ export default function AdminSystemPage() {
     blocked.current = true;
     await post("/api/admin/session", { action: "logout" }).catch(() => undefined);
     setAdminEmail("");
-    setData({ health: null, parsers: [], history: [], observability: null, monitor: null, ifix: null });
+    setData({ health: null, parsers: [], history: [], observability: null, monitor: null, ifix: null, catalog: { run: null, audit: null } });
     if (message) setError(message);
   }, []);
 
@@ -241,23 +244,69 @@ export default function AdminSystemPage() {
     }
   }
 
-  async function publishOfficialReference(ticker: "VGIA11" | "MXRF11") {
-    setPublishingReference(ticker);
+  async function previewCatalog() {
+    setRunningCatalog("preview");
     setError("");
-    setReferenceMessage("");
+    setCatalogMessage("");
     try {
-      await post("/api/admin/official-fund-reference", { ticker });
-      setReferenceMessage(`Dados oficiais do ${ticker} publicados com backup, aprovação e auditoria.`);
+      const payload = await post<{ run: FundCatalogRun }>("/api/admin/system/fund-catalog", { action: "preview" });
+      setCatalogMessage(payload.run.safety.safeToApply
+        ? "Análise concluída. Confira os números abaixo antes de aplicar a atualização."
+        : "Análise concluída, mas a aplicação foi bloqueada pelos controles de segurança.");
       await loadDashboard();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : `Não foi possível publicar os dados oficiais do ${ticker}.`);
+      setError(caught instanceof Error ? caught.message : "Não foi possível analisar as fontes oficiais.");
     } finally {
-      setPublishingReference("");
+      setRunningCatalog("");
+    }
+  }
+
+  async function applyCatalog() {
+    const run = data.catalog.run;
+    if (!run) return;
+    const confirmed = window.confirm(`Aplicar a prévia ${run.id}? Serão processados ${run.totals.planned} fundo(s), sempre com backup e versão.`);
+    if (!confirmed) return;
+    setRunningCatalog("apply");
+    setError("");
+    setCatalogMessage("");
+    try {
+      const payload = await post<{ run: FundCatalogRun; audit: FundCatalogAudit }>("/api/admin/system/fund-catalog", {
+        action: "apply",
+        runId: run.id,
+        approvalHash: run.approvalHash,
+      });
+      setCatalogMessage(payload.audit.acceptanceMet
+        ? "Atualização aplicada e conferida: as metas de cobertura foram atingidas."
+        : "Atualização aplicada e conferida. Ainda existem lacunas listadas no double check.");
+      await loadDashboard();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível aplicar a atualização do catálogo.");
+    } finally {
+      setRunningCatalog("");
+    }
+  }
+
+  async function auditCatalog() {
+    setRunningCatalog("audit");
+    setError("");
+    setCatalogMessage("");
+    try {
+      const payload = await post<{ audit: FundCatalogAudit }>("/api/admin/system/fund-catalog", { action: "audit", runId: data.catalog.run?.id });
+      setCatalogMessage(payload.audit.acceptanceMet
+        ? "Double check concluído: cobertura mínima confirmada."
+        : "Double check concluído: ainda há fundos ou indicadores que exigem tratamento.");
+      await loadDashboard();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Não foi possível conferir o catálogo.");
+    } finally {
+      setRunningCatalog("");
     }
   }
 
   const latest = data.history[0] || null;
   const components = data.health?.components;
+  const catalogRun = data.catalog.run;
+  const catalogAudit = data.catalog.audit;
 
   if (!ready && !adminEmail) return <main className="grid min-h-screen place-items-center"><RefreshCw className="animate-spin text-indigo-700" /></main>;
 
@@ -369,12 +418,30 @@ export default function AdminSystemPage() {
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <div><p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Dados oficiais</p><h2 className="mt-2 text-2xl font-black text-slate-900">Publicação cadastral</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Grava os dados confirmados na base regulatória com backup, versão, aprovação e registro de auditoria.</p></div>
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="font-black text-slate-900">VGIA11</h3><p className="mt-2 text-sm text-slate-600">CNPJ e VP por cota do relatório oficial de maio/2026.</p><button type="button" onClick={() => publishOfficialReference("VGIA11")} disabled={Boolean(publishingReference)} className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><UploadCloud size={16} /> {publishingReference === "VGIA11" ? "Publicando…" : "Publicar VGIA11"}</button></article>
-            <article className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><h3 className="font-black text-slate-900">MXRF11</h3><p className="mt-2 text-sm text-slate-600">CNPJ, razão social, gestor e administrador do cadastro oficial da CVM.</p><button type="button" onClick={() => publishOfficialReference("MXRF11")} disabled={Boolean(publishingReference)} className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><UploadCloud size={16} /> {publishingReference === "MXRF11" ? "Publicando…" : "Publicar MXRF11"}</button></article>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div><p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><Database size={15} /> Catálogo oficial normalizado</p><h2 className="mt-2 text-2xl font-black text-slate-900">Cadastro e cobertura de todos os fundos</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Cruza B3 e CVM em lote, inclui fundos ausentes, identifica mudanças de ticker e preenche cadastro, cotas, patrimônio e composição de cotistas. Primeiro analise; depois aplique a mesma prévia protegida por hash.</p></div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={previewCatalog} disabled={Boolean(runningCatalog)} className="inline-flex items-center justify-center gap-2 rounded-full bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60"><RefreshCw size={16} className={runningCatalog === "preview" ? "animate-spin" : ""} /> {runningCatalog === "preview" ? "Analisando…" : "Analisar fontes oficiais"}</button>
+              <button type="button" onClick={applyCatalog} disabled={Boolean(runningCatalog) || !catalogRun?.safety.safeToApply || catalogRun?.status === "applied"} className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-40"><UploadCloud size={16} /> {runningCatalog === "apply" ? "Aplicando…" : "Aplicar atualização"}</button>
+              <button type="button" onClick={auditCatalog} disabled={Boolean(runningCatalog)} className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-extrabold text-indigo-700 ring-1 ring-indigo-200 disabled:opacity-50"><CheckCircle2 size={16} /> {runningCatalog === "audit" ? "Conferindo…" : "Fazer double check"}</button>
+            </div>
           </div>
-          {referenceMessage && <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100">{referenceMessage}</p>}
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Small label="Candidatos B3" value={catalogRun?.coverage.b3Candidates || 0} />
+            <Small label="Conciliação B3/CVM" value={`${catalogRun?.coverage.sourceMatchPercent || 0}%`} />
+            <Small label="Fundos ativos" value={catalogRun?.coverage.activeFunds || catalogAudit?.activeDocuments || 0} />
+            <Small label="Alterações previstas" value={catalogRun?.totals.planned || 0} />
+            <Small label="Dados básicos" value={`${catalogAudit?.basicCoveragePercent ?? catalogRun?.coverage.basicCoveragePercent ?? 0}%`} />
+            <Small label="Indicadores essenciais" value={`${catalogAudit?.essentialCoveragePercent ?? catalogRun?.coverage.essentialCoveragePercent ?? 0}%`} />
+            <Small label="Incluídos" value={catalogRun?.totals.added || 0} />
+            <Small label="Inativados" value={catalogRun?.totals.inactivated || 0} />
+          </div>
+          {catalogRun && <div className={`mt-4 rounded-2xl p-4 text-sm ring-1 ${catalogRun.safety.safeToApply ? "bg-emerald-50 text-emerald-800 ring-emerald-100" : "bg-amber-50 text-amber-900 ring-amber-100"}`}><p className="font-black">Prévia {catalogRun.status === "applied" ? "aplicada" : catalogRun.safety.safeToApply ? "pronta para revisão" : "bloqueada"} · {dateTime(catalogRun.createdAt)}</p><p className="mt-1">{catalogRun.totals.added} inclusão(ões), {catalogRun.totals.updated} atualização(ões), {catalogRun.totals.inactivated} inativação(ões) e {catalogRun.totals.reactivated} reativação(ões).</p>{catalogRun.safety.blockers.map((blocker) => <p key={blocker} className="mt-1 font-bold">• {blocker}</p>)}{catalogRun.acceptance.gaps.map((gap) => <p key={gap} className="mt-1">• {gap}</p>)}</div>}
+          {catalogAudit && <p className={`mt-4 rounded-xl p-3 text-sm font-bold ring-1 ${catalogAudit.acceptanceMet ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-amber-50 text-amber-900 ring-amber-100"}`}>Último double check: {catalogAudit.totalCatalogDocuments} cadastros, {catalogAudit.missingBasic.length} com pendência básica e {catalogAudit.missingEssential.length} com pendência essencial aplicável. Conferido em {dateTime(catalogAudit.generatedAt)}.</p>}
+          {catalogRun?.reviewSamples.length ? <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950 ring-1 ring-amber-200"><p className="font-black">Revisões que não serão escondidas</p>{catalogRun.reviewSamples.slice(0, 12).map((item) => <p key={`${item.ticker}-${item.issue}`} className="mt-1"><strong>{item.ticker}</strong>: {item.issue}</p>)}</div> : null}
+          {catalogAudit?.missingEssential.length ? <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200"><p className="font-black text-slate-900">Dados que a fonte estruturada ainda não forneceu</p><p className="mt-1">Esses campos continuam vazios e datados; não são convertidos em zero.</p>{catalogAudit.missingEssential.slice(0, 15).map((item) => <p key={item.ticker} className="mt-1"><strong>{item.ticker}</strong>: {item.fields.join(", ")}</p>)}</div> : null}
+          {catalogAudit?.staleOrInactive.length ? <div className="mt-4 rounded-2xl bg-indigo-50 p-4 text-sm text-indigo-900 ring-1 ring-indigo-100"><p className="font-black">Fundos inativos ou em revisão</p>{catalogAudit.staleOrInactive.slice(0, 15).map((item) => <p key={item.ticker} className="mt-1"><strong>{item.ticker}</strong> ({item.status}): {item.reason}</p>)}</div> : null}
+          {catalogMessage && <p className="mt-4 rounded-xl bg-indigo-50 p-3 text-sm font-bold text-indigo-800 ring-1 ring-indigo-100">{catalogMessage}</p>}
         </section>
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200"><h2 className="text-2xl font-black text-slate-900">Saúde dos parsers</h2><div className="mt-5 grid gap-4 md:grid-cols-3">{data.parsers.map((parser) => <article key={parser.parser} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><div className="flex items-center justify-between gap-3"><strong className="text-slate-900">{parser.parser}</strong><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(parser.status)}`}>{parser.status}</span></div><p className="mt-3 text-3xl font-black text-indigo-700">{parser.successRate}%</p><p className="mt-2 text-xs text-slate-500">{parser.successes} sucesso(s) · {parser.failures} falha(s)</p>{parser.lastError && <p className="mt-2 text-xs font-bold text-red-700">{parser.lastError}</p>}</article>)}</div></section>

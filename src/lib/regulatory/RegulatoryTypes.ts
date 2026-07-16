@@ -1,4 +1,5 @@
 import type { RegulatorySource } from "@/types/regulatory";
+import type { CanonicalFundCatalogEntry } from "@/types/fund-catalog";
 
 export const REGULATORY_COLLECTIONS = {
   legacyFunds: "Fiis",
@@ -13,6 +14,9 @@ export const REGULATORY_COLLECTIONS = {
   monitorAlerts: "RegulatoryMonitorAlerts",
   monitorLocks: "RegulatoryMonitorLocks",
   indexCompositions: "RegulatoryIndexCompositions",
+  catalogRuns: "RegulatoryCatalogRuns",
+  catalogAudits: "RegulatoryCatalogAudits",
+  catalogDirectory: "RegulatoryCatalogDirectory",
 } as const;
 
 export type LegacyFundRecord = {
@@ -24,6 +28,7 @@ export type RegulatoryOverlay = Record<string, unknown> & {
   ticker?: string;
   currentVersion?: number;
   sources?: RegulatorySource[];
+  catalog?: CanonicalFundCatalogEntry;
 };
 
 export type PublicationAuthorization = {

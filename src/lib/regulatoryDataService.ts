@@ -8,6 +8,7 @@ import { applyOfficialFundReference, getOfficialFundReference } from "@/lib/regu
 import { regulatoryTimeline, type RegulatoryTimeline } from "@/lib/regulatory/RegulatoryTimeline";
 import {
   canonicalFrom,
+  catalogPublicProjection,
   marketFallback,
   normalizeDividendFields,
   normalizeTicker,
@@ -45,6 +46,9 @@ import type { PremiumFundReport } from "@/types/premium-report";
 import type { SystemObservability } from "@/types/observability";
 import type { MonitorRun, MonitorStatus } from "@/types/monitor";
 import type { IfixComposition } from "@/types/indexes";
+import { augmentWithPublicIdentityBridge, fetchOfficialCatalogDataset } from "@/lib/catalog/OfficialCatalogSources";
+import { fundCatalogEngine, type FundCatalogEngine } from "@/lib/catalog/FundCatalogEngine";
+import type { FundCatalogAudit, FundCatalogDirectory, FundCatalogRun } from "@/types/fund-catalog";
 
 const FUND_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_CACHE_TTL_MS, 5 * 60_000);
 const MARKET_CACHE_TTL_MS = positiveInt(process.env.REGULATORY_MARKET_CACHE_TTL_MS, 60_000);
@@ -66,7 +70,9 @@ export class RegulatoryDataService {
   private readonly fundCache = new RegulatoryCache<PublicFundData>(FUND_CACHE_TTL_MS, MAX_CACHE_ENTRIES);
   private readonly marketCache = new RegulatoryCache<MarketQuote[]>(MARKET_CACHE_TTL_MS, 1);
   private readonly indexCache = new RegulatoryCache<IfixComposition>(24 * 60 * 60_000, 4);
+  private readonly catalogDirectoryCache = new RegulatoryCache<FundCatalogDirectory>(10 * 60_000, 1);
   private marketPromise: Promise<MarketQuote[]> | null = null;
+  private catalogPreviewPromise: Promise<FundCatalogRun> | null = null;
   private readonly validationRunner: ValidationRunner;
 
   constructor(
@@ -79,13 +85,17 @@ export class RegulatoryDataService {
     private readonly premiumReports: PremiumReportEngine = premiumReportEngine,
     private readonly observability: ObservabilityEngine = observabilityEngine,
     private readonly monitor: AutomaticMonitor = automaticMonitor,
+    private readonly catalogEngine: FundCatalogEngine = fundCatalogEngine,
   ) {
     this.validationRunner = new ValidationRunner({ canonicalFrom, normalizeTicker, validateFund: validateRegulatoryFund, now: nowIso });
   }
 
   invalidate(ticker?: string) {
     if (ticker) this.fundCache.delete(normalizeTicker(ticker));
-    else this.fundCache.clear();
+    else {
+      this.fundCache.clear();
+      this.catalogDirectoryCache.clear();
+    }
   }
 
   async getMarketQuotes(options?: { force?: boolean }) {
@@ -146,11 +156,16 @@ export class RegulatoryDataService {
   ) {
     const legacy = normalizeDividendFields(legacyRecord?.data || {});
     const publicOverlay = Object.fromEntries(Object.entries(safeRegulatoryOverlay(overlay)).filter(([key]) => key !== "sources"));
-    const baseData = applyOfficialFundReference(ticker, {
+    const legacyAndManual = applyOfficialFundReference(ticker, {
       ...legacy,
       ...publicOverlay,
-      ...(quote || marketFallback(ticker)),
     });
+    const catalogProjection = catalogPublicProjection(overlay);
+    const baseData = {
+      ...legacyAndManual,
+      ...catalogProjection,
+      ...(quote || marketFallback(ticker)),
+    };
     const officialReference = getOfficialFundReference(ticker);
     const canonical = canonicalFrom(ticker, baseData, overlay);
     const membership = ifixMembership(ticker, canonical.kind, ifixCompositionData);
@@ -166,11 +181,11 @@ export class RegulatoryDataService {
       ifixMembership: membership,
       dataSources: {
         price: quote ? "Planilha de cotações Dados FII" : "Preço indisponível",
-        fund: legacyRecord ? "Base interna Dados FII" : "Dados cadastrais/dividendos indisponíveis",
+        fund: catalogProjection.cnpj ? "Catálogo oficial normalizado Dados FII" : legacyRecord ? "Base interna Dados FII" : "Dados cadastrais/dividendos indisponíveis",
         regulatory: overlay ? "Base regulatória versionada Dados FII" : "Sem overlay regulatório publicado",
       },
       marketDataSource: quote ? "Planilha de cotações Dados FII" : null,
-      fundDataSource: legacyRecord ? "Base interna Dados FII" : null,
+      fundDataSource: catalogProjection.cnpj ? "Catálogo oficial normalizado Dados FII" : legacyRecord ? "Base interna Dados FII" : null,
       marketDataUpdatedAt: quote ? nowIso() : null,
       regulatoryMeta: {
         schemaVersion: canonical.schemaVersion,
@@ -259,6 +274,89 @@ export class RegulatoryDataService {
     this.indexCache.set("IFIX", composition);
     if (persistence.changed) this.invalidate();
     return { composition, ...persistence };
+  }
+
+  async previewFundCatalog(actor: string): Promise<FundCatalogRun> {
+    if (this.catalogPreviewPromise) return this.catalogPreviewPromise;
+    this.catalogPreviewPromise = this.observability.track("catalog.preview", async () => {
+      const [legacy, overlays] = await Promise.all([
+        this.repository.listLegacy(2_000),
+        this.repository.listOverlays(2_000),
+      ]);
+      const knownCnpjByTicker = new Map<string, string>();
+      for (const record of legacy) {
+        const ticker = normalizeTicker(record.data.code || record.id);
+        const cnpj = String(record.data.cnpj || record.data.CNPJ || "").replace(/\D/g, "");
+        if (ticker && cnpj.length === 14) knownCnpjByTicker.set(ticker, cnpj);
+      }
+      for (const record of overlays) {
+        const ticker = normalizeTicker(record.data.ticker || record.id);
+        const cnpj = String(record.data.catalog?.identity?.cnpj || record.data.cnpj || "").replace(/\D/g, "");
+        if (ticker && cnpj.length === 14) knownCnpjByTicker.set(ticker, cnpj);
+      }
+      let dataset = await fetchOfficialCatalogDataset(new Date(), { knownCnpjByTicker });
+      let result = this.catalogEngine.build(dataset, legacy, overlays, actor);
+      const ambiguousTickers = result.run.reviewSamples
+        .filter((item) => item.ticker !== "SISTEMA")
+        .map((item) => item.ticker);
+      if (ambiguousTickers.length) {
+        dataset = await augmentWithPublicIdentityBridge(dataset, ambiguousTickers);
+        result = this.catalogEngine.build(dataset, legacy, overlays, actor);
+      }
+      return this.repository.saveCatalogPreview(result);
+    });
+    try {
+      return await this.catalogPreviewPromise;
+    } finally {
+      this.catalogPreviewPromise = null;
+    }
+  }
+
+  async getFundCatalogStatus(): Promise<{ run: FundCatalogRun | null; audit: FundCatalogAudit | null }> {
+    const [run, audit] = await Promise.all([
+      this.repository.getCatalogRun(),
+      this.repository.getLatestCatalogAudit(),
+    ]);
+    return { run, audit };
+  }
+
+  async getFundDirectory(options?: { force?: boolean }) {
+    const cached = options?.force ? null : this.catalogDirectoryCache.get("current");
+    if (cached) return cached;
+    const directory = await this.repository.getCatalogDirectory();
+    if (directory) this.catalogDirectoryCache.set("current", directory);
+    return directory;
+  }
+
+  async auditFundCatalog(actor: string, runId?: string | null) {
+    return this.observability.track("catalog.audit", async () => {
+      const entries = await this.repository.listCatalogEntries(2_000);
+      const audit = this.catalogEngine.audit(entries, runId || null, nowIso());
+      return this.repository.saveCatalogAudit(audit, actor);
+    });
+  }
+
+  async applyFundCatalog(runId: string, approvalHash: string, actor: string) {
+    return this.observability.track("catalog.apply", async () => {
+      try {
+        const run = await this.repository.applyCatalogRun(runId, approvalHash, actor);
+        this.invalidate();
+        const entries = await this.repository.listCatalogEntries(2_000);
+        const generatedAt = nowIso();
+        const auditDraft = this.catalogEngine.audit(entries, run.id, generatedAt);
+        const [audit, directory] = await Promise.all([
+          this.repository.saveCatalogAudit(auditDraft, actor),
+          this.repository.saveCatalogDirectory(entries, run.id, generatedAt, actor),
+        ]);
+        await this.repository.markCatalogRunVerified(run.id, audit.generatedAt, actor);
+        this.catalogDirectoryCache.set("current", directory);
+        return { run: { ...run, verifiedAt: audit.generatedAt }, audit, directory };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha desconhecida ao aplicar o catálogo.";
+        await this.repository.failCatalogRun(runId, message, actor).catch(() => undefined);
+        throw error;
+      }
+    });
   }
 
   async listMissingCnpj(limit: number, cursor?: string) {
