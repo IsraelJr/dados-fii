@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import {
+  DIVIDEND_MONTHS,
+  mergeDividendYear,
+  parseStatusInvestDividends,
+  parseStatusInvestMarketIndicators,
+} from "@/lib/market/StatusInvestParser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS: string[] = [...DIVIDEND_MONTHS];
 const TIME_ZONE = "America/Sao_Paulo";
 
 function tickerOf(value: unknown) {
@@ -47,46 +53,6 @@ function clean(html: string) {
 
 function noAccent(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function numberOf(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  const raw = String(value || "").replace("R$", "").replace("%", "").trim();
-  const numeric = raw.replace(/[^0-9.,-]/g, "");
-  const normalized = numeric.includes(",")
-    ? numeric.replace(/\./g, "").replace(",", ".")
-    : numeric.replace(/\.(?=\d{3}(\D|$))/g, "");
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function compactNumberOf(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  const raw = String(value || "")
-    .replace("R$", "")
-    .replace(/\s+/g, "")
-    .trim()
-    .toUpperCase();
-
-  if (!raw) return 0;
-
-  let multiplier = 1;
-  let cleanValue = raw;
-
-  if (/BI$|B$/.test(cleanValue)) {
-    multiplier = 1_000_000_000;
-    cleanValue = cleanValue.replace(/BI$|B$/, "");
-  } else if (/MI$|M$/.test(cleanValue)) {
-    multiplier = 1_000_000;
-    cleanValue = cleanValue.replace(/MI$|M$/, "");
-  } else if (/MIL$|K$/.test(cleanValue)) {
-    multiplier = 1_000;
-    cleanValue = cleanValue.replace(/MIL$|K$/, "");
-  }
-
-  const parsed = numberOf(cleanValue);
-  return parsed ? parsed * multiplier : 0;
 }
 
 function removeUndefinedFields<T>(value: T): T {
@@ -161,94 +127,6 @@ async function getStatusInvestPage(ticker: string) {
   throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
 }
 
-function parseDividends(text: string, year: number) {
-  const output: Record<string, any> = {};
-  const parts = text.split("Rendimento ").slice(1);
-
-  for (const part of parts) {
-    const tokens = part.trim().split(" ");
-    const dateWith = tokens[0];
-    const paymentDate = tokens[1];
-    const value = tokens[2];
-
-    if (!dateWith || !paymentDate || !value) continue;
-    if (!paymentDate.includes(`/${year}`)) continue;
-
-    const [, month] = paymentDate.match(/\d{2}\/(\d{2})\/\d{4}/) || [];
-    const monthName = MONTHS[Number(month) - 1];
-    if (!monthName) continue;
-
-    output[monthName] = {
-      payment_date: paymentDate,
-      date_with: dateWith,
-      earnings: value.startsWith("R$") ? value : `R$ ${value}`,
-      price_date_with: "R$ 0,0",
-    };
-  }
-
-  return output;
-}
-
-function findMetric(text: string, labels: string[]) {
-  const normalizedText = noAccent(text.toUpperCase());
-
-  for (const label of labels) {
-    const normalizedLabel = noAccent(label.toUpperCase());
-    const index = normalizedText.indexOf(normalizedLabel);
-    if (index < 0) continue;
-
-    const slice = normalizedText.slice(index + normalizedLabel.length, index + normalizedLabel.length + 180);
-    const match = slice.match(/R?\$?\s*([0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]+)?|[0-9]+(?:,[0-9]+)?)(?:\s*(BI|MI|MIL|B|M|K))?/i);
-    if (!match) continue;
-
-    const value = compactNumberOf(`${match[1]}${match[2] || ""}`);
-    if (value > 0) return value;
-  }
-
-  return undefined;
-}
-
-function parseMarketIndicators(text: string, sourceUrl: string) {
-  const dailyLiquidity = findMetric(text, [
-    "Liquidez Diária",
-    "Liquidez média diária",
-    "Volume médio diário",
-    "Volume diário médio",
-  ]);
-  const numberShares = findMetric(text, [
-    "Cotas emitidas",
-    "Número de cotas",
-    "Nº de cotas",
-    "Total de cotas",
-  ]);
-  const numberShareholders = findMetric(text, [
-    "Número de cotistas",
-    "Nº de cotistas",
-    "Cotistas",
-  ]);
-
-  if (!dailyLiquidity && !numberShares && !numberShareholders) return {};
-
-  return removeUndefinedFields({
-    dailyLiquidity,
-    liquidity: dailyLiquidity,
-    numberShares,
-    numberCotistas: numberShareholders,
-    numberShareholders,
-    marketData: {
-      dailyLiquidity,
-      numberShares,
-      numberCotistas: numberShareholders,
-      numberShareholders,
-      source: "StatusInvest",
-      sourceUrl,
-      updatedAt: todayKey(),
-    },
-    marketDataSource: "StatusInvest",
-    marketDataUpdatedAt: todayKey(),
-  });
-}
-
 async function reserveDailyRequest(anonId: string, ticker: string) {
   const ref = adminDb
     .collection("Parameters")
@@ -283,15 +161,15 @@ async function updateTickerDividends(ticker: string) {
   const doc = await getFiiDoc(ticker);
   const previous = doc.data() || {};
   const page = await getStatusInvestPage(ticker);
-  const fetched = parseDividends(page.text, year);
+  const fetched = parseStatusInvestDividends(page.text, year);
   const fetchedMonths = Object.keys(fetched).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
-  const marketIndicators = parseMarketIndicators(page.text, page.url);
+  const marketIndicators = removeUndefinedFields(parseStatusInvestMarketIndicators(page.text, page.url, todayKey()));
 
   if (!fetchedMonths.length) throw new Error(`Nenhum dividendo de ${year} encontrado no StatusInvest.`);
 
   const field = `earnings${year}`;
   const previousYear = previous[field] || {};
-  const merged = { ...previousYear, ...fetched };
+  const merged = mergeDividendYear(previousYear, fetched);
 
   await adminDb.collection("Fiis_Backup").doc(ticker).set({
     ...previous,

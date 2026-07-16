@@ -1,7 +1,7 @@
 import type { PublicFundData } from "../../types/regulatory";
 import type { FundScores, ScoreLevel, ScoreMetric, ScoreResult } from "../../types/scores";
 
-export const SCORE_ENGINE_VERSION = "1.1.0";
+export const SCORE_ENGINE_VERSION = "1.2.0";
 
 type NumericRecord = Record<string, unknown>;
 
@@ -30,6 +30,19 @@ function numberValue(value: unknown): number | null {
 function firstNumber(data: NumericRecord, keys: string[]) {
   for (const key of keys) {
     const value = numberValue(data[key]);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+export function plausibleDailyLiquidity(value: unknown) {
+  const parsed = numberValue(value);
+  return parsed !== null && parsed >= 1_000 ? parsed : null;
+}
+
+function firstDailyLiquidity(data: NumericRecord, keys: string[]) {
+  for (const key of keys) {
+    const value = plausibleDailyLiquidity(data[key]);
     if (value !== null) return value;
   }
   return null;
@@ -157,7 +170,7 @@ function growthScore(data: NumericRecord): ScoreResult {
 }
 
 function liquidityScore(data: NumericRecord): ScoreResult {
-  const daily = firstNumber(data, ["averageDailyLiquidity", "dailyLiquidity", "liquidezMediaDiaria", "liquidity"]);
+  const daily = firstDailyLiquidity(data, ["averageDailyLiquidity", "dailyLiquidity", "liquidezMediaDiaria", "liquidity"]);
   const marketCap = firstNumber(data, ["marketCap", "valorDeMercado", "marketValue"]);
   const holders = firstNumber(data, ["shareholders", "holders", "cotistas"]);
   const available = [daily, marketCap, holders].filter((item) => item !== null).length;

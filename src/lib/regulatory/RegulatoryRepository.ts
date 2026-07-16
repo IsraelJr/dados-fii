@@ -18,8 +18,9 @@ import {
 } from "@/types/regulatory";
 import type { TimelineRecord } from "@/types/timeline";
 import type { MonitorAlert, MonitorDelivery, MonitorRun, MonitorStatus } from "@/types/monitor";
+import type { IfixComposition } from "@/types/indexes";
 
-type AuditAction = "publish" | "rollback" | "validation" | "monitor";
+type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync";
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -72,6 +73,27 @@ export class RegulatoryRepository {
   async listOverlays(limit: number): Promise<Array<{ id: string; data: RegulatoryOverlay }>> {
     const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.funds).limit(limit).get();
     return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() as RegulatoryOverlay }));
+  }
+
+  async getIndexComposition(index = "IFIX"): Promise<IfixComposition | null> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.indexCompositions).doc(index.toUpperCase()).get();
+    return snapshot.exists ? snapshot.data() as IfixComposition : null;
+  }
+
+  async saveIndexComposition(composition: IfixComposition, actor: string) {
+    const batch = adminDb.batch();
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.indexCompositions).doc(composition.index), {
+      ...composition,
+      updatedAt: adminFieldValue.serverTimestamp(),
+      updatedBy: actor,
+    }, { merge: false });
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("index-sync", actor, undefined, {
+      index: composition.index,
+      referenceDate: composition.referenceDate,
+      constituents: composition.total,
+      source: composition.source,
+    }));
+    await batch.commit();
   }
 
   async publish(tickerInput: unknown, patch: Record<string, unknown>, authorization: PublicationAuthorization) {

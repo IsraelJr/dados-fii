@@ -2,11 +2,18 @@ import type { NextRequest } from "next/server";
 import admin, { adminDb } from "@/lib/firebaseAdmin";
 import { isAllowedAdminEmail, isSameOrigin } from "@/lib/adminSecurity";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
+import { paidPlanFromRecord, type PaidProductPlan } from "@/lib/productPlans";
 
 type RateBucket = { count: number; resetsAt: number };
 const buckets = new Map<string, RateBucket>();
 
-export type PremiumIdentity = { uid: string; email: string; plan: "premium" | "vip" | "admin" | "preview" };
+export type PremiumIdentity = {
+  uid: string;
+  email: string;
+  plan: PaidProductPlan;
+  role: "user" | "admin";
+  accessSource: "subscription" | "admin_override" | "preview";
+};
 export type PremiumAuthorization =
   | { ok: true; identity: PremiumIdentity }
   | { ok: false; status: 401 | 403 | 429; error: string; retryAfter?: number };
@@ -18,20 +25,15 @@ function previewEmails() {
     .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
 }
 
-function premiumRecord(data: Record<string, any>) {
-  const plan = String(data.plan || data.subscription?.plan || data.subscriptionPlan || "").toLowerCase();
-  const status = String(data.subscription?.status || data.subscriptionStatus || "").toLowerCase();
-  return data.isVip === true || data.isPremium === true || data.premium === true
-    || ["vip", "premium"].includes(plan) && (!status || ["active", "trialing", "paid"].includes(status));
-}
-
 async function firestoreEntitlement(uid: string, email: string) {
   const users = adminDb.collection("User");
   const [uidSnapshot, emailSnapshot] = await Promise.all([users.doc(uid).get(), users.doc(email).get()]);
-  if (uidSnapshot.exists && premiumRecord(uidSnapshot.data() || {})) return true;
-  if (emailSnapshot.exists && premiumRecord(emailSnapshot.data() || {})) return true;
+  const uidPlan = uidSnapshot.exists ? paidPlanFromRecord(uidSnapshot.data() || {}) : null;
+  if (uidPlan) return uidPlan;
+  const emailPlan = emailSnapshot.exists ? paidPlanFromRecord(emailSnapshot.data() || {}) : null;
+  if (emailPlan) return emailPlan;
   const query = await users.where("email", "==", email).limit(1).get();
-  return !query.empty && premiumRecord(query.docs[0].data() || {});
+  return query.empty ? null : paidPlanFromRecord(query.docs[0].data() || {});
 }
 
 function consumeRateLimit(request: NextRequest) {
@@ -61,15 +63,17 @@ export async function requirePremium(request: NextRequest): Promise<PremiumAutho
     const decoded = await admin.auth().verifyIdToken(token, true);
     const email = String(decoded.email || "").trim().toLowerCase();
     if (!decoded.email_verified || !email) return { ok: false, status: 403, error: "Confirme seu e-mail antes de acessar o Premium." };
-    if (isAllowedAdminEmail(email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "admin" } };
-    if (previewEmails().includes(email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "preview" } };
+    if (isAllowedAdminEmail(email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "super_premium", role: "admin", accessSource: "admin_override" } };
+    if (previewEmails().includes(email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "super_premium", role: "user", accessSource: "preview" } };
     const claims = decoded as Record<string, unknown>;
     const claimPlan = String(claims.plan || "").toLowerCase();
-    if (claims.premium === true || claims.isVip === true || ["premium", "vip"].includes(claimPlan)) {
-      return { ok: true, identity: { uid: decoded.uid, email, plan: claims.isVip === true || claimPlan === "vip" ? "vip" : "premium" } };
+    if (claims.premium === true || claims.isVip === true || ["premium", "vip", "super_premium"].includes(claimPlan)) {
+      const plan = claims.isVip === true || ["vip", "super_premium"].includes(claimPlan) ? "super_premium" : "premium";
+      return { ok: true, identity: { uid: decoded.uid, email, plan, role: "user", accessSource: "subscription" } };
     }
-    if (await firestoreEntitlement(decoded.uid, email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "vip" } };
-    return { ok: false, status: 403, error: "Relatório disponível para assinantes Premium/VIP." };
+    const entitlement = await firestoreEntitlement(decoded.uid, email);
+    if (entitlement) return { ok: true, identity: { uid: decoded.uid, email, plan: entitlement, role: "user", accessSource: "subscription" } };
+    return { ok: false, status: 403, error: "Relatório disponível para assinantes Premium e Super Premium." };
   } catch {
     return { ok: false, status: 401, error: "Sessão inválida ou expirada." };
   }

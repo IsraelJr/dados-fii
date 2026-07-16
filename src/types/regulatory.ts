@@ -1,4 +1,5 @@
 import type { FundScores } from "@/types/scores";
+import type { IndexMembership } from "@/types/indexes";
 
 export const REGULATORY_SCHEMA_VERSION = 1 as const;
 
@@ -52,6 +53,8 @@ export type PublicFundData = Record<string, unknown> & {
   code: string;
   ticker: string;
   fundKind: FundKind;
+  isIFIX?: boolean;
+  ifixMembership?: IndexMembership;
   regulatoryMeta: {
     schemaVersion: number;
     currentVersion: number;

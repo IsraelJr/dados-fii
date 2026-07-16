@@ -6,6 +6,8 @@ import { FreeReportEngine } from "../src/lib/reports/FreeReportEngine.ts";
 import { ScoreEngine } from "../src/lib/scores/ScoreEngine.ts";
 // @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
 import { AIInsightsEngine } from "../src/lib/ai/AIInsightsEngine.ts";
+// @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
+import { PremiumReportEngine } from "../src/lib/reports/PremiumReportEngine.ts";
 import type { PublicFundData } from "../src/types/regulatory.ts";
 
 const generatedAt = "2026-07-14T16:00:00.000Z";
@@ -106,7 +108,8 @@ test("AI Insights Engine returns the six canonical groups and reuses identical i
   assert.equal(first.risks.length, 1);
   assert.equal(first.opportunities.length, 1);
   assert.equal(first.alerts.length, 1);
-  assert.equal(first.metadata.promptVersion, "fund-insights-v3");
+  assert.equal(first.metadata.promptVersion, "fund-insights-v4");
+  assert.doesNotMatch(requestBody, /annualizedDistributionOnNavPercent|"NAV"/);
   assert.match(requestBody, /premiumDiscountPercent/);
   assert.match(requestBody, /changeVsPrevious3mPercent/);
   assert.doesNotMatch(requestBody, /dataQuality/);
@@ -166,4 +169,28 @@ test("AI Insights Engine centralizes generic text generation for legacy reports"
   assert.match(result.text, /Relatório/);
   assert.equal(result.metadata.model, "test-model");
   assert.equal(result.metadata.promptVersion, "test-v1");
+});
+
+test("Premium analysis uses a distinct prompt and interprets portfolio plus peers", async () => {
+  process.env.ENABLE_AI_INSIGHTS = "true";
+  process.env.OPENAI_API_KEY = "test-key";
+  let body = "";
+  const engine = new AIInsightsEngine(async (_input, init) => {
+    body = String(init?.body || "");
+    return new Response(JSON.stringify({ output_text: JSON.stringify({
+      executiveSummary: "Resumo Premium combinado.",
+      differentiatedInsight: "O valuation foi combinado ao cenário adverso.",
+      portfolioReading: "A posição teria impacto financeiro mensurável.",
+      peerReading: "A amostra contextualiza a nota sem prever retorno.",
+      monitoringTriggers: ["Reavaliar se o rendimento mensal cair 15%."],
+      plainLanguage: "O relatório testa o efeito dos números sobre a carteira.",
+    }) }), { status: 200 });
+  });
+  const draft = new PremiumReportEngine().prepare(report(), [fund()], generatedAt, [{ ticker: "TGAR11", quotas: 10, fund: fund() }]);
+  const result = await engine.generatePremiumInsights(draft);
+  assert.equal(result.metadata.promptVersion, "premium-fund-analysis-v1");
+  assert.match(body, /portfolioImpact|comparative|stressTest/);
+  assert.match(body, /não repetir o resumo gratuito/i);
+  assert.doesNotMatch(body, /estimatedNavPerShare|annualizedDistributionOnNavPercent/);
+  assert.equal(result.monitoringTriggers.length, 1);
 });

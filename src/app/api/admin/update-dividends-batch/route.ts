@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import admin, { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { DIVIDEND_MONTHS, mergeDividendYear, parseStatusInvestDividends, parseStatusInvestMarketIndicators } from "@/lib/market/StatusInvestParser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS: string[] = [...DIVIDEND_MONTHS];
 
 type FiiDoc = FirebaseFirestore.QueryDocumentSnapshot<FirebaseFirestore.DocumentData>;
 
@@ -79,48 +80,21 @@ async function getStatusInvestPage(ticker: string) {
   throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
 }
 
-function parseDividends(text: string, year: number) {
-  const output: Record<string, any> = {};
-  const parts = text.split("Rendimento ").slice(1);
-
-  for (const part of parts) {
-    const tokens = part.trim().split(" ");
-    const dateWith = tokens[0];
-    const paymentDate = tokens[1];
-    const value = tokens[2];
-
-    if (!dateWith || !paymentDate || !value) continue;
-    if (!paymentDate.includes(`/${year}`)) continue;
-
-    const [, month] = paymentDate.match(/\d{2}\/(\d{2})\/\d{4}/) || [];
-    const monthName = MONTHS[Number(month) - 1];
-    if (!monthName) continue;
-
-    output[monthName] = {
-      payment_date: paymentDate,
-      date_with: dateWith,
-      earnings: value.startsWith("R$") ? value : `R$ ${value}`,
-      price_date_with: "R$ 0,0",
-    };
-  }
-
-  return output;
-}
-
 async function updateOne(doc: FiiDoc, year: number) {
   const previous = doc.data() || {};
   const ticker = tickerOf(previous.code || doc.id);
   if (!ticker) throw new Error("Documento sem ticker no ID e sem campo code.");
 
   const page = await getStatusInvestPage(ticker);
-  const fetched = parseDividends(page.text, year);
+  const fetched = parseStatusInvestDividends(page.text, year);
   const fetchedMonths = Object.keys(fetched).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
 
   if (!fetchedMonths.length) throw new Error(`Nenhum dividendo de ${year} encontrado no StatusInvest.`);
 
   const field = `earnings${year}`;
   const previousYear = previous[field] || {};
-  const merged = { ...previousYear, ...fetched };
+  const merged = mergeDividendYear(previousYear, fetched);
+  const marketIndicators = parseStatusInvestMarketIndicators(page.text, page.url, new Date().toISOString());
 
   await adminDb.collection("Fiis_Backup").doc(ticker).set({
     ...previous,
@@ -130,6 +104,7 @@ async function updateOne(doc: FiiDoc, year: number) {
 
   await doc.ref.set({
     [field]: merged,
+    ...marketIndicators,
     modified_in: adminFieldValue.serverTimestamp(),
   }, { merge: true });
 

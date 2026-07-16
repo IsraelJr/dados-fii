@@ -7,11 +7,14 @@ import type {
   AITextGeneration,
   AITextMessage,
   FundAIInsights,
+  PremiumAIInsights,
 } from "@/types/ai-insights";
 import type { FreeFundReport } from "@/types/reports";
+import type { PremiumReportDraft } from "@/lib/reports/PremiumReportEngine";
 
-export const AI_INSIGHTS_ENGINE_VERSION = "2.1.0";
-export const FUND_INSIGHTS_PROMPT_VERSION = "fund-insights-v3";
+export const AI_INSIGHTS_ENGINE_VERSION = "2.2.0";
+export const FUND_INSIGHTS_PROMPT_VERSION = "fund-insights-v4";
+export const PREMIUM_INSIGHTS_PROMPT_VERSION = "premium-fund-analysis-v1";
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const CACHE_TTL_MS = positiveInt(process.env.AI_INSIGHTS_CACHE_TTL_MS, 6 * 60 * 60_000);
@@ -31,6 +34,20 @@ const FUND_INSIGHTS_SCHEMA = {
     plainLanguage: { type: "string", minLength: 1, maxLength: 1200 },
   },
   required: ["executiveSummary", "changes", "risks", "opportunities", "alerts", "plainLanguage"],
+} as const;
+
+const PREMIUM_INSIGHTS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    executiveSummary: { type: "string", minLength: 1, maxLength: 1200 },
+    differentiatedInsight: { type: "string", minLength: 1, maxLength: 1600 },
+    portfolioReading: { type: "string", minLength: 1, maxLength: 1200 },
+    peerReading: { type: "string", minLength: 1, maxLength: 1200 },
+    monitoringTriggers: { type: "array", minItems: 1, maxItems: 6, items: { type: "string", minLength: 1, maxLength: 500 } },
+    plainLanguage: { type: "string", minLength: 1, maxLength: 1200 },
+  },
+  required: ["executiveSummary", "differentiatedInsight", "portfolioReading", "peerReading", "monitoringTriggers", "plainLanguage"],
 } as const;
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -137,6 +154,20 @@ function normalizeContent(value: unknown): AIInsightsContent {
   };
 }
 
+function normalizePremiumContent(value: unknown) {
+  const data = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const executiveSummary = narrative(data.executiveSummary, 1200);
+  const differentiatedInsight = narrative(data.differentiatedInsight, 1600);
+  const portfolioReading = narrative(data.portfolioReading, 1200);
+  const peerReading = narrative(data.peerReading, 1200);
+  const plainLanguage = narrative(data.plainLanguage, 1200);
+  const monitoringTriggers = stringList(data.monitoringTriggers);
+  if (!executiveSummary || !differentiatedInsight || !portfolioReading || !peerReading || !plainLanguage || !monitoringTriggers.length) {
+    throw new AIInsightsError("A IA retornou a análise Premium incompleta.", "PREMIUM_AI_INVALID_OUTPUT", 502);
+  }
+  return { executiveSummary, differentiatedInsight, portfolioReading, peerReading, monitoringTriggers, plainLanguage };
+}
+
 function outputText(payload: ResponsesPayload) {
   if (typeof payload.output_text === "string") return payload.output_text.trim();
   const texts = payload.output
@@ -182,8 +213,26 @@ function safeFundInput(report: FreeFundReport) {
       fundKind: report.identity.fundKind,
       segment: report.identity.segment,
     },
-    market: report.market,
-    analysis: report.analysis,
+    market: {
+      price: report.market.price,
+      variation: report.market.variation,
+      dividendYield12mPercent: report.market.dividendYield,
+      pvp: report.market.pvp,
+      lastDividend: report.market.lastDividend,
+      lastDividendReference: report.market.lastDividendReference,
+      lastDividendDateWith: report.market.lastDividendDateWith,
+      lastDividendPriceDateWith: report.market.lastDividendPriceDateWith,
+      lastDividendYieldOnDateWithPercent: report.market.lastDividendYieldOnDateWithPercent,
+      lastDividendYieldOnCurrentPricePercent: report.market.lastDividendYieldOnCurrentPricePercent,
+    },
+    analysis: {
+      valuation: {
+        premiumDiscountPercent: report.analysis.valuation.premiumDiscountPercent,
+        position: report.analysis.valuation.position,
+        annualizedDistributionOnVpPerSharePercent: report.analysis.valuation.annualizedDistributionOnNavPercent,
+      },
+      income: report.analysis.income,
+    },
     scores,
     highlights: report.highlights.slice(0, 4).map(({ category, title, detail, score, confidence }) => ({ category, title, detail: limitedText(detail), score, confidence })),
     attentionPoints,
@@ -199,6 +248,33 @@ function safeFundInput(report: FreeFundReport) {
   });
 }
 
+function safePremiumInput(report: PremiumReportDraft) {
+  const free = safeFundInput(report.freeReport) as Record<string, unknown>;
+  return compactValue({
+    ticker: report.ticker,
+    valuation: {
+      price: report.valuation.price,
+      pvp: report.valuation.pvp,
+      estimatedVpPerShare: report.valuation.estimatedNavPerShare,
+      premiumDiscountPercent: report.valuation.premiumDiscountPercent,
+      assessment: report.valuation.assessment,
+      explanation: report.valuation.explanation,
+    },
+    stressTest: report.stressTest,
+    scenarios: report.scenarios,
+    comparative: report.comparative,
+    portfolioImpact: report.portfolioImpact,
+    monitoringPlan: report.recommendations,
+    fundEvidence: {
+      identity: report.freeReport.identity,
+      market: free.market,
+      analysis: free.analysis,
+      scores: free.scores,
+      recentEvents: free.recentEvents,
+    },
+  });
+}
+
 function modelForInsights() {
   return process.env.OPENAI_INSIGHTS_MODEL || process.env.OPENAI_MODEL || DEFAULT_MODEL;
 }
@@ -206,6 +282,8 @@ function modelForInsights() {
 export class AIInsightsEngine {
   private readonly cache = new RegulatoryCache<FundAIInsights>(CACHE_TTL_MS, CACHE_MAX_ENTRIES);
   private readonly inFlight = new Map<string, Promise<FundAIInsights>>();
+  private readonly premiumCache = new RegulatoryCache<PremiumAIInsights>(CACHE_TTL_MS, CACHE_MAX_ENTRIES);
+  private readonly premiumInFlight = new Map<string, Promise<PremiumAIInsights>>();
   private readonly rateLimits = new Map<string, RateEntry>();
   private readonly fetcher: Fetcher;
 
@@ -259,7 +337,8 @@ export class AIInsightsEngine {
     input: AITextMessage[];
     model: string;
     maxOutputTokens: number;
-    schema?: typeof FUND_INSIGHTS_SCHEMA;
+    schema?: Record<string, unknown>;
+    schemaName?: string;
   }) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new AIInsightsError("OPENAI_API_KEY não configurada.", "OPENAI_API_KEY_MISSING", 503);
@@ -273,7 +352,7 @@ export class AIInsightsEngine {
           model: options.model,
           input: options.input,
           max_output_tokens: options.maxOutputTokens,
-          ...(options.schema ? { text: { format: { type: "json_schema", name: "dados_fii_fund_insights", strict: true, schema: options.schema } } } : {}),
+          ...(options.schema ? { text: { format: { type: "json_schema", name: options.schemaName || "dados_fii_fund_insights", strict: true, schema: options.schema } } } : {}),
         }),
         signal: AbortSignal.timeout(positiveInt(process.env.OPENAI_TIMEOUT_MS, 120_000)),
       });
@@ -334,6 +413,7 @@ export class AIInsightsEngine {
               "Não repita métricas isoladas nem escreva observações genéricas sobre insuficiência de dados.",
               "Oportunidade significa ponto favorável para acompanhamento, não recomendação de investimento.",
               "Não recomende compra, venda ou manutenção de ativos.",
+              "Nunca use a sigla NAV; escreva VP por cota e diferencie o yield do último evento, o yield sobre a cotação atual e o dividend yield acumulado em 12 meses.",
             ].join(" "),
           },
           { role: "user", content: `Gere os seis grupos de insights para este relatório automático:\n${JSON.stringify(input)}` },
@@ -367,6 +447,58 @@ export class AIInsightsEngine {
     }
   }
 
+  async generatePremiumInsights(report: PremiumReportDraft, options?: GenerateFundOptions): Promise<PremiumAIInsights> {
+    this.assertEnabled();
+    this.consumeRateLimit(options?.requestKey);
+    const input = safePremiumInput(report);
+    const model = modelForInsights();
+    const inputFingerprint = fingerprint({ promptVersion: PREMIUM_INSIGHTS_PROMPT_VERSION, model, input });
+    const cached = this.premiumCache.get(inputFingerprint);
+    if (cached) return { ...cached, metadata: { ...cached.metadata, cached: true } };
+    const pending = this.premiumInFlight.get(inputFingerprint);
+    if (pending) return pending.then((result) => ({ ...result, metadata: { ...result.metadata, cached: true } }));
+
+    const promise = (async () => {
+      const response = await this.callResponses({
+        model,
+        maxOutputTokens: positiveInt(process.env.OPENAI_PREMIUM_MAX_OUTPUT_TOKENS, 2200),
+        schema: PREMIUM_INSIGHTS_SCHEMA,
+        schemaName: "dados_fii_premium_analysis",
+        input: [
+          {
+            role: "system",
+            content: [
+              "Você é a camada analítica Premium do Dados FII.",
+              "Use somente o JSON fornecido e escreva em português brasileiro simples.",
+              "Esta análise deve acrescentar interpretação, não repetir o resumo gratuito nem listar métricas isoladas.",
+              "Combine pelo menos dois indicadores ao formular cada conclusão e explique a relação entre eles.",
+              "Interprete valuation, cenário de estresse, posição entre pares e impacto financeiro na carteira do usuário.",
+              "Se a posição não estiver na carteira, deixe isso claro e explique o efeito por cota; não invente patrimônio nem quantidade.",
+              "Nunca use a sigla NAV; escreva VP por cota. Diferencie dividend yield de 12 meses, yield na data-com e yield sobre o preço atual.",
+              "Percentil contextualiza a nota da amostra e não mede retorno futuro.",
+              "Os gatilhos de monitoramento devem ser objetivos, mensuráveis e não podem repetir a mesma frase.",
+              "Não use ausência cadastral como risco do fundo e não recomende compra, venda ou manutenção.",
+            ].join(" "),
+          },
+          { role: "user", content: `Produza a análise exclusiva do relatório Premium a partir deste JSON:\n${JSON.stringify(input)}` },
+        ],
+      });
+      let parsed: unknown;
+      try { parsed = JSON.parse(response); } catch { throw new AIInsightsError("A IA retornou JSON Premium inválido.", "PREMIUM_AI_INVALID_JSON", 502); }
+      const content = normalizePremiumContent(parsed);
+      const result: PremiumAIInsights = {
+        ticker: report.ticker,
+        ...content,
+        sources: Array.from(new Map(report.freeReport.sources.map((item) => [`${item.kind}:${item.provider}`, { provider: limitedText(item.provider, 120), kind: item.kind }])).values()).slice(0, 12),
+        metadata: this.metadata(model, PREMIUM_INSIGHTS_PROMPT_VERSION, inputFingerprint, false),
+      };
+      this.premiumCache.set(inputFingerprint, result);
+      return result;
+    })();
+    this.premiumInFlight.set(inputFingerprint, promise);
+    try { return await promise; } finally { this.premiumInFlight.delete(inputFingerprint); }
+  }
+
   async generateText(options: GenerateTextOptions): Promise<AITextGeneration> {
     this.assertEnabled();
     const model = options.model || process.env.OPENAI_MODEL || DEFAULT_MODEL;
@@ -380,7 +512,7 @@ export class AIInsightsEngine {
   }
 
   stats() {
-    return { ...this.cache.stats(), inFlight: this.inFlight.size, rateLimitKeys: this.rateLimits.size, engineVersion: AI_INSIGHTS_ENGINE_VERSION };
+    return { ...this.cache.stats(), premium: this.premiumCache.stats(), inFlight: this.inFlight.size + this.premiumInFlight.size, rateLimitKeys: this.rateLimits.size, engineVersion: AI_INSIGHTS_ENGINE_VERSION };
   }
 }
 

@@ -4,7 +4,7 @@ import type { FundScores, ScoreResult } from "../../types/scores";
 import type { RegulatoryTimelineResponse } from "../../types/timeline";
 import { plausiblePvpValue } from "../fiiDerivedData";
 
-export const FREE_REPORT_VERSION = "1.0.0";
+export const FREE_REPORT_VERSION = "1.1.0";
 
 const SCORE_LABELS: Record<Exclude<keyof FundScores, "engineVersion" | "generatedAt">, string> = {
   risk: "Risco",
@@ -66,8 +66,13 @@ function firstText(data: Data, keys: string[]) {
 
 function lastDividend(data: Data) {
   const item = dividendSeries(data).at(-1);
-  if (item) return { value: item.value, reference: `${MONTHS_PT[item.month] || item.month}/${item.year}` };
-  return { value: null, reference: null };
+  if (item) return {
+    value: item.value,
+    reference: `${MONTHS_PT[item.month] || item.month}/${item.year}`,
+    dateWith: item.dateWith,
+    priceDateWith: item.priceDateWith,
+  };
+  return { value: null, reference: null, dateWith: null, priceDateWith: null };
 }
 
 function round(value: number, digits = 2) {
@@ -80,13 +85,20 @@ function average(values: number[]) {
 }
 
 function dividendSeries(data: Data) {
-  const result: Array<{ year: number; month: string; value: number }> = [];
+  const result: Array<{ year: number; month: string; value: number; dateWith: string | null; priceDateWith: number | null }> = [];
   for (const [yearKey, yearValue] of Object.entries(data)) {
     const match = yearKey.match(/^earnings(\d{4})$/);
     if (!match || !yearValue || typeof yearValue !== "object" || Array.isArray(yearValue)) continue;
     for (const [month, item] of Object.entries(yearValue as Data)) {
-      const value = item && typeof item === "object" ? numberValue((item as Data).earnings) : numberValue(item);
-      if (value !== null && value > 0) result.push({ year: Number(match[1]), month, value });
+      const details = item && typeof item === "object" && !Array.isArray(item) ? item as Data : null;
+      const value = details ? numberValue(details.earnings) : numberValue(item);
+      if (value !== null && value > 0) result.push({
+        year: Number(match[1]),
+        month,
+        value,
+        dateWith: details ? text(details.date_with) : null,
+        priceDateWith: details ? numberValue(details.price_date_with) : null,
+      });
     }
   }
   return result.sort((a, b) => a.year - b.year || MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month));
@@ -231,6 +243,14 @@ export class FreeReportEngine {
         pvp,
         lastDividend: dividend.value,
         lastDividendReference: dividend.reference,
+        lastDividendDateWith: dividend.dateWith,
+        lastDividendPriceDateWith: dividend.priceDateWith,
+        lastDividendYieldOnDateWithPercent: dividend.value !== null && dividend.priceDateWith !== null && dividend.priceDateWith > 0
+          ? round((dividend.value / dividend.priceDateWith) * 100)
+          : null,
+        lastDividendYieldOnCurrentPricePercent: dividend.value !== null && numberValue(data.price) !== null && numberValue(data.price)! > 0
+          ? round((dividend.value / numberValue(data.price)!) * 100)
+          : null,
       },
       analysis: derivedAnalysis(data, pvp),
       scores,

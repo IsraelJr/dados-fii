@@ -1,10 +1,12 @@
-import type { FundAIInsights } from "../../types/ai-insights";
+import type { PremiumAIInsights } from "../../types/ai-insights";
 import type { PremiumFundReport, PremiumPortfolioImpact, PremiumPortfolioProjection, PremiumRecommendation, PremiumScenario, PremiumStressCase } from "../../types/premium-report";
 import type { PublicFundData } from "../../types/regulatory";
 import type { FreeFundReport } from "../../types/reports";
 import type { FundScores } from "../../types/scores";
 
-export const PREMIUM_REPORT_VERSION = "1.1.0";
+export const PREMIUM_REPORT_VERSION = "1.2.0";
+
+export type PremiumReportDraft = Omit<PremiumFundReport, "aiAnalysis">;
 
 export type PremiumPortfolioHolding = {
   ticker: string;
@@ -245,7 +247,7 @@ function portfolioImpact(report: FreeFundReport, holdings: PremiumPortfolioHoldi
 }
 
 export class PremiumReportEngine {
-  generate(freeReport: FreeFundReport, peers: PublicFundData[], aiAnalysis: FundAIInsights, generatedAt = new Date().toISOString(), holdings: PremiumPortfolioHolding[] = []): PremiumFundReport {
+  prepare(freeReport: FreeFundReport, peers: PublicFundData[], generatedAt = new Date().toISOString(), holdings: PremiumPortfolioHolding[] = []): PremiumReportDraft {
     const valuationResult = valuation(freeReport);
     const stressCases = stressTest(freeReport);
     const scenarioCases = scenarios(freeReport);
@@ -260,7 +262,6 @@ export class PremiumReportEngine {
       comparative: comparative(freeReport, peers),
       portfolioImpact: portfolioImpact(freeReport, holdings, stressCases, scenarioCases),
       recommendations: recommendations(freeReport, valuationResult),
-      aiAnalysis,
       methodology: [
         "Valuation limitado à relação entre cotação e valor patrimonial estimado; não calcula preço-alvo.",
         "Stress tests e cenários são sensibilidades matemáticas, não previsões de mercado.",
@@ -273,6 +274,14 @@ export class PremiumReportEngine {
         "Cenários hipotéticos podem divergir materialmente dos resultados futuros.",
       ],
     };
+  }
+
+  complete(draft: PremiumReportDraft, aiAnalysis: PremiumAIInsights): PremiumFundReport {
+    return { ...draft, aiAnalysis };
+  }
+
+  generate(freeReport: FreeFundReport, peers: PublicFundData[], aiAnalysis: PremiumAIInsights, generatedAt = new Date().toISOString(), holdings: PremiumPortfolioHolding[] = []): PremiumFundReport {
+    return this.complete(this.prepare(freeReport, peers, generatedAt, holdings), aiAnalysis);
   }
 }
 
