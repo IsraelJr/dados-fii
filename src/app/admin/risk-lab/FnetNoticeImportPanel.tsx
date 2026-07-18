@@ -3,9 +3,15 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ExternalLink, FileDown, Loader2, ShieldAlert, XCircle } from "lucide-react";
 import type { FnetDividendNoticePreview } from "@/types/riskLabFnetNotice";
+import type { DividendSeriesReadiness } from "@/types/riskLabSeriesReadiness";
 
 type ListResponse =
-  | { ok: true; enabled: boolean; candidates: FnetDividendNoticePreview[] }
+  | {
+      ok: true;
+      enabled: boolean;
+      candidates: FnetDividendNoticePreview[];
+      series: DividendSeriesReadiness[];
+    }
   | { ok: false; error: string };
 
 type WriteResponse =
@@ -38,9 +44,16 @@ function reviewStyle(status: FnetDividendNoticePreview["reviewStatus"]) {
   return "bg-amber-100 text-amber-900 ring-amber-300";
 }
 
+function missingLabel(months: string[]) {
+  if (!months.length) return "Nenhuma lacuna entre a primeira e a última competência";
+  const visible = months.slice(0, 12).join(", ");
+  return months.length > 12 ? `${visible} e mais ${months.length - 12}` : visible;
+}
+
 export default function FnetNoticeImportPanel() {
   const [enabled, setEnabled] = useState(false);
   const [candidates, setCandidates] = useState<FnetDividendNoticePreview[]>([]);
+  const [series, setSeries] = useState<DividendSeriesReadiness[]>([]);
   const [documentId, setDocumentId] = useState("");
   const [confirmations, setConfirmations] = useState<Record<string, boolean>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
@@ -56,6 +69,7 @@ export default function FnetNoticeImportPanel() {
       if (!response.ok) throw new Error(response.error);
       setEnabled(response.enabled);
       setCandidates(response.candidates);
+      setSeries(response.series);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível carregar os avisos FNET.");
     } finally {
@@ -104,6 +118,40 @@ export default function FnetNoticeImportPanel() {
         <ShieldAlert className="mr-2 inline" size={18} /> Aprovar um aviso não executa o detector, não altera alertas e não libera o backtest externo.
       </div>
 
+      {!loading && (
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          {series.map((item) => (
+            <article key={item.ticker} className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400">Cobertura da série verificada</p>
+                  <h3 className="mt-1 text-2xl font-black">{item.ticker}</h3>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${item.readyForStressDetection ? "bg-emerald-200 text-emerald-950 ring-emerald-300" : "bg-amber-200 text-amber-950 ring-amber-300"}`}>
+                  {item.readyForStressDetection ? "Série suficiente" : "Coleta incompleta"}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <SeriesMetric label="Meses aprovados" value={String(item.approvedObservations)} />
+                <SeriesMetric label="Maior sequência" value={`${item.longestContiguousCount}/${item.requiredContiguousCount}`} />
+                <SeriesMetric label="Detector" value={item.detectorExecuted ? "Executado" : "Não executado"} />
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm text-slate-300">
+                <p><strong className="text-white">Intervalo aprovado:</strong> {item.firstCompetence && item.lastCompetence ? `${item.firstCompetence} a ${item.lastCompetence}` : "nenhum mês aprovado"}</p>
+                <p><strong className="text-white">Maior sequência contínua:</strong> {item.longestContiguousMonths.length ? item.longestContiguousMonths.join(", ") : "nenhuma"}</p>
+                <p><strong className="text-white">Lacunas:</strong> {missingLabel(item.missingMonths)}</p>
+              </div>
+
+              <p className="mt-4 rounded-xl bg-white/10 p-3 text-xs font-bold leading-5 text-slate-200">
+                “Série suficiente” significa apenas que existem nove competências consecutivas aprovadas para alimentar o detector. Nenhum resultado analítico foi calculado nesta etapa.
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <input
           value={documentId}
@@ -124,7 +172,7 @@ export default function FnetNoticeImportPanel() {
       </div>
 
       {error && <p className="mt-4 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-900 ring-1 ring-red-200">{error}</p>}
-      {loading && <p className="mt-5 flex items-center gap-2 text-sm font-bold text-slate-500"><Loader2 className="animate-spin" size={17} /> Carregando candidatos…</p>}
+      {loading && <p className="mt-5 flex items-center gap-2 text-sm font-bold text-slate-500"><Loader2 className="animate-spin" size={17} /> Carregando candidatos e cobertura…</p>}
 
       {!loading && (
         <div className="mt-6 space-y-4">
@@ -199,6 +247,10 @@ export default function FnetNoticeImportPanel() {
       )}
     </section>
   );
+}
+
+function SeriesMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-white/10 p-3"><p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-sm font-black text-white">{value}</p></div>;
 }
 
 function Small({ label, value }: { label: string; value: string }) {
