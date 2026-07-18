@@ -51,9 +51,12 @@ test("candidate dataset cannot be relabeled gold without stronger primary eviden
   assert.throws(() => loadRiskDataset(promoted), /must be confirmed in a gold dataset/);
 });
 
-test("gold seed keeps primary provenance and remains blocked from production", () => {
+test("gold seed has explicit approval only for HCTR11 admin unit test", () => {
   assert.equal(goldDataset.metadata.quality, "gold");
-  assert.equal(goldDataset.metadata.productionApproved, false);
+  assert.equal(goldDataset.metadata.productionApproved, true);
+  assert.equal(goldDataset.metadata.productionApproval?.scope, "admin_unit_test_only");
+  assert.deepEqual(goldDataset.metadata.productionApproval?.allowedTickers, ["HCTR11"]);
+  assert.match(goldDataset.metadata.productionApproval?.approvalHash || "", /^[a-f0-9]{64}$/);
   assert.equal(goldDataset.snapshots.length, 1);
 
   const cashEvidence = goldDataset.snapshots[0].observations.cashResultPerShare?.evidence[0];
@@ -85,6 +88,24 @@ test("gold datasets reject secondary evidence, missing pages and automated-only 
   const automated = structuredClone(goldRaw);
   automated.snapshots[0].observations.cashResultPerShare.evidence[0].reviewMethod = "automated_extraction";
   assert.throws(() => loadRiskDataset(automated), /reviewMethod must be manual_document_review/);
+});
+
+test("production approval rejects missing audit metadata, invalid hash and wider ticker scope", () => {
+  const missingApproval = structuredClone(goldRaw);
+  delete missingApproval.metadata.productionApproval;
+  assert.throws(() => loadRiskDataset(missingApproval), /productionApproval is required/);
+
+  const invalidHash = structuredClone(goldRaw);
+  invalidHash.metadata.productionApproval.approvalHash = "invalid";
+  assert.throws(() => loadRiskDataset(invalidHash), /SHA-256/);
+
+  const invalidScope = structuredClone(goldRaw);
+  invalidScope.metadata.productionApproval.scope = "public";
+  assert.throws(() => loadRiskDataset(invalidScope), /Unsupported production approval scope/);
+
+  const widerTicker = structuredClone(goldRaw);
+  widerTicker.metadata.productionApproval.allowedTickers = ["TGAR11"];
+  assert.throws(() => loadRiskDataset(widerTicker), /disallowed ticker: HCTR11/);
 });
 
 test("candidate datasets cannot be approved for production", () => {
