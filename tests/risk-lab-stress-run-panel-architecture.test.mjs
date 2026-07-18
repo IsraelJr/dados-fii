@@ -11,9 +11,10 @@ const page = source("src/app/admin/risk-lab/stress-runs/page.tsx");
 const combined = `${panel}\n${page}`;
 
 test("carregamento inicial consulta apenas o status", () => {
-  assert.match(panel, /useEffect\(\(\) => \{\s*void load\(\);\s*\}, \[\]\)/s);
+  const effect = panel.match(/useEffect\(\(\) => \{([\s\S]*?)\}, \[\]\)/)?.[1] || "";
+  assert.match(effect, /void load\(\)/);
+  assert.doesNotMatch(effect, /execute\(/);
   assert.match(panel, /requestJson<StatusResponse>\("\/api\/admin\/system\/risk-lab\/stress-runs"\)/);
-  assert.doesNotMatch(panel, /useEffect\([\s\S]*void execute\(/);
 });
 
 test("execução exige ação, ticker e confirmação explícita", () => {
