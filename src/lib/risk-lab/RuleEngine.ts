@@ -67,10 +67,12 @@ export class RiskRuleEngine {
     const deteriorationHits = hits.filter((hit) => hit.dimension !== "structural");
     const deteriorationAlert = maxAlert(deteriorationHits.map((hit) => hit.alert));
     const prudentialAlert = maxAlert(hits.map((hit) => hit.alert));
-    const deteriorationScore = Math.round(clamp(deteriorationHits.reduce((sum, hit) => sum + hit.weight, 0)));
+    const deteriorationSeverityScore = Math.round(clamp(deteriorationHits.reduce((sum, hit) => sum + hit.weight, 0)));
     const hitConfidence = hits.length
       ? hits.reduce((sum, hit) => sum + clamp(hit.confidence), 0) / hits.length
       : observationConfidence(snapshot.observations);
+    const evidenceConfidence = Math.round(clamp(hitConfidence));
+    const thesisHealthScore = Math.round(clamp(100 - deteriorationSeverityScore));
 
     return {
       ticker: snapshot.ticker,
@@ -79,8 +81,12 @@ export class RiskRuleEngine {
       structuralRisk: structuralLevel(snapshot.structuralRiskScore),
       deteriorationAlert,
       prudentialAlert,
-      deteriorationScore,
-      confidence: Math.round(clamp(hitConfidence)),
+      deteriorationSeverityScore,
+      deteriorationScore: deteriorationSeverityScore,
+      thesisHealthScore,
+      evidenceConfidence,
+      confidence: evidenceConfidence,
+      managementTrustScore: null,
       hits: hits.sort((a, b) => ALERT_RANK[b.alert] - ALERT_RANK[a.alert] || b.weight - a.weight),
     };
   }
