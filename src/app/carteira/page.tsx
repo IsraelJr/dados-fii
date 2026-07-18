@@ -24,8 +24,6 @@ import WalletRiskReportCard from "../components/WalletRiskReportCard";
 import AppToast from "../components/AppToast";
 import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
 import PortfolioNotificationPreferences from "../components/PortfolioNotificationPreferences";
-import { buildWalletDividendHistory } from "@/lib/walletDividendHistory";
-import type { WalletDividendHistory as DividendHistory } from "@/lib/walletDividendHistory";
 
 type WalletItem = { ticker: string; quotas: number };
 type LoadedFii = WalletItem & { data?: any; error?: string };
@@ -52,6 +50,16 @@ type WalletSnapshot = {
   topIncomeTicker?: string;
   createdAt: string;
   updatedAt: string;
+};
+type DividendMonth = { month: string; label: string; value: number };
+type DividendHistory = {
+  months: DividendMonth[];
+  visibleMonths: DividendMonth[];
+  total: number;
+  average: number;
+  best: DividendMonth | null;
+  worst: DividendMonth | null;
+  topPayer: { ticker: string; value: number } | null;
 };
 type WalletInsights = {
   currentMonth: string;
@@ -233,6 +241,28 @@ function getUpcomingPayments(items: LoadedFii[]) {
   });
 }
 
+function buildDividendHistory(items: EnrichedFii[]): DividendHistory {
+  const year = new Date().getFullYear();
+  const currentMonthIndex = new Date().getMonth();
+  const byTicker: Record<string, number> = {};
+  const months = MONTHS.slice(0, currentMonthIndex + 1).map((month) => {
+    const value = items.reduce((acc, item) => {
+      const earning = getYearData(item.data, year)?.[month]?.earnings;
+      const amount = parseCurrency(earning) * item.quotas;
+      if (amount > 0) byTicker[item.ticker] = (byTicker[item.ticker] || 0) + amount;
+      return acc + amount;
+    }, 0);
+    return { month, label: MONTHS_SHORT_PTBR[month], value };
+  });
+  const visibleMonths = months.filter((item) => item.value > 0);
+  const total = months.reduce((acc, item) => acc + item.value, 0);
+  const average = visibleMonths.length ? total / visibleMonths.length : 0;
+  const best = [...visibleMonths].sort((a, b) => b.value - a.value)[0] || null;
+  const worst = [...visibleMonths].sort((a, b) => a.value - b.value)[0] || null;
+  const topPayer = Object.entries(byTicker).sort((a, b) => b[1] - a[1]).map(([ticker, value]) => ({ ticker, value }))[0] || null;
+  return { months, visibleMonths, total, average, best, worst, topPayer };
+}
+
 function buildCsv(items: LoadedFii[]) {
   const header = ["Ticker", "Movimento do dia", "Cotas", "Preco", "Ultimo rendimento", "Mes ultimo rendimento", "Renda estimada", "Rendimento mes atual", "Renda anunciada mes atual"];
   const rows = items.map((item) => {
@@ -373,7 +403,7 @@ export default function WalletPage() {
     const segmentBase = segmentWeights.reduce((acc, item) => acc + item.value, 0);
     const segmentBreakdown = segmentWeights.slice(0, 3).map((item) => ({ ticker: item.label, value: segmentBase > 0 ? formatPercentValue((item.value / segmentBase) * 100) : "0,0%" }));
     const incomeByFii = topIncome.map((item) => ({ label: item.ticker, value: item.estimatedIncome, detail: monthlyIncome ? formatPercentValue((item.estimatedIncome / monthlyIncome) * 100) : "0,0%" }));
-    const dividendHistory = buildWalletDividendHistory(enriched);
+    const dividendHistory = buildDividendHistory(enriched);
     return { currentMonth, enriched, monthlyIncome, announcedIncome, currentValue, pendingIncome: Math.max(monthlyIncome - announcedIncome, 0), waiting, topIncome, topWeight, segmentBreakdown, mainSegment: segmentBreakdown[0], assetWeights, segmentWeights, incomeByFii, dividendHistory };
   }, [loaded]);
 

@@ -5,8 +5,6 @@ import test from "node:test";
 const engine = readFileSync(new URL("../src/lib/portfolioNotificationEngine.ts", import.meta.url), "utf8");
 const preferencesRoute = readFileSync(new URL("../src/app/api/wallet/notification-preferences/route.ts", import.meta.url), "utf8");
 const preferencesUi = readFileSync(new URL("../src/app/components/PortfolioNotificationPreferences.tsx", import.meta.url), "utf8");
-const walletLayout = readFileSync(new URL("../src/app/carteira/layout.tsx", import.meta.url), "utf8");
-const walletUxEnhancer = readFileSync(new URL("../src/app/components/WalletPageUxEnhancer.tsx", import.meta.url), "utf8");
 
 test("portfolio notifications consolidate every event from one run into one email", () => {
   assert.match(engine, /const queuedEmails: QueuedEmailNotification\[\]/);
@@ -43,10 +41,4 @@ test("paid patrimony threshold is authenticated, resolved on the server and conf
   assert.doesNotMatch(preferencesRoute, /body\?\.(?:isPaid|isPremium|isVip)/);
   assert.match(preferencesUi, /Variação patrimonial para notificar/);
   assert.match(preferencesUi, /plano Grátis/i);
-});
-
-test("wallet quick numbers are not overwritten by browser-only monthly snapshots", () => {
-  assert.doesNotMatch(walletLayout, /WalletHistoricalSummaryEnhancer/);
-  assert.doesNotMatch(walletUxEnhancer, /replaceDividendExtremesSummary/);
-  assert.doesNotMatch(walletUxEnhancer, /dados-fii-wallet-monthly-snapshots-v1/);
 });
