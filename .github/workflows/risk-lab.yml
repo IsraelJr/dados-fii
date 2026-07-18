@@ -50,4 +50,22 @@ jobs:
         run: npm run typecheck
 
       - name: Run Risk Lab tests
-        run: npm run test:risk-lab
+        id: risk_tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:risk-lab 2>&1 | tee risk-lab-test.log
+
+      - name: Upload Risk Lab test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-test-report
+          path: risk-lab-test.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce Risk Lab test result
+        if: steps.risk_tests.outcome != 'success'
+        run: exit 1
