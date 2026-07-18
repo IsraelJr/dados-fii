@@ -1,0 +1,20 @@
+{
+  "rulesetVersion": "0.1.0",
+  "status": "frozen_out_of_sample_validation",
+  "frozenAt": "2026-07-18T06:00:00.000Z",
+  "sourcePath": "src/lib/risk-lab/rules.ts",
+  "gitBlobSha": "a0f5ec27ff368e4bacbfaf8564fa3dfafcf9b48c",
+  "changePolicy": {
+    "allowThresholdChanges": false,
+    "allowWeightChanges": false,
+    "allowAlertLevelChanges": false,
+    "allowRuleLogicChanges": false,
+    "requiredForAnyChange": [
+      "new ruleset version",
+      "documented rationale written before re-running validation",
+      "separate train and validation samples",
+      "full backtest rerun with comparison against v0.1.0"
+    ]
+  },
+  "validationPurpose": "Prevent hindsight-driven tuning while testing funds not used to formulate the pilot rules."
+}
