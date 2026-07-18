@@ -32,8 +32,13 @@ export interface CandidateOfficialDocument {
   sourceUrl: string;
   sourceType: "primary_regulatory" | "primary_manager";
   documentType: string;
-  referenceDate: string;
-  publishedAt: string;
+
+  /** Só pode ser preenchida após conferência no documento ou protocolo primário. */
+  referenceDate: string | null;
+
+  /** Primeira data pública confirmada em fonte primária; nunca copiar de agregador. */
+  publishedAt: string | null;
+
   contentReview: PrimaryContentReview;
 }
 
@@ -42,7 +47,10 @@ export interface EventVerificationCandidate {
   ticker: string;
   role: EventVerificationCaseRole;
   status: EventVerificationStatus;
+
+  /** Deve permanecer null enquanto publishedAt não estiver confirmado na fonte primária. */
   eventDateCandidate: string | null;
+
   officialDocument: CandidateOfficialDocument | null;
   locatorEvidence: EventLocatorEvidence[];
   candidateFacts: string[];
