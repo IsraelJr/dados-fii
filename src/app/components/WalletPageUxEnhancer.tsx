@@ -295,12 +295,6 @@ function replaceDividendExtremesSummary() {
 
 export default function WalletPageUxEnhancer() {
   useEffect(() => {
-    const refreshDividendSummary = () => {
-      findQuickSummarySection()?.removeAttribute("data-dividend-extremes-fixed");
-      replaceDividendExtremesSummary();
-    };
-    window.addEventListener("dados-fii-wallet-snapshots-updated", refreshDividendSummary);
-
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
@@ -336,10 +330,7 @@ export default function WalletPageUxEnhancer() {
       window.clearInterval(timer);
     }, 500);
 
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("dados-fii-wallet-snapshots-updated", refreshDividendSummary);
-    };
+    return () => window.clearInterval(timer);
   }, []);
 
   return (
@@ -394,3 +385,4 @@ export default function WalletPageUxEnhancer() {
     `}</style>
   );
 }
+
