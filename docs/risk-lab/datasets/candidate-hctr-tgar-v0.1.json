@@ -1,0 +1,337 @@
+{
+  "metadata": {
+    "id": "candidate-hctr-tgar-v0.1",
+    "version": "0.1.0",
+    "quality": "candidate",
+    "createdAt": "2026-07-18T02:00:00-03:00",
+    "description": "Primeiro dataset documental do Risk Lab, com datas de publicação reais e métricas extraídas da investigação forense. Ainda requer conferência página a página nos PDFs originais antes de promoção para gold.",
+    "limitations": [
+      "Parte dos números de HCTR11 em outubro de 2024 foi obtida por transcrição secundária que aponta para o documento oficial.",
+      "As páginas exatas dos PDFs ainda não foram registradas para todas as métricas.",
+      "O primeiro amarelo estrutural de HCTR11 em 2020 permanece no teste sintético até a localização e conferência do relatório original.",
+      "O relatório TGAR11 de dezembro de 2025 publicado em 26/01/2026 foi posteriormente substituído, mas era informação pública disponível naquela data e deve permanecer no backtest temporal."
+    ]
+  },
+  "snapshots": [
+    {
+      "ticker": "HCTR11",
+      "family": "credit_high_yield",
+      "asOf": "2024-11-22T18:19:00-03:00",
+      "structuralRiskScore": 95,
+      "observations": {
+        "currentAssetsPercent": {
+          "metric": "currentAssetsPercent",
+          "value": 17,
+          "unit": "percent",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 75,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Carteira: Em Dia 17%; Em Carência de Juros acima de 77%; Inadimplente 6%.",
+            "classification": "manager_declared"
+          }]
+        },
+        "graceAssetsPercent": {
+          "metric": "graceAssetsPercent",
+          "value": 77,
+          "unit": "percent",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 70,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Carteira: Em Carência de Juros acima de 77%.",
+            "classification": "manager_declared"
+          }]
+        },
+        "defaultedAssetsPercent": {
+          "metric": "defaultedAssetsPercent",
+          "value": 6,
+          "unit": "percent",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 75,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Carteira: Inadimplente 6%.",
+            "classification": "manager_declared"
+          }]
+        },
+        "cashResultPerShare": {
+          "metric": "cashResultPerShare",
+          "value": 0.32,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 70,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Resultado caixa informado em R$ 0,32 por cota.",
+            "classification": "manager_declared"
+          }]
+        },
+        "dividendPerShare": {
+          "metric": "dividendPerShare",
+          "value": 0.37,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 80,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Distribuição de R$ 0,37 por cota.",
+            "classification": "manager_declared"
+          }]
+        }
+      }
+    },
+    {
+      "ticker": "HCTR11",
+      "family": "credit_high_yield",
+      "asOf": "2024-12-12T15:54:00-03:00",
+      "structuralRiskScore": 95,
+      "observations": {
+        "currentAssetsPercent": {
+          "metric": "currentAssetsPercent",
+          "value": 17,
+          "unit": "percent",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 75,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Carteira: Em Dia 17%.",
+            "classification": "manager_declared"
+          }]
+        },
+        "graceAssetsPercent": {
+          "metric": "graceAssetsPercent",
+          "value": 77,
+          "unit": "percent",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 70,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Carteira: Em Carência de Juros acima de 77%.",
+            "classification": "manager_declared"
+          }]
+        },
+        "defaultedAssetsPercent": {
+          "metric": "defaultedAssetsPercent",
+          "value": 6,
+          "unit": "percent",
+          "competenceDate": "2024-10-31T23:59:59-03:00",
+          "knownAt": "2024-11-22T18:19:00-03:00",
+          "confidence": 75,
+          "evidence": [{
+            "documentId": "hctr-rg-2024-10-785935",
+            "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=161963",
+            "excerpt": "Carteira: Inadimplente 6%.",
+            "classification": "manager_declared"
+          }]
+        },
+        "cashResultPerShare": {
+          "metric": "cashResultPerShare",
+          "value": 0,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-11-30T23:59:59-03:00",
+          "knownAt": "2024-12-12T15:54:00-03:00",
+          "confidence": 95,
+          "evidence": [{
+            "documentId": "hctr-fr-2024-12-12-799507",
+            "sourceUrl": "https://www.clubefii.com.br/fundo_comunicados_embed?cod_neg=HCTR11%3Futm_source%3Dsitemap&id=799507",
+            "excerpt": "A administradora comunicou que o fundo não apresentou resultado no mês.",
+            "classification": "confirmed"
+          }]
+        },
+        "dividendPerShare": {
+          "metric": "dividendPerShare",
+          "value": 0.37,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-11-30T23:59:59-03:00",
+          "knownAt": "2024-12-12T15:54:00-03:00",
+          "confidence": 95,
+          "evidence": [{
+            "documentId": "hctr-fr-2024-12-12-799507",
+            "sourceUrl": "https://www.clubefii.com.br/fundo_comunicados_embed?cod_neg=HCTR11%3Futm_source%3Dsitemap&id=799507",
+            "excerpt": "A gestora indicou distribuição de R$ 0,37 por cota com base no resultado caixa semestral.",
+            "classification": "confirmed"
+          }]
+        }
+      }
+    },
+    {
+      "ticker": "TGAR11",
+      "family": "development_equity",
+      "asOf": "2024-07-31T18:15:00-03:00",
+      "structuralRiskScore": 75,
+      "observations": {
+        "semesterCashResultPerShare": {
+          "metric": "semesterCashResultPerShare",
+          "value": 7.77,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-06-28T23:59:59-03:00",
+          "knownAt": "2024-07-31T18:15:00-03:00",
+          "confidence": 90,
+          "evidence": [{
+            "documentId": "tgar-rg-2024-06-709442",
+            "sourceUrl": "https://www.clubefii.com.br/fundo_comunicados_embed?cod=0&cod_neg=TGAR11&id=709442&tipo_comunicado=relatorio_gerencial_relatorios",
+            "excerpt": "Resultado caixa acumulado no primeiro semestre de R$ 7,77 por cota.",
+            "classification": "manager_declared"
+          }]
+        },
+        "semesterDistributionsPerShare": {
+          "metric": "semesterDistributionsPerShare",
+          "value": 8,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-06-28T23:59:59-03:00",
+          "knownAt": "2024-07-31T18:15:00-03:00",
+          "confidence": 95,
+          "evidence": [{
+            "documentId": "tgar-rg-2024-06-709442",
+            "sourceUrl": "https://www.clubefii.com.br/fundo_comunicados_embed?cod=0&cod_neg=TGAR11&id=709442&tipo_comunicado=relatorio_gerencial_relatorios",
+            "excerpt": "Distribuições acumuladas no primeiro semestre de R$ 8,00 por cota.",
+            "classification": "manager_declared"
+          }]
+        },
+        "reservePerShare": {
+          "metric": "reservePerShare",
+          "value": 0.05,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-06-28T23:59:59-03:00",
+          "knownAt": "2024-07-31T18:15:00-03:00",
+          "confidence": 90,
+          "evidence": [{
+            "documentId": "tgar-rg-2024-06-709442",
+            "sourceUrl": "https://www.clubefii.com.br/fundo_comunicados_embed?cod=0&cod_neg=TGAR11&id=709442&tipo_comunicado=relatorio_gerencial_relatorios",
+            "excerpt": "Reserva não distribuída de R$ 0,05 por cota.",
+            "classification": "manager_declared"
+          }]
+        }
+      }
+    },
+    {
+      "ticker": "TGAR11",
+      "family": "development_equity",
+      "asOf": "2025-11-19T18:31:00-03:00",
+      "structuralRiskScore": 78,
+      "observations": {
+        "cashResultPerShare": {
+          "metric": "cashResultPerShare",
+          "value": 0.95,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2025-09-30T23:59:59-03:00",
+          "knownAt": "2025-11-19T18:31:00-03:00",
+          "confidence": 90,
+          "evidence": [{
+            "documentId": "tgar-rg-2025-09-1044705",
+            "sourceUrl": "https://brfiis.com.br/fundos/TGAR11/documentos/2025-nov-19/relatorio-gerencial-1044705",
+            "excerpt": "Resultado em regime de caixa do mês foi de R$ 0,95 por cota.",
+            "classification": "manager_declared"
+          }]
+        },
+        "dividendPerShare": {
+          "metric": "dividendPerShare",
+          "value": 1,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2025-09-30T23:59:59-03:00",
+          "knownAt": "2025-11-19T18:31:00-03:00",
+          "confidence": 95,
+          "evidence": [{
+            "documentId": "tgar-rg-2025-09-1044705",
+            "sourceUrl": "https://brfiis.com.br/fundos/TGAR11/documentos/2025-nov-19/relatorio-gerencial-1044705",
+            "excerpt": "Distribuição mantida em R$ 1,00 por cota.",
+            "classification": "manager_declared"
+          }]
+        },
+        "reservePerShare": {
+          "metric": "reservePerShare",
+          "value": 0.11,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2025-09-30T23:59:59-03:00",
+          "knownAt": "2025-11-19T18:31:00-03:00",
+          "confidence": 90,
+          "evidence": [{
+            "documentId": "tgar-rg-2025-09-1044705",
+            "sourceUrl": "https://brfiis.com.br/fundos/TGAR11/documentos/2025-nov-19/relatorio-gerencial-1044705",
+            "excerpt": "Reserva acumulada diminuiu para R$ 0,11 por cota.",
+            "classification": "manager_declared"
+          }]
+        }
+      }
+    },
+    {
+      "ticker": "TGAR11",
+      "family": "development_equity",
+      "asOf": "2026-01-26T18:03:00-03:00",
+      "structuralRiskScore": 82,
+      "observations": {
+        "guidanceDependsOnLiquidityEvent": {
+          "metric": "guidanceDependsOnLiquidityEvent",
+          "value": true,
+          "unit": "boolean",
+          "competenceDate": "2025-12-31T23:59:59-03:00",
+          "knownAt": "2026-01-26T18:03:00-03:00",
+          "confidence": 90,
+          "evidence": [{
+            "documentId": "tgar-rg-2025-12-1093064",
+            "sourceUrl": "https://brfiis.com.br/fundos/TGAR11/documentos/2026-jan-26/relatorio-gerencial-1093064",
+            "excerpt": "O guidance foi revisado e a expectativa de caixa de curto prazo dependia do recebimento da venda da Viel.",
+            "classification": "manager_declared"
+          }]
+        },
+        "liquidityEventDelayed": {
+          "metric": "liquidityEventDelayed",
+          "value": true,
+          "unit": "boolean",
+          "competenceDate": "2025-12-31T23:59:59-03:00",
+          "knownAt": "2026-01-26T18:03:00-03:00",
+          "confidence": 95,
+          "evidence": [{
+            "documentId": "tgar-rg-2025-12-1093064",
+            "sourceUrl": "https://brfiis.com.br/fundos/TGAR11/documentos/2026-jan-26/relatorio-gerencial-1093064",
+            "excerpt": "O recebimento da venda da participação na Viel foi postergado.",
+            "classification": "manager_declared"
+          }]
+        },
+        "positiveNavRevaluation": {
+          "metric": "positiveNavRevaluation",
+          "value": true,
+          "unit": "boolean",
+          "competenceDate": "2025-12-31T23:59:59-03:00",
+          "knownAt": "2026-01-26T18:03:00-03:00",
+          "confidence": 90,
+          "evidence": [{
+            "documentId": "tgar-rg-2025-12-1093064",
+            "sourceUrl": "https://brfiis.com.br/fundos/TGAR11/documentos/2026-jan-26/relatorio-gerencial-1093064",
+            "excerpt": "O patrimônio líquido recebeu reavaliação positiva de 5,52% em dezembro.",
+            "classification": "manager_declared"
+          }]
+        },
+        "reservePerShare": {
+          "metric": "reservePerShare",
+          "value": 0.19,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2025-12-31T23:59:59-03:00",
+          "knownAt": "2026-01-26T18:03:00-03:00",
+          "confidence": 90,
+          "evidence": [{
+            "documentId": "tgar-rg-2025-12-1093064",
+            "sourceUrl": "https://brfiis.com.br/fundos/TGAR11/documentos/2026-jan-26/relatorio-gerencial-1093064",
+            "excerpt": "Reserva de R$ 0,19 por cota ao fim de dezembro.",
+            "classification": "manager_declared"
+          }]
+        }
+      }
+    }
+  ]
+}
