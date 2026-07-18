@@ -11,6 +11,9 @@ on:
       - "src/lib/featureFlags.ts"
       - "src/types/riskLab.ts"
       - "src/types/riskLabProduction.ts"
+      - "src/types/riskLabDividendStress.ts"
+      - "src/types/riskLabDividendStressRun.ts"
+      - "src/types/riskLabSeriesReadiness.ts"
       - "tests/risk-lab-*.test.ts"
       - "tests/risk-lab-*.test.mjs"
       - "package.json"
@@ -27,6 +30,9 @@ on:
       - "src/lib/featureFlags.ts"
       - "src/types/riskLab.ts"
       - "src/types/riskLabProduction.ts"
+      - "src/types/riskLabDividendStress.ts"
+      - "src/types/riskLabDividendStressRun.ts"
+      - "src/types/riskLabSeriesReadiness.ts"
       - "tests/risk-lab-*.test.ts"
       - "tests/risk-lab-*.test.mjs"
       - "package.json"
@@ -57,7 +63,12 @@ jobs:
         run: npm install --silent
 
       - name: Typecheck
-        run: npm run typecheck
+        id: typecheck
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee risk-lab-typecheck.log
 
       - name: Run Risk Lab tests
         id: risk_tests
@@ -67,15 +78,17 @@ jobs:
           set -o pipefail
           npm run test:risk-lab 2>&1 | tee risk-lab-test.log
 
-      - name: Upload Risk Lab test report
+      - name: Upload Risk Lab validation reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: risk-lab-test-report
-          path: risk-lab-test.log
+          name: risk-lab-validation-report
+          path: |
+            risk-lab-typecheck.log
+            risk-lab-test.log
           if-no-files-found: error
           retention-days: 14
 
-      - name: Enforce Risk Lab test result
-        if: steps.risk_tests.outcome != 'success'
+      - name: Enforce Risk Lab validation result
+        if: steps.typecheck.outcome != 'success' || steps.risk_tests.outcome != 'success'
         run: exit 1
