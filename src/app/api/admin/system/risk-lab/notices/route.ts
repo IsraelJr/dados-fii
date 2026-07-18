@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
+import { calculateDividendSeriesReadiness } from "@/lib/risk-lab/DividendSeriesReadiness";
 import { FnetDividendNoticeImportService } from "@/lib/risk-lab/FnetDividendNoticeImportService";
 import { fnetNoticeCandidateStore } from "@/lib/risk-lab/FnetNoticeCandidateStore";
+import { verifiedDividendNoticeStore } from "@/lib/risk-lab/VerifiedDividendNoticeStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +20,16 @@ export async function GET(request: NextRequest) {
   if (authorization.rejection) return authorization.rejection;
 
   try {
-    const candidates = await service.listRecent(50);
-    return adminJson({ ok: true, enabled: enabled(), candidates });
+    const [candidates, mcciNotices, rbryNotices] = await Promise.all([
+      service.listRecent(50),
+      verifiedDividendNoticeStore.listByTicker("MCCI11"),
+      verifiedDividendNoticeStore.listByTicker("RBRY11"),
+    ]);
+    const series = [
+      calculateDividendSeriesReadiness("MCCI11", mcciNotices),
+      calculateDividendSeriesReadiness("RBRY11", rbryNotices),
+    ];
+    return adminJson({ ok: true, enabled: enabled(), candidates, series });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao carregar candidatos FNET.";
     console.error("Risk Lab FNET list error", { actor: authorization.identity.email, message });
