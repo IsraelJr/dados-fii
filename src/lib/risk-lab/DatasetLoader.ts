@@ -1,5 +1,7 @@
 import type {
   EvidenceClassification,
+  EvidenceReviewMethod,
+  EvidenceSourceType,
   MetricObservation,
   MetricValue,
   RiskFamily,
@@ -15,6 +17,7 @@ export interface RiskDatasetMetadata {
   createdAt: string;
   description: string;
   limitations: string[];
+  productionApproved: boolean;
 }
 
 export interface RiskDataset {
@@ -39,6 +42,17 @@ const EVIDENCE_CLASSIFICATIONS = new Set<EvidenceClassification>([
   "unverifiable",
 ]);
 
+const EVIDENCE_SOURCE_TYPES = new Set<EvidenceSourceType>([
+  "primary_regulatory",
+  "primary_manager",
+  "secondary",
+]);
+
+const EVIDENCE_REVIEW_METHODS = new Set<EvidenceReviewMethod>([
+  "manual_document_review",
+  "automated_extraction",
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -49,9 +63,19 @@ function requiredString(record: Record<string, unknown>, key: string, context: s
   return value;
 }
 
+function optionalString(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
 function validDate(value: string, context: string) {
   if (!Number.isFinite(Date.parse(value))) throw new Error(`${context} must be a valid ISO date: ${value}`);
   return value;
+}
+
+function optionalDate(record: Record<string, unknown>, key: string, context: string) {
+  const value = optionalString(record, key);
+  return value ? validDate(value, `${context}.${key}`) : undefined;
 }
 
 function validConfidence(value: unknown, context: string) {
@@ -67,12 +91,21 @@ function validMetricValue(value: unknown, context: string): MetricValue {
   throw new Error(`${context} must be a finite number, string, boolean or null`);
 }
 
+function validOptionalPage(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
 export function loadRiskDataset(raw: unknown): RiskDataset {
   if (!isRecord(raw)) throw new Error("Risk dataset must be an object");
   if (!isRecord(raw.metadata)) throw new Error("Risk dataset metadata is required");
 
   const quality = requiredString(raw.metadata, "quality", "metadata");
   if (quality !== "candidate" && quality !== "gold") throw new Error(`Unsupported dataset quality: ${quality}`);
+
+  const productionApproved = raw.metadata.productionApproved === true;
+  if (productionApproved && quality !== "gold") {
+    throw new Error("Only gold datasets can be approved for production");
+  }
 
   const metadata: RiskDatasetMetadata = {
     id: requiredString(raw.metadata, "id", "metadata"),
@@ -86,6 +119,7 @@ export function loadRiskDataset(raw: unknown): RiskDataset {
           return item;
         })
       : [],
+    productionApproved,
   };
 
   if (!Array.isArray(raw.snapshots) || !raw.snapshots.length) throw new Error("Risk dataset snapshots are required");
@@ -131,23 +165,58 @@ export function loadRiskDataset(raw: unknown): RiskDataset {
           const classification = requiredString(evidenceRaw, "classification", evidenceContext) as EvidenceClassification;
           if (!EVIDENCE_CLASSIFICATIONS.has(classification)) throw new Error(`${evidenceContext}.classification is unsupported`);
 
-          const sourceUrl = typeof evidenceRaw.sourceUrl === "string" ? evidenceRaw.sourceUrl : undefined;
-          const excerpt = typeof evidenceRaw.excerpt === "string" ? evidenceRaw.excerpt : undefined;
-          const page = typeof evidenceRaw.page === "number" && Number.isInteger(evidenceRaw.page) && evidenceRaw.page > 0
-            ? evidenceRaw.page
-            : undefined;
+          const sourceTypeRaw = optionalString(evidenceRaw, "sourceType");
+          const sourceType = sourceTypeRaw as EvidenceSourceType | undefined;
+          if (sourceType && !EVIDENCE_SOURCE_TYPES.has(sourceType)) {
+            throw new Error(`${evidenceContext}.sourceType is unsupported`);
+          }
+
+          const reviewMethodRaw = optionalString(evidenceRaw, "reviewMethod");
+          const reviewMethod = reviewMethodRaw as EvidenceReviewMethod | undefined;
+          if (reviewMethod && !EVIDENCE_REVIEW_METHODS.has(reviewMethod)) {
+            throw new Error(`${evidenceContext}.reviewMethod is unsupported`);
+          }
+
+          const sourceUrl = optionalString(evidenceRaw, "sourceUrl");
+          const excerpt = optionalString(evidenceRaw, "excerpt");
+          const page = validOptionalPage(evidenceRaw.page);
+          const publishedAt = optionalDate(evidenceRaw, "publishedAt", evidenceContext);
+          const reviewedAt = optionalDate(evidenceRaw, "reviewedAt", evidenceContext);
+          const reviewedBy = optionalString(evidenceRaw, "reviewedBy");
+
+          if (publishedAt && Date.parse(knownAt) < Date.parse(publishedAt)) {
+            throw new Error(`${evidenceContext}.publishedAt cannot be after observation knownAt`);
+          }
+          if (reviewedAt && Date.parse(reviewedAt) < Date.parse(knownAt)) {
+            throw new Error(`${evidenceContext}.reviewedAt cannot be before observation knownAt`);
+          }
 
           if (metadata.quality === "gold") {
             if (classification !== "confirmed") throw new Error(`${evidenceContext} must be confirmed in a gold dataset`);
+            if (sourceType !== "primary_regulatory" && sourceType !== "primary_manager") {
+              throw new Error(`${evidenceContext}.sourceType must be primary in a gold dataset`);
+            }
             if (!sourceUrl) throw new Error(`${evidenceContext}.sourceUrl is required in a gold dataset`);
+            if (!page) throw new Error(`${evidenceContext}.page is required in a gold dataset`);
             if (!excerpt) throw new Error(`${evidenceContext}.excerpt is required in a gold dataset`);
+            if (!publishedAt) throw new Error(`${evidenceContext}.publishedAt is required in a gold dataset`);
+            if (!reviewedAt) throw new Error(`${evidenceContext}.reviewedAt is required in a gold dataset`);
+            if (!reviewedBy) throw new Error(`${evidenceContext}.reviewedBy is required in a gold dataset`);
+            if (reviewMethod !== "manual_document_review") {
+              throw new Error(`${evidenceContext}.reviewMethod must be manual_document_review in a gold dataset`);
+            }
           }
 
           return {
             documentId: requiredString(evidenceRaw, "documentId", evidenceContext),
             sourceUrl,
+            sourceType,
             page,
             excerpt,
+            publishedAt,
+            reviewedAt,
+            reviewedBy,
+            reviewMethod,
             classification,
           };
         });
