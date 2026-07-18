@@ -5,9 +5,14 @@ on:
     paths:
       - ".github/workflows/risk-lab.yml"
       - "docs/risk-lab/**"
+      - "src/app/admin/risk-lab/**"
+      - "src/app/api/admin/system/risk-lab/**"
       - "src/lib/risk-lab/**"
+      - "src/lib/featureFlags.ts"
       - "src/types/riskLab.ts"
+      - "src/types/riskLabProduction.ts"
       - "tests/risk-lab-*.test.ts"
+      - "tests/risk-lab-*.test.mjs"
       - "package.json"
       - "package-lock.json"
   push:
@@ -16,9 +21,14 @@ on:
     paths:
       - ".github/workflows/risk-lab.yml"
       - "docs/risk-lab/**"
+      - "src/app/admin/risk-lab/**"
+      - "src/app/api/admin/system/risk-lab/**"
       - "src/lib/risk-lab/**"
+      - "src/lib/featureFlags.ts"
       - "src/types/riskLab.ts"
+      - "src/types/riskLabProduction.ts"
       - "tests/risk-lab-*.test.ts"
+      - "tests/risk-lab-*.test.mjs"
       - "package.json"
       - "package-lock.json"
 
