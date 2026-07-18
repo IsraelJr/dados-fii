@@ -103,10 +103,10 @@ export default function PortfolioNotificationPreferences() {
         <div className="mt-5 rounded-2xl bg-indigo-50/70 p-4 ring-1 ring-indigo-100">
           {preferences.isPaid ? (
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className="block flex-1 text-sm font-bold text-slate-700">
+              <label className="block w-full text-sm font-bold text-slate-700 sm:w-48">
                 Variação patrimonial para notificar
                 <span className="mt-1 flex items-center rounded-xl bg-white px-3 ring-1 ring-indigo-200">
-                  <input type="number" min={preferences.minimumPercent} max={preferences.maximumPercent} step="0.1" value={threshold.replace(",", ".")} onChange={(event) => setThreshold(event.target.value.replace(".", ","))} className="w-full bg-transparent py-3 text-base font-black text-slate-900 outline-none" />
+                  <input type="number" min={preferences.minimumPercent} max={preferences.maximumPercent} step="0.1" value={threshold.replace(",", ".")} onChange={(event) => setThreshold(event.target.value.replace(".", ","))} className="min-w-0 w-full bg-transparent py-3 text-base font-black text-slate-900 outline-none" />
                   <span className="font-black text-slate-500">%</span>
                 </span>
               </label>
