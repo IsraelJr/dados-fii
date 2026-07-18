@@ -1,4 +1,10 @@
-import type { EvidenceClassification, RiskFamily, RiskSnapshot } from "../../types/riskLab";
+import type {
+  EvidenceClassification,
+  MetricObservation,
+  MetricValue,
+  RiskFamily,
+  RiskSnapshot,
+} from "../../types/riskLab";
 
 export type DatasetQuality = "candidate" | "gold";
 
@@ -55,6 +61,12 @@ function validConfidence(value: unknown, context: string) {
   return value;
 }
 
+function validMetricValue(value: unknown, context: string): MetricValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  throw new Error(`${context} must be a finite number, string, boolean or null`);
+}
+
 export function loadRiskDataset(raw: unknown): RiskDataset {
   if (!isRecord(raw)) throw new Error("Risk dataset must be an object");
   if (!isRecord(raw.metadata)) throw new Error("Risk dataset metadata is required");
@@ -87,67 +99,75 @@ export function loadRiskDataset(raw: unknown): RiskDataset {
 
     const asOf = validDate(requiredString(candidate, "asOf", context), `${context}.asOf`);
     const structuralRiskScore = candidate.structuralRiskScore;
-    if (typeof structuralRiskScore !== "number" || structuralRiskScore < 0 || structuralRiskScore > 100) {
+    if (typeof structuralRiskScore !== "number" || !Number.isFinite(structuralRiskScore) || structuralRiskScore < 0 || structuralRiskScore > 100) {
       throw new Error(`${context}.structuralRiskScore must be between 0 and 100`);
     }
     if (!isRecord(candidate.observations)) throw new Error(`${context}.observations must be an object`);
 
-    const observations = Object.fromEntries(Object.entries(candidate.observations).map(([metricKey, observationRaw]) => {
-      const observationContext = `${context}.observations.${metricKey}`;
-      if (!isRecord(observationRaw)) throw new Error(`${observationContext} must be an object`);
-      const metric = requiredString(observationRaw, "metric", observationContext);
-      if (metric !== metricKey) throw new Error(`${observationContext}.metric must match its object key`);
+    const observations: Record<string, MetricObservation> = Object.fromEntries(
+      Object.entries(candidate.observations).map(([metricKey, observationRaw]) => {
+        const observationContext = `${context}.observations.${metricKey}`;
+        if (!isRecord(observationRaw)) throw new Error(`${observationContext} must be an object`);
+        const metric = requiredString(observationRaw, "metric", observationContext);
+        if (metric !== metricKey) throw new Error(`${observationContext}.metric must match its object key`);
 
-      const competenceDate = validDate(requiredString(observationRaw, "competenceDate", observationContext), `${observationContext}.competenceDate`);
-      const knownAt = validDate(requiredString(observationRaw, "knownAt", observationContext), `${observationContext}.knownAt`);
-      if (Date.parse(knownAt) > Date.parse(asOf)) throw new Error(`${observationContext} introduces look-ahead bias`);
+        const competenceDate = validDate(
+          requiredString(observationRaw, "competenceDate", observationContext),
+          `${observationContext}.competenceDate`,
+        );
+        const knownAt = validDate(
+          requiredString(observationRaw, "knownAt", observationContext),
+          `${observationContext}.knownAt`,
+        );
+        if (Date.parse(knownAt) > Date.parse(asOf)) throw new Error(`${observationContext} introduces look-ahead bias`);
 
-      if (!Array.isArray(observationRaw.evidence) || !observationRaw.evidence.length) {
-        throw new Error(`${observationContext}.evidence must contain at least one reference`);
-      }
-
-      const evidence = observationRaw.evidence.map((evidenceRaw, evidenceIndex) => {
-        const evidenceContext = `${observationContext}.evidence[${evidenceIndex}]`;
-        if (!isRecord(evidenceRaw)) throw new Error(`${evidenceContext} must be an object`);
-        const classification = requiredString(evidenceRaw, "classification", evidenceContext) as EvidenceClassification;
-        if (!EVIDENCE_CLASSIFICATIONS.has(classification)) throw new Error(`${evidenceContext}.classification is unsupported`);
-
-        const sourceUrl = typeof evidenceRaw.sourceUrl === "string" ? evidenceRaw.sourceUrl : undefined;
-        const excerpt = typeof evidenceRaw.excerpt === "string" ? evidenceRaw.excerpt : undefined;
-        const page = typeof evidenceRaw.page === "number" ? evidenceRaw.page : undefined;
-
-        if (metadata.quality === "gold") {
-          if (classification !== "confirmed") throw new Error(`${evidenceContext} must be confirmed in a gold dataset`);
-          if (!sourceUrl) throw new Error(`${evidenceContext}.sourceUrl is required in a gold dataset`);
-          if (!excerpt) throw new Error(`${evidenceContext}.excerpt is required in a gold dataset`);
+        if (!Array.isArray(observationRaw.evidence) || !observationRaw.evidence.length) {
+          throw new Error(`${observationContext}.evidence must contain at least one reference`);
         }
 
-        return {
-          documentId: requiredString(evidenceRaw, "documentId", evidenceContext),
-          sourceUrl,
-          page,
-          excerpt,
-          classification,
-        };
-      });
+        const evidence = observationRaw.evidence.map((evidenceRaw, evidenceIndex) => {
+          const evidenceContext = `${observationContext}.evidence[${evidenceIndex}]`;
+          if (!isRecord(evidenceRaw)) throw new Error(`${evidenceContext} must be an object`);
+          const classification = requiredString(evidenceRaw, "classification", evidenceContext) as EvidenceClassification;
+          if (!EVIDENCE_CLASSIFICATIONS.has(classification)) throw new Error(`${evidenceContext}.classification is unsupported`);
 
-      const confidence = validConfidence(observationRaw.confidence, `${observationContext}.confidence`);
-      if (metadata.quality === "gold" && confidence < 90) {
-        throw new Error(`${observationContext}.confidence must be at least 90 in a gold dataset`);
-      }
+          const sourceUrl = typeof evidenceRaw.sourceUrl === "string" ? evidenceRaw.sourceUrl : undefined;
+          const excerpt = typeof evidenceRaw.excerpt === "string" ? evidenceRaw.excerpt : undefined;
+          const page = typeof evidenceRaw.page === "number" && Number.isInteger(evidenceRaw.page) && evidenceRaw.page > 0
+            ? evidenceRaw.page
+            : undefined;
 
-      return [metricKey, {
-        metric,
-        value: observationRaw.value as RiskSnapshot["observations"][string] extends infer T
-          ? T extends { value: infer V } ? V : never
-          : never,
-        unit: typeof observationRaw.unit === "string" ? observationRaw.unit : undefined,
-        competenceDate,
-        knownAt,
-        confidence,
-        evidence,
-      }];
-    }));
+          if (metadata.quality === "gold") {
+            if (classification !== "confirmed") throw new Error(`${evidenceContext} must be confirmed in a gold dataset`);
+            if (!sourceUrl) throw new Error(`${evidenceContext}.sourceUrl is required in a gold dataset`);
+            if (!excerpt) throw new Error(`${evidenceContext}.excerpt is required in a gold dataset`);
+          }
+
+          return {
+            documentId: requiredString(evidenceRaw, "documentId", evidenceContext),
+            sourceUrl,
+            page,
+            excerpt,
+            classification,
+          };
+        });
+
+        const confidence = validConfidence(observationRaw.confidence, `${observationContext}.confidence`);
+        if (metadata.quality === "gold" && confidence < 90) {
+          throw new Error(`${observationContext}.confidence must be at least 90 in a gold dataset`);
+        }
+
+        return [metricKey, {
+          metric,
+          value: validMetricValue(observationRaw.value, `${observationContext}.value`),
+          unit: typeof observationRaw.unit === "string" ? observationRaw.unit : undefined,
+          competenceDate,
+          knownAt,
+          confidence,
+          evidence,
+        } satisfies MetricObservation];
+      }),
+    );
 
     return {
       ticker: requiredString(candidate, "ticker", context),
