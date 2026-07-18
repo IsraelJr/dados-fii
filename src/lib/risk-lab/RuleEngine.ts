@@ -39,7 +39,11 @@ function observationConfidence(observations: Record<string, MetricObservation | 
 }
 
 export class RiskRuleEngine {
-  constructor(private readonly rules: RiskRule[]) {}
+  private readonly rules: RiskRule[];
+
+  constructor(rules: RiskRule[]) {
+    this.rules = rules;
+  }
 
   evaluate(snapshot: RiskSnapshot, history: RiskSnapshot[] = []): RiskAssessment {
     this.assertNoLookAhead(snapshot);
