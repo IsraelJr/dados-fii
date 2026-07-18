@@ -40,6 +40,13 @@ function alertStyle(alert: AlertLevel) {
   return "bg-slate-100 text-slate-700 ring-slate-300";
 }
 
+function reportMetrics(report: RiskLabReport) {
+  const severity = report.assessment.deteriorationSeverityScore ?? report.assessment.deteriorationScore;
+  const evidenceConfidence = report.assessment.evidenceConfidence ?? report.assessment.confidence;
+  const thesisHealth = report.assessment.thesisHealthScore ?? Math.max(0, 100 - severity);
+  return { severity, evidenceConfidence, thesisHealth };
+}
+
 export default function RiskLabAdminPage() {
   const [status, setStatus] = useState<RiskLabAdminStatus | null>(null);
   const [report, setReport] = useState<RiskLabReport | null>(null);
@@ -84,6 +91,8 @@ export default function RiskLabAdminPage() {
     void loadStatus();
   }, []);
 
+  const metrics = report ? reportMetrics(report) : null;
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 md:px-8">
       <div className="mx-auto max-w-6xl">
@@ -92,7 +101,7 @@ export default function RiskLabAdminPage() {
             <div>
               <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-red-200"><Beaker size={15} /> Laboratório administrativo</p>
               <h1 className="mt-3 text-3xl font-black md:text-5xl">Risk Lab unitário</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200">Executa o marco histórico validado do HCTR11 com regras determinísticas e evidências primárias.</p>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200">Executa o marco histórico validado do HCTR11 com regras determinísticas, congeladas e evidências primárias.</p>
             </div>
             <Link href="/admin/sistema" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-slate-900"><ArrowLeft size={16} /> Voltar ao Admin</Link>
           </div>
@@ -116,7 +125,7 @@ export default function RiskLabAdminPage() {
             <div>
               <p className="text-xs font-extrabold uppercase tracking-widest text-red-700">Execução permitida</p>
               <h2 className="mt-2 text-3xl font-black text-slate-900">HCTR11 · 12/12/2024</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Um clique carrega somente o dataset ouro aprovado, aplica o motor v0.1.0, salva o relatório e registra a auditoria.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Um clique carrega somente o dataset ouro aprovado, aplica o motor v0.1.0 congelado, salva o relatório e registra a auditoria.</p>
             </div>
             <button
               type="button"
@@ -141,7 +150,7 @@ export default function RiskLabAdminPage() {
           ) : null}
         </section>
 
-        {report && (
+        {report && metrics && (
           <>
             <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -153,17 +162,22 @@ export default function RiskLabAdminPage() {
                 <span className={`rounded-full px-5 py-2 text-sm font-black uppercase ring-1 ${alertStyle(report.assessment.prudentialAlert)}`}>{report.assessment.prudentialAlert}</span>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <Small label="Deterioração" value={report.assessment.deteriorationAlert.toUpperCase()} />
                 <Small label="Risco estrutural" value={report.assessment.structuralRisk} />
-                <Small label="Confiança" value={`${report.assessment.confidence}%`} />
-                <Small label="Score" value={`${report.assessment.deteriorationScore}/100`} />
+                <Small label="Severidade · maior é pior" value={`${metrics.severity}/100`} />
+                <Small label="Saúde da tese · maior é melhor" value={`${metrics.thesisHealth}/100`} />
+                <Small label="Confiança nas evidências" value={`${metrics.evidenceConfidence}%`} />
+              </div>
+
+              <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200">
+                <strong>Confiança na gestão:</strong> não calculada neste piloto. A confiança de {metrics.evidenceConfidence}% mede a qualidade das fontes e do diagnóstico, não a qualidade do fundo ou da gestora.
               </div>
 
               <div className="mt-6 grid gap-5 lg:grid-cols-2">
                 <article className="rounded-2xl bg-red-50 p-5 ring-1 ring-red-100">
                   <h3 className="flex items-center gap-2 font-black text-red-900"><FileSearch size={18} /> Regras acionadas</h3>
-                  <div className="mt-3 space-y-3">{report.assessment.hits.map((hit) => <div key={hit.ruleId} className="rounded-xl bg-white p-3 text-sm ring-1 ring-red-100"><p className="font-black text-slate-900">{hit.ruleId} · {hit.title}</p><p className="mt-1 text-slate-700">{hit.message}</p><p className="mt-1 text-xs font-bold text-slate-500">Confiança {hit.confidence}%</p></div>)}</div>
+                  <div className="mt-3 space-y-3">{report.assessment.hits.map((hit) => <div key={hit.ruleId} className="rounded-xl bg-white p-3 text-sm ring-1 ring-red-100"><p className="font-black text-slate-900">{hit.ruleId} · {hit.title}</p><p className="mt-1 text-slate-700">{hit.message}</p><p className="mt-1 text-xs font-bold text-slate-500">Confiança da evidência {hit.confidence}%</p></div>)}</div>
                 </article>
 
                 <article className="rounded-2xl bg-indigo-50 p-5 ring-1 ring-indigo-100">
@@ -183,8 +197,8 @@ export default function RiskLabAdminPage() {
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
           <h2 className="flex items-center gap-2 text-2xl font-black text-slate-900"><History className="text-indigo-700" /> Histórico recente</h2>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600"><tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Fundo</th><th className="px-4 py-3">Alerta</th><th className="px-4 py-3">Confiança</th><th className="px-4 py-3">Dataset</th><th className="px-4 py-3">Responsável</th></tr></thead>
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600"><tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Fundo</th><th className="px-4 py-3">Alerta</th><th className="px-4 py-3">Confiança nas evidências</th><th className="px-4 py-3">Dataset</th><th className="px-4 py-3">Responsável</th></tr></thead>
               <tbody className="divide-y divide-slate-100">{(status?.recentReports || []).map((item) => <tr key={item.id}><td className="px-4 py-3">{dateTime(item.generatedAt)}</td><td className="px-4 py-3 font-black">{item.ticker}</td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-black uppercase ring-1 ${alertStyle(item.prudentialAlert)}`}>{item.prudentialAlert}</span></td><td className="px-4 py-3">{item.confidence}%</td><td className="px-4 py-3">v{item.datasetVersion}</td><td className="px-4 py-3">{item.generatedBy}</td></tr>)}{!status?.recentReports.length && <tr><td colSpan={6} className="px-4 py-8 text-center font-bold text-slate-500">Nenhuma execução persistida.</td></tr>}</tbody>
             </table>
           </div>
