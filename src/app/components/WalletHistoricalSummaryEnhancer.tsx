@@ -163,7 +163,7 @@ function applyHistoricalSummary() {
 
   const description = Array.from(section.querySelectorAll("p")).find((item) => textOf(item).includes("Resumo numérico e educativo"));
   if (description) {
-    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira.";
+    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira, considerando apenas os meses já encerrados.";
   }
 
   return true;
