@@ -138,13 +138,13 @@ test("fonte fora dos hosts oficiais é rejeitada", () => {
 });
 
 test("tipo de fonte secundária é rejeitado mesmo com URL oficial", () => {
-  const series = notices([1, 1, 1, 1, 1, 1, 0.8, 0.8, 0.8]) as Array<VerifiedDividendNotice & {
-    source: VerifiedDividendNotice["source"] & { sourceType: string };
+  const invalid = structuredClone(notices([1, 1, 1, 1, 1, 1, 0.8, 0.8, 0.8])) as unknown as Array<{
+    source: { sourceType: string };
   }>;
-  series[0].source.sourceType = "secondary";
+  invalid[0].source.sourceType = "secondary";
 
   assert.throws(
-    () => engine.detect(series as VerifiedDividendNotice[]),
+    () => engine.detect(invalid as unknown as VerifiedDividendNotice[]),
     /Tipo de fonte não autorizado/,
   );
 });
