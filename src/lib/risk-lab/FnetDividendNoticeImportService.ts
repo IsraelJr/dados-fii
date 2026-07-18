@@ -3,7 +3,6 @@ import {
   parseFnetDividendNoticeHtml,
   parseFnetProtocolHtml,
 } from "@/lib/risk-lab/FnetDividendNoticeParser";
-import { fnetNoticeCandidateStore } from "@/lib/risk-lab/FnetNoticeCandidateStore";
 import type {
   FnetDividendNoticePreview,
   FnetNoticeCandidateRepository,
@@ -65,7 +64,7 @@ async function fetchHtml(fetchImpl: typeof fetch, url: string) {
 
 export interface FnetDividendNoticeImportDependencies {
   fetchImpl?: typeof fetch;
-  repository?: FnetNoticeCandidateRepository;
+  repository: FnetNoticeCandidateRepository;
   now?: () => Date;
 }
 
@@ -74,9 +73,9 @@ export class FnetDividendNoticeImportService {
   private readonly repository: FnetNoticeCandidateRepository;
   private readonly now: () => Date;
 
-  constructor(dependencies: FnetDividendNoticeImportDependencies = {}) {
+  constructor(dependencies: FnetDividendNoticeImportDependencies) {
     this.fetchImpl = dependencies.fetchImpl || fetch;
-    this.repository = dependencies.repository || fnetNoticeCandidateStore;
+    this.repository = dependencies.repository;
     this.now = dependencies.now || (() => new Date());
   }
 
@@ -149,5 +148,3 @@ export class FnetDividendNoticeImportService {
     return this.repository.reject(candidateId.trim(), actor, reason);
   }
 }
-
-export const fnetDividendNoticeImportService = new FnetDividendNoticeImportService();
