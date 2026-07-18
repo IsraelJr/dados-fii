@@ -24,6 +24,7 @@ import WalletRiskReportCard from "../components/WalletRiskReportCard";
 import AppToast from "../components/AppToast";
 import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
 import PortfolioNotificationPreferences from "../components/PortfolioNotificationPreferences";
+import { buildWalletMonthlyDividendTotals } from "@/lib/walletDividendTotals";
 
 type WalletItem = { ticker: string; quotas: number };
 type LoadedFii = WalletItem & { data?: any; error?: string };
@@ -412,14 +413,32 @@ export default function WalletPage() {
     const now = new Date();
     const key = monthKey(now);
     const label = monthLabelFromKey(key);
+    const databaseDividendTotals = buildWalletMonthlyDividendTotals(insights.enriched, now);
 
     setSnapshots((currentSnapshots) => {
+      const byMonth = new Map(currentSnapshots.map((snapshot) => [snapshot.monthKey, snapshot]));
+      databaseDividendTotals.forEach((monthlyTotal) => {
+        const current = byMonth.get(monthlyTotal.monthKey);
+        byMonth.set(monthlyTotal.monthKey, {
+          monthKey: monthlyTotal.monthKey,
+          label: current?.label || monthLabelFromKey(monthlyTotal.monthKey),
+          totalValue: current?.totalValue || 0,
+          estimatedMonthlyIncome: monthlyTotal.value,
+          announcedMonthlyIncome: current?.announcedMonthlyIncome || monthlyTotal.value,
+          walletCount: items.length,
+          topWeightTicker: current?.topWeightTicker,
+          topIncomeTicker: current?.topIncomeTicker,
+          createdAt: current?.createdAt || now.toISOString(),
+          updatedAt: now.toISOString(),
+        });
+      });
       const current = currentSnapshots.find((item) => item.monthKey === key);
+      const currentMonthDividend = databaseDividendTotals.find((item) => item.monthKey === key)?.value;
       const nextSnapshot: WalletSnapshot = {
         monthKey: key,
         label,
         totalValue: insights.currentValue,
-        estimatedMonthlyIncome: insights.monthlyIncome,
+        estimatedMonthlyIncome: currentMonthDividend ?? insights.monthlyIncome,
         announcedMonthlyIncome: insights.announcedIncome,
         walletCount: items.length,
         topWeightTicker: insights.topWeight[0]?.ticker,
@@ -427,16 +446,18 @@ export default function WalletPage() {
         createdAt: current?.createdAt || now.toISOString(),
         updatedAt: now.toISOString(),
       };
-      const next = [...currentSnapshots.filter((item) => item.monthKey !== key), nextSnapshot].sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-60);
+      byMonth.set(key, nextSnapshot);
+      const next = Array.from(byMonth.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-60);
       if (snapshotSignature(next) === snapshotSignature(currentSnapshots)) return currentSnapshots;
       try {
         window.localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
+        window.dispatchEvent(new CustomEvent("dados-fii-wallet-snapshots-updated"));
       } catch {
         return currentSnapshots;
       }
       return next;
     });
-  }, [loading, items.length, insights.currentValue, insights.monthlyIncome, insights.announcedIncome, insights.topIncome, insights.topWeight]);
+  }, [loading, items.length, insights.currentValue, insights.monthlyIncome, insights.announcedIncome, insights.topIncome, insights.topWeight, insights.enriched]);
 
   const upcomingPayments = useMemo(() => getUpcomingPayments(loaded), [loaded]);
   const displayedUpcomingPayments = upcomingPayments.slice(0, 12);
