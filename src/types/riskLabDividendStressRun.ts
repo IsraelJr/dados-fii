@@ -5,6 +5,10 @@ export const DIVIDEND_STRESS_RULESET_VERSION = "dividend-stress-v0.1.0";
 
 export type DividendStressRunTicker = "MCCI11" | "RBRY11";
 
+export type DividendStressExecutionReadiness = Omit<DividendSeriesReadiness, "detectorExecuted"> & {
+  detectorExecuted: true;
+};
+
 export interface DividendStressRunExternalEffects {
   alertsCreated: false;
   notificationsSent: false;
@@ -24,7 +28,7 @@ export interface DividendStressRun {
   classificationFinal: false;
   limitations: ["material_credit_events_not_reviewed"];
   result: DividendStressWindow;
-  readiness: DividendSeriesReadiness;
+  readiness: DividendStressExecutionReadiness;
   externalEffects: DividendStressRunExternalEffects;
 }
 
