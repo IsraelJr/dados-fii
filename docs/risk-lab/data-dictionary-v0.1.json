@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0",
+  "metrics": [
+    { "name": "currentAssetsPercent", "type": "number", "unit": "percent", "families": ["credit_high_yield", "fiagro_credit", "fiinfra_credit"], "description": "Percentual da carteira classificado como em dia." },
+    { "name": "graceAssetsPercent", "type": "number", "unit": "percent", "families": ["credit_high_yield", "fiagro_credit", "fiinfra_credit"], "description": "Percentual da carteira em carência de juros ou principal." },
+    { "name": "defaultedAssetsPercent", "type": "number", "unit": "percent", "families": ["credit_high_yield", "fiagro_credit", "fiinfra_credit"], "description": "Percentual da carteira classificado como inadimplente." },
+    { "name": "cashResultPerShare", "type": "number", "unit": "BRL_PER_SHARE", "families": ["credit_high_yield", "development_equity", "fiagro_credit", "fiinfra_credit", "fiagro_land_equity"], "description": "Resultado caixa por cota do período." },
+    { "name": "dividendPerShare", "type": "number", "unit": "BRL_PER_SHARE", "families": ["credit_high_yield", "development_equity", "fiagro_credit", "fiinfra_credit", "fiagro_land_equity"], "description": "Distribuição por cota do período." },
+    { "name": "semesterCashResultPerShare", "type": "number", "unit": "BRL_PER_SHARE", "families": ["development_equity", "fiagro_land_equity"], "description": "Resultado caixa acumulado no semestre por cota." },
+    { "name": "semesterDistributionsPerShare", "type": "number", "unit": "BRL_PER_SHARE", "families": ["development_equity", "fiagro_land_equity"], "description": "Distribuições acumuladas no semestre por cota." },
+    { "name": "reservePerShare", "type": "number", "unit": "BRL_PER_SHARE", "families": ["development_equity", "credit_high_yield", "fiagro_credit", "fiinfra_credit", "fiagro_land_equity"], "description": "Reserva ou resultado não distribuído por cota." },
+    { "name": "guidanceDependsOnLiquidityEvent", "type": "boolean", "families": ["development_equity", "fiagro_land_equity"], "description": "Indica dependência explícita do guidance em venda, desinvestimento ou recebimento pontual." },
+    { "name": "liquidityEventDelayed", "type": "boolean", "families": ["development_equity", "fiagro_land_equity"], "description": "Indica que um evento de liquidez material não ocorreu no prazo comunicado." },
+    { "name": "positiveNavRevaluation", "type": "boolean", "families": ["development_equity", "fiagro_land_equity"], "description": "Indica reavaliação positiva do valor patrimonial no período." },
+    { "name": "materialDisclosureRemoved", "type": "boolean", "families": ["all"], "description": "Tabela ou métrica material deixou de ser publicada sem reconciliação." },
+    { "name": "methodologyChangedWithoutReconciliation", "type": "boolean", "families": ["all"], "description": "Definição de métrica mudou sem ponte comparativa suficiente." }
+  ]
+}

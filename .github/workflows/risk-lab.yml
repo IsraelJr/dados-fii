@@ -1,0 +1,81 @@
+name: Risk Lab CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/risk-lab.yml"
+      - "docs/risk-lab/**"
+      - "src/app/admin/risk-lab/**"
+      - "src/app/api/admin/system/risk-lab/**"
+      - "src/lib/risk-lab/**"
+      - "src/lib/featureFlags.ts"
+      - "src/types/riskLab.ts"
+      - "src/types/riskLabProduction.ts"
+      - "tests/risk-lab-*.test.ts"
+      - "tests/risk-lab-*.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/risk-lab.yml"
+      - "docs/risk-lab/**"
+      - "src/app/admin/risk-lab/**"
+      - "src/app/api/admin/system/risk-lab/**"
+      - "src/lib/risk-lab/**"
+      - "src/lib/featureFlags.ts"
+      - "src/types/riskLab.ts"
+      - "src/types/riskLabProduction.ts"
+      - "tests/risk-lab-*.test.ts"
+      - "tests/risk-lab-*.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: risk-lab-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --silent
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run Risk Lab tests
+        id: risk_tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:risk-lab 2>&1 | tee risk-lab-test.log
+
+      - name: Upload Risk Lab test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-test-report
+          path: risk-lab-test.log
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce Risk Lab test result
+        if: steps.risk_tests.outcome != 'success'
+        run: exit 1
