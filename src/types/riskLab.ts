@@ -84,8 +84,21 @@ export interface RiskAssessment {
   structuralRisk: StructuralRiskLevel;
   deteriorationAlert: AlertLevel;
   prudentialAlert: AlertLevel;
+
+  /** Quanto maior, pior. Mantido também em deteriorationScore por compatibilidade. */
+  deteriorationSeverityScore: number;
   deteriorationScore: number;
+
+  /** Quanto maior, melhor. É o complemento da severidade de deterioração neste piloto. */
+  thesisHealthScore: number;
+
+  /** Confiabilidade dos dados e do diagnóstico, não da qualidade do fundo ou da gestão. */
+  evidenceConfidence: number;
   confidence: number;
+
+  /** Não é calculado pelo piloto até existir uma metodologia própria de governança e execução. */
+  managementTrustScore: number | null;
+
   hits: RuleHit[];
 }
 
