@@ -65,9 +65,12 @@ test("gold seed keeps primary provenance and remains blocked from production", (
 
 test("gold HCTR11 seed reproduces the red distribution-without-result alert", () => {
   const [row] = backtest.run(goldDataset.snapshots).rows;
+  const criticalHit = row.hits.find((hit) => hit.ruleId === "HY-003");
+
   assert.equal(row.deteriorationAlert, "red");
-  assert.ok(row.hits.some((hit) => hit.ruleId === "HY-003"));
-  assert.equal(row.confidence, 99);
+  assert.ok(criticalHit);
+  assert.equal(criticalHit.confidence, 99);
+  assert.equal(row.confidence, 95);
 });
 
 test("gold datasets reject secondary evidence, missing pages and automated-only review", () => {
