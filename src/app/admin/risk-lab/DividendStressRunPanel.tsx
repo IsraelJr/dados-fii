@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -44,15 +44,16 @@ function dateTime(value?: string | null) {
 function resultLabel(value?: string | null) {
   if (value === "reversible_stress_confirmed") return "Estresse reversível matemático";
   if (value === "stress_without_recovery") return "Estresse sem recuperação";
-  if (value === "blocked_by_material_default") return "Bloqueado por evento de crédito";
+  if (value === "recovery_blocked_by_material_credit_event") {
+    return "Recuperação bloqueada por evento de crédito";
+  }
   if (value === "no_qualifying_stress") return "Sem estresse qualificável";
-  if (value === "insufficient_data") return "Dados insuficientes";
   return "Sem execução";
 }
 
 function statusStyle(value?: string | null) {
   if (value === "reversible_stress_confirmed") return "bg-amber-100 text-amber-950 ring-amber-300";
-  if (value === "stress_without_recovery" || value === "blocked_by_material_default") {
+  if (value === "stress_without_recovery" || value === "recovery_blocked_by_material_credit_event") {
     return "bg-red-100 text-red-950 ring-red-300";
   }
   if (value === "no_qualifying_stress") return "bg-emerald-100 text-emerald-950 ring-emerald-300";
@@ -213,8 +214,8 @@ export default function DividendStressRunPanel() {
   );
 }
 
-function Notice({ icon, text, warning = false }: { icon: React.ReactNode; text: string; warning?: boolean }) {
-  return <div className={`flex items-center gap-2 rounded-2xl p-3 text-sm font-bold ring-1 ${warning ? "bg-amber-50 text-amber-950 ring-amber-200" : "bg-emerald-50 text-emerald-950 ring-emerald-200"}`}>{icon}{text}</div>;
+function Notice({ icon, text, warning = false }: { icon: ReactNode; text: string; warning?: boolean }) {
+  return <div className={`flex items-center gap-2 rounded-2xl p-3 text-sm font-bold ring-1 ${warning ? "bg-amber-50 text-amber-950 ring-amber-200" : "bg-emerald-50 text-emerald-950 ring-emerald-200"}`}>{icon}<span>{text}</span></div>;
 }
 
 function Small({ label, value }: { label: string; value: string | number }) {
