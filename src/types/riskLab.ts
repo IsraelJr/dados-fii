@@ -10,13 +10,20 @@ export type AlertLevel = "green" | "yellow" | "orange" | "red" | "gray";
 export type StructuralRiskLevel = "low" | "moderate" | "high" | "very_high";
 export type RuleDimension = "structural" | "deterioration" | "transparency";
 export type EvidenceClassification = "confirmed" | "manager_declared" | "inferred" | "contradictory" | "unverifiable";
+export type EvidenceSourceType = "primary_regulatory" | "primary_manager" | "secondary";
+export type EvidenceReviewMethod = "manual_document_review" | "automated_extraction";
 export type MetricValue = number | string | boolean | null;
 
 export interface EvidenceReference {
   documentId: string;
   sourceUrl?: string;
+  sourceType?: EvidenceSourceType;
   page?: number;
   excerpt?: string;
+  publishedAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewMethod?: EvidenceReviewMethod;
   classification: EvidenceClassification;
 }
 
