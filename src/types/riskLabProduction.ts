@@ -37,6 +37,8 @@ export interface RiskLabReport {
   ruleSet: {
     version: string;
     contentHash: string;
+    status: "frozen_out_of_sample_validation";
+    frozenAt: string;
   };
   assessment: RiskAssessment;
   evidence: RiskLabEvidenceItem[];

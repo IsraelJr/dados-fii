@@ -30,19 +30,30 @@ test("runtime production dataset is identical to the reviewed gold document", ()
   assert.equal(riskLabContentHash(runtime), riskLabContentHash(documented));
 });
 
-test("admin unit report produces the validated HCTR11 red alert without Premium or notifications", () => {
+test("admin unit report produces the validated HCTR11 red alert with unambiguous metrics", () => {
   const report = buildRiskLabReport(PRODUCTION_RISK_DATASET_RAW, "hctr11", "ADMIN@example.com", fixedGeneratedAt);
   assert.equal(report.ticker, "HCTR11");
   assert.equal(report.assessment.prudentialAlert, "red");
   assert.equal(report.assessment.deteriorationAlert, "red");
+  assert.equal(report.assessment.deteriorationSeverityScore, 100);
+  assert.equal(report.assessment.deteriorationScore, 100);
+  assert.equal(report.assessment.thesisHealthScore, 0);
+  assert.equal(report.assessment.evidenceConfidence, 95);
+  assert.equal(report.assessment.confidence, 95);
+  assert.equal(report.assessment.managementTrustScore, null);
   assert.equal(report.assessment.hits.some((hit) => hit.ruleId === "HY-003"), true);
   assert.equal(report.evidence.length, 2);
   assert.equal(report.evidence.every((item) => item.sourceType === "primary_regulatory" && item.page === 3), true);
   assert.equal(report.dataset.scope, "admin_unit_test_only");
+  assert.equal(report.ruleSet.status, "frozen_out_of_sample_validation");
   assert.equal(report.premiumIntegrated, false);
   assert.equal(report.notificationsSent, false);
   assert.match(report.reportMarkdown, /HY-003/);
   assert.match(report.reportMarkdown, /não apresentou resultado no mês/i);
+  assert.match(report.reportMarkdown, /Severidade da deterioração:\*\* 100\/100/i);
+  assert.match(report.reportMarkdown, /Saúde estimada da tese:\*\* 0\/100/i);
+  assert.match(report.reportMarkdown, /Confiança nas evidências e no diagnóstico:\*\* 95%/i);
+  assert.match(report.reportMarkdown, /Confiança na gestão:\*\* não calculada/i);
   assert.match(report.id, /^risk-HCTR11-/);
 });
 
@@ -61,7 +72,7 @@ test("production builder blocks TGAR11 and unapproved data", () => {
   );
 });
 
-test("healthy high-yield control does not generate red", () => {
+test("healthy high-yield control keeps high thesis health without generating red", () => {
   const snapshot: RiskSnapshot = {
     ticker: "CTRL11",
     family: "credit_high_yield",
@@ -78,6 +89,9 @@ test("healthy high-yield control does not generate red", () => {
   const assessment = engine.evaluate(snapshot);
   assert.equal(assessment.deteriorationAlert, "green");
   assert.notEqual(assessment.prudentialAlert, "red");
+  assert.equal(assessment.deteriorationSeverityScore, 0);
+  assert.equal(assessment.thesisHealthScore, 100);
+  assert.equal(assessment.managementTrustScore, null);
 });
 
 test("reversible stressed control can become orange without being forced to red", () => {
@@ -97,5 +111,7 @@ test("reversible stressed control can become orange without being forced to red"
   const assessment = engine.evaluate(snapshot);
   assert.equal(assessment.deteriorationAlert, "orange");
   assert.equal(assessment.prudentialAlert, "orange");
+  assert.equal(assessment.deteriorationSeverityScore, 85);
+  assert.equal(assessment.thesisHealthScore, 15);
   assert.equal(assessment.hits.some((hit) => hit.ruleId === "HY-003"), false);
 });

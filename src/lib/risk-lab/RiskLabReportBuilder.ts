@@ -6,6 +6,8 @@ import { RiskRuleEngine } from "./RuleEngine";
 import { PILOT_RISK_RULES } from "./rules";
 
 export const RISK_LAB_RULESET_VERSION = "0.1.0";
+export const RISK_LAB_RULESET_STATUS = "frozen_out_of_sample_validation" as const;
+export const RISK_LAB_RULESET_FROZEN_AT = "2026-07-18T06:00:00.000Z";
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -26,6 +28,7 @@ function rulesFingerprint(rules: RiskRule[]) {
     id: rule.id,
     version: rule.version,
     title: rule.title,
+    description: rule.description,
     dimension: rule.dimension,
     alert: rule.alert,
     weight: rule.weight,
@@ -85,7 +88,7 @@ function prudentialAction(alert: RiskLabReport["assessment"]["prudentialAlert"])
 
 function buildMarkdown(report: Omit<RiskLabReport, "reportMarkdown">) {
   const rules = report.assessment.hits.length
-    ? report.assessment.hits.map((hit) => `- **${hit.ruleId} — ${hit.title}:** ${hit.message} (confiança ${hit.confidence}%)`).join("\n")
+    ? report.assessment.hits.map((hit) => `- **${hit.ruleId} — ${hit.title}:** ${hit.message} (confiança da evidência ${hit.confidence}%)`).join("\n")
     : "- Nenhuma regra acionada.";
   const evidence = report.evidence.length
     ? report.evidence.map((item) => `- **${item.metric}:** ${String(item.value)} ${item.unit || ""} — página ${item.page}. ${item.excerpt} Fonte: ${item.sourceUrl}`).join("\n")
@@ -97,12 +100,19 @@ function buildMarkdown(report: Omit<RiskLabReport, "reportMarkdown">) {
     `**Alerta prudencial:** ${report.assessment.prudentialAlert.toUpperCase()}\n\n` +
     `**Alerta de deterioração:** ${report.assessment.deteriorationAlert.toUpperCase()}\n\n` +
     `**Risco estrutural:** ${report.assessment.structuralRisk}\n\n` +
-    `**Confiança consolidada:** ${report.assessment.confidence}%\n\n` +
+    `**Severidade da deterioração:** ${report.assessment.deteriorationSeverityScore}/100 — quanto maior, pior\n\n` +
+    `**Saúde estimada da tese:** ${report.assessment.thesisHealthScore}/100 — quanto maior, melhor\n\n` +
+    `**Confiança nas evidências e no diagnóstico:** ${report.assessment.evidenceConfidence}%\n\n` +
+    `**Confiança na gestão:** não calculada neste piloto\n\n` +
+    `**Regras congeladas:** v${report.ruleSet.version}, desde ${report.ruleSet.frozenAt}\n\n` +
     `## Regras acionadas\n\n${rules}\n\n` +
     `## Evidências verificadas\n\n${evidence}\n\n` +
     `## Ação prudencial\n\n${prudentialAction(report.assessment.prudentialAlert)}\n\n` +
     `## Limitações\n\n` +
     `- Este relatório reproduz um marco histórico já validado; não representa uma análise corrente do fundo.\n` +
+    `- A confiança exibida mede a confiabilidade das evidências e do diagnóstico, não a qualidade do fundo ou da gestão.\n` +
+    `- A nota de saúde da tese é derivada da severidade de deterioração e ainda não incorpora uma nota própria de governança.\n` +
+    `- As regras v${report.ruleSet.version} estão congeladas para validação fora da amostra.\n` +
     `- Não está integrado ao Relatório Premium.\n` +
     `- Não envia notificações e não altera nenhuma recomendação pública.\n` +
     `- A decisão de investimento continua sendo do investidor.\n`;
@@ -160,6 +170,8 @@ export function buildRiskLabReport(
     ruleSet: {
       version: RISK_LAB_RULESET_VERSION,
       contentHash: ruleSetHash,
+      status: RISK_LAB_RULESET_STATUS,
+      frozenAt: RISK_LAB_RULESET_FROZEN_AT,
     },
     assessment,
     evidence,
