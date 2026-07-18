@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "id": "gold-hctr-tgar-v0.1",
+    "version": "0.1.0",
+    "quality": "gold",
+    "createdAt": "2026-07-18T02:30:00-03:00",
+    "description": "Primeiro seed ouro do Risk Lab. Contém somente observações conferidas diretamente em documento primário oficial e com trilha de revisão registrada.",
+    "limitations": [
+      "Nesta versão, somente o evento HCTR11 de 12/12/2024 foi promovido para gold.",
+      "As métricas de carteira do HCTR11 em outubro de 2024 permanecem no dataset candidate até conferência direta do relatório gerencial oficial.",
+      "As observações do TGAR11 permanecem no dataset candidate até validação página a página dos documentos primários.",
+      "O dataset ainda não está aprovado para uso público em produção; falta revisão humana final e inclusão de fundos de controle."
+    ],
+    "productionApproved": false
+  },
+  "snapshots": [
+    {
+      "ticker": "HCTR11",
+      "family": "credit_high_yield",
+      "asOf": "2024-12-12T15:54:00-03:00",
+      "structuralRiskScore": 95,
+      "observations": {
+        "cashResultPerShare": {
+          "metric": "cashResultPerShare",
+          "value": 0,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-11-30T23:59:59-03:00",
+          "knownAt": "2024-12-12T15:54:00-03:00",
+          "confidence": 99,
+          "evidence": [
+            {
+              "documentId": "hctr-fr-2024-12-12-799507",
+              "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=799507",
+              "sourceType": "primary_regulatory",
+              "page": 3,
+              "excerpt": "comunicou que o Fundo não apresentou resultado no mês.",
+              "publishedAt": "2024-12-12T15:54:00-03:00",
+              "reviewedAt": "2026-07-18T02:30:00-03:00",
+              "reviewedBy": "openai-gpt-5.6-thinking",
+              "reviewMethod": "manual_document_review",
+              "classification": "confirmed"
+            }
+          ]
+        },
+        "dividendPerShare": {
+          "metric": "dividendPerShare",
+          "value": 0.37,
+          "unit": "BRL_PER_SHARE",
+          "competenceDate": "2024-11-30T23:59:59-03:00",
+          "knownAt": "2024-12-12T15:54:00-03:00",
+          "confidence": 99,
+          "evidence": [
+            {
+              "documentId": "hctr-fr-2024-12-12-799507",
+              "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=799507",
+              "sourceType": "primary_regulatory",
+              "page": 3,
+              "excerpt": "o valor de R$ 0,37 por cota ser consoante com o resultado caixa obtido pelo Fundo ao longo do semestre",
+              "publishedAt": "2024-12-12T15:54:00-03:00",
+              "reviewedAt": "2026-07-18T02:30:00-03:00",
+              "reviewedBy": "openai-gpt-5.6-thinking",
+              "reviewMethod": "manual_document_review",
+              "classification": "confirmed"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
