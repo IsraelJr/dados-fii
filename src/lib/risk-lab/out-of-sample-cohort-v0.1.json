@@ -1,0 +1,133 @@
+{
+  "metadata": {
+    "id": "risk-lab-credit-oos-v0.1",
+    "version": "0.1.0",
+    "rulesetVersion": "0.1.0",
+    "status": "pre_registered_pending_primary_verification",
+    "registeredAt": "2026-07-18T00:00:00-03:00",
+    "family": "credit_high_yield",
+    "executionAllowed": false,
+    "blockReason": "As datas objetivas dos eventos e janelas de estresse ainda precisam ser verificadas em fontes primárias antes de qualquer backtest.",
+    "selectionPolicy": "Dois casos graves, dois controles saudáveis e dois casos de estresse reversível, todos escolhidos antes da extração dos documentos e sem participação de HCTR11 ou TGAR11.",
+    "prohibitedActions": [
+      "alterar o ruleset v0.1.0 durante esta rodada",
+      "iniciar extração antes de congelar datas e fontes primárias",
+      "substituir um fundo depois de observar o resultado do motor",
+      "mudar a definição do evento depois do backtest",
+      "tratar ausência de dado como zero",
+      "usar documentos publicados após a data simulada"
+    ]
+  },
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "family": "credit_high_yield",
+      "role": "severe_deterioration",
+      "analysisWindow": {
+        "start": "2021-01-01",
+        "end": null
+      },
+      "hypothesis": "O ruleset congelado deve produzir sinais de deterioração antes do evento material, sem usar informações posteriores.",
+      "bomb": {
+        "type": "material_credit_deterioration",
+        "definition": "Primeiro documento primário que confirme default, inadimplência, impairment ou reestruturação material afetando pelo menos 10% do patrimônio, ou corte recorrente de rendimento igual ou superior a 30% versus a mediana dos seis meses anteriores quando atribuído a perda de crédito.",
+        "eventDate": null,
+        "status": "pending_primary_source",
+        "primarySourceUrl": null
+      },
+      "stress": null,
+      "healthyControlCriterion": null,
+      "dataExtractionStarted": false
+    },
+    {
+      "ticker": "VSLH11",
+      "family": "credit_high_yield",
+      "role": "severe_deterioration",
+      "analysisWindow": {
+        "start": "2021-01-01",
+        "end": null
+      },
+      "hypothesis": "O ruleset congelado deve produzir sinais de deterioração antes do evento material, sem usar informações posteriores.",
+      "bomb": {
+        "type": "material_credit_deterioration",
+        "definition": "Primeiro documento primário que confirme default, inadimplência, impairment ou reestruturação material afetando pelo menos 10% do patrimônio, ou corte recorrente de rendimento igual ou superior a 30% versus a mediana dos seis meses anteriores quando atribuído a perda de crédito.",
+        "eventDate": null,
+        "status": "pending_primary_source",
+        "primarySourceUrl": null
+      },
+      "stress": null,
+      "healthyControlCriterion": null,
+      "dataExtractionStarted": false
+    },
+    {
+      "ticker": "KNCR11",
+      "family": "credit_high_yield",
+      "role": "healthy_control",
+      "analysisWindow": {
+        "start": "2022-01-01",
+        "end": "2025-12-31"
+      },
+      "hypothesis": "Um controle saudável não deve receber alerta vermelho e só pode receber laranja quando houver evidência primária material.",
+      "bomb": null,
+      "stress": null,
+      "healthyControlCriterion": "Ausência de default material não resolvido, ausência de distribuição recorrente sem cobertura de caixa e ausência de alerta vermelho durante toda a janela.",
+      "dataExtractionStarted": false
+    },
+    {
+      "ticker": "KNSC11",
+      "family": "credit_high_yield",
+      "role": "healthy_control",
+      "analysisWindow": {
+        "start": "2022-01-01",
+        "end": "2025-12-31"
+      },
+      "hypothesis": "Um controle saudável não deve receber alerta vermelho e só pode receber laranja quando houver evidência primária material.",
+      "bomb": null,
+      "stress": null,
+      "healthyControlCriterion": "Ausência de default material não resolvido, ausência de distribuição recorrente sem cobertura de caixa e ausência de alerta vermelho durante toda a janela.",
+      "dataExtractionStarted": false
+    },
+    {
+      "ticker": "MCCI11",
+      "family": "credit_high_yield",
+      "role": "reversible_stress",
+      "analysisWindow": {
+        "start": "2022-01-01",
+        "end": "2025-12-31"
+      },
+      "hypothesis": "O motor pode reconhecer estresse temporário sem produzir vermelho persistente quando a cobertura e a carteira se recuperam.",
+      "bomb": null,
+      "stress": {
+        "definition": "Queda de pelo menos 20% na média de rendimentos de três meses versus a mediana dos seis meses anteriores, seguida de recuperação da média de três meses para pelo menos 90% da referência sem default material reconhecido.",
+        "stressStart": null,
+        "stressEnd": null,
+        "recoveryDate": null,
+        "status": "pending_primary_source",
+        "primarySourceUrls": []
+      },
+      "healthyControlCriterion": null,
+      "dataExtractionStarted": false
+    },
+    {
+      "ticker": "RBRY11",
+      "family": "credit_high_yield",
+      "role": "reversible_stress",
+      "analysisWindow": {
+        "start": "2022-01-01",
+        "end": "2025-12-31"
+      },
+      "hypothesis": "O motor pode reconhecer estresse temporário sem produzir vermelho persistente quando a cobertura e a carteira se recuperam.",
+      "bomb": null,
+      "stress": {
+        "definition": "Queda de pelo menos 20% na média de rendimentos de três meses versus a mediana dos seis meses anteriores, seguida de recuperação da média de três meses para pelo menos 90% da referência sem default material reconhecido.",
+        "stressStart": null,
+        "stressEnd": null,
+        "recoveryDate": null,
+        "status": "pending_primary_source",
+        "primarySourceUrls": []
+      },
+      "healthyControlCriterion": null,
+      "dataExtractionStarted": false
+    }
+  ]
+}
