@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const engine = readFileSync(new URL("../src/lib/portfolioNotificationEngine.ts", import.meta.url), "utf8");
+const preferencesRoute = readFileSync(new URL("../src/app/api/wallet/notification-preferences/route.ts", import.meta.url), "utf8");
+const preferencesUi = readFileSync(new URL("../src/app/components/PortfolioNotificationPreferences.tsx", import.meta.url), "utf8");
+const walletLayout = readFileSync(new URL("../src/app/carteira/layout.tsx", import.meta.url), "utf8");
+const walletUxEnhancer = readFileSync(new URL("../src/app/components/WalletPageUxEnhancer.tsx", import.meta.url), "utf8");
 
 test("portfolio notifications consolidate every event from one run into one email", () => {
   assert.match(engine, /const queuedEmails: QueuedEmailNotification\[\]/);
@@ -20,4 +24,29 @@ test("concentration transitions compare stable identities and previous percentag
   assert.match(engine, /RISK_ACTIVATION_BUFFER_PERCENT/);
   assert.match(engine, /RISK_RESOLUTION_BUFFER_PERCENT/);
   assert.doesNotMatch(engine, /previousRiskFlags\.includes\(item\.id\)/);
+});
+
+test("unchanged dividends suppress scheduled summaries and patrimony uses a stable threshold reference", () => {
+  assert.match(engine, /changedDividendTickers/);
+  assert.match(engine, /portfolioValueChangeDecision/);
+  assert.match(engine, /patrimonyReferenceValue/);
+  assert.match(engine, /walletFingerprint/);
+  assert.match(engine, /emailEligible: false/);
+  assert.doesNotMatch(engine, /scheduleIsDue/);
+  assert.doesNotMatch(engine, /digestDue/);
+});
+
+test("paid patrimony threshold is authenticated, resolved on the server and configurable in the wallet", () => {
+  assert.match(preferencesRoute, /WalletSessions/);
+  assert.match(preferencesRoute, /paidPlanFromRecord\(user\.data\)/);
+  assert.match(preferencesRoute, /notificationPreferences\.patrimonyChangeThresholdPercent/);
+  assert.doesNotMatch(preferencesRoute, /body\?\.(?:isPaid|isPremium|isVip)/);
+  assert.match(preferencesUi, /Variação patrimonial para notificar/);
+  assert.match(preferencesUi, /plano Grátis/i);
+});
+
+test("wallet quick numbers are not overwritten by browser-only monthly snapshots", () => {
+  assert.doesNotMatch(walletLayout, /WalletHistoricalSummaryEnhancer/);
+  assert.doesNotMatch(walletUxEnhancer, /replaceDividendExtremesSummary/);
+  assert.doesNotMatch(walletUxEnhancer, /dados-fii-wallet-monthly-snapshots-v1/);
 });

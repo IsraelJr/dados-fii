@@ -1,6 +1,6 @@
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 4.0.0  
+**Versão:** 4.1.0  
 **Data:** 16/07/2026
 
 > Este documento substitui todos os planejamentos anteriores quando houver divergência.
@@ -17,7 +17,7 @@ Sempre que houver divergência entre documentos, conversas, prompts ou planejame
 
 ### Status geral
 
-**Fases 1 e 2 implementadas; aceite global reaberto pelo gate de qualidade de dados**
+**Fases 1 e 2 concluídas e validadas em Produção**
 
 Situação atual:
 
@@ -30,13 +30,14 @@ Situação atual:
 - QA operacional
 - CI existente
 - Arquitetura de serviços pronta para evolução
-- Catálogo normalizado B3/CVM implementado e auditado localmente
+- Catálogo normalizado B3/CVM publicado e validado
+- Relatórios, IA, observabilidade e notificações operacionais em Produção
 
-A avaliação anterior foi otimista ao considerar componentes funcionais e alguns fundos sentinela como prova de conclusão. A partir desta versão, uma fase só recebe aceite total depois de cobertura integral do universo aplicável, deploy, carga protegida, double check pós-carga e homologação de relatórios/IA. O código do hardening está pronto, mas a carga e a auditoria final de Produção ainda estão pendentes.
+A avaliação anterior foi otimista ao considerar componentes funcionais e alguns fundos sentinela como prova de conclusão. A partir desta versão, uma fase só recebe aceite total depois de cobertura integral do universo aplicável, deploy, carga protegida, double check pós-carga e homologação de relatórios/IA. O responsável pelo produto confirmou o aceite da Fase 2 em 16/07/2026; as exceções externas documentadas continuam monitoradas e não anulam o aceite.
 
 ---
 
-## 2. Fase concluída
+## 2. Fases concluídas
 
 ### Fase 1 — Regulatory Engine
 
@@ -65,15 +66,31 @@ Fundos utilizados na homologação:
 
 Todos aprovados.
 
+### Fase 2 — Serviços, inteligência e produto
+
+**Concluída e validada em Produção:**
+
+- RegulatoryDataService
+- Score Engine
+- Health e Validation
+- Dashboard Administrativo
+- Timeline Regulatória
+- Relatório Gratuito
+- AI Insights Engine
+- Relatório Premium
+- Observabilidade
+- Monitor Automático
+- Catálogo normalizado e Data Quality Hardening
+
 ---
 
 ## 3. Sprint atual
 
-### Gate transversal — Data Quality Hardening
+### Transição para a Fase 3 — Notificações e Radar Inteligente
 
-**Objetivo:** normalizar, conciliar, completar e auditar o catálogo inteiro antes de encerrar as Fases 1 e 2.
+**Objetivo atual:** reduzir ruído nas notificações da carteira e preparar o Radar Inteligente com regras comerciais seguras.
 
-**Status:** código e auditoria externa local concluídos; integração, deploy, aplicação administrativa e double check de Produção pendentes.
+**Status:** Fase 2 validada; política de notificações em aprimoramento antes da Sprint 3.1.
 
 **Auditoria de 16/07/2026:**
 
@@ -105,6 +122,9 @@ Detalhes, fontes, contrato, custos e procedimento: `docs/data-quality-hardening.
 | 2.9 | Relatório Premium |
 | 2.10 | Observabilidade |
 | 2.11 | Monitor Automático |
+| 3.1 | Radar Inteligente — acompanhamento, cotas por plano e segurança |
+| 3.2 | Inteligência do Radar — eventos e mudanças de tese |
+| 3.3 | Experiência, preferências e monetização |
 
 ---
 
@@ -427,12 +447,10 @@ Além dos sentinelas, todo fechamento de fase exige auditoria do universo comple
 
 ### Alta prioridade
 
-- integrar o Data Quality Hardening ao branch principal e validar o CI;
-- confirmar o deploy de Produção;
-- gerar a prévia do catálogo no Admin e revisar 511/511, inativações e exceções;
-- aplicar a carga protegida por hash e backup;
-- executar o double check pós-carga;
-- homologar relatório gratuito, Premium, scores e IA com fundos de tipos e níveis de completude diferentes;
+- substituir notificações periódicas sem mudança por eventos reais de rendimento ou variação patrimonial relevante;
+- manter 3% como limite patrimonial fixo no Grátis e permitir configuração autenticada nos planos pagos;
+- implementar a Sprint 3.1 do Radar Inteligente, com plano resolvido exclusivamente no servidor;
+- aplicar as cotas de 1 fundo por ciclo no Grátis e 10 no Premium;
 - manter as 11 exceções essenciais visíveis e acompanhar novas competências CVM para preenchimento futuro.
 
 ### Decisões abertas
@@ -455,6 +473,7 @@ As seguintes decisões passam a substituir planejamentos anteriores:
 6. Cobertura parcial ou homologação por poucos fundos não autoriza mais declarar uma fase totalmente concluída.
 7. Quantidade de cotas, patrimônio e cotistas são snapshots datados, não campos cadastrais fixos.
 8. A ausência de dado externo é `null` com aviso; nunca zero, risco do fundo ou inferência negativa da IA.
+9. Notificações da carteira são orientadas a eventos: sem mudança de rendimento, só há aviso patrimonial ao atingir o limite acumulado; o plano e o limite são resolvidos no servidor.
 
 ---
 

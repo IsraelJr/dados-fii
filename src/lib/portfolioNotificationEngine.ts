@@ -3,6 +3,12 @@ import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { logObservabilityEvent } from "@/lib/observability";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
 import { extractUserWallet } from "@/lib/userWallet";
+import { paidPlanFromRecord } from "@/lib/productPlans";
+import {
+  PORTFOLIO_NOTIFICATION_POLICY_VERSION,
+  patrimonyThresholdPercent,
+  portfolioValueChangeDecision,
+} from "@/lib/portfolioNotificationPolicy";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -48,6 +54,7 @@ type NotificationInput = {
   emailSubject?: string;
   emailText?: string;
   emailHtml?: string;
+  emailEligible?: boolean;
 };
 type RiskFlag = {
   id: string;
@@ -73,8 +80,6 @@ type QueuedEmailNotification = {
 type LocalDateParts = {
   year: number;
   month: number;
-  day: number;
-  weekday: number;
   dateKey: string;
 };
 
@@ -142,9 +147,7 @@ function localDateParts(date = new Date()): LocalDateParts {
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   const year = Number(map.year);
   const month = Number(map.month);
-  const day = Number(map.day);
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return { year, month, day, weekday, dateKey: `${map.year}-${map.month}-${map.day}` };
+  return { year, month, dateKey: `${map.year}-${map.month}-${map.day}` };
 }
 
 function parseBrDate(value: string) {
@@ -154,16 +157,14 @@ function parseBrDate(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function daysBetweenDateKeys(start: string, end: string) {
-  const startDate = new Date(`${start}T00:00:00Z`);
-  const endDate = new Date(`${end}T00:00:00Z`);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return Number.POSITIVE_INFINITY;
-  return Math.floor((endDate.getTime() - startDate.getTime()) / 86400000);
+function isVipUser(data: any) {
+  return paidPlanFromRecord(data || {}) !== null;
 }
 
-function isVipUser(data: any) {
-  const plan = String(data?.plan || data?.subscription?.plan || "").toLowerCase();
-  return Boolean(data?.isVip || data?.isVIP || data?.isPremium || data?.premium || ["vip", "premium", "pro"].includes(plan));
+function walletFingerprint(wallet: WalletItem[]) {
+  return hash(JSON.stringify([...wallet]
+    .sort((left, right) => left.ticker.localeCompare(right.ticker))
+    .map((item) => ({ ticker: item.ticker, quotas: item.quotas }))));
 }
 
 async function loadFiiMap(tickers: string[]) {
@@ -532,27 +533,6 @@ function notificationPreferences(data: any) {
   return data?.notificationPreferences && typeof data.notificationPreferences === "object" ? data.notificationPreferences : {};
 }
 
-function scheduleIsDue(scheduleValue: string, lastDigestDate: string, now: LocalDateParts) {
-  if (lastDigestDate === now.dateKey) return false;
-  const schedule = String(scheduleValue || "daily").trim().toLowerCase();
-  if (!schedule || schedule === "daily") return true;
-  if (schedule === "even_days") return now.day % 2 === 0;
-  if (schedule === "odd_days") return now.day % 2 !== 0;
-  if (schedule.startsWith("weekly:")) {
-    const weekday = Number(schedule.split(":")[1]);
-    return Number.isFinite(weekday) && now.weekday === weekday;
-  }
-  if (schedule.startsWith("weekdays:")) {
-    const weekdays = schedule.split(":")[1].split(",").map(Number).filter(Number.isFinite);
-    return weekdays.includes(now.weekday);
-  }
-  if (schedule.startsWith("every:")) {
-    const interval = Math.max(Number(schedule.split(":")[1]) || 1, 1);
-    return !lastDigestDate || daysBetweenDateKeys(lastDigestDate, now.dateKey) >= interval;
-  }
-  return true;
-}
-
 function findNextPayment(positions: PortfolioPosition[]) {
   const now = new Date();
   const candidates = positions.flatMap((position) => position.records.map((record) => ({
@@ -601,6 +581,30 @@ function digestNotification(positions: PortfolioPosition[], isVip: boolean, date
     emailSubject: "[Dados FII] Resumo da sua carteira",
     emailText: message,
     emailHtml: baseEmailHtml("Resumo da sua carteira", message, "/carteira", extraHtml),
+  };
+}
+
+function patrimonyChangeNotification(decision: ReturnType<typeof portfolioValueChangeDecision>, referenceDate: string, dateKey: string): NotificationInput {
+  const changePercent = Number(decision.changePercent || 0);
+  const referenceValue = Number(decision.referenceValue || 0);
+  const rose = decision.direction === "up";
+  const directionLabel = rose ? "subiu" : "caiu";
+  const message = `O patrimônio estimado da carteira ${directionLabel} ${formatPercent(Math.abs(changePercent))}, de ${formatCurrency(referenceValue)} para ${formatCurrency(decision.currentValue)}. O aviso foi gerado ao atingir o limite de ${formatPercent(decision.thresholdPercent)} configurado para sua conta. A comparação mantém as mesmas quantidades de cotas e usa as cotações disponíveis em cada leitura.`;
+  return {
+    type: "portfolio_value_change",
+    eventKey: `patrimony:${referenceDate || "baseline"}:${dateKey}:${decision.direction}:${Math.round(decision.currentValue * 100)}`,
+    title: `Patrimônio da carteira ${directionLabel} ${formatPercent(Math.abs(changePercent))}`,
+    message,
+    severity: rose ? "success" : "warning",
+    actionUrl: "/carteira",
+    portfolioImpact: {
+      previousValue: referenceValue,
+      currentValue: decision.currentValue,
+      changePercent,
+      thresholdPercent: decision.thresholdPercent,
+      referenceDate: referenceDate || null,
+    },
+    emailEligible: false,
   };
 }
 
@@ -655,16 +659,23 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       const created = await createNotification(userRef, input);
       if (!created.created) return false;
       notificationsCreated += 1;
-      if (emailEnabled) queuedEmails.push({ ref: created.ref, input });
+      if (emailEnabled && input.emailEligible !== false) queuedEmails.push({ ref: created.ref, input });
       return true;
     };
 
-    for (const position of scope) {
+    const changedDividendTickers = new Set<string>();
+    for (const position of positions) {
       const currentHash = dividendHash(position);
       if (!currentHash) continue;
       const previousHash = previousDividendHashes[position.ticker] || "";
       nextDividendHashes[position.ticker] = currentHash;
-      if (!initialized || !previousHash || previousHash === currentHash || !dividendAlertsEnabled) continue;
+      if (initialized && previousHash && previousHash !== currentHash) changedDividendTickers.add(position.ticker);
+    }
+
+    const dividendChangesInScope = dividendAlertsEnabled
+      ? scope.filter((position) => changedDividendTickers.has(position.ticker))
+      : [];
+    for (const position of dividendChangesInScope) {
       await queueNotification(dividendNotification(position, totalEstimatedIncome, isVip));
     }
 
@@ -717,17 +728,40 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       }
     }
 
-    const schedule = isVip
-      ? String(preferences.digestSchedule || process.env.PORTFOLIO_DIGEST_SCHEDULE || "daily")
-      : "weekly:5";
+    const schedule = "event-driven";
     const digestEnabled = preferences.digestEnabled !== false && envBoolean("PORTFOLIO_DIGEST_ENABLED", true);
-    const digestDue = digestEnabled && scheduleIsDue(schedule, String(state.lastDigestDate || ""), now);
+    const patrimonyAlertsEnabled = preferences.patrimonyAlerts !== false;
+    const thresholdPercent = patrimonyThresholdPercent(isVip, preferences.patrimonyChangeThresholdPercent);
+    const currentWalletFingerprint = walletFingerprint(wallet);
+    const currentPortfolioValue = positions.reduce((sum, position) => sum + position.currentValue, 0);
+    const dividendEventDetected = dividendAlertsEnabled && changedDividendTickers.size > 0;
+    const patrimonyConfigurationChanged = !initialized
+      || Number(state.patrimonyPolicyVersion || 0) !== PORTFOLIO_NOTIFICATION_POLICY_VERSION
+      || String(state.walletFingerprint || "") !== currentWalletFingerprint
+      || Number(state.patrimonyChangeThresholdPercent || 0) !== thresholdPercent;
+    const patrimonyDecision = portfolioValueChangeDecision({
+      currentValue: currentPortfolioValue,
+      referenceValue: state.patrimonyReferenceValue,
+      thresholdPercent,
+      dataComplete: completeRiskData,
+      dividendChanged: dividendEventDetected,
+      configurationChanged: patrimonyConfigurationChanged,
+    });
     let digestSent = false;
     let nextLastDigestDate = String(state.lastDigestDate || "");
+    let nextPatrimonyReferenceValue = Number(state.patrimonyReferenceValue || 0) || null;
+    let nextPatrimonyReferenceDate = String(state.patrimonyReferenceDate || "");
 
-    if (digestDue) {
+    if (dividendEventDetected && digestEnabled && dividendChangesInScope.length === 0) {
       await queueNotification(digestNotification(positions, isVip, now.dateKey));
       nextLastDigestDate = now.dateKey;
+    } else if (!dividendEventDetected && patrimonyAlertsEnabled && patrimonyDecision.shouldNotify) {
+      await queueNotification(patrimonyChangeNotification(patrimonyDecision, nextPatrimonyReferenceDate, now.dateKey));
+    }
+
+    if (patrimonyDecision.shouldRebaseline) {
+      nextPatrimonyReferenceValue = patrimonyDecision.currentValue;
+      nextPatrimonyReferenceDate = now.dateKey;
     }
 
     if (emailEnabled && queuedEmails.length) {
@@ -750,6 +784,14 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       riskFlags: Object.values(nextRiskState).map((item) => `${item.type}:${item.key}:${item.threshold}`),
       lastDigestDate: nextLastDigestDate || null,
       digestSchedule: schedule,
+      patrimonyPolicyVersion: PORTFOLIO_NOTIFICATION_POLICY_VERSION,
+      patrimonyChangeThresholdPercent: thresholdPercent,
+      patrimonyReferenceValue: nextPatrimonyReferenceValue,
+      patrimonyReferenceDate: nextPatrimonyReferenceDate || null,
+      patrimonyLastEvaluatedValue: completeRiskData ? currentPortfolioValue : null,
+      patrimonyLastEvaluatedChangePercent: patrimonyDecision.changePercent,
+      patrimonyLastDecision: patrimonyDecision.reason,
+      walletFingerprint: currentWalletFingerprint,
       lastProcessedDate: now.dateKey,
       lastProcessedAt: adminFieldValue.serverTimestamp(),
       updatedAt: adminFieldValue.serverTimestamp(),

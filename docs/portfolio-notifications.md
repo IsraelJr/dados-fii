@@ -1,73 +1,66 @@
 # Notificações inteligentes da carteira
 
-O novo processamento não utiliza nem altera o `monitor.js` legado. Ele roda por uma rota protegida do Next.js acionada pelo Vercel Cron.
+O processamento não utiliza nem altera o `monitor.js` legado. Ele roda por uma rota protegida do Next.js acionada pelo Vercel Cron.
 
 ## Fluxo
 
-1. O cron atualiza dividendos pendentes às 11:00 UTC.
-2. Às 11:30 UTC, `/api/admin/process-portfolio-notifications` lê as carteiras salvas no Firestore.
-3. O serviço identifica novos dividendos, mudanças de concentração e a necessidade de envio do resumo da carteira.
+1. O cron atualiza os dados necessários da carteira.
+2. `/api/admin/process-portfolio-notifications` lê as carteiras salvas no Firestore.
+3. O serviço compara rendimentos anunciados ou pagos, riscos de concentração e patrimônio estimado.
 4. Cada evento recebe uma chave determinística e é salvo em `User/{userId}/Notifications`, impedindo duplicidade.
-5. Os eventos da mesma execução continuam separados na central de notificações, mas são consolidados em um único e-mail por usuário.
-6. O e-mail é enviado pela Resend com o resumo e todas as atualizações geradas naquela execução.
+5. Os eventos elegíveis da mesma execução são consolidados em um único e-mail por usuário.
+6. Alertas exclusivamente patrimoniais aparecem somente no site.
 
-A primeira execução cria a linha de base dos dividendos e riscos, evitando disparar alertas antigos em massa. O resumo do dia pode ser enviado normalmente nessa primeira execução.
+A primeira execução de uma versão da política cria as linhas de base sem disparar alertas antigos em massa.
 
-## Plano grátis e VIP
+## Política anti-ruído
+
+Uma execução diária não cria notificação apenas porque a data mudou. A ordem de decisão é:
+
+1. comparar os hashes dos rendimentos anunciados ou pagos com a leitura anterior;
+2. quando houver alteração real, criar os alertas de rendimento aplicáveis e atualizar a referência patrimonial;
+3. quando não houver alteração de rendimento, comparar o patrimônio atual com a última referência significativa;
+4. criar um alerta no site apenas se a alta ou queda acumulada atingir o limite do usuário;
+5. manter a referência anterior enquanto a oscilação ficar abaixo do limite, permitindo acumular movimentos pequenos;
+6. recriar a linha de base, sem alerta, quando a carteira, o plano ou o limite forem alterados;
+7. não comparar o patrimônio quando houver cotação ausente ou posição não carregada.
+
+O objetivo é evitar notificações repetitivas quando os rendimentos permanecem iguais e o patrimônio oscila pouco.
+
+## Planos e limites
 
 ### Grátis
 
-- Alertas de dividendos para os 3 maiores FIIs da carteira por valor financeiro.
-- Alerta de concentração por ativo a partir de 40%.
-- Resumo completo da carteira enviado toda sexta-feira.
-- Central de notificações e toast persistente.
+- Limite patrimonial fixo de 3%.
+- Alertas de dividendos para os três maiores FIIs da carteira por valor financeiro.
+- Alerta de concentração por ativo a partir do limite definido para o plano.
+- Central de notificações no site.
 
-### VIP
+### Premium e Super Premium
 
+- Limite patrimonial configurável entre 0,5% e 20% na página da carteira.
 - Alertas de dividendos para todos os FIIs da carteira.
 - Comparação do dividendo com o pagamento anterior.
 - Impacto do pagamento na renda estimada da carteira.
-- Concentração por ativo, renda e segmento.
-- Aviso quando a concentração volta ao limite configurado.
-- Resumo periódico completo.
+- Alertas de concentração por ativo, renda e segmento.
+- Aviso quando uma concentração volta ao limite configurado.
 
-## Variáveis de ambiente
+O plano é resolvido no servidor. Valores enviados pelo navegador não concedem acesso a recursos pagos.
 
-As variáveis existentes `CRON_SECRET`, `RESEND_API_KEY` e `WALLET_EMAIL_FROM` continuam sendo usadas.
+## Referência patrimonial
 
-```env
-PORTFOLIO_NOTIFICATIONS_ENABLED=true
-PORTFOLIO_EMAIL_ALERTS_ENABLED=true
-PORTFOLIO_DIGEST_ENABLED=true
-PORTFOLIO_DIGEST_SCHEDULE=daily # usado pelo VIP; grátis é fixo em weekly:5
-PORTFOLIO_NOTIFICATION_USER_LIMIT=100
-PORTFOLIO_NOTIFICATION_CONCURRENCY=5
-FREE_PORTFOLIO_ALERT_LIMIT=3
-FREE_ASSET_CONCENTRATION_THRESHOLD=40
-VIP_ASSET_CONCENTRATION_THRESHOLD=30
-VIP_INCOME_CONCENTRATION_THRESHOLD=45
-VIP_SEGMENT_CONCENTRATION_THRESHOLD=60
-```
+O patrimônio é comparado com a última referência significativa, e não simplesmente com o dia anterior. Assim, movimentos diários pequenos podem acumular até atingir o limite.
 
-Os valores acima já são os padrões do código. Portanto, só precisam ser cadastrados na Vercel quando for necessário substituí-los.
+Exemplo no plano Grátis:
 
-## Frequência do resumo
+- referência de R$ 10.000;
+- leituras de R$ 10.100 e R$ 10.200 não geram alerta nem substituem a referência;
+- ao chegar a R$ 10.300, a alta acumulada de 3% gera um alerta no site;
+- R$ 10.300 passa a ser a nova referência.
 
-Para o plano grátis, o resumo é fixo em `weekly:5` (sexta-feira), mesmo que exista outra preferência no documento do usuário. Para o VIP, `PORTFOLIO_DIGEST_SCHEDULE` aceita:
+A alteração das quantidades de cotas muda a identidade da carteira e cria uma nova referência sem atribuir esse movimento ao mercado.
 
-| Valor | Regra |
-|---|---|
-| `daily` | Todos os dias |
-| `every:2` | A cada dois dias desde o último envio |
-| `every:3` | A cada três dias desde o último envio |
-| `even_days` | Somente nos dias pares do mês |
-| `odd_days` | Somente nos dias ímpares do mês |
-| `weekly:0` | Aos domingos |
-| `weekly:1` | Às segundas-feiras |
-| `weekly:5` | Às sextas-feiras |
-| `weekdays:1,3,5` | Segunda, quarta e sexta |
-
-A preferência global pode ser substituída individualmente no documento do usuário:
+## Preferência individual
 
 ```json
 {
@@ -77,44 +70,52 @@ A preferência global pode ser substituída individualmente no documento do usu�
     "dividendAlerts": true,
     "riskAlerts": true,
     "digestEnabled": true,
-    "digestSchedule": "every:2"
+    "patrimonyAlerts": true,
+    "patrimonyChangeThresholdPercent": 2.5
   }
 }
 ```
 
+No plano Grátis, qualquer valor salvo anteriormente é ignorado e o limite permanece em 3%.
+
+## Variáveis de ambiente
+
+As variáveis existentes `CRON_SECRET`, `RESEND_API_KEY` e `WALLET_EMAIL_FROM` continuam sendo usadas.
+
+```env
+PORTFOLIO_NOTIFICATIONS_ENABLED=true
+PORTFOLIO_EMAIL_ALERTS_ENABLED=true
+PORTFOLIO_DIGEST_ENABLED=true
+PORTFOLIO_NOTIFICATION_USER_LIMIT=100
+PORTFOLIO_NOTIFICATION_CONCURRENCY=5
+FREE_PORTFOLIO_ALERT_LIMIT=3
+FREE_ASSET_CONCENTRATION_THRESHOLD=40
+VIP_ASSET_CONCENTRATION_THRESHOLD=30
+VIP_INCOME_CONCENTRATION_THRESHOLD=45
+VIP_SEGMENT_CONCENTRATION_THRESHOLD=60
+```
+
+Os valores acima são os padrões do código e só precisam ser cadastrados na Vercel quando for necessário substituí-los.
+
 ## Segurança e antirrepetição
 
-- A rota do cron aceita apenas `CRON_SECRET` ou `ADMIN_UPDATE_SECRET`.
-- A central de notificações exige e-mail e sessão válida de `WalletSessions`.
-- O plano VIP é lido no servidor; não depende de valor enviado pelo navegador.
-- O primeiro processamento apenas registra a linha de base dos dividendos e riscos.
+- A rota do cron aceita apenas o segredo administrativo configurado.
+- A central e as preferências exigem e-mail e sessão válida de `WalletSessions`.
+- O plano comercial é lido no servidor e é independente do papel de administrador.
 - Cada notificação usa um identificador derivado do tipo e da chave do evento.
 - O e-mail só é tentado depois de a notificação ser criada com sucesso.
 - Alertas de concentração são emitidos quando o limite é cruzado, e não todos os dias.
-- O estado de concentração usa uma identidade estável por tipo e ativo/segmento; o limite não faz parte dessa identidade.
-- Cada execução guarda o percentual calculado. O e-mail informa o percentual anterior, o atual e o limite comparado.
-- A primeira execução da versão atual, mudanças de plano/limites e dados incompletos apenas recriam a linha de base, sem avisos contraditórios.
-- A ativação e a resolução usam margem de 1 ponto percentual para reduzir alertas causados por oscilação próxima ao limite.
-- A quantidade de cotas pode permanecer igual e o peso mudar com as cotações; essa origem é explicitada no alerta.
-- Uma execução envia no máximo um e-mail por usuário, ainda que gere resumo, dividendos e vários alertas.
+- A ativação e a resolução usam margem para reduzir alertas causados por oscilações próximas ao limite.
+- Uma execução envia no máximo um e-mail por usuário, ainda que gere vários eventos elegíveis.
+- Uma retomada após falha não cria resumo duplicado quando o alerta detalhado já existe.
 
-## Coleções criadas
+## Entrega por canal
 
-```text
-User/{userId}/Notifications/{notificationId}
-User/{userId}/NotificationState/main
-PortfolioNotificationRuns/{runId}
-```
+| Evento | Site | E-mail |
+|---|---:|---:|
+| Mudança real de rendimento | Sim | Sim, consolidado |
+| Concentração cruzou ou voltou ao limite | Sim | Sim, consolidado |
+| Patrimônio atingiu o limite de variação | Sim | Não |
+| Rendimento igual e patrimônio abaixo do limite | Não | Não |
 
-## Execução manual segura
-
-Para testar sem aguardar o cron:
-
-```bash
-curl -X POST https://www.dadosfii.com.br/api/admin/process-portfolio-notifications \
-  -H "Content-Type: application/json" \
-  -H "x-admin-secret: $ADMIN_UPDATE_SECRET" \
-  -d '{"limit":10}'
-```
-
-A resposta informa usuários processados, notificações criadas, e-mails enviados e eventuais erros por usuário.
+O alerta patrimonial é exclusivo do site para não recriar o excesso de e-mails que esta política pretende eliminar.
