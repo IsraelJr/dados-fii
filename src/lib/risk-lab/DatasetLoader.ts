@@ -9,6 +9,16 @@ import type {
 } from "../../types/riskLab";
 
 export type DatasetQuality = "candidate" | "gold";
+export type ProductionApprovalScope = "admin_unit_test_only" | "production";
+
+export interface RiskDatasetProductionApproval {
+  approvedAt: string;
+  approvedBy: string;
+  approvalReason: string;
+  approvalHash: string;
+  allowedTickers: string[];
+  scope: ProductionApprovalScope;
+}
 
 export interface RiskDatasetMetadata {
   id: string;
@@ -18,6 +28,7 @@ export interface RiskDatasetMetadata {
   description: string;
   limitations: string[];
   productionApproved: boolean;
+  productionApproval?: RiskDatasetProductionApproval;
 }
 
 export interface RiskDataset {
@@ -51,6 +62,11 @@ const EVIDENCE_SOURCE_TYPES = new Set<EvidenceSourceType>([
 const EVIDENCE_REVIEW_METHODS = new Set<EvidenceReviewMethod>([
   "manual_document_review",
   "automated_extraction",
+]);
+
+const PRODUCTION_APPROVAL_SCOPES = new Set<ProductionApprovalScope>([
+  "admin_unit_test_only",
+  "production",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -95,6 +111,40 @@ function validOptionalPage(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
+function parseProductionApproval(raw: Record<string, unknown>, productionApproved: boolean) {
+  const candidate = raw.productionApproval;
+  if (!productionApproved) {
+    if (candidate !== undefined) throw new Error("metadata.productionApproval requires productionApproved=true");
+    return undefined;
+  }
+  if (!isRecord(candidate)) throw new Error("metadata.productionApproval is required for production approval");
+
+  const scope = requiredString(candidate, "scope", "metadata.productionApproval") as ProductionApprovalScope;
+  if (!PRODUCTION_APPROVAL_SCOPES.has(scope)) throw new Error(`Unsupported production approval scope: ${scope}`);
+
+  const approvalHash = requiredString(candidate, "approvalHash", "metadata.productionApproval");
+  if (!/^[a-f0-9]{64}$/i.test(approvalHash)) throw new Error("metadata.productionApproval.approvalHash must be a SHA-256 hex hash");
+
+  if (!Array.isArray(candidate.allowedTickers) || !candidate.allowedTickers.length) {
+    throw new Error("metadata.productionApproval.allowedTickers must contain at least one ticker");
+  }
+  const allowedTickers = [...new Set(candidate.allowedTickers.map((item, index) => {
+    if (typeof item !== "string" || !/^[A-Z0-9]{4,12}$/.test(item.trim().toUpperCase())) {
+      throw new Error(`metadata.productionApproval.allowedTickers[${index}] is invalid`);
+    }
+    return item.trim().toUpperCase();
+  }))];
+
+  return {
+    approvedAt: validDate(requiredString(candidate, "approvedAt", "metadata.productionApproval"), "metadata.productionApproval.approvedAt"),
+    approvedBy: requiredString(candidate, "approvedBy", "metadata.productionApproval"),
+    approvalReason: requiredString(candidate, "approvalReason", "metadata.productionApproval"),
+    approvalHash,
+    allowedTickers,
+    scope,
+  } satisfies RiskDatasetProductionApproval;
+}
+
 export function loadRiskDataset(raw: unknown): RiskDataset {
   if (!isRecord(raw)) throw new Error("Risk dataset must be an object");
   if (!isRecord(raw.metadata)) throw new Error("Risk dataset metadata is required");
@@ -106,6 +156,7 @@ export function loadRiskDataset(raw: unknown): RiskDataset {
   if (productionApproved && quality !== "gold") {
     throw new Error("Only gold datasets can be approved for production");
   }
+  const productionApproval = parseProductionApproval(raw.metadata, productionApproved);
 
   const metadata: RiskDatasetMetadata = {
     id: requiredString(raw.metadata, "id", "metadata"),
@@ -120,6 +171,7 @@ export function loadRiskDataset(raw: unknown): RiskDataset {
         })
       : [],
     productionApproved,
+    productionApproval,
   };
 
   if (!Array.isArray(raw.snapshots) || !raw.snapshots.length) throw new Error("Risk dataset snapshots are required");
@@ -239,13 +291,27 @@ export function loadRiskDataset(raw: unknown): RiskDataset {
     );
 
     return {
-      ticker: requiredString(candidate, "ticker", context),
+      ticker: requiredString(candidate, "ticker", context).trim().toUpperCase(),
       family,
       asOf,
       structuralRiskScore,
       observations,
     };
   });
+
+  if (metadata.productionApproval) {
+    const datasetTickers = [...new Set(snapshots.map((snapshot) => snapshot.ticker))];
+    for (const ticker of datasetTickers) {
+      if (!metadata.productionApproval.allowedTickers.includes(ticker)) {
+        throw new Error(`Production-approved dataset contains disallowed ticker: ${ticker}`);
+      }
+    }
+    for (const ticker of metadata.productionApproval.allowedTickers) {
+      if (!datasetTickers.includes(ticker)) {
+        throw new Error(`Production approval references missing ticker: ${ticker}`);
+      }
+    }
+  }
 
   return { metadata, snapshots };
 }
