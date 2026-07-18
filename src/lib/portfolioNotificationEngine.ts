@@ -652,7 +652,6 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
     const dividendAlertsEnabled = preferences.dividendAlerts !== false;
     const riskAlertsEnabled = preferences.riskAlerts !== false;
     let notificationsCreated = 0;
-    let dividendNotificationsCreated = 0;
     let emailsSent = 0;
     const queuedEmails: QueuedEmailNotification[] = [];
 
@@ -673,11 +672,11 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
       if (initialized && previousHash && previousHash !== currentHash) changedDividendTickers.add(position.ticker);
     }
 
-    if (dividendAlertsEnabled) {
-      for (const position of scope) {
-        if (!changedDividendTickers.has(position.ticker)) continue;
-        if (await queueNotification(dividendNotification(position, totalEstimatedIncome, isVip))) dividendNotificationsCreated += 1;
-      }
+    const dividendChangesInScope = dividendAlertsEnabled
+      ? scope.filter((position) => changedDividendTickers.has(position.ticker))
+      : [];
+    for (const position of dividendChangesInScope) {
+      await queueNotification(dividendNotification(position, totalEstimatedIncome, isVip));
     }
 
     const riskFlags = buildRiskFlags(positions, isVip);
@@ -753,7 +752,7 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
     let nextPatrimonyReferenceValue = Number(state.patrimonyReferenceValue || 0) || null;
     let nextPatrimonyReferenceDate = String(state.patrimonyReferenceDate || "");
 
-    if (dividendEventDetected && digestEnabled && dividendNotificationsCreated === 0) {
+    if (dividendEventDetected && digestEnabled && dividendChangesInScope.length === 0) {
       await queueNotification(digestNotification(positions, isVip, now.dateKey));
       nextLastDigestDate = now.dateKey;
     } else if (!dividendEventDetected && patrimonyAlertsEnabled && patrimonyDecision.shouldNotify) {
