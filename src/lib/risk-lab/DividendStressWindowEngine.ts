@@ -5,6 +5,7 @@ import type {
 } from "../../types/riskLabDividendStress";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const ALLOWED_SOURCE_TYPES = new Set(["primary_regulatory", "primary_manager"]);
 const ALLOWED_PRIMARY_HOSTS = new Set([
   "fnet.bmfbovespa.com.br",
   "www.mauacapital.com.br",
@@ -69,6 +70,9 @@ function validateNotice(notice: VerifiedDividendNotice, ticker: string) {
   }
   if (!isIsoDate(notice.announcedAt)) throw new Error(`Data de anúncio inválida em ${notice.competenceMonth}`);
   if (!notice.source.documentId.trim()) throw new Error(`Documento ausente em ${notice.competenceMonth}`);
+  if (!ALLOWED_SOURCE_TYPES.has(notice.source.sourceType)) {
+    throw new Error(`Tipo de fonte não autorizado em ${notice.competenceMonth}`);
+  }
   assertPrimaryUrl(notice.source.sourceUrl);
   if (notice.source.reviewMethod !== "manual_document_review") {
     throw new Error(`Rendimento sem revisão manual em ${notice.competenceMonth}`);
@@ -187,10 +191,8 @@ export class DividendStressWindowEngine {
 
       for (let recoveryEndIndex = stressEndIndex + 3; recoveryEndIndex < notices.length; recoveryEndIndex += 1) {
         const recovery = notices.slice(recoveryEndIndex - 2, recoveryEndIndex + 1);
-        if (!contiguous(recovery)) continue;
-        if (monthIndex(recovery[0].competenceMonth) !== monthIndex(stress[2].competenceMonth) + 1) {
-          if (monthIndex(recovery[0].competenceMonth) <= monthIndex(stress[2].competenceMonth)) continue;
-        }
+        const fullPath = notices.slice(stressEndIndex - 8, recoveryEndIndex + 1);
+        if (!contiguous(fullPath) || !contiguous(recovery)) continue;
 
         const recoveryAverage = average(recovery.map((item) => item.amountPerShare));
         if (recoveryAverage < baselineMedian * recoveryThreshold) continue;
