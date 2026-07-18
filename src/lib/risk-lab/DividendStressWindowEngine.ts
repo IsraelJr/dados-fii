@@ -5,6 +5,7 @@ import type {
 } from "../../types/riskLabDividendStress";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const COMPARISON_EPSILON = 1e-12;
 const ALLOWED_SOURCE_TYPES = new Set(["primary_regulatory", "primary_manager"]);
 const ALLOWED_PRIMARY_HOSTS = new Set([
   "fnet.bmfbovespa.com.br",
@@ -166,7 +167,7 @@ export class DividendStressWindowEngine {
       const baselineMedian = median(baseline.map((item) => item.amountPerShare));
       if (baselineMedian <= 0) continue;
       const stressAverage = average(stress.map((item) => item.amountPerShare));
-      if (stressAverage > baselineMedian * stressThreshold) continue;
+      if (stressAverage - baselineMedian * stressThreshold > COMPARISON_EPSILON) continue;
 
       const stressDetectedAt = stress.reduce(
         (latest, item) => Date.parse(item.announcedAt) > Date.parse(latest) ? item.announcedAt : latest,
@@ -195,7 +196,7 @@ export class DividendStressWindowEngine {
         if (!contiguous(fullPath) || !contiguous(recovery)) continue;
 
         const recoveryAverage = average(recovery.map((item) => item.amountPerShare));
-        if (recoveryAverage < baselineMedian * recoveryThreshold) continue;
+        if (baselineMedian * recoveryThreshold - recoveryAverage > COMPARISON_EPSILON) continue;
 
         const recoveryDetectedAt = recovery.reduce(
           (latest, item) => Date.parse(item.announcedAt) > Date.parse(latest) ? item.announcedAt : latest,
