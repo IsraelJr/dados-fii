@@ -13,6 +13,7 @@ import {
   PlayCircle,
   ShieldCheck,
 } from "lucide-react";
+import FnetNoticeImportPanel from "@/app/admin/risk-lab/FnetNoticeImportPanel";
 import type { AlertLevel } from "@/types/riskLab";
 import type { RiskLabAdminStatus, RiskLabReport } from "@/types/riskLabProduction";
 
@@ -193,6 +194,8 @@ export default function RiskLabAdminPage() {
             </section>
           </>
         )}
+
+        <FnetNoticeImportPanel />
 
         <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
           <h2 className="flex items-center gap-2 text-2xl font-black text-slate-900"><History className="text-indigo-700" /> Histórico recente</h2>
