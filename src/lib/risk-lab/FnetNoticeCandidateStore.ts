@@ -1,4 +1,5 @@
 import { adminDb } from "@/lib/firebaseAdmin";
+import type { VerifiedDividendNotice } from "@/types/riskLabDividendStress";
 import type {
   FnetDividendNoticePreview,
   FnetNoticeCandidateRepository,
@@ -6,6 +7,7 @@ import type {
 } from "@/types/riskLabFnetNotice";
 
 const CANDIDATE_COLLECTION = "RiskLabNoticeCandidates";
+const VERIFIED_COLLECTION = "RiskLabVerifiedDividendNotices";
 const AUDIT_COLLECTION = "RiskLabNoticeAudit";
 
 function assertCandidateId(value: string) {
@@ -18,6 +20,25 @@ function assertActor(value: string) {
   if (!value || !value.includes("@") || value.length > 254) {
     throw new Error("Responsável administrativo inválido.");
   }
+}
+
+function verifiedObservation(current: FnetDividendNoticePreview, actor: string, reviewedAt: string): VerifiedDividendNotice {
+  return {
+    ticker: current.ticker,
+    competenceMonth: current.competenceMonth,
+    amountPerShare: current.amountPerShare,
+    announcedAt: current.announcedAt,
+    source: {
+      documentId: current.documentId,
+      sourceUrl: current.sourceUrl,
+      sourceType: "primary_regulatory",
+      reviewMethod: "manual_document_review",
+      reviewedBy: actor,
+      reviewedAt,
+      page: null,
+      excerpt: `Aviso estruturado FNET confirmado: ${current.periodReferenceRaw}; R$ ${current.amountPerShare.toFixed(6)} por cota; protocolo entregue em ${current.announcedAt}.`,
+    },
+  };
 }
 
 export class FirestoreFnetNoticeCandidateStore implements FnetNoticeCandidateRepository {
@@ -94,6 +115,19 @@ export class FirestoreFnetNoticeCandidateStore implements FnetNoticeCandidateRep
         throw new Error(`Candidato já revisado como ${current.reviewStatus}.`);
       }
 
+      const verifiedReference = status === "approved"
+        ? adminDb.collection(VERIFIED_COLLECTION).doc(`${current.ticker}_${current.competenceMonth}`)
+        : null;
+      const existingVerified = verifiedReference ? await transaction.get(verifiedReference) : null;
+      if (existingVerified?.exists) {
+        const existing = existingVerified.data() as VerifiedDividendNotice;
+        if (existing.source.documentId !== current.documentId) {
+          throw new Error(
+            `Conflito: ${current.ticker} ${current.competenceMonth} já possui observação aprovada pelo documento ${existing.source.documentId}.`,
+          );
+        }
+      }
+
       const reviewed: FnetDividendNoticePreview = {
         ...current,
         reviewStatus: status,
@@ -102,14 +136,22 @@ export class FirestoreFnetNoticeCandidateStore implements FnetNoticeCandidateRep
         rejectionReason,
       };
       transaction.set(reference, reviewed);
+
+      if (verifiedReference && !existingVerified?.exists) {
+        transaction.set(verifiedReference, verifiedObservation(current, actor, reviewedAt));
+      }
+
       const auditReference = adminDb.collection(AUDIT_COLLECTION).doc();
       transaction.set(auditReference, {
         action: status,
         candidateId,
         documentId: current.documentId,
+        ticker: current.ticker,
+        competenceMonth: current.competenceMonth,
         actor,
         at: reviewedAt,
         rejectionReason,
+        verifiedObservationId: status === "approved" ? `${current.ticker}_${current.competenceMonth}` : null,
       });
       return reviewed;
     });
