@@ -10,6 +10,7 @@ Este módulo valida um detector precoce de deterioração de tese sem usar infor
 4. Risco estrutural e deterioração são avaliados separadamente.
 5. Regras são determinísticas, versionadas e explicáveis.
 6. IA pode extrair informações, mas não cria números ausentes nem substitui a fonte.
+7. Qualidade documental (`gold`) e liberação para produção (`productionApproved`) são decisões separadas.
 
 ## Escopo v0.1
 
@@ -19,14 +20,15 @@ Este módulo valida um detector precoce de deterioração de tese sem usar infor
 
 ## Estrutura
 
-- `src/types/riskLab.ts`: contratos do domínio.
+- `src/types/riskLab.ts`: contratos do domínio e metadados de proveniência.
 - `src/lib/risk-lab/RuleEngine.ts`: avaliação explicável e bloqueio de look-ahead.
 - `src/lib/risk-lab/rules.ts`: regras iniciais do piloto.
 - `src/lib/risk-lab/BacktestEngine.ts`: simulação cronológica.
-- `src/lib/risk-lab/DatasetLoader.ts`: validação de datasets candidatos e ouro.
+- `src/lib/risk-lab/DatasetLoader.ts`: validação de datasets candidatos, ouro e bloqueio de produção.
 - `tests/risk-lab-pilot.test.ts`: casos históricos sintéticos mínimos.
-- `tests/risk-lab-dataset.test.ts`: execução sobre o primeiro dataset documental.
+- `tests/risk-lab-dataset.test.ts`: execução sobre datasets documentais e testes das travas de qualidade.
 - `datasets/candidate-hctr-tgar-v0.1.json`: observações extraídas da investigação com datas de publicação e evidências.
+- `datasets/gold-hctr-tgar-v0.1.json`: somente observações promovidas após conferência direta da fonte primária.
 - `data-dictionary-v0.1.json`: métricas e semântica.
 - `backtest-spec-v0.1.md`: critérios de validação.
 
@@ -40,15 +42,26 @@ Pode incluir fontes secundárias rastreáveis, trechos ainda sem página exata e
 
 Para promoção, cada observação precisa ter:
 
-- documento primário conferido;
+- documento primário regulatório ou da gestora;
 - URL rastreável;
+- página exata;
 - trecho que sustente diretamente o valor;
+- data da primeira publicação pública;
 - classificação `confirmed`;
 - confiança mínima de 90%;
 - `knownAt` correspondente à primeira disponibilização pública;
-- revisão humana da competência, unidade e interpretação econômica.
+- data, método e responsável pela revisão;
+- método `manual_document_review`.
 
-Trocar apenas o rótulo de `candidate` para `gold` faz o carregador rejeitar o arquivo.
+Trocar apenas o rótulo de `candidate` para `gold` faz o carregador rejeitar o arquivo. Fonte secundária, página ausente ou revisão somente automatizada também são rejeitadas.
+
+## Liberação para produção
+
+`productionApproved` não é sinônimo de `gold`:
+
+- um dataset `candidate` nunca pode ser aprovado para produção;
+- um dataset `gold` pode continuar com `productionApproved: false`;
+- a liberação pública exige revisão final, fundos de controle e medição de falsos positivos.
 
 ## Estado atual
 
@@ -59,6 +72,15 @@ O dataset candidato v0.1 reproduz:
 
 A data de 31/07/2024 substitui 30/06/2024 como momento acionável do alerta do TGAR11, porque o dado do primeiro semestre só se tornou público na entrega do relatório.
 
+O primeiro seed ouro contém exclusivamente o evento HCTR11 de 12/12/2024, conferido no fato relevante oficial:
+
+- resultado mensal igual a zero;
+- distribuição de R$ 0,37 por cota;
+- alerta vermelho pela regra `HY-003` — distribuição sem resultado positivo no período;
+- `productionApproved: false`.
+
+As métricas de carteira do HCTR11 de outubro de 2024 e todas as observações do TGAR11 continuam como `candidate` até conferência direta, página a página, dos documentos primários.
+
 ## Próxima entrega
 
-Conferir os documentos primários página a página, registrar a primeira URL oficial disponível e promover somente as observações aprovadas para `gold-hctr-tgar-v0.1.json`. Depois disso, preencher os meses intermediários e adicionar fundos de controle.
+Promover as métricas de carteira do HCTR11 e os primeiros eventos do TGAR11 somente após validação dos PDFs oficiais. Em seguida, preencher os meses intermediários e adicionar fundos saudáveis e fundos com estresse reversível para medir falsos positivos.
