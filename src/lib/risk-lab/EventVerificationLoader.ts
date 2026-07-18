@@ -35,8 +35,12 @@ function assertPrimaryUrl(value: string) {
 function assertOfficialDocument(document: CandidateOfficialDocument, ticker: string) {
   if (!document.documentId.trim()) throw new Error(`Documento oficial sem ID: ${ticker}`);
   assertPrimaryUrl(document.sourceUrl);
-  if (!isIsoDate(document.referenceDate) || !isIsoDate(document.publishedAt)) {
-    throw new Error(`Datas do documento oficial inválidas: ${ticker}`);
+
+  if (document.referenceDate !== null && !isIsoDate(document.referenceDate)) {
+    throw new Error(`Data de referência oficial inválida: ${ticker}`);
+  }
+  if (document.publishedAt !== null && !isIsoDate(document.publishedAt)) {
+    throw new Error(`Data de publicação oficial inválida: ${ticker}`);
   }
 
   const review = document.contentReview;
@@ -59,6 +63,10 @@ function assertOfficialDocument(document: CandidateOfficialDocument, ticker: str
     if (review.page !== null || review.excerpt !== null || review.reviewedBy !== null || review.reviewedAt !== null) {
       throw new Error(`Documento pendente não pode carregar evidência parcial: ${ticker}`);
     }
+  }
+
+  if (review.status === "manually_verified" && (!document.referenceDate || !document.publishedAt)) {
+    throw new Error(`Revisão manual exige datas primárias confirmadas: ${ticker}`);
   }
 }
 
@@ -86,12 +94,20 @@ function assertCandidate(candidate: EventVerificationCandidate) {
     return;
   }
 
-  if (!candidate.officialDocument || !candidate.eventDateCandidate) {
-    throw new Error(`Documento candidato incompleto: ${candidate.ticker}`);
+  if (!candidate.officialDocument) {
+    throw new Error(`Documento candidato ausente: ${candidate.ticker}`);
   }
   assertOfficialDocument(candidate.officialDocument, candidate.ticker);
 
-  if (Date.parse(candidate.eventDateCandidate) !== Date.parse(candidate.officialDocument.publishedAt)) {
+  const publishedAt = candidate.officialDocument.publishedAt;
+  if ((candidate.eventDateCandidate === null) !== (publishedAt === null)) {
+    throw new Error(`Data candidata e publishedAt devem ser confirmadas juntas: ${candidate.ticker}`);
+  }
+  if (
+    candidate.eventDateCandidate &&
+    publishedAt &&
+    Date.parse(candidate.eventDateCandidate) !== Date.parse(publishedAt)
+  ) {
     throw new Error(`Data candidata deve ser a primeira data pública do documento: ${candidate.ticker}`);
   }
 
@@ -101,6 +117,9 @@ function assertCandidate(candidate: EventVerificationCandidate) {
   }
   if (candidate.status !== "primary_content_verified" && manuallyVerified) {
     throw new Error(`Revisão manual exige status primary_content_verified: ${candidate.ticker}`);
+  }
+  if (candidate.status === "primary_content_verified" && (!candidate.eventDateCandidate || !publishedAt)) {
+    throw new Error(`Evento verificado exige data pública primária: ${candidate.ticker}`);
   }
   if (candidate.eligibleForCohortPromotion !== manuallyVerified) {
     throw new Error(`Elegibilidade de promoção incompatível com a revisão: ${candidate.ticker}`);
@@ -158,4 +177,7 @@ export function assertCandidatePromotionReady(candidate: EventVerificationCandid
     throw new Error(`${candidate.ticker}: documento primário ausente.`);
   }
   assertOfficialDocument(candidate.officialDocument, candidate.ticker);
+  if (!candidate.eventDateCandidate || !candidate.officialDocument.publishedAt) {
+    throw new Error(`${candidate.ticker}: data pública primária ainda não confirmada.`);
+  }
 }
