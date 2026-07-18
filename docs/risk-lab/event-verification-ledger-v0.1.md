@@ -7,34 +7,46 @@ Registrar documentos candidatos para os casos fora da amostra sem promover datas
 ## Estados
 
 - `pending_document_location`: ainda não há documento oficial candidato.
-- `candidate_document_located`: a URL oficial foi localizada, mas o conteúdo primário ainda não foi revisado.
-- `primary_content_verified`: página, trecho, data de publicação, revisor e denominador da métrica foram confirmados manualmente.
+- `candidate_document_located`: a URL ou o ID oficial foi localizado, mas o conteúdo e as datas primárias ainda podem permanecer desconhecidos.
+- `primary_content_verified`: página, trecho, competência, primeira data pública, revisor e denominador da métrica foram confirmados manualmente.
 
 Somente `primary_content_verified` pode se tornar elegível para promoção da coorte. O ledger nunca libera o backtest diretamente.
+
+## Regra para datas
+
+Datas exibidas por agregadores, comentários ou páginas secundárias não são copiadas para `referenceDate`, `publishedAt` ou `eventDateCandidate`.
+
+Enquanto a competência e a primeira data pública não forem confirmadas no documento ou protocolo oficial, os três campos permanecem `null`.
 
 ## Casos localizados
 
 ### VSLH11
 
-Documento candidato:
+Documento prioritário atualmente localizado:
 
-- FNET ID: `677773`
+- FNET ID: `585037`
 - tipo: Relatório Gerencial
-- competência: fevereiro de 2024
-- entrega pública candidata: 12/06/2024 às 09:49
+- competência oficial: ainda não confirmada
+- primeira data pública oficial: ainda não confirmada
 
-O localizador secundário resume possível deterioração material: operações inadimplentes, ativos em execução, marcação negativa e execução judicial de um CRI. Esses fatos ainda não são evidência aceita pelo motor. Precisam ser conferidos no PDF oficial, com página, trecho e denominador.
+Um localizador secundário reproduz texto atribuído à gestão indicando aproximadamente 32,8% de inadimplência aguardando renegociação. Esse conteúdo não é evidência aceita pelo motor e precisa ser conferido no documento oficial, com página, trecho e denominador.
+
+O documento FNET `677773`, inicialmente considerado, é posterior ao `585037`. Portanto, ele foi descartado como candidato prioritário para a primeira “bomba”. Usá-lo criaria um evento artificialmente tardio e poderia aumentar falsamente a antecedência aparente do motor.
+
+Ainda é necessário pesquisar documentos anteriores ao `585037`, porque o objetivo é identificar o primeiro documento primário que atende ao critério pré-registrado.
 
 ### DEVA11
 
-Documento candidato:
+Documento candidato localizado:
 
 - FNET ID: `1124543`
 - tipo: Relatório Gerencial
-- competência: janeiro de 2026
-- entrega pública candidata: 27/02/2026 às 18:38
+- competência oficial: ainda não confirmada
+- primeira data pública oficial: ainda não confirmada
 
-O localizador secundário indica possível cruzamento do limiar de 10% de inadimplência da carteira de CRIs. Antes de promover a data, é obrigatório confirmar o PDF oficial, o denominador utilizado e se houve documento primário anterior que já atendia ao critério pré-registrado.
+O localizador secundário indica possível cruzamento do limiar de 10% de inadimplência da carteira de CRIs. As datas exibidas pelo localizador foram removidas do ledger e só poderão retornar depois de validação no protocolo primário.
+
+Antes de promover esse documento, é obrigatório confirmar o PDF oficial, o denominador utilizado e se houve documento anterior que já atendia ao critério pré-registrado.
 
 ## Casos ainda sem janela
 
@@ -58,7 +70,7 @@ Um candidato só pode promover a coorte quando:
 - a URL pertence ao FNET ou ao site oficial da gestora;
 - o PDF foi aberto e revisado manualmente;
 - a página e o trecho estão registrados;
-- `publishedAt` representa a primeira data pública;
+- `publishedAt` representa a primeira data pública confirmada em fonte primária;
 - a competência não é confundida com a data acionável;
 - o denominador da métrica foi confirmado;
 - o revisor e a data da revisão estão registrados;
@@ -70,5 +82,6 @@ Um candidato só pode promover a coorte quando:
 - `executionAllowed` permanece `false`;
 - a coorte continua bloqueada;
 - fontes secundárias funcionam apenas como localizadores;
+- nenhuma data secundária é armazenada como data oficial;
 - nenhuma regra do ruleset v0.1.0 foi alterada;
 - nenhum backtest externo foi executado.
