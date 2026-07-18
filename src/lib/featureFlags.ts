@@ -4,7 +4,8 @@ export type Phase2Feature =
   | "ENABLE_AI_INSIGHTS"
   | "ENABLE_REPORT_PREMIUM"
   | "ENABLE_AUTOMATIC_MONITOR"
-  | "ENABLE_SCORE_ENGINE";
+  | "ENABLE_SCORE_ENGINE"
+  | "ENABLE_RISK_LAB_ADMIN";
 
 export function featureEnabled(name: Phase2Feature, defaultValue = true) {
   const value = process.env[name];
