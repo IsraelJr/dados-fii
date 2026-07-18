@@ -7,11 +7,22 @@
     "description": "Primeiro seed ouro do Risk Lab. Contém somente observações conferidas diretamente em documento primário oficial e com trilha de revisão registrada.",
     "limitations": [
       "Nesta versão, somente o evento HCTR11 de 12/12/2024 foi promovido para gold.",
+      "A aprovação é restrita ao teste unitário manual na área administrativa, sem integração com Relatório Premium, notificações ou recomendações públicas.",
       "As métricas de carteira do HCTR11 em outubro de 2024 permanecem no dataset candidate até conferência direta do relatório gerencial oficial.",
       "As observações do TGAR11 permanecem no dataset candidate até validação página a página dos documentos primários.",
-      "O dataset ainda não está aprovado para uso público em produção; falta revisão humana final e inclusão de fundos de controle."
+      "O dataset não autoriza análise corrente de outros períodos nem de outros fundos."
     ],
-    "productionApproved": false
+    "productionApproved": true,
+    "productionApproval": {
+      "approvedAt": "2026-07-18T05:30:00-03:00",
+      "approvedBy": "IsraelJr",
+      "approvalReason": "Autorização explícita do proprietário para teste unitário do Risk Lab no Admin em produção, restrito ao HCTR11 histórico, sem integração com o Relatório Premium e sem notificações públicas.",
+      "approvalHash": "0de9829e5a422677e61895faf8f4c322c77e1c6ae0d08b6f802a4eead1e9ad63",
+      "allowedTickers": [
+        "HCTR11"
+      ],
+      "scope": "admin_unit_test_only"
+    }
   },
   "snapshots": [
     {
