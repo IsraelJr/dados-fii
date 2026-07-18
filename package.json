@@ -9,7 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:sprint2": "node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/sprint-2-architecture.test.mjs tests/score-engine.test.ts tests/health-validation.test.ts tests/timeline-dashboard.test.ts tests/report-ai-insights.test.ts tests/phase-2-completion.test.ts tests/wallet-snapshots.test.ts tests/user-wallet.test.ts tests/portfolio-notification-regression.test.mjs tests/market-index-plan.test.ts tests/ifix-admin.test.mjs tests/fund-catalog.test.ts",
-    "test:risk-lab": "node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/risk-lab-pilot.test.ts tests/risk-lab-dataset.test.ts tests/risk-lab-production.test.ts tests/risk-lab-admin-architecture.test.mjs tests/risk-lab-ruleset-freeze.test.mjs tests/risk-lab-cohort-registry.test.ts tests/risk-lab-event-verification.test.ts tests/risk-lab-dividend-stress.test.ts"
+    "test:risk-lab": "node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/risk-lab-pilot.test.ts tests/risk-lab-dataset.test.ts tests/risk-lab-production.test.ts tests/risk-lab-admin-architecture.test.mjs tests/risk-lab-ruleset-freeze.test.mjs tests/risk-lab-cohort-registry.test.ts tests/risk-lab-event-verification.test.ts tests/risk-lab-dividend-stress.test.ts tests/risk-lab-fnet-notice-parser.test.ts tests/risk-lab-fnet-notice-import.test.ts tests/risk-lab-fnet-admin-architecture.test.mjs"
   },
   "engines": {
     "node": "22.x"
