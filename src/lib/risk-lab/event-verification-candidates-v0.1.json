@@ -21,14 +21,14 @@
       "ticker": "DEVA11",
       "role": "severe_deterioration",
       "status": "candidate_document_located",
-      "eventDateCandidate": "2026-02-27T18:38:00-03:00",
+      "eventDateCandidate": null,
       "officialDocument": {
         "documentId": "1124543",
         "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=1124543&cod_neg=DEVA11&cod=341730&tipo_comunicado=relatorio_gerencial_relatorios",
         "sourceType": "primary_regulatory",
         "documentType": "Relatório Gerencial",
-        "referenceDate": "2026-01-30",
-        "publishedAt": "2026-02-27T18:38:00-03:00",
+        "referenceDate": null,
+        "publishedAt": null,
         "contentReview": {
           "status": "not_retrieved",
           "page": null,
@@ -42,36 +42,37 @@
           "sourceUrl": "https://www.clubefii.com.br/comunicado-comentado?cod_cmu=222446",
           "sourceType": "secondary_locator",
           "observedAt": "2026-07-18T16:30:00-03:00",
-          "note": "Página secundária aponta o documento FNET 1124543 e resume 12,1% da carteira de CRIs como inadimplente. O resumo não é evidência utilizável pelo motor."
+          "note": "Página secundária aponta o documento FNET 1124543 e resume 12,1% da carteira de CRIs como inadimplente. Também informa datas de referência e entrega, mas nenhuma delas é tratada como data primária confirmada."
         }
       ],
       "candidateFacts": [
         "O localizador secundário indica possível cruzamento do limiar de 10% de inadimplência da carteira de CRIs.",
         "O relatório também teria parcela elevada em carência, mas carência não deve ser somada automaticamente a default ou inadimplência.",
-        "A data candidata é a data de entrega pública do relatório, não a competência de janeiro de 2026."
+        "A data de referência e a primeira data pública permanecem nulas até conferência no documento ou protocolo primário."
       ],
       "unresolvedChecks": [
         "abrir e revisar o PDF oficial",
         "confirmar página e trecho do percentual de inadimplência",
         "confirmar se o percentual usa carteira de CRIs, patrimônio líquido ou outro denominador",
+        "confirmar no protocolo primário a data de referência e a primeira data pública",
         "confirmar se este foi o primeiro documento primário a atender ao critério pré-registrado",
         "verificar se houve documento anterior com default, impairment ou reestruturação material"
       ],
       "eligibleForCohortPromotion": false
     },
     {
-      "candidateId": "VSLH11-2024-02-RG",
+      "candidateId": "VSLH11-2023-12-RG",
       "ticker": "VSLH11",
       "role": "severe_deterioration",
       "status": "candidate_document_located",
-      "eventDateCandidate": "2024-06-12T09:49:00-03:00",
+      "eventDateCandidate": null,
       "officialDocument": {
-        "documentId": "677773",
-        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=677773&cod_neg=VSLH11&tipo_comunicado=relatorio_gerencial_relatorios",
+        "documentId": "585037",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=585037&cod_neg=VSLH11&cod=33759&tipo_comunicado=relatorio_gerencial_relatorios",
         "sourceType": "primary_regulatory",
         "documentType": "Relatório Gerencial",
-        "referenceDate": "2024-02-28",
-        "publishedAt": "2024-06-12T09:49:00-03:00",
+        "referenceDate": null,
+        "publishedAt": null,
         "contentReview": {
           "status": "not_retrieved",
           "page": null,
@@ -82,23 +83,31 @@
       },
       "locatorEvidence": [
         {
+          "sourceUrl": "https://www.clubefii.com.br/comentarios_monitor.aspx?dat_fim=16%2F1%2F2024&dat_ini=15%2F1%2F2024&modo_filtro=true",
+          "sourceType": "secondary_locator",
+          "observedAt": "2026-07-18T17:10:00-03:00",
+          "note": "Página secundária aponta o documento FNET 585037 e reproduz texto atribuído à gestão indicando 32,8% inadimplente aguardando renegociação. O conteúdo é apenas um localizador até revisão do documento oficial."
+        },
+        {
           "sourceUrl": "https://www.clubefii.com.br/fundo_comunicados_embed?cod=0&cod_neg=VSLH11&id=677773&tipo_comunicado=relatorio_gerencial_relatorios",
           "sourceType": "secondary_locator",
           "observedAt": "2026-07-18T16:30:00-03:00",
-          "note": "Página secundária aponta o documento FNET 677773 e resume 19,0% das operações como inadimplentes, 1,2% em execução e marcação negativa de aproximadamente R$ 6,2 milhões."
+          "note": "O documento FNET 677773, inicialmente localizado, é posterior ao ID 585037 e não pode ser usado como primeiro evento sem revisão cronológica integral."
         }
       ],
       "candidateFacts": [
-        "O localizador secundário indica deterioração material da carteira de CRIs acima do limiar pré-registrado.",
-        "O documento teria informado início de execução judicial do CRI STX 37.",
-        "A data candidata é 12 de junho de 2024, quando o relatório foi entregue, e não fevereiro de 2024."
+        "O localizador secundário do documento 585037 indica possível inadimplência de 32,8%, acima do limiar pré-registrado.",
+        "O denominador descrito pelo localizador precisa ser confirmado diretamente no relatório oficial.",
+        "O documento 677773, de período posterior, foi descartado como candidato prioritário para evitar uma bomba artificialmente tardia.",
+        "A data de referência e a primeira data pública permanecem nulas até conferência em fonte primária."
       ],
       "unresolvedChecks": [
-        "abrir e revisar o PDF oficial",
-        "confirmar página e trecho dos percentuais de inadimplência e execução",
-        "confirmar o denominador dos percentuais",
-        "confirmar página e natureza da marcação negativa de R$ 6,2 milhões",
-        "confirmar se este foi o primeiro documento primário a atender ao critério pré-registrado"
+        "abrir e revisar o PDF oficial 585037",
+        "confirmar página e trecho do percentual de inadimplência",
+        "confirmar o denominador utilizado no relatório",
+        "confirmar no protocolo primário a competência e a primeira data pública",
+        "pesquisar relatórios anteriores ao documento 585037 que possam já atender ao critério",
+        "documentar por que o relatório 677773 não representa o primeiro evento"
       ],
       "eligibleForCohortPromotion": false
     },
