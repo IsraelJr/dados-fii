@@ -8,7 +8,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 **Branch principal:** `main`  
 **Commit auditado em `main`:** `b42034f19620c93f0af4038a61afc5003b281758`  
 **Branch desta atualização:** `agent/canonical-handoff-v6`  
-**PR desta atualização:** a ser aberta após a primeira versão do arquivo
+**PR desta atualização:** #43 — `docs: atualiza handoff canônico v6` (draft)
 
 ## Como interpretar os status deste documento
 
@@ -327,7 +327,7 @@ Incidentes de segurança, integridade de dados e regressões de Produção sempr
 
 - **#5 — “Adicionar ingestão operacional controlada de FIIs e presentes VIP”**: draft antigo; TGAR11 aprovado, VGIA11 pendente segundo o próprio texto. Deve ser reconciliado com o que já entrou em `main` e então fechado ou atualizado.
 - **#1 e #2 — correções automáticas de CVE em React Server Components**: antigas e potencialmente superadas pela versão atual `Next 16.2.9`/`React 19.1.0`; exigem revisão de segurança antes de fechar, nunca merge automático sem comparar dependências.
-- **PR desta atualização canônica v6:** a ser aberta após a primeira versão do arquivo.
+- **#43 — atualização canônica v6:** draft aberta nesta auditoria; substitui o conteúdo da PR #42 após revisão e merge.
 
 ### Branches remotas
 
