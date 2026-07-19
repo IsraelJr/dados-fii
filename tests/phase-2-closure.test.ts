@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Native strip-types requires an explicit .ts extension at runtime.
-import {
-  basicFundEvidence,
-  evaluateCatalogAudit,
-  evaluateCatalogPreview,
-  evidenceHash,
-  misleadingMissingDataClaims,
-  selectStratifiedSamples,
-} from "../src/lib/phase2/Phase2ClosurePolicy.ts";
+import { basicFundEvidence, evaluateCatalogAudit, evaluateCatalogPreview, evidenceHash, misleadingMissingDataClaims, selectStratifiedSamples } from "../src/lib/phase2/Phase2ClosurePolicy.ts";
 import type { FundCatalogAudit, FundCatalogDirectory, FundCatalogRun } from "../src/types/fund-catalog.ts";
 import type { PublicFundData } from "../src/types/regulatory.ts";
 
