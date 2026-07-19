@@ -110,9 +110,10 @@ export interface AutomaticMonthlySeries {
   method: "direct_declared_per_share" | "unavailable";
   detectorResult: DividendStressWindow | null;
   detectorExecuted: boolean;
-  creditEventScreen: AutomaticCreditEventScreen | null;
+  creditEventScreen?: AutomaticCreditEventScreen | null;
   classificationFinal: boolean;
   limitation:
+    | "material_credit_events_not_automatically_validated"
     | "material_credit_event_confirmed"
     | "no_explicit_material_credit_event_found"
     | "material_credit_event_screen_inconclusive"
