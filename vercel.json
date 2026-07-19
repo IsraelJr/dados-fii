@@ -34,15 +34,15 @@
     },
     {
       "path": "/api/cron/phase-2-closure?attempt=1",
-      "schedule": "0 21 * * *"
+      "schedule": "20 20 * * *"
     },
     {
       "path": "/api/cron/phase-2-closure?attempt=2",
-      "schedule": "10 21 * * *"
+      "schedule": "30 20 * * *"
     },
     {
       "path": "/api/cron/phase-2-closure?attempt=3",
-      "schedule": "20 21 * * *"
+      "schedule": "40 20 * * *"
     }
   ]
 }
