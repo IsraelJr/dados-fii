@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Native strip-types requires an explicit .ts extension at runtime.
-import { basicFundEvidence, evaluateCatalogAudit, evaluateCatalogPreview, evidenceHash, misleadingMissingDataClaims, selectStratifiedSamples } from "../src/lib/phase2/Phase2ClosurePolicy.ts";
+import { basicFundEvidence, evaluateCatalogAudit, evaluateCatalogPreview, evidenceHash, misleadingMissingDataClaims, selectEdgeSamples, selectStratifiedSamples } from "../src/lib/phase2/Phase2ClosurePolicy.ts";
 import type { FundCatalogAudit, FundCatalogDirectory, FundCatalogRun } from "../src/types/fund-catalog.ts";
 import type { PublicFundData } from "../src/types/regulatory.ts";
 
@@ -96,6 +96,27 @@ test("smoke selection is stratified and deterministic", () => {
     { ticker: "VGIA11", kind: "FIAGRO" },
     { ticker: "BODB11", kind: "FI_INFRA" },
   ]);
+});
+
+test("edge selection requires one incomplete fund and one lifecycle exception", () => {
+  const selected = selectEdgeSamples(
+    run({ reviewSamples: [{ ticker: "REVIEW11", issue: "Liquidação ainda presente na B3." }] }),
+    {
+      ...audit,
+      missingEssential: [
+        { ticker: "OTHER11", fields: ["composição PF/PJ"] },
+        { ticker: "RJDA11", fields: ["cotas emitidas", "patrimônio líquido"] },
+      ],
+      staleOrInactive: [
+        { ticker: "OLD11", status: "inactive", reason: "Registro cancelado." },
+        { ticker: "HGPO11", status: "inactive", reason: "Ausente da B3 e em liquidação na CVM." },
+      ],
+    },
+  );
+  assert.deepEqual(selected, {
+    incomplete: { ticker: "RJDA11", fields: ["cotas emitidas", "patrimônio líquido"] },
+    exceptional: { ticker: "HGPO11", status: "inactive", reason: "Ausente da B3 e em liquidação na CVM." },
+  });
 });
 
 test("AI validation rejects false claims about basic data that is present", () => {
