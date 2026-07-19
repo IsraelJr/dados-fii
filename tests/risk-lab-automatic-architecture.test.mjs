@@ -22,7 +22,7 @@ test("automatic page asks only for a ticker and has no manual-validation control
   const code = await source(pagePath);
   assert.match(code, /Informe somente o ticker/);
   assert.match(code, /Você não precisa validar documentos/);
-  assert.match(code, /Pesquisar e validar automaticamente/);
+  assert.match(code, /Pesquisar, validar e analisar/);
   assert.doesNotMatch(code, /id="documentId"|id="candidateId"|type="checkbox"/);
 });
 

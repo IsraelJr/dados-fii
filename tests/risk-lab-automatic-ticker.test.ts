@@ -37,7 +37,7 @@ test("parser ignores another CNPJ", () => {
   assert.equal(result.documents.length, 0);
 });
 
-test("ticker orchestrator resolves identity and validates official documents automatically", async () => {
+test("ticker orchestrator resolves identity and interrupts automatically when the series is incomplete", async () => {
   const discovery = new CvmEventualDocumentDiscovery(async () => response(csv()));
   const orchestrator = new RiskLabTickerOrchestrator({
     resolveFund: async () => ({ cnpj: CNPJ, name: "MCCI Fundo Teste" } as unknown as PublicFundData),
@@ -45,10 +45,11 @@ test("ticker orchestrator resolves identity and validates official documents aut
     now: () => new Date("2026-07-18T20:00:00-03:00"),
   });
   const scan = await orchestrator.scan("mcci11", "admin@example.com");
-  assert.equal(scan.status, "validated");
+  assert.equal(scan.status, "inconclusive");
   assert.equal(scan.identity.ticker, "MCCI11");
   assert.equal(scan.requiresHumanDocumentValidation, false);
-  assert.equal(scan.analysisReadiness, "documents_validated_waiting_structured_dividends");
+  assert.equal(scan.analysisReadiness, "structured_series_incomplete");
+  assert.equal(scan.monthlySeries?.detectorExecuted, false);
   assert.equal(scan.premiumIntegrated, false);
   assert.equal(scan.notificationsSent, false);
 });

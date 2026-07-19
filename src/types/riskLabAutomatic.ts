@@ -1,8 +1,11 @@
+import type { DividendStressWindow, VerifiedDividendNotice } from "./riskLabDividendStress";
+
 export type AutomaticValidationStatus = "validated" | "inconclusive" | "blocked";
 
 export type AutomaticAnalysisReadiness =
   | "historical_unit_available"
-  | "documents_validated_waiting_structured_dividends"
+  | "structured_series_ready"
+  | "structured_series_incomplete"
   | "detector_not_yet_supported"
   | "insufficient_official_evidence"
   | "blocked";
@@ -43,6 +46,31 @@ export interface AutomaticValidationIssue {
   message: string;
 }
 
+export interface AutomaticMonthlySourceSummary {
+  year: number;
+  sourceUrl: string;
+  sourceHash: string | null;
+  fetched: boolean;
+  documentsInspected: number;
+  matchingRows: number;
+  acceptedMonths: number;
+  error: string | null;
+}
+
+export interface AutomaticMonthlySeries {
+  status: "ready" | "incomplete" | "blocked";
+  observations: VerifiedDividendNotice[];
+  sources: AutomaticMonthlySourceSummary[];
+  missingMonths: string[];
+  conflicts: string[];
+  longestContiguousSequence: number;
+  method: "direct_declared_per_share" | "unavailable";
+  detectorResult: DividendStressWindow | null;
+  detectorExecuted: boolean;
+  classificationFinal: false;
+  limitation: "material_credit_events_not_automatically_validated" | "insufficient_structured_series";
+}
+
 export interface RiskLabAutomaticScan {
   id: string;
   ticker: string;
@@ -54,6 +82,7 @@ export interface RiskLabAutomaticScan {
   documents: AutomaticDocumentEvidence[];
   sources: AutomaticSourceSummary[];
   issues: AutomaticValidationIssue[];
+  monthlySeries: AutomaticMonthlySeries | null;
   analysisReadiness: AutomaticAnalysisReadiness;
   requiresHumanDocumentValidation: false;
   notificationsSent: false;

@@ -10,6 +10,14 @@ function cnpj(value: string) {
   return value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 }
 
+function detectorLabel(value: string) {
+  if (value === "no_qualifying_stress") return "Nenhum estresse qualificado encontrado";
+  if (value === "stress_without_recovery") return "Estresse identificado sem recuperação confirmada";
+  if (value === "reversible_stress_confirmed") return "Recuperação matemática identificada — resultado preliminar";
+  if (value === "recovery_blocked_by_material_credit_event") return "Recuperação bloqueada por evento material de crédito";
+  return value;
+}
+
 export default function AutomaticRiskLabPage() {
   const [ticker, setTicker] = useState("MCCI11");
   const [running, setRunning] = useState(false);
@@ -37,33 +45,36 @@ export default function AutomaticRiskLabPage() {
     }
   }
 
+  const monthly = scan?.monthlySeries || null;
+  const detector = monthly?.detectorResult || null;
+
   return <main className="min-h-screen bg-slate-50 px-4 py-8">
     <div className="mx-auto max-w-5xl">
       <header className="rounded-3xl bg-slate-950 p-7 text-white">
         <p className="text-xs font-black uppercase tracking-widest text-indigo-200">Risk Lab automático</p>
         <h1 className="mt-3 text-4xl font-black">Informe somente o ticker</h1>
-        <p className="mt-3 text-sm text-slate-200">O sistema identifica o fundo, pesquisa a CVM e bloqueia sozinho qualquer conclusão insegura.</p>
+        <p className="mt-3 text-sm text-slate-200">O sistema identifica o fundo, pesquisa fontes oficiais, valida a série e bloqueia sozinho qualquer conclusão insegura.</p>
         <Link href="/admin/risk-lab" className="mt-5 inline-flex rounded-full bg-white px-4 py-2 text-sm font-black text-slate-900">Voltar ao Risk Lab</Link>
       </header>
 
       <section className="mt-5 rounded-2xl bg-emerald-50 p-5 text-emerald-950 ring-1 ring-emerald-200">
         <p className="font-black">Você não precisa validar documentos.</p>
-        <p className="mt-1 text-sm">Não há IDs, aprovações ou decisões técnicas. Dados insuficientes resultam em análise interrompida.</p>
+        <p className="mt-1 text-sm">Não há IDs, aprovações ou decisões técnicas. Dados insuficientes ou conflitantes interrompem a análise automaticamente.</p>
       </section>
 
       <section className="mt-6 rounded-3xl bg-white p-6 ring-1 ring-slate-200">
         <label htmlFor="ticker" className="text-sm font-black">Ticker do fundo</label>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row">
           <input id="ticker" value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8))} placeholder="MCCI11" className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-lg font-black uppercase" />
-          <button type="button" onClick={execute} disabled={running || !ticker} className="rounded-2xl bg-indigo-700 px-6 py-3 font-black text-white disabled:opacity-40">{running ? "Pesquisando e validando…" : "Pesquisar e validar automaticamente"}</button>
+          <button type="button" onClick={execute} disabled={running || !ticker} className="rounded-2xl bg-indigo-700 px-6 py-3 font-black text-white disabled:opacity-40">{running ? "Pesquisando, validando e analisando…" : "Pesquisar, validar e analisar"}</button>
         </div>
       </section>
 
       {error && <section className="mt-5 rounded-2xl bg-red-50 p-5 text-red-900 ring-1 ring-red-200"><p className="font-black">Pesquisa não concluída</p><p className="mt-1 text-sm">{error}</p></section>}
 
       {scan && <>
-        <section className={`mt-6 rounded-3xl p-6 ring-1 ${scan.status === "validated" ? "bg-emerald-50 text-emerald-950 ring-emerald-200" : "bg-amber-50 text-amber-950 ring-amber-200"}`}>
-          <h2 className="text-2xl font-black">{scan.status === "validated" ? "Validado automaticamente" : scan.status === "inconclusive" ? "Inconclusivo — análise interrompida" : "Bloqueado automaticamente"}</h2>
+        <section className={`mt-6 rounded-3xl p-6 ring-1 ${scan.status === "validated" ? "bg-emerald-50 text-emerald-950 ring-emerald-200" : scan.status === "blocked" ? "bg-red-50 text-red-950 ring-red-200" : "bg-amber-50 text-amber-950 ring-amber-200"}`}>
+          <h2 className="text-2xl font-black">{scan.status === "validated" ? "Pipeline automático concluído" : scan.status === "inconclusive" ? "Inconclusivo — análise interrompida" : "Bloqueado automaticamente"}</h2>
           <p className="mt-2 text-sm">{scan.nextAction}</p>
         </section>
 
@@ -73,7 +84,31 @@ export default function AutomaticRiskLabPage() {
           <div className="mt-4 grid gap-3 md:grid-cols-4"><Info label="Fontes consultadas" value={String(scan.sources.length)} /><Info label="Fontes disponíveis" value={String(scan.sources.filter((item) => item.fetched).length)} /><Info label="Documentos aceitos" value={String(scan.documents.length)} /><Info label="Validação humana" value="Não exigida" /></div>
         </section>
 
-        {scan.issues.length > 0 && <section className="mt-6 space-y-2">{scan.issues.map((issue, index) => <div key={`${issue.code}-${index}`} className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-950 ring-1 ring-amber-200"><strong>{issue.severity === "error" ? "Bloqueio automático" : "Aviso automático"}:</strong> {issue.message}</div>)}</section>}
+        {monthly && <section className="mt-6 rounded-3xl bg-white p-6 ring-1 ring-slate-200">
+          <h2 className="text-2xl font-black">Série mensal validada automaticamente</h2>
+          <p className="mt-2 text-sm text-slate-600">Avisos e protocolos oficiais foram cruzados por competência. Reapresentações e conflitos são tratados pelo sistema.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <Info label="Status da série" value={monthly.status === "ready" ? "Suficiente" : monthly.status === "blocked" ? "Bloqueada" : "Incompleta"} />
+            <Info label="Meses validados" value={String(monthly.observations.length)} />
+            <Info label="Maior sequência" value={`${monthly.longestContiguousSequence} meses`} />
+            <Info label="Detector" value={monthly.detectorExecuted ? "Executado" : "Não executado"} />
+          </div>
+          {monthly.missingMonths.length > 0 && <p className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950 ring-1 ring-amber-200"><strong>Competências ausentes:</strong> {monthly.missingMonths.join(", ")}</p>}
+        </section>}
+
+        {detector && <section className="mt-6 rounded-3xl bg-indigo-50 p-6 text-indigo-950 ring-1 ring-indigo-200">
+          <p className="text-xs font-black uppercase tracking-widest">Resultado técnico preliminar</p>
+          <h2 className="mt-2 text-2xl font-black">{detectorLabel(detector.status)}</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <Info label="Observações usadas" value={String(detector.observationsUsed)} />
+            <Info label="Queda no estresse" value={detector.stressDropPercent === null ? "Não identificada" : `${detector.stressDropPercent}%`} />
+            <Info label="Meses de estresse" value={detector.stressMonths.length ? detector.stressMonths.join(", ") : "Nenhum"} />
+            <Info label="Recuperação" value={detector.recoveryPercentOfBaseline === null ? "Não identificada" : `${detector.recoveryPercentOfBaseline}% da referência`} />
+          </div>
+          <p className="mt-4 rounded-2xl bg-white/70 p-4 text-sm ring-1 ring-indigo-200"><strong>Por que ainda é preliminar?</strong> O cálculo dos dividendos foi automatizado, mas a classificação final ainda depende da validação automática dos eventos materiais de crédito. Você não precisa conferir esses documentos.</p>
+        </section>}
+
+        {scan.issues.length > 0 && <section className="mt-6 space-y-2">{scan.issues.map((issue, index) => <div key={`${issue.code}-${index}`} className={`rounded-2xl p-4 text-sm ring-1 ${issue.severity === "error" ? "bg-red-50 text-red-950 ring-red-200" : "bg-amber-50 text-amber-950 ring-amber-200"}`}><strong>{issue.severity === "error" ? "Bloqueio automático" : "Aviso automático"}:</strong> {issue.message}</div>)}</section>}
 
         <section className="mt-6 rounded-3xl bg-white p-6 ring-1 ring-slate-200">
           <h2 className="text-2xl font-black">Documentos oficiais encontrados</h2>
