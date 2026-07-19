@@ -6,13 +6,13 @@ Encerrar a Fase 2 somente depois de executar em Produção a carga oficial do ca
 
 ## Fluxo retomável
 
-A rota protegida `GET /api/cron/phase-2-closure` avança uma etapa por chamada. Três chamadas temporárias e espaçadas permitem respeitar o tempo máximo de cada função:
+A rota protegida `GET /api/cron/phase-2-closure` pode avançar até três etapas na mesma chamada, interrompendo o encadeamento depois de quatro minutos para preservar margem no limite de cinco minutos da função. Três chamadas temporárias e espaçadas funcionam como redundância caso uma fonte externa fique lenta, a função seja interrompida ou a plataforma atrase um agendamento:
 
 1. `catalog-preview`: baixa fontes oficiais, normaliza, concilia e cria uma prévia imutável vinculada por hash;
 2. `catalog-apply`: aplica exatamente a prévia aprovada pela engine, criando backup, versão, hash de publicação, auditoria e diretório materializado;
 3. `production-smoke`: executa Validation, Health e relatórios para FII, FIAGRO e FI-Infra.
 
-Cada execução usa lock com expiração. Uma repetição retoma o passo pendente; depois do estado `passed`, novas chamadas não fazem escrita regulatória.
+Cada etapa usa lock com expiração. Uma repetição retoma o passo pendente; a ordem dos horários não altera o resultado e, depois do estado `passed`, novas chamadas não fazem escrita regulatória.
 
 ## Gates antes da publicação
 
