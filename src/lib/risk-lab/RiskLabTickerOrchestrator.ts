@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { cvmEventualDocumentDiscovery, type CvmEventualDocumentDiscovery } from "@/lib/risk-lab/CvmEventualDocumentDiscovery";
-import { regulatoryDataService } from "@/lib/regulatoryDataService";
 import type { PublicFundData } from "@/types/regulatory";
 import type {
   AutomaticAnalysisReadiness,
@@ -56,6 +55,11 @@ function nextActionFor(readinessValue: AutomaticAnalysisReadiness) {
   return "A análise foi bloqueada automaticamente. Nenhuma decisão técnica é exigida do administrador.";
 }
 
+async function resolveFundFromCatalog(ticker: string): Promise<PublicFundData | null> {
+  const { regulatoryDataService } = await import("@/lib/regulatoryDataService");
+  return regulatoryDataService.getByTicker(ticker, { bypassCache: true });
+}
+
 export interface RiskLabTickerOrchestratorDependencies {
   resolveFund?: (ticker: string) => Promise<PublicFundData | null>;
   discovery?: CvmEventualDocumentDiscovery;
@@ -70,7 +74,7 @@ export class RiskLabTickerOrchestrator {
   private readonly now: () => Date;
 
   constructor(dependencies: RiskLabTickerOrchestratorDependencies = {}) {
-    this.resolveFund = dependencies.resolveFund || ((ticker) => regulatoryDataService.getByTicker(ticker, { bypassCache: true }));
+    this.resolveFund = dependencies.resolveFund || resolveFundFromCatalog;
     this.discovery = dependencies.discovery || cvmEventualDocumentDiscovery;
     this.repository = dependencies.repository;
     this.now = dependencies.now || (() => new Date());
