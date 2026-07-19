@@ -1,10 +1,11 @@
 export type DividendNoticeSourceType = "primary_regulatory" | "primary_manager";
+export type DividendNoticeReviewMethod = "manual_document_review" | "automatic_regulatory_validation";
 
 export interface VerifiedDividendNoticeSource {
   documentId: string;
   sourceUrl: string;
   sourceType: DividendNoticeSourceType;
-  reviewMethod: "manual_document_review";
+  reviewMethod: DividendNoticeReviewMethod;
   reviewedBy: string;
   reviewedAt: string;
   page: number | null;
