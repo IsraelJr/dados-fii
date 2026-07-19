@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCvmEventualCsv } from "../src/lib/risk-lab/CvmEventualCsvParser.ts";
-import { CvmEventualDocumentDiscovery } from "../src/lib/risk-lab/CvmEventualDocumentDiscovery.ts";
-import { RiskLabTickerOrchestrator } from "../src/lib/risk-lab/RiskLabTickerOrchestrator.ts";
-import type { PublicFundData } from "../src/types/regulatory.ts";
+import { parseCvmEventualCsv } from "../src/lib/risk-lab/CvmEventualCsvParser";
+import { CvmEventualDocumentDiscovery } from "../src/lib/risk-lab/CvmEventualDocumentDiscovery";
+import { RiskLabTickerOrchestrator } from "../src/lib/risk-lab/RiskLabTickerOrchestrator";
+import type { PublicFundData } from "../src/types/regulatory";
 
 const HEADER = "TP_FUNDO_CLASSE;CNPJ_FUNDO_CLASSE;DENOM_SOCIAL;ID_SUBCLASSE;DT_COMPTC;DT_RECEB;TP_DOC;NM_ARQ;ID_DOC;LINK_ARQ;RESULTADO_AUDITORIA";
 const CNPJ = "12.345.678/0001-90";
