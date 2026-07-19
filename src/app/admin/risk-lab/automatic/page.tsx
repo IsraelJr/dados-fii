@@ -18,6 +18,12 @@ function detectorLabel(value: string) {
   return value;
 }
 
+function creditLabel(value: string) {
+  if (value === "material_event_confirmed") return "Evento material de crédito confirmado";
+  if (value === "inconclusive") return "Triagem inconclusiva — classificação final interrompida";
+  return "Nenhum evento explícito confirmado — não é certificado de ausência de risco";
+}
+
 export default function AutomaticRiskLabPage() {
   const [ticker, setTicker] = useState("MCCI11");
   const [running, setRunning] = useState(false);
@@ -47,6 +53,7 @@ export default function AutomaticRiskLabPage() {
 
   const monthly = scan?.monthlySeries || null;
   const detector = monthly?.detectorResult || null;
+  const credit = monthly?.creditEventScreen || null;
 
   return <main className="min-h-screen bg-slate-50 px-4 py-8">
     <div className="mx-auto max-w-5xl">
@@ -97,7 +104,7 @@ export default function AutomaticRiskLabPage() {
         </section>}
 
         {detector && <section className="mt-6 rounded-3xl bg-indigo-50 p-6 text-indigo-950 ring-1 ring-indigo-200">
-          <p className="text-xs font-black uppercase tracking-widest">Resultado técnico preliminar</p>
+          <p className="text-xs font-black uppercase tracking-widest">{monthly?.classificationFinal ? "Resultado final no piloto" : "Resultado técnico preliminar"}</p>
           <h2 className="mt-2 text-2xl font-black">{detectorLabel(detector.status)}</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <Info label="Observações usadas" value={String(detector.observationsUsed)} />
@@ -105,7 +112,22 @@ export default function AutomaticRiskLabPage() {
             <Info label="Meses de estresse" value={detector.stressMonths.length ? detector.stressMonths.join(", ") : "Nenhum"} />
             <Info label="Recuperação" value={detector.recoveryPercentOfBaseline === null ? "Não identificada" : `${detector.recoveryPercentOfBaseline}% da referência`} />
           </div>
-          <p className="mt-4 rounded-2xl bg-white/70 p-4 text-sm ring-1 ring-indigo-200"><strong>Por que ainda é preliminar?</strong> O cálculo dos dividendos foi automatizado, mas a classificação final ainda depende da validação automática dos eventos materiais de crédito. Você não precisa conferir esses documentos.</p>
+          <p className="mt-4 rounded-2xl bg-white/70 p-4 text-sm ring-1 ring-indigo-200">{monthly?.classificationFinal
+            ? <><strong>Conclusão do piloto:</strong> um evento material foi confirmado automaticamente em fonte oficial e bloqueou a interpretação de recuperação saudável.</>
+            : <><strong>Limite da conclusão:</strong> o sistema não certifica ausência de risco apenas porque não encontrou um evento explícito. Você não precisa conferir documentos.</>}
+          </p>
+        </section>}
+
+        {credit && <section className={`mt-6 rounded-3xl p-6 ring-1 ${credit.status === "material_event_confirmed" ? "bg-red-50 text-red-950 ring-red-200" : credit.status === "inconclusive" ? "bg-amber-50 text-amber-950 ring-amber-200" : "bg-slate-100 text-slate-950 ring-slate-200"}`}>
+          <p className="text-xs font-black uppercase tracking-widest">Triagem automática de eventos de crédito</p>
+          <h2 className="mt-2 text-2xl font-black">{creditLabel(credit.status)}</h2>
+          <p className="mt-2 text-sm">{credit.summary}</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
+            <Info label="Documentos examinados" value={String(credit.inspectedDocuments)} />
+            <Info label="Cobertura das fontes" value={credit.sourceCoverageComplete ? "Completa no intervalo" : "Incompleta"} />
+            <Info label="Eventos confirmados" value={String(credit.verifiedEvents.length)} />
+            <Info label="Documentos ambíguos" value={String(credit.ambiguousDocuments.length)} />
+          </div>
         </section>}
 
         {scan.issues.length > 0 && <section className="mt-6 space-y-2">{scan.issues.map((issue, index) => <div key={`${issue.code}-${index}`} className={`rounded-2xl p-4 text-sm ring-1 ${issue.severity === "error" ? "bg-red-50 text-red-950 ring-red-200" : "bg-amber-50 text-amber-950 ring-amber-200"}`}><strong>{issue.severity === "error" ? "Bloqueio automático" : "Aviso automático"}:</strong> {issue.message}</div>)}</section>}

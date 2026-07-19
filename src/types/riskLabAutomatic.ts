@@ -1,11 +1,17 @@
-import type { DividendStressWindow, VerifiedDividendNotice } from "./riskLabDividendStress";
+import type {
+  DividendStressWindow,
+  VerifiedDividendNotice,
+  VerifiedMaterialCreditEvent,
+} from "./riskLabDividendStress";
 
 export type AutomaticValidationStatus = "validated" | "inconclusive" | "blocked";
 
 export type AutomaticAnalysisReadiness =
   | "historical_unit_available"
+  | "structured_series_final"
   | "structured_series_ready"
   | "structured_series_incomplete"
+  | "credit_event_screen_inconclusive"
   | "detector_not_yet_supported"
   | "insufficient_official_evidence"
   | "blocked";
@@ -57,6 +63,43 @@ export interface AutomaticMonthlySourceSummary {
   error: string | null;
 }
 
+export type AutomaticCreditEventScreenStatus =
+  | "material_event_confirmed"
+  | "no_explicit_event_found"
+  | "inconclusive";
+
+export interface AutomaticCreditEventMatch {
+  documentId: string;
+  sourceUrl: string;
+  knownAt: string;
+  eventType: VerifiedMaterialCreditEvent["type"];
+  matchedTerm: string;
+  matchedIn: "metadata" | "official_html";
+  confidence: number;
+}
+
+export interface AutomaticCreditAmbiguousDocument {
+  documentId: string;
+  documentType: string;
+  fileName: string;
+  receivedAt: string;
+  sourceUrl: string;
+  reason: string;
+}
+
+export interface AutomaticCreditEventScreen {
+  status: AutomaticCreditEventScreenStatus;
+  relevantFrom: string;
+  relevantUntil: string;
+  inspectedDocuments: number;
+  sourceCoverageComplete: boolean;
+  matches: AutomaticCreditEventMatch[];
+  verifiedEvents: VerifiedMaterialCreditEvent[];
+  ambiguousDocuments: AutomaticCreditAmbiguousDocument[];
+  summary: string;
+  classificationFinal: boolean;
+}
+
 export interface AutomaticMonthlySeries {
   status: "ready" | "incomplete" | "blocked";
   observations: VerifiedDividendNotice[];
@@ -67,8 +110,14 @@ export interface AutomaticMonthlySeries {
   method: "direct_declared_per_share" | "unavailable";
   detectorResult: DividendStressWindow | null;
   detectorExecuted: boolean;
-  classificationFinal: false;
-  limitation: "material_credit_events_not_automatically_validated" | "insufficient_structured_series";
+  creditEventScreen?: AutomaticCreditEventScreen | null;
+  classificationFinal: boolean;
+  limitation:
+    | "material_credit_events_not_automatically_validated"
+    | "material_credit_event_confirmed"
+    | "no_explicit_material_credit_event_found"
+    | "material_credit_event_screen_inconclusive"
+    | "insufficient_structured_series";
 }
 
 export interface RiskLabAutomaticScan {

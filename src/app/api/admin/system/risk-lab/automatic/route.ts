@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
-import { RiskLabTickerOrchestrator } from "@/lib/risk-lab/RiskLabTickerOrchestrator";
+import { RiskLabAutomaticOrchestrator } from "@/lib/risk-lab/RiskLabAutomaticOrchestrator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   if (action !== "scan") return adminJson({ ok: false, error: "Ação inválida. Use scan." }, 400);
 
   try {
-    const orchestrator = new RiskLabTickerOrchestrator();
+    const orchestrator = new RiskLabAutomaticOrchestrator();
     const scan = await orchestrator.scan(String(body?.ticker || ""), authorization.identity.email);
     return adminJson({ ok: true, scan });
   } catch (error) {
