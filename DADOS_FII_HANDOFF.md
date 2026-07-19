@@ -1,482 +1,149 @@
+Este documento substitui todos os planejamentos anteriores quando houver divergência.
+
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 4.1.0  
-**Data:** 16/07/2026
+**Versão:** 5.0.0  
+**Data:** 19/07/2026  
+**Repositório:** `IsraelJr/dados-fii`
 
-> Este documento substitui todos os planejamentos anteriores quando houver divergência.
+## Decisões que substituem as anteriores
 
-## Objetivo
-
-Este documento consolida o estado oficial do projeto Dados FII, servindo como referência única para continuidade do desenvolvimento.
-
-Sempre que houver divergência entre documentos, conversas, prompts ou planejamentos antigos, este documento prevalece.
-
----
+- **Fase 3 = Risk Lab.** O Radar Inteligente passa para a Fase 4.
+- **Fluxo principal = ticker-only.** O proprietário não procura IDs, não escolhe documentos e não aprova dados técnicos.
+- Dúvida, falta ou conflito retornam `inconclusive`/`blocked`.
+- Importação, fila de IDs, revisão e execução manual permanecem somente como debug. PRs #38, #40 e #41 substituem como fluxo principal #28, #35, #36 e #37.
+- HCTR11/TGAR11 são casos de desenvolvimento. Coorte externa: DEVA11, VSLH11, KNCR11, KNSC11, MCCI11 e RBRY11.
+- Ruleset `v0.1.0` congelado. Mudanças exigem nova versão, hash e repetição integral.
+- “Nenhum evento explícito encontrado” não certifica ausência de risco.
+- Merge não prova Produção: exige deployment e smoke test do commit exato.
+- Texto vigente: **“Dividendos consolidados pelo histórico mensal da carteira.”** PR #39 substitui #34; #32 foi revertido por #33.
 
 ## 1. Estado atual do projeto
 
-### Status geral
+**Fases 1 e 2 concluídas e validadas em Produção:** engine CVM/B3, parser, reconciliação, catálogo normalizado, backup/aprovação/hash/rollback, RegulatoryDataService, ScoreEngine, Health/Validation, Dashboard, Timeline, relatórios Gratuito/Premium, AI Insights, observabilidade e monitor.
 
-**Fases 1 e 2 concluídas e validadas em Produção**
+Auditoria de 16/07/2026: 511/511 B3 conciliados com CVM; 504/504 ativos com cadastro básico; 491/502 com indicadores essenciais; zero CNPJ duplicado; 11 exceções externas nulas; nenhum valor inventado.
 
-Situação atual:
+**Risk Lab concluído em código até PR #41:** piloto HCTR11, métricas separadas, ruleset congelado, coorte, detector, descoberta por ticker, série mensal automática, tratamento de conflitos/lacunas, triagem automática de crédito, Admin sem validação documental e isolamento de Premium/notificações.
 
-- Engine regulatória implementada
-- Parser v2 consolidado
-- Publicação protegida
-- Rollback implementado
-- Backup imutável
-- Aprovação humana
-- QA operacional
-- CI existente
-- Arquitetura de serviços pronta para evolução
-- Catálogo normalizado B3/CVM publicado e validado
-- Relatórios, IA, observabilidade e notificações operacionais em Produção
+**Deploy:** `main` em `ae0a6c8969bd68526e414617bcf1ced49096b9a1`; CI aprovado; Vercel bloqueada por `build-rate-limit`; Produção não comprovada nesse commit; sem decisão de contratar Pro.
 
-A avaliação anterior foi otimista ao considerar componentes funcionais e alguns fundos sentinela como prova de conclusão. A partir desta versão, uma fase só recebe aceite total depois de cobertura integral do universo aplicável, deploy, carga protegida, double check pós-carga e homologação de relatórios/IA. O responsável pelo produto confirmou o aceite da Fase 2 em 16/07/2026; as exceções externas documentadas continuam monitoradas e não anulam o aceite.
+Trilhas paralelas: Risk Lab, Data Coverage Hardening e SEO 90 dias.
 
----
+## 2. Fase concluída
 
-## 2. Fases concluídas
-
-### Fase 1 — Regulatory Engine
-
-**Concluído:**
-
-- Parser CVM v2
-- Suporte FII
-- Suporte FIAGRO
-- Reconciliação automática
-- QA Operacional
-- Aprovação humana
-- Backup imutável
-- Publicação protegida
-- Rollback
-- Hash de aprovação
-- Separação Staging x Produção
-- Pipeline CI
-- Testes reais
-
-Fundos utilizados na homologação:
-
-- TGAR11
-- VGIA11
-- MXRF11
-- KNCA11
-
-Todos aprovados.
-
-### Fase 2 — Serviços, inteligência e produto
-
-**Concluída e validada em Produção:**
-
-- RegulatoryDataService
-- Score Engine
-- Health e Validation
-- Dashboard Administrativo
-- Timeline Regulatória
-- Relatório Gratuito
-- AI Insights Engine
-- Relatório Premium
-- Observabilidade
-- Monitor Automático
-- Catálogo normalizado e Data Quality Hardening
-
----
+- **Fase 1 — concluída:** Regulatory Engine, QA, publicação protegida, backup, hash, rollback e CI.
+- **Fase 2 — concluída:** serviços, scores, relatórios, IA, observabilidade, monitor e qualidade global.
+- **Fase 3 — em andamento:** 3.0 PRs #22-23; 3.1 #24-26; 3.2 #27-37; 3.3 #38/#40/#41 concluídas em código.
 
 ## 3. Sprint atual
 
-### Transição para a Fase 3 — Notificações e Radar Inteligente
+**Sprint 3.4 — Ativação em Produção e homologação ponta a ponta.**
 
-**Objetivo atual:** reduzir ruído nas notificações da carteira e preparar o Radar Inteligente com regras comerciais seguras.
+Fluxo: `ticker → identidade/CNPJ → fontes oficiais → validação → série mensal → detector → triagem de crédito → validated/inconclusive/blocked`.
 
-**Status:** Fase 2 validada; política de notificações em aprimoramento antes da Sprint 3.1.
+Status: bloqueada pelo limite de builds da Vercel.
 
-**Auditoria de 16/07/2026:**
+## 4. Ordem oficial das próximas sprints
 
-- 511/511 candidatos B3 conciliados com cadastro CVM;
-- zero CNPJ duplicado entre ativos;
-- 504/504 fundos ativos com cadastro básico completo;
-- 491/502 fundos aplicáveis com indicadores essenciais completos (97,81%);
-- 11 exceções essenciais atribuídas a ausência nos layouts estruturados, sem zeros inventados;
-- HGPO11 identificado para inativação por ausência B3 + liquidação CVM;
-- sete tickers presentes na B3 e em liquidação preservados em revisão;
-- três divergências históricas de ISIN preservadas para revisão sem trocar CNPJ.
+1. **3.4:** deploy e homologação.
+2. **3.5:** backtest fora da amostra.
+3. **3.6:** métricas, calibração e gate.
+4. **3.7:** integração read-only ao Premium.
+5. **3.8:** piloto opt-in de impacto e alertas.
+6. **4.1:** Radar — fundação, planos e segurança.
+7. **4.2:** Radar — eventos e mudanças de tese.
+8. **4.3:** Radar — experiência e monetização.
 
-Detalhes, fontes, contrato, custos e procedimento: `docs/data-quality-hardening.md`.
-
----
-
-## 4. Ordem oficial das próximas Sprints
-
-| Sprint | Entrega principal |
-|---|---|
-| 2.1 | RegulatoryDataService |
-| 2.2 | Score Engine |
-| 2.3 | Health System |
-| 2.4 | Validation System |
-| 2.5 | Dashboard Administrativo |
-| 2.6 | Timeline Regulatória |
-| 2.7 | Relatório Gratuito |
-| 2.8 | AI Insights Engine |
-| 2.9 | Relatório Premium |
-| 2.10 | Observabilidade |
-| 2.11 | Monitor Automático |
-| 3.1 | Radar Inteligente — acompanhamento, cotas por plano e segurança |
-| 3.2 | Inteligência do Radar — eventos e mudanças de tese |
-| 3.3 | Experiência, preferências e monetização |
-
----
+SEO, cobertura de dados e incidentes operacionais seguem em paralelo.
 
 ## 5. Escopo e critérios de aceite
 
-### Sprint 2.1 — RegulatoryDataService
-
-Criar:
-
-- RegulatoryRepository
-- RegulatoryDataService
-- RegulatoryNormalizer
-- RegulatoryValidator
-- RegulatoryCache
-- RegulatoryTypes
-
-Critérios:
-
-- Nenhuma API acessar Firestore diretamente.
-- Todas utilizam RegulatoryDataService.
-
-### Sprint 2.2 — Score Engine
-
-Criar:
-
-- ScoreEngine
-
-Subscores:
-
-- Risk
-- Dividend
-- Governance
-- Growth
-- Liquidity
-- Quality
-- Premium
-
-Critério:
-
-- Novo FII deve gerar todos os scores automaticamente.
-
-### Sprint 2.3 — Health API
-
-Criar:
-
-- `GET /api/admin/system/health`
-
-Retorno:
-
-- Firestore
-- Parser
-- QA
-- Publicação
-- Rollback
-- Cache
-- Score
-
-### Sprint 2.4 — Validation Runner
-
-Criar:
-
-- `POST /api/admin/system/run-validation`
-- Validation History
-- Parser Health
-- System Health
-
-### Sprint 2.5 — Dashboard Admin
-
-Cards:
-
-- Saúde
-- Parser
-- Firestore
-- QA
-- Publicação
-- Rollback
-- Histórico
-
-### Sprint 2.6 — Timeline
-
-Mostrar:
-
-- Documentos
-- Eventos
-- Fatos relevantes
-- Assembleias
-- Regulamentos
-
-### Sprint 2.7 — Relatório Gratuito
-
-- Gerado automaticamente.
-
-### Sprint 2.8 — AI Insights Engine
-
-Gerar:
-
-- Resumo executivo
-- Mudanças
-- Riscos
-- Oportunidades
-- Alertas
-- Linguagem simples
-
-### Sprint 2.9 — Relatório Premium
-
-Adicionar:
-
-- Valuation
-- Stress test
-- Cenários
-- Comparativos
-- Recomendações
-- Análise IA
-
-### Sprint 2.10 — Observabilidade
-
-Métricas:
-
-- Tempo
-- Retries
-- Falhas
-- Ingestão
-- Parser
-- QA
-- Publicação
-
-### Sprint 2.11 — Monitor Automático
-
-Alertas via:
-
-- Painel
-- Firestore
-- E-mail
-- Telegram
-
----
+- **3.4:** implantar o commit atual, registrar URL/commit/horário, conferir flags, testar HCTR11/MCCI11/RBRY11, validar bloqueios e confirmar ausência de efeitos em Premium/notificações. Aceite: Vercel `Ready`, Admin ticker-only, typecheck, `test:sprint2`, `test:risk-lab`, build e smoke verdes.
+- **3.5:** executar os seis fundos sem mudar `v0.1.0`; registrar `knownAt`, fontes e versões; medir primeiro amarelo/laranja/vermelho, antecedência, falsos positivos/negativos, inconclusão e cobertura. Aceite: sem informação futura, achados materiais oficiais, controles sem vermelho injustificado.
+- **3.6:** decidir aprovar/reprovar/revisar; nova regra gera nova versão/hash e repetição. Gate mínimo: zero vermelho falso positivo nos controles; nenhuma conclusão final só com fonte secundária; ambiguidades inconclusivas.
+- **3.7:** Premium somente leitura, com flag, fontes, linguagem simples, métricas separadas, falha isolada e rollback.
+- **3.8:** impacto por peso/renda, opt-in, painel antes de canais interruptivos, deduplicação/cooldown. Sem alertas periódicos sem mudança ou vermelho por ausência.
+- **4.1:** acompanhamento fora da carteira, plano resolvido no servidor e cotas vigentes de 1 fundo/ciclo no Grátis e 10 no Premium, salvo nova decisão.
+- **4.2:** eventos, dividendos, tese e relatório pré-compra com fontes.
+- **4.3:** preferências, canais, consentimento e monetização sem spam.
 
 ## 6. Regras arquiteturais obrigatórias
 
-### Regra 1 — Acesso ao Firestore
+1. APIs usam serviços/repositórios; Firestore direto somente quando formalmente justificado.
+2. Dados derivados são calculados; campos protegidos não são sobrescritos.
+3. Scores passam pelo ScoreEngine; IA textual pelo AIInsightsEngine; IA não decide alerta determinístico.
+4. Publicação sensível exige fonte/data, hash, identidade, idempotência, auditoria, backup e rollback.
+5. Risk Lab principal é ticker-only; proprietário não valida documentos.
+6. Fontes oficiais prevalecem; secundárias só localizam/contextualizam; sem bypass de captcha, URL livre ou host não autorizado.
+7. `knownAt` governa o backtest; look-ahead proibido.
+8. Falta/conflito/ambiguidade bloqueiam; ausência de evento não certifica segurança.
+9. Regras versionadas e congeladas; ferramentas manuais são debug.
+10. Sem integração ao Premium antes do gate e sem alertas antes da 3.8.
+11. Não inventar preço, VP, P/VP, dividendos, liquidez, vacância, crédito ou evento; separar fato, cálculo, estimativa, inferência e indisponibilidade.
+12. SEO exige fonte, data, método e limitações; não autoriza páginas rasas em massa.
 
-Nenhuma API nova pode acessar Firestore diretamente.
+## 7. Arquivos, branches, commits e PRs
 
-Fluxo obrigatório:
+- Branch canônica: `main`; branch desta atualização: `docs/canonical-handoff-v5`.
+- Commits-chave: `11e85a5` (#23), `556285c2` (#24), `6b966056` (#27), `8a6cc942` (#40), `ae0a6c89` (#41).
+- PRs: #21 catálogo; #22 piloto; #23 freeze; #24 coorte; #25 ledger; #26 datas conservadoras; #27 motor; #28/#35/#36/#37 ferramentas manuais legadas; #29 cobertura; #38 ticker automático; #40 série/detector; #41 crédito automático.
+- Arquivos centrais: `src/app/admin/risk-lab/automatic/page.tsx`, rota API homônima, `CvmEventualCsvParser`, `CvmEventualDocumentDiscovery`, `RiskLabTickerOrchestrator`, `AutomaticDividendSeriesService`, `DividendStressWindowEngine`, `AutomaticCreditEventScreeningService`, `RiskLabAutomaticOrchestrator`, tipos e `tests/risk-lab-*`.
 
-```text
-API
- ↓
-RegulatoryDataService
- ↓
-Firestore
-```
+## 8. Funcionalidades concluídas, parciais e pendentes
 
-### Regra 2 — RegulatoryRepository
-
-Toda leitura regulatória passa pelo RegulatoryRepository.
-
-### Regra 3 — Dados derivados
-
-Dados derivados nunca serão gravados manualmente. Devem ser calculados.
-
-### Regra 4 — Publicação
-
-Toda publicação exige:
-
-- Backup
-- Aprovação
-- Hash
-- Rollback
-
-### Regra 5 — Campos legados
-
-Campos legados protegidos nunca podem ser sobrescritos automaticamente.
-
-### Regra 6 — Inteligência artificial
-
-Toda IA utiliza AI Insights Engine. Nenhuma API chama OpenAI diretamente.
-
-### Regra 7 — Scores
-
-Todo Score passa pelo ScoreEngine.
-
----
-
-## 7. Branches, commits e PRs
-
-### Estado conhecido
-
-**Branch principal:** `main`
-
-**CI:** configurado
-
-O commit, PR e resultado de CI desta entrega de qualidade devem ser registrados aqui depois da publicação. Nenhum estado local é prova de deploy.
-
----
-
-## 8. Funcionalidades
-
-### Implementadas e existentes em Produção antes do hardening
-
-- Parser
-- QA
-- Reconciliação
-- Backup
-- Rollback
-- Publicação
-- Approval
-- Hash
-- CI
-- Staging
-- Produção
-
-### Componentes funcionais da Fase 2
-
-- RegulatoryDataService
-- Score Engine
-- Health System
-- Validation System
-- Dashboard Administrativo
-- Timeline Regulatória
-- Relatório Gratuito
-- AI Insights Engine
-- Relatório Premium
-- Observabilidade
-- Monitor Automático
-
-### Pendências para aceite total
-
-- integrar e publicar o catálogo normalizado;
-- aplicar a prévia em Produção com aprovação e hash;
-- executar o double check pós-carga;
-- confirmar as exceções essenciais no Admin;
-- homologar relatórios, scores e IA em amostra estratificada;
-- reavaliar formalmente o aceite das Fases 1 e 2.
-
----
+- **Concluídas:** Fases 1/2; piloto; freeze; coorte; detector; ticker-only; série e triagem automáticas; bloqueios e testes.
+- **Parciais:** Fase 3; deploy; relatório final da coorte; validação DEVA/VSLH; resultado externo MCCI/RBRY; PDFs não extraíveis; persistência/auditoria do scan automático; Premium deliberadamente ausente.
+- **Pendentes:** 3.4-3.8, backtest, gate, possível v0.2.0, Premium read-only, alertas, Radar, ledger histórico, screener, comparador, centro fiscal e dados profundos de ativos/crédito.
 
 ## 9. Decisões de segurança
 
-### APIs administrativas
-
-Exigem:
-
-- Firebase Authentication
-- E-mail autorizado
-- Perfil Admin
-
-Nenhuma API administrativa será pública.
-
-Logs obrigatórios:
-
-- Publicação
-- Rollback
-- Validação
-- Aprovação
-
-Também são obrigatórios:
-
-- Rate limiting
-- Backup antes da publicação
-- Rollback
-- Hash
-
----
+Firebase Auth, e-mail autorizado, Admin, mesma origem, rate limit e logs sem segredos. Rota automática: GET 30/minuto, POST 3 scans/15 minutos, máximo 60 segundos. Sem URL livre, bypass de captcha ou promoção de fonte secundária. Nenhum alerta por ausência de dados ou mudança pública de recomendação. Segredos somente no ambiente.
 
 ## 10. Variáveis de ambiente
 
-Além das variáveis já existentes para OpenAI, Firebase e demais integrações, adicionar na Fase 2:
+Plataforma: `ENABLE_SYSTEM_VALIDATION`, `ENABLE_HEALTH_MONITOR`, `ENABLE_AI_INSIGHTS`, `ENABLE_REPORT_PREMIUM`, `ENABLE_SCORE_ENGINE`, `ENABLE_AUTOMATIC_MONITOR`, `ENABLE_PORTFOLIO_REGULATORY_INTELLIGENCE`, variáveis Premium/monitor/SMTP/Telegram e `CRON_SECRET`.
+
+Risk Lab:
 
 ```text
-ENABLE_SYSTEM_VALIDATION
-ENABLE_HEALTH_MONITOR
-ENABLE_AI_INSIGHTS
-ENABLE_REPORT_PREMIUM
-ENABLE_SCORE_ENGINE
-ENABLE_AUTOMATIC_MONITOR
-ENABLE_PORTFOLIO_REGULATORY_INTELLIGENCE
-PREMIUM_PREVIEW_EMAILS
-MONITOR_ALERT_COOLDOWN_MS
-MONITOR_ALERT_EMAILS
-SMTP_HOST
-SMTP_PORT
-SMTP_SECURE
-SMTP_USER
-SMTP_PASS
-SMTP_FROM
-TELEGRAM_BOT_TOKEN
-TELEGRAM_CHAT_ID
-CRON_SECRET
+ENABLE_RISK_LAB_ADMIN
+ENABLE_RISK_LAB_AUTOMATIC_DISCOVERY
+ENABLE_RISK_LAB_FNET_IMPORT
+ENABLE_RISK_LAB_STRESS_RUN
 ```
 
----
+`ENABLE_RISK_LAB_AUTOMATIC_DISCOVERY` controla o fluxo principal e deve ser explícita em Produção. FNET import/stress run são debug legado. Valores secretos não entram neste documento.
 
 ## 11. Testes obrigatórios
 
-Antes de qualquer deploy:
+```bash
+npm run typecheck
+npm run test:sprint2
+npm run test:risk-lab
+npm run build
+```
 
-- CI
-- Parser
-- QA
-- Reconciliação
-- Publicação
-- Rollback
-- Backup
-- Health
-- Validation
+Workflows: Portfolio Notifications CI, Risk Lab CI e deployment. Cobertura obrigatória: hash/freeze, look-ahead, ticker/CNPJ, fontes, insuficiência, lacuna, duplicidade, reapresentação, conflito, 20%/90%, data do anúncio, evento de crédito, ambiguidade, inconclusão, isolamento Premium/notificações, autenticação e rate limit.
 
-Todo parser novo deve homologar, no mínimo:
+Smoke 3.4: confirmar commit, autenticar Admin, abrir `/admin/risk-lab/automatic`, testar ticker válido/inválido, insuficiência/ambiguidade, confirmar ausência de validação humana e efeitos externos, registrar resultado.
 
-- 1 FII
-- 1 FIAGRO
+## 12. Pendências e decisões ainda abertas
 
-antes da produção.
+1. Repetir/criar deployment quando o limite Vercel permitir.
+2. Executar coorte e publicar desempenho.
+3. Definir limiares do gate e categorias suportadas.
+4. Avaliar extração determinística de PDF; até lá, não legível = inconclusivo.
+5. Confirmar/padronizar persistência e auditoria dos scans automáticos.
+6. Decidir sobre `v0.2.0`.
+7. Ocultar, mover para `/debug` ou remover rotas manuais.
+8. Validar mensagens com usuário não técnico; fontes são auditoria opcional.
+9. Definir gate Premium, segmentação de planos, alertas e cobrança.
+10. Não contratar plano pago sem análise específica.
+11. Manter SEO/Data Coverage em paralelo e atualizar este arquivo a cada mudança de fase, ruleset, coorte ou gate.
 
-Além dos sentinelas, todo fechamento de fase exige auditoria do universo completo aplicável, 100% de conciliação de identidade, 100% de cadastro básico dos ativos, zero duplicidade de CNPJ e lista explícita das lacunas externas. Ver `docs/data-quality-hardening.md`.
+## Critério para concluir a Fase 3
 
----
+Fluxo implantado e homologado; coorte completa; desempenho publicado; ambiguidades bloqueadas; ruleset versionado; gate formal; Premium read-only testado ou formalmente adiado; nenhuma notificação não autorizada; proprietário operando apenas por ticker.
 
-## 12. Pendências
-
-### Alta prioridade
-
-- substituir notificações periódicas sem mudança por eventos reais de rendimento ou variação patrimonial relevante;
-- manter 3% como limite patrimonial fixo no Grátis e permitir configuração autenticada nos planos pagos;
-- implementar a Sprint 3.1 do Radar Inteligente, com plano resolvido exclusivamente no servidor;
-- aplicar as cotas de 1 fundo por ciclo no Grátis e 10 no Premium;
-- manter as 11 exceções essenciais visíveis e acompanhar novas competências CVM para preenchimento futuro.
-
-### Decisões abertas
-
-1. Modelo final do Premium.
-2. Modelo de cobrança.
-3. Estratégia de cache distribuído.
-4. Monitoramento em tempo real.
-5. Integração futura com novos provedores regulatórios.
-
-### Decisões substituídas
-
-As seguintes decisões passam a substituir planejamentos anteriores:
-
-1. RegulatoryDataService obrigatório substitui qualquer acesso direto ao Firestore por novas APIs.
-2. AI Insights Engine centralizado substitui a ideia anterior de cada relatório consumir IA diretamente.
-3. ScoreEngine único substitui cálculos independentes por API.
-4. Dashboard Administrativo com Health Score substitui o uso do GitHub Actions como principal mecanismo operacional para validações rotineiras.
-5. Arquitetura baseada em serviços reutilizáveis substitui implementações específicas por endpoint.
-6. Cobertura parcial ou homologação por poucos fundos não autoriza mais declarar uma fase totalmente concluída.
-7. Quantidade de cotas, patrimônio e cotistas são snapshots datados, não campos cadastrais fixos.
-8. A ausência de dado externo é `null` com aviso; nunca zero, risco do fundo ou inferência negativa da IA.
-9. Notificações da carteira são orientadas a eventos: sem mudança de rendimento, só há aviso patrimonial ao atingir o limite acumulado; o plano e o limite são resolvidos no servidor.
-
----
-
-## Objetivo estratégico
-
-O objetivo da Fase 2 permanece uma arquitetura orientada a serviços, com ingestão regulatória consolidada, inteligência reutilizável, observabilidade e relatórios consistentes. O aceite total só ocorrerá quando essa capacidade estiver comprovada em Produção sobre todo o universo aplicável, com qualidade, rastreabilidade e exceções documentadas.
+Até lá, o Risk Lab é laboratório avançado, não recomendação pública nem sistema autônomo de alertas.
