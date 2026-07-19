@@ -1,6 +1,6 @@
 import type { FundKind } from "@/types/regulatory";
 
-export const PHASE2_CLOSURE_SCHEMA_VERSION = 1 as const;
+export const PHASE2_CLOSURE_SCHEMA_VERSION = 2 as const;
 
 export type Phase2ClosureStatus = "pending" | "ready" | "running" | "passed" | "blocked" | "failed";
 export type Phase2ClosurePhase = "catalog-preview" | "catalog-apply" | "production-smoke" | "complete";
@@ -36,7 +36,11 @@ export type Phase2CatalogEvidence = {
 
 export type Phase2SmokeSample = {
   ticker: string;
-  kind: Exclude<FundKind, "UNKNOWN">;
+  kind: FundKind;
+  caseType: "standard" | "incomplete" | "exceptional";
+  missingFields: string[];
+  lifecycleStatus: string | null;
+  lifecycleReason: string | null;
   basicDataComplete: boolean;
   freeReport: boolean;
   aiInsights: boolean;
