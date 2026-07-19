@@ -7,9 +7,10 @@ import {
   evaluateCatalogPreview,
   evidenceHash,
   misleadingMissingDataClaims,
+  selectEdgeSamples,
   selectStratifiedSamples,
 } from "@/lib/phase2/Phase2ClosurePolicy";
-import type { FundCatalogAudit, FundCatalogDirectory, FundCatalogRun } from "@/types/fund-catalog";
+import type { CanonicalFundCatalogEntry, FundCatalogAudit, FundCatalogDirectory, FundCatalogRun } from "@/types/fund-catalog";
 import {
   PHASE2_CLOSURE_SCHEMA_VERSION,
   type Phase2CatalogEvidence,
@@ -126,6 +127,25 @@ export class Phase2ClosureService {
     if (!acquired) return (await this.getStatus()) || initialState(actor);
     let state = (await this.getStatus()) || initialState(actor);
     try {
+      if (Number(state.schemaVersion) < PHASE2_CLOSURE_SCHEMA_VERSION) {
+        state = state.runId && state.catalog
+          ? {
+              ...state,
+              schemaVersion: PHASE2_CLOSURE_SCHEMA_VERSION,
+              status: "ready",
+              phase: "production-smoke",
+              actor,
+              updatedAt: nowIso(),
+              completedAt: null,
+              retryAfter: null,
+              blockers: [],
+              error: null,
+              smoke: null,
+              evidenceHash: null,
+            }
+          : initialState(actor);
+        await this.repository.savePhase2ClosureState(state, actor);
+      }
       if (state.status === "passed") return state;
       if (state.status === "blocked" && state.retryAfter && new Date(state.retryAfter).getTime() > Date.now()) return state;
       if (state.status === "blocked" && state.phase === "catalog-preview") state = { ...initialState(actor), attempt: state.attempt, startedAt: state.startedAt };
@@ -220,24 +240,38 @@ export class Phase2ClosureService {
     if (!run || !audit || !directory || run.id !== state.runId) throw new Error("Carga, auditoria ou diretório da Sprint 2.12 não está disponível para homologação.");
     const catalogEvaluation = evaluateCatalogAudit(audit, directory, run.id);
     const samples = selectStratifiedSamples(directory);
+    const edgeSamples = selectEdgeSamples(run, audit);
     const sampleCheck: Phase2ClosureCheck = {
       id: "smoke.stratified-universe",
       status: samples.length === 3 ? "passed" : "failed",
       message: "A homologação deve conter um FII, um FIAGRO e um FI-Infra.",
       metadata: { samples: samples.length, required: 3 },
     };
-    if (sampleCheck.status === "failed") {
-      const blocked = { ...state, status: "blocked" as const, updatedAt: nowIso(), retryAfter: new Date(Date.now() + RETRY_DELAY_MS).toISOString(), blockers: [sampleCheck.message], checks: mergeChecks(state.checks, [...catalogEvaluation.checks, sampleCheck]) };
+    const edgeCheck: Phase2ClosureCheck = {
+      id: "smoke.edge-universe",
+      status: edgeSamples.incomplete && edgeSamples.exceptional ? "passed" : "failed",
+      message: "A homologação deve conter um fundo incompleto e um caso excepcional de ciclo de vida.",
+      metadata: { incomplete: Boolean(edgeSamples.incomplete), exceptional: Boolean(edgeSamples.exceptional) },
+    };
+    if (sampleCheck.status === "failed" || edgeCheck.status === "failed") {
+      const failedChecks = [sampleCheck, edgeCheck].filter((item) => item.status === "failed");
+      const blocked = { ...state, status: "blocked" as const, updatedAt: nowIso(), retryAfter: new Date(Date.now() + RETRY_DELAY_MS).toISOString(), blockers: failedChecks.map((item) => item.message), checks: mergeChecks(state.checks, [...catalogEvaluation.checks, sampleCheck, edgeCheck]) };
       await this.repository.savePhase2ClosureState(blocked, actor);
       return blocked;
     }
 
+    const smokeTargets = [
+      ...samples.map((item) => ({ ...item, caseType: "standard" as const, missingFields: [] as string[], lifecycleStatus: null as string | null, lifecycleReason: null as string | null })),
+      { ticker: edgeSamples.incomplete!.ticker, kind: undefined, caseType: "incomplete" as const, missingFields: edgeSamples.incomplete!.fields, lifecycleStatus: null as string | null, lifecycleReason: null as string | null },
+      { ticker: edgeSamples.exceptional!.ticker, kind: undefined, caseType: "exceptional" as const, missingFields: [] as string[], lifecycleStatus: edgeSamples.exceptional!.status, lifecycleReason: edgeSamples.exceptional!.reason },
+    ];
+
     const [funds, validation] = await Promise.all([
-      this.data.getMany(samples.map((item) => item.ticker), samples.length),
+      this.data.getMany(smokeTargets.map((item) => item.ticker), smokeTargets.length),
       this.data.runValidation(actor, { limit: 500 }),
     ]);
 
-    const sampleEvidence = await Promise.all(samples.map(async (sample) => {
+    const sampleEvidence = await Promise.all(smokeTargets.map(async (sample) => {
       const fund = funds.items[sample.ticker] || null;
       const basic = basicFundEvidence(fund);
       const basicComplete = Object.values(basic).every(Boolean);
@@ -252,9 +286,16 @@ export class Phase2ClosureService {
         ...misleadingMissingDataClaims(premiumText(premium), basic),
       ];
       if (claims.length) throw new Error(`${sample.ticker}: ${claims.join(" ")}`);
+      const catalog = fund?.catalog && typeof fund.catalog === "object"
+        ? fund.catalog as CanonicalFundCatalogEntry
+        : null;
       return {
         ticker: sample.ticker,
-        kind: sample.kind,
+        kind: sample.kind || fund?.fundKind || "UNKNOWN",
+        caseType: sample.caseType,
+        missingFields: sample.missingFields,
+        lifecycleStatus: catalog?.lifecycle.status || sample.lifecycleStatus,
+        lifecycleReason: catalog?.lifecycle.reason || sample.lifecycleReason,
         basicDataComplete: basicComplete,
         freeReport: Boolean(freeReport),
         aiInsights: Boolean(insights?.executiveSummary && insights?.plainLanguage),
@@ -266,8 +307,14 @@ export class Phase2ClosureService {
     }));
 
     const health = await this.data.getSystemHealth();
+    const incompleteEvidence = sampleEvidence.find((item) => item.caseType === "incomplete");
+    const exceptionalEvidence = sampleEvidence.find((item) => item.caseType === "exceptional");
+    const reportReady = (item: typeof incompleteEvidence) => Boolean(item?.basicDataComplete && item.freeReport && item.aiInsights && item.premiumReport);
     const smokeChecks: Phase2ClosureCheck[] = [
       sampleCheck,
+      edgeCheck,
+      { id: "smoke.incomplete-report", status: reportReady(incompleteEvidence) && Boolean(incompleteEvidence?.missingFields.length) ? "passed" : "failed", message: "Um fundo com lacuna essencial deve gerar relatórios e IA sem transformar ausência externa em dado inventado.", metadata: { ticker: incompleteEvidence?.ticker || null, missingFields: incompleteEvidence?.missingFields.length || 0, reportsReady: reportReady(incompleteEvidence) } },
+      { id: "smoke.lifecycle-exception", status: reportReady(exceptionalEvidence) && Boolean(exceptionalEvidence?.lifecycleStatus && exceptionalEvidence.lifecycleStatus !== "active" && exceptionalEvidence.lifecycleReason) ? "passed" : "failed", message: "Um fundo excepcional deve preservar status, motivo e geração segura dos relatórios.", metadata: { ticker: exceptionalEvidence?.ticker || null, lifecycleStatus: exceptionalEvidence?.lifecycleStatus || null, hasReason: Boolean(exceptionalEvidence?.lifecycleReason), reportsReady: reportReady(exceptionalEvidence) } },
       { id: "smoke.validation", status: validation.status === "completed" && validation.healthScore >= 90 ? "passed" : "failed", message: "Validation deve concluir com saúde mínima de 90 pontos.", metadata: { status: validation.status, healthScore: validation.healthScore, processed: validation.totals.processed } },
       { id: "smoke.health", status: health.ok && health.score >= 80 ? "passed" : "failed", message: "Health deve confirmar o ambiente de Produção sem falha crítica.", metadata: { ok: health.ok, score: health.score, status: health.status } },
       { id: "smoke.basic-data", status: sampleEvidence.every((item) => item.basicDataComplete) ? "passed" : "failed", message: "As três classes de fundos devem chegar aos relatórios com dados básicos completos.", metadata: { passed: sampleEvidence.filter((item) => item.basicDataComplete).length, samples: sampleEvidence.length } },

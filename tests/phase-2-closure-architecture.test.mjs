@@ -21,6 +21,10 @@ test("Sprint 2.12 performs preview, protected apply, global validation and strat
     assert.match(service, new RegExp(`\\.${operation}\\(`));
   }
   assert.match(service, /FII.*FIAGRO.*FI_INFRA|selectStratifiedSamples/s);
+  assert.match(service, /selectEdgeSamples/);
+  assert.match(service, /smoke\.incomplete-report/);
+  assert.match(service, /smoke\.lifecycle-exception/);
+  assert.match(service, /schemaVersion\) < PHASE2_CLOSURE_SCHEMA_VERSION/);
   assert.match(service, /evidenceHash/);
   assert.doesNotMatch(service, /firebase-admin|adminDb|\.collection\(|api\.openai\.com/);
 });
@@ -29,6 +33,7 @@ test("Sprint 2.12 state is locked, JSON-sanitized, audited and historically pers
   const repository = read("src/lib/regulatory/RegulatoryRepository.ts");
   const types = read("src/lib/regulatory/RegulatoryTypes.ts");
   assert.match(types, /RegulatoryPhase2ClosureRuns/);
+  assert.match(read("src/types/phase2-closure.ts"), /PHASE2_CLOSURE_SCHEMA_VERSION = 2/);
   assert.match(repository, /acquirePhase2ClosureLock/);
   assert.match(repository, /releasePhase2ClosureLock/);
   assert.match(repository, /savePhase2ClosureState/);

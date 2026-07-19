@@ -60,6 +60,24 @@ function nonEmpty(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+export function selectEdgeSamples(run: FundCatalogRun, audit: FundCatalogAudit) {
+  const standardTickers = new Set(["MXRF11", "VGIA11", "BODB11"]);
+  const missingCandidates = audit.missingEssential.filter((item) => !standardTickers.has(item.ticker));
+  const incomplete = missingCandidates.find((item) => item.ticker === "RJDA11") || missingCandidates[0] || null;
+  const lifecycleCandidates = audit.staleOrInactive.filter((item) => item.ticker !== incomplete?.ticker);
+  const lifecycle = lifecycleCandidates.find((item) => item.ticker === "HGPO11") || lifecycleCandidates[0] || null;
+  const review = run.reviewSamples.find((item) => item.ticker !== incomplete?.ticker) || null;
+  const exceptional = lifecycle
+    ? { ticker: lifecycle.ticker, status: lifecycle.status, reason: lifecycle.reason }
+    : review
+      ? { ticker: review.ticker, status: "under_review" as const, reason: review.issue }
+      : null;
+  return {
+    incomplete: incomplete ? { ticker: incomplete.ticker, fields: incomplete.fields } : null,
+    exceptional,
+  };
+}
+
 export function basicFundEvidence(fund: PublicFundData | null) {
   const catalog = fund?.catalog && typeof fund.catalog === "object" ? fund.catalog as CanonicalFundCatalogEntry : null;
   const cnpj = String(catalog?.identity.cnpj || fund?.cnpj || fund?.CNPJ || "").replace(/\D/g, "");
