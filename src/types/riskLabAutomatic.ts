@@ -51,7 +51,7 @@ export interface AutomaticMonthlySourceSummary {
   sourceUrl: string;
   sourceHash: string | null;
   fetched: boolean;
-  csvFilesInspected: number;
+  documentsInspected: number;
   matchingRows: number;
   acceptedMonths: number;
   error: string | null;
