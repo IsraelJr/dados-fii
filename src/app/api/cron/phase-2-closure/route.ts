@@ -19,7 +19,16 @@ function validSecret(request: NextRequest) {
 export async function GET(request: NextRequest) {
   if (!validSecret(request)) return NextResponse.json({ ok: false, error: "Cron não autorizado." }, { status: 401 });
   try {
-    const state = await phase2ClosureService.advance();
+    const startedAt = Date.now();
+    let stepsAttempted = 0;
+    let state = await phase2ClosureService.advance();
+    stepsAttempted += 1;
+    for (let step = 1; step < 3; step += 1) {
+      if (["passed", "blocked", "failed"].includes(state.status)) break;
+      if (Date.now() - startedAt >= 240_000) break;
+      state = await phase2ClosureService.advance();
+      stepsAttempted += 1;
+    }
     return NextResponse.json({
       ok: state.status !== "failed" && state.status !== "blocked",
       sprint: state.sprint,
@@ -28,6 +37,7 @@ export async function GET(request: NextRequest) {
       runId: state.runId,
       blockers: state.blockers,
       evidenceHash: state.evidenceHash,
+      stepsAttempted,
     }, { headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" } });
   } catch (error) {
     console.error("Phase 2 closure cron error", error instanceof Error ? error.message : "unknown");
