@@ -31,6 +31,18 @@
     {
       "path": "/api/cron/fund-catalog",
       "schedule": "0 9 * * 2"
+    },
+    {
+      "path": "/api/cron/phase-2-closure?attempt=1",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron/phase-2-closure?attempt=2",
+      "schedule": "10 21 * * *"
+    },
+    {
+      "path": "/api/cron/phase-2-closure?attempt=3",
+      "schedule": "20 21 * * *"
     }
   ]
 }
