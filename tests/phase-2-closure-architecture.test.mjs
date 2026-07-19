@@ -51,7 +51,11 @@ test("public closure evidence is read-only and does not expose credentials or ap
 test("temporary production schedule gives three resumable attempts and Sprint CI includes the gates", () => {
   const vercel = read("vercel.json");
   const packageJson = read("package.json");
+  const workflow = read(".github/workflows/phase-2-closure.yml");
   assert.equal((vercel.match(/\/api\/cron\/phase-2-closure\?attempt=/g) || []).length, 3);
   assert.match(packageJson, /phase-2-closure\.test\.ts/);
   assert.match(packageJson, /phase-2-closure-architecture\.test\.mjs/);
+  assert.match(workflow, /npm run typecheck/);
+  assert.match(workflow, /npm run test:sprint2/);
+  assert.match(workflow, /npm run test:risk-lab/);
 });
