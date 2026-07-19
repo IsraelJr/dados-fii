@@ -73,7 +73,11 @@ async function fetchYear(fetchImpl: typeof fetch, cnpj: string, year: number) {
 }
 
 export class CvmEventualDocumentDiscovery {
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(fetchImpl: typeof fetch = fetch) {
+    this.fetchImpl = fetchImpl;
+  }
 
   async discover(cnpj: string, years: number[]): Promise<CvmEventualDiscoveryResult> {
     const currentYear = new Date().getFullYear();
