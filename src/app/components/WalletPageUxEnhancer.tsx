@@ -272,7 +272,7 @@ function replaceDividendExtremesSummary() {
 
   const description = Array.from(section.querySelectorAll("p")).find((item) => textOf(item).includes("Resumo numérico"));
   if (description) {
-    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira, considerando apenas os meses já encerrados.";
+    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira.";
   }
 
   const grid = Array.from(section.querySelectorAll("div")).find((item) => {
