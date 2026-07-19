@@ -10,6 +10,8 @@ test("Sprint 2.12 cron is protected, bounded and delegates to one orchestrator",
   assert.match(route, /timingSafeEqual/);
   assert.match(route, /maxDuration = 300/);
   assert.match(route, /phase2ClosureService\.advance/);
+  assert.match(route, /step < 3/);
+  assert.match(route, /240_000/);
   assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
 });
 
