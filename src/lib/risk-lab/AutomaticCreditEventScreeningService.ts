@@ -111,9 +111,18 @@ function inInterval(document: AutomaticDocumentEvidence, from: string, until: st
   return Number.isFinite(value) && value >= Date.parse(from) && value <= Date.parse(until);
 }
 
+function civilYear(value: string) {
+  const match = /^(\d{4})-/.exec(value);
+  const year = match ? Number(match[1]) : Number.NaN;
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    throw new Error(`Ano civil inválido na triagem de crédito: ${value}`);
+  }
+  return year;
+}
+
 function requiredYears(from: string, until: string) {
-  const first = new Date(from).getUTCFullYear();
-  const last = new Date(until).getUTCFullYear();
+  const first = civilYear(from);
+  const last = civilYear(until);
   const years: number[] = [];
   for (let year = first; year <= last; year += 1) years.push(year);
   return years;
