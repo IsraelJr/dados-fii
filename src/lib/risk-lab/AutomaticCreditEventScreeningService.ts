@@ -1,0 +1,324 @@
+import type {
+  AutomaticCreditAmbiguousDocument,
+  AutomaticCreditEventMatch,
+  AutomaticCreditEventScreen,
+  AutomaticDocumentEvidence,
+  AutomaticSourceSummary,
+} from "@/types/riskLabAutomatic";
+import type { VerifiedMaterialCreditEvent } from "@/types/riskLabDividendStress";
+
+const PIPELINE = "risk-lab-credit-screen-v0.1.0";
+const MAX_HTML_BYTES = 1_000_000;
+const FETCH_TIMEOUT_MS = 10_000;
+const MAX_DOCUMENTS = 20;
+const ALLOWED_HOSTS = new Set([
+  "dados.cvm.gov.br",
+  "fnet.bmfbovespa.com.br",
+  "www.mauacapital.com.br",
+  "mauacapital.com.br",
+  "www.rbrasset.com.br",
+  "rbrasset.com.br",
+]);
+
+const EVENT_PATTERNS: Array<{
+  type: VerifiedMaterialCreditEvent["type"];
+  terms: string[];
+}> = [
+  {
+    type: "judicial_recovery",
+    terms: ["RECUPERACAO JUDICIAL", "RECUPERACAO EXTRAJUDICIAL", "PEDIDO DE FALENCIA", "DECRETO DE FALENCIA"],
+  },
+  {
+    type: "default",
+    terms: ["INADIMPLENCIA", "VENCIMENTO ANTECIPADO", "NAO PAGAMENTO", "DEFAULT", "MORA MATERIAL"],
+  },
+  {
+    type: "impairment",
+    terms: ["IMPAIRMENT", "PROVISAO PARA PERDA", "PERDA ESPERADA", "AJUSTE AO VALOR RECUPERAVEL"],
+  },
+  {
+    type: "material_restructuring",
+    terms: ["REESTRUTURACAO", "RENEGOCIACAO", "REPERFILAMENTO", "WAIVER DE COVENANT"],
+  },
+];
+
+const POTENTIALLY_RELEVANT = [
+  "FATO RELEVANTE",
+  "COMUNICADO AO MERCADO",
+  "OUTROS COMUNICADOS",
+  "RELATORIO GERENCIAL",
+  "RELATORIO MENSAL",
+];
+
+const EXCLUDED_DOCUMENTS = [
+  "RENDIMENTO",
+  "AMORTIZACAO",
+  "ASSEMBLEIA",
+  "EDITAL",
+  "ATA DE",
+  "INFORME MENSAL",
+  "INFORME TRIMESTRAL",
+  "INFORME ANUAL",
+];
+
+function normalize(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function textFromHtml(value: string) {
+  return normalize(
+    value
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;|&#160;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&quot;/gi, "\"")
+      .replace(/&#39;|&apos;/gi, "'"),
+  );
+}
+
+function findEvent(value: string) {
+  const normalized = normalize(value);
+  for (const pattern of EVENT_PATTERNS) {
+    const matchedTerm = pattern.terms.find((term) => normalized.includes(term));
+    if (matchedTerm) return { type: pattern.type, matchedTerm };
+  }
+  return null;
+}
+
+function officialUrl(value: string) {
+  const parsed = new URL(value);
+  if (parsed.protocol !== "https:" || !ALLOWED_HOSTS.has(parsed.hostname)) {
+    throw new Error(`Fonte oficial não autorizada: ${parsed.hostname}`);
+  }
+  return parsed;
+}
+
+function isPotentiallyRelevant(document: AutomaticDocumentEvidence) {
+  const text = normalize(`${document.documentType} ${document.fileName}`);
+  if (EXCLUDED_DOCUMENTS.some((term) => text.includes(term))) return false;
+  return POTENTIALLY_RELEVANT.some((term) => text.includes(term)) || Boolean(findEvent(text));
+}
+
+function inInterval(document: AutomaticDocumentEvidence, from: string, until: string) {
+  const value = Date.parse(document.receivedAt);
+  return Number.isFinite(value) && value >= Date.parse(from) && value <= Date.parse(until);
+}
+
+function requiredYears(from: string, until: string) {
+  const first = new Date(from).getUTCFullYear();
+  const last = new Date(until).getUTCFullYear();
+  const years: number[] = [];
+  for (let year = first; year <= last; year += 1) years.push(year);
+  return years;
+}
+
+async function fetchOfficialText(fetchImpl: typeof fetch, sourceUrl: string) {
+  const url = officialUrl(sourceUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetchImpl(url, {
+      method: "GET",
+      redirect: "follow",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/pdf",
+        "User-Agent": "DadosFII-RiskLab/0.2 (+automatic-credit-screen)",
+      },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+      return { text: null, reason: `Formato ${contentType || "não informado"} ainda não possui extração textual determinística.` };
+    }
+    const html = await response.text();
+    if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) {
+      return { text: null, reason: "Documento HTML excede o limite seguro de 1 MB." };
+    }
+    return { text: textFromHtml(html), reason: null };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function matchToVerifiedEvent(
+  ticker: string,
+  document: AutomaticDocumentEvidence,
+  match: AutomaticCreditEventMatch,
+  reviewedAt: string,
+): VerifiedMaterialCreditEvent {
+  return {
+    ticker,
+    knownAt: document.receivedAt,
+    type: match.eventType,
+    documentId: document.documentId,
+    sourceUrl: document.link,
+    reviewedBy: PIPELINE,
+    reviewedAt,
+  };
+}
+
+export interface AutomaticCreditEventScreeningDependencies {
+  fetchImpl?: typeof fetch;
+  now?: () => Date;
+}
+
+export class AutomaticCreditEventScreeningService {
+  private readonly fetchImpl: typeof fetch;
+  private readonly now: () => Date;
+
+  constructor(dependencies: AutomaticCreditEventScreeningDependencies = {}) {
+    this.fetchImpl = dependencies.fetchImpl || fetch;
+    this.now = dependencies.now || (() => new Date());
+  }
+
+  async screen(
+    ticker: string,
+    documents: AutomaticDocumentEvidence[],
+    sources: AutomaticSourceSummary[],
+    relevantFrom: string,
+    relevantUntil: string,
+  ): Promise<AutomaticCreditEventScreen> {
+    if (!Number.isFinite(Date.parse(relevantFrom)) || !Number.isFinite(Date.parse(relevantUntil))) {
+      throw new Error("Intervalo de triagem de crédito inválido.");
+    }
+    if (Date.parse(relevantFrom) > Date.parse(relevantUntil)) {
+      throw new Error("Início da triagem de crédito posterior ao fim.");
+    }
+
+    const reviewedAt = this.now().toISOString();
+    const years = requiredYears(relevantFrom, relevantUntil);
+    const sourceCoverageComplete = years.every((year) => sources.some((source) => source.year === year && source.fetched));
+    const relevant = documents
+      .filter((document) => inInterval(document, relevantFrom, relevantUntil) && isPotentiallyRelevant(document))
+      .slice(0, MAX_DOCUMENTS);
+    const matches: AutomaticCreditEventMatch[] = [];
+    const verifiedEvents: VerifiedMaterialCreditEvent[] = [];
+    const ambiguousDocuments: AutomaticCreditAmbiguousDocument[] = [];
+
+    for (const document of relevant) {
+      try {
+        officialUrl(document.link);
+        const metadataMatch = findEvent(`${document.documentType} ${document.fileName} ${document.auditResult || ""}`);
+        if (metadataMatch) {
+          const match: AutomaticCreditEventMatch = {
+            documentId: document.documentId,
+            sourceUrl: document.link,
+            knownAt: document.receivedAt,
+            eventType: metadataMatch.type,
+            matchedTerm: metadataMatch.matchedTerm,
+            matchedIn: "metadata",
+            confidence: 99,
+          };
+          matches.push(match);
+          verifiedEvents.push(matchToVerifiedEvent(ticker, document, match, reviewedAt));
+          continue;
+        }
+
+        const fetched = await fetchOfficialText(this.fetchImpl, document.link);
+        if (!fetched.text) {
+          ambiguousDocuments.push({
+            documentId: document.documentId,
+            documentType: document.documentType,
+            fileName: document.fileName,
+            receivedAt: document.receivedAt,
+            sourceUrl: document.link,
+            reason: fetched.reason || "Conteúdo oficial não pôde ser analisado automaticamente.",
+          });
+          continue;
+        }
+
+        const bodyMatch = findEvent(fetched.text);
+        if (!bodyMatch) {
+          ambiguousDocuments.push({
+            documentId: document.documentId,
+            documentType: document.documentType,
+            fileName: document.fileName,
+            receivedAt: document.receivedAt,
+            sourceUrl: document.link,
+            reason: "Documento potencialmente relevante sem evento objetivo identificável pelas regras congeladas.",
+          });
+          continue;
+        }
+
+        const match: AutomaticCreditEventMatch = {
+          documentId: document.documentId,
+          sourceUrl: document.link,
+          knownAt: document.receivedAt,
+          eventType: bodyMatch.type,
+          matchedTerm: bodyMatch.matchedTerm,
+          matchedIn: "official_html",
+          confidence: 97,
+        };
+        matches.push(match);
+        verifiedEvents.push(matchToVerifiedEvent(ticker, document, match, reviewedAt));
+      } catch (error) {
+        ambiguousDocuments.push({
+          documentId: document.documentId,
+          documentType: document.documentType,
+          fileName: document.fileName,
+          receivedAt: document.receivedAt,
+          sourceUrl: document.link,
+          reason: error instanceof Error ? error.message : "Falha desconhecida na triagem automática.",
+        });
+      }
+    }
+
+    const deduplicatedEvents = verifiedEvents.filter((event, index, all) =>
+      all.findIndex((candidate) => candidate.documentId === event.documentId && candidate.type === event.type) === index,
+    );
+
+    if (deduplicatedEvents.length > 0) {
+      return {
+        status: "material_event_confirmed",
+        relevantFrom,
+        relevantUntil,
+        inspectedDocuments: relevant.length,
+        sourceCoverageComplete,
+        matches,
+        verifiedEvents: deduplicatedEvents,
+        ambiguousDocuments,
+        summary: `${deduplicatedEvents.length} evento(s) material(is) de crédito confirmado(s) automaticamente em fonte oficial.`,
+        classificationFinal: true,
+      };
+    }
+
+    if (!sourceCoverageComplete || ambiguousDocuments.length > 0) {
+      return {
+        status: "inconclusive",
+        relevantFrom,
+        relevantUntil,
+        inspectedDocuments: relevant.length,
+        sourceCoverageComplete,
+        matches: [],
+        verifiedEvents: [],
+        ambiguousDocuments,
+        summary: "A triagem automática não encontrou evento explícito, mas não possui evidência suficiente para declarar ausência de evento material.",
+        classificationFinal: false,
+      };
+    }
+
+    return {
+      status: "no_explicit_event_found",
+      relevantFrom,
+      relevantUntil,
+      inspectedDocuments: relevant.length,
+      sourceCoverageComplete,
+      matches: [],
+      verifiedEvents: [],
+      ambiguousDocuments: [],
+      summary: "Nenhum evento material explícito foi localizado nos metadados oficiais do intervalo; isso não equivale a uma certificação de ausência.",
+      classificationFinal: false,
+    };
+  }
+}
+
+export const automaticCreditEventScreeningService = new AutomaticCreditEventScreeningService();
