@@ -27,8 +27,9 @@ import type {
   FundCatalogPlanItem,
   FundCatalogRun,
 } from "@/types/fund-catalog";
+import type { Phase2ClosureState } from "@/types/phase2-closure";
 
-type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync" | "catalog-preview" | "catalog-apply" | "catalog-audit";
+type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync" | "catalog-preview" | "catalog-apply" | "catalog-audit" | "phase2-closure";
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -38,6 +39,10 @@ function stableValue(value: unknown): unknown {
 
 function contentHash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(stableValue(value)), "utf8").digest("hex");
+}
+
+function safeFirestoreDocument<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function assertApproval(authorization: PublicationAuthorization | RollbackAuthorization) {
@@ -506,6 +511,59 @@ export class RegulatoryRepository {
       .limit(Math.min(Math.max(limit, 1), 500))
       .get();
     return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, unknown> }));
+  }
+
+  async getPhase2ClosureState(): Promise<Phase2ClosureState | null> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.phase2ClosureRuns).doc("current").get();
+    return snapshot.exists ? snapshot.data() as Phase2ClosureState : null;
+  }
+
+  async acquirePhase2ClosureLock(owner: string, ttlMs = 10 * 60_000) {
+    const ref = adminDb.collection(REGULATORY_COLLECTIONS.phase2ClosureRuns).doc("_lock");
+    return adminDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const current = snapshot.data() || {};
+      const expiresAt = toIso(current.expiresAt) || toIso(current.expiresAtIso);
+      const active = snapshot.exists && expiresAt && new Date(expiresAt).getTime() > Date.now();
+      if (active) return false;
+      transaction.set(ref, {
+        owner,
+        acquiredAt: adminFieldValue.serverTimestamp(),
+        acquiredAtIso: nowIso(),
+        expiresAtIso: new Date(Date.now() + ttlMs).toISOString(),
+        updatedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: false });
+      return true;
+    });
+  }
+
+  async releasePhase2ClosureLock(owner: string) {
+    const ref = adminDb.collection(REGULATORY_COLLECTIONS.phase2ClosureRuns).doc("_lock");
+    await adminDb.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      if (snapshot.exists && snapshot.data()?.owner === owner) transaction.delete(ref);
+    });
+  }
+
+  async savePhase2ClosureState(state: Phase2ClosureState, actor: string) {
+    const safe = safeFirestoreDocument(state);
+    const historyId = `${state.updatedAt.replace(/\D/g, "").slice(0, 17)}-${String(state.attempt).padStart(3, "0")}-${state.status}`;
+    const collection = adminDb.collection(REGULATORY_COLLECTIONS.phase2ClosureRuns);
+    const batch = adminDb.batch();
+    batch.set(collection.doc("current"), { ...safe, persistedAt: adminFieldValue.serverTimestamp() }, { merge: false });
+    batch.set(collection.doc("current").collection("history").doc(historyId), { ...safe, persistedAt: adminFieldValue.serverTimestamp() }, { merge: false });
+    batch.set(adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(), this.auditPayload("phase2-closure", actor, undefined, {
+      sprint: state.sprint,
+      status: state.status,
+      phase: state.phase,
+      attempt: state.attempt,
+      runId: state.runId,
+      releaseCommit: state.releaseCommit,
+      evidenceHash: state.evidenceHash,
+      blockers: state.blockers.length,
+    }));
+    await batch.commit();
+    return state;
   }
 
   async getAuditEventsForTicker(ticker: string, limit = 100): Promise<RegulatoryAuditEvent[]> {
