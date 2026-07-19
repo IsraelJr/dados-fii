@@ -7,8 +7,10 @@ import type {
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const COMPARISON_EPSILON = 1e-12;
 const ALLOWED_SOURCE_TYPES = new Set(["primary_regulatory", "primary_manager"]);
+const ALLOWED_REVIEW_METHODS = new Set(["manual_document_review", "automatic_regulatory_validation"]);
 const ALLOWED_PRIMARY_HOSTS = new Set([
   "fnet.bmfbovespa.com.br",
+  "dados.cvm.gov.br",
   "www.mauacapital.com.br",
   "mauacapital.com.br",
   "www.rbrasset.com.br",
@@ -75,8 +77,14 @@ function validateNotice(notice: VerifiedDividendNotice, ticker: string) {
     throw new Error(`Tipo de fonte não autorizado em ${notice.competenceMonth}`);
   }
   assertPrimaryUrl(notice.source.sourceUrl);
-  if (notice.source.reviewMethod !== "manual_document_review") {
-    throw new Error(`Rendimento sem revisão manual em ${notice.competenceMonth}`);
+  const reviewMethod = String((notice.source as unknown as { reviewMethod?: unknown }).reviewMethod || "");
+  if (!ALLOWED_REVIEW_METHODS.has(reviewMethod)) {
+    throw new Error(`Método de validação não autorizado em ${notice.competenceMonth}`);
+  }
+  if (reviewMethod === "automatic_regulatory_validation") {
+    if (notice.source.sourceType !== "primary_regulatory" || !notice.source.reviewedBy.startsWith("risk-lab-")) {
+      throw new Error(`Validação regulatória automática inválida em ${notice.competenceMonth}`);
+    }
   }
   if (!notice.source.reviewedBy.trim() || !isIsoDate(notice.source.reviewedAt)) {
     throw new Error(`Metadados de revisão incompletos em ${notice.competenceMonth}`);
