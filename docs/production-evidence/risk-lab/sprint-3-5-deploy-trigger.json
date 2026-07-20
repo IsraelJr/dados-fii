@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "sprint": "3.5",
   "runId": "risk-lab-3-5-20260720-v2",
-  "attempt": 2,
+  "attempt": 3,
   "maximumAttempts": 6,
-  "lastTriggeredAt": "2026-07-20T22:55:00Z",
+  "lastTriggeredAt": "2026-07-20T23:20:00Z",
   "lastObservedHttpStatus": null,
-  "lastObservedRelease": "e30843eea7fec509d1f27710215d4fd0481a1119",
+  "lastObservedRelease": "643612d72f2e3e454f7dcd50d6aaa2abe19bc6ab",
   "lastObservedStatus": "pending",
-  "reason": "Gatilho explícito do runtime concorrente após a execução monolítica não produzir evidência final.",
+  "reason": "Gatilho explícito após correção do lock órfão e expiração da janela anterior de build-rate-limit.",
   "completed": false
 }
