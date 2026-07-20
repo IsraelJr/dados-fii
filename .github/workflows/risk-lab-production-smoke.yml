@@ -34,6 +34,44 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Initialize deterministic result branch
+        id: result_branch
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          short_sha="${RELEASE_COMMIT:0:12}"
+          branch="automation/risk-lab-3-4-result-${short_sha}"
+          result_dir="docs/production-evidence/risk-lab"
+          diagnostic_path="${result_dir}/diagnostic-${RELEASE_COMMIT}.json"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch origin "$branch"
+            git checkout -B "$branch" "origin/$branch"
+          else
+            git checkout -b "$branch"
+          fi
+
+          mkdir -p "$result_dir"
+          jq -n \
+            --arg status "running" \
+            --arg releaseCommit "$RELEASE_COMMIT" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg startedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{ok:false,status:$status,releaseCommit:$releaseCommit,workflowRunId:$workflowRunId,startedAt:$startedAt}' \
+            > "$diagnostic_path"
+
+          git add "$diagnostic_path"
+          git commit -m "docs: inicia smoke observável da Sprint 3.4" || true
+          git push --set-upstream origin "$branch"
+
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "diagnostic_path=${diagnostic_path}" >> "$GITHUB_OUTPUT"
+
       - name: Execute observable production smoke
         id: smoke
         shell: bash
@@ -104,44 +142,45 @@ jobs:
           PASSED: ${{ steps.smoke.outputs.passed }}
           STATUS: ${{ steps.smoke.outputs.status }}
           HTTP_CODE: ${{ steps.smoke.outputs.http_code }}
+          RESULT_BRANCH: ${{ steps.result_branch.outputs.branch }}
+          DIAGNOSTIC_PATH: ${{ steps.result_branch.outputs.diagnostic_path }}
         run: |
           set -euo pipefail
           result_dir="docs/production-evidence/risk-lab"
-          branch="automation/risk-lab-3-4-result-${GITHUB_RUN_ID}"
-          mkdir -p "$result_dir"
 
           if [[ "$PASSED" == "true" ]] && jq -e '.evidence.status == "passed" and (.evidence.evidenceHash | length == 64)' risk-lab-production-smoke-response.json >/dev/null; then
             result_path="${result_dir}/${RUN_ID}.json"
             jq '.evidence' risk-lab-production-smoke-response.json > "$result_path"
+            rm -f "$DIAGNOSTIC_PATH"
             title="chore: formaliza conclusão da Sprint 3.4"
             commit_message="docs: versiona evidência aprovada da Sprint 3.4"
           else
-            result_path="${result_dir}/diagnostic-${GITHUB_SHA}.json"
+            result_path="$DIAGNOSTIC_PATH"
             jq '.' risk-lab-production-smoke-response.json > "$result_path"
             title="fix: registra bloqueio do smoke da Sprint 3.4"
             commit_message="docs: registra diagnóstico do smoke da Sprint 3.4"
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add "$result_path"
-          git commit -m "$commit_message"
-          git push origin "$branch"
+          git add -A "$result_dir"
+          git commit -m "$commit_message" || true
+          git push origin "$RESULT_BRANCH"
 
-          gh pr create \
-            --base main \
-            --head "$branch" \
-            --title "$title" \
-            --body "## Resultado automatizado do smoke
+          existing_pr=$(gh pr list --base main --head "$RESULT_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [[ -z "$existing_pr" ]]; then
+            gh pr create \
+              --base main \
+              --head "$RESULT_BRANCH" \
+              --title "$title" \
+              --body "## Resultado automatizado do smoke
 
           - status: \`${STATUS}\`
           - HTTP: \`${HTTP_CODE}\`
           - commit solicitado: \`${GITHUB_SHA}\`
           - arquivo: \`${result_path}\`
 
-          A branch foi criada mesmo em caso de reprovação para permitir diagnóstico e correção sem ação manual do proprietário." \
-            || echo "A branch de resultado foi criada; a abertura automática da PR não foi autorizada pelo repositório."
+          A branch determinística é criada no início da execução e atualizada com o resultado final, inclusive em caso de reprovação." \
+              || echo "A branch de resultado foi criada; a abertura automática da PR não foi autorizada pelo repositório."
+          fi
 
       - name: Enforce smoke result
         if: always()
