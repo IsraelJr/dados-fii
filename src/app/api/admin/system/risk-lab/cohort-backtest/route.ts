@@ -1,13 +1,18 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
+import { ConcurrentAutomaticDividendSeriesService } from "@/lib/risk-lab/ConcurrentAutomaticDividendSeriesService";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
-  riskLabCohortBacktestV2Service,
+  RiskLabCohortBacktestV2Service,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+
+const adminBacktestService = new RiskLabCohortBacktestV2Service({
+  dividendSeries: new ConcurrentAutomaticDividendSeriesService({ yearConcurrency: 3 }),
+});
 
 function activeProductionRelease() {
   const release = process.env.VERCEL_GIT_COMMIT_SHA || "";
@@ -25,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const releaseCommit = activeProductionRelease();
-    const evidence = await riskLabCohortBacktestV2Service.getPublicEvidence();
+    const evidence = await adminBacktestService.getPublicEvidence();
     return adminJson({
       ok: true,
       enabled: Boolean(releaseCommit),
@@ -73,7 +78,7 @@ export async function POST(request: NextRequest) {
       releaseCommit,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
     });
-    const evidence = await riskLabCohortBacktestV2Service.run();
+    const evidence = await adminBacktestService.run();
     return adminJson({
       ok: true,
       enabled: true,
