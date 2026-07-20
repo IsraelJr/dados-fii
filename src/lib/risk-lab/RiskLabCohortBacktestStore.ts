@@ -1,4 +1,3 @@
-import { adminDb } from "@/lib/firebaseAdmin";
 import type { RiskLabCohortBacktestEvidence } from "@/types/riskLabCohortBacktest";
 
 const RUN_COLLECTION = "RiskLabCohortBacktestRuns";
@@ -16,22 +15,30 @@ function assertRunId(value: string) {
   }
 }
 
+async function database() {
+  const { adminDb } = await import("@/lib/firebaseAdmin");
+  return adminDb;
+}
+
 export class RiskLabCohortBacktestStore {
   async get(runId: string): Promise<RiskLabCohortBacktestEvidence | null> {
     assertRunId(runId);
-    const snapshot = await adminDb.collection(RUN_COLLECTION).doc(runId).get();
+    const db = await database();
+    const snapshot = await db.collection(RUN_COLLECTION).doc(runId).get();
     return snapshot.exists ? snapshot.data() as RiskLabCohortBacktestEvidence : null;
   }
 
   async latest(): Promise<RiskLabCohortBacktestEvidence | null> {
-    const snapshot = await adminDb.collection(RUN_COLLECTION).doc("latest").get();
+    const db = await database();
+    const snapshot = await db.collection(RUN_COLLECTION).doc("latest").get();
     return snapshot.exists ? snapshot.data() as RiskLabCohortBacktestEvidence : null;
   }
 
   async acquireLock(runId: string, owner: string): Promise<boolean> {
     assertRunId(runId);
-    const reference = adminDb.collection(LOCK_COLLECTION).doc(runId);
-    return adminDb.runTransaction(async (transaction) => {
+    const db = await database();
+    const reference = db.collection(LOCK_COLLECTION).doc(runId);
+    return db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(reference);
       const current = snapshot.data() as { owner?: string; expiresAt?: string } | undefined;
       const active = Boolean(current?.expiresAt && Date.parse(current.expiresAt) > Date.now());
@@ -48,8 +55,9 @@ export class RiskLabCohortBacktestStore {
 
   async releaseLock(runId: string, owner: string): Promise<void> {
     assertRunId(runId);
-    const reference = adminDb.collection(LOCK_COLLECTION).doc(runId);
-    await adminDb.runTransaction(async (transaction) => {
+    const db = await database();
+    const reference = db.collection(LOCK_COLLECTION).doc(runId);
+    await db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(reference);
       if (!snapshot.exists || snapshot.data()?.owner !== owner) return;
       transaction.delete(reference);
@@ -58,11 +66,12 @@ export class RiskLabCohortBacktestStore {
 
   async save(evidence: RiskLabCohortBacktestEvidence): Promise<RiskLabCohortBacktestEvidence> {
     assertRunId(evidence.runId);
+    const db = await database();
     const safeEvidence = safeDocument(evidence);
-    const batch = adminDb.batch();
-    batch.set(adminDb.collection(RUN_COLLECTION).doc(evidence.runId), safeEvidence, { merge: false });
-    batch.set(adminDb.collection(RUN_COLLECTION).doc("latest"), safeEvidence, { merge: false });
-    batch.create(adminDb.collection(AUDIT_COLLECTION).doc(), {
+    const batch = db.batch();
+    batch.set(db.collection(RUN_COLLECTION).doc(evidence.runId), safeEvidence, { merge: false });
+    batch.set(db.collection(RUN_COLLECTION).doc("latest"), safeEvidence, { merge: false });
+    batch.create(db.collection(AUDIT_COLLECTION).doc(), {
       action: "cohort-backtest",
       sprint: "3.5",
       runId: evidence.runId,
