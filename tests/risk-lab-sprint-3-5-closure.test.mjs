@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 const SCRIPT = "scripts/finalize-risk-lab-sprint-3-5.mjs";
+const HANDOFF_FIXTURE = "tests/fixtures/risk-lab-handoff-pre-3-5.md";
 const TICKERS = ["DEVA11", "VSLH11", "KNCR11", "KNSC11", "MCCI11", "RBRY11"];
 
 function validEvidence() {
@@ -85,7 +86,7 @@ function execute(evidence) {
   const evidencePath = join(directory, "evidence.json");
   const handoffPath = join(directory, "DADOS_FII_HANDOFF.md");
   writeFileSync(evidencePath, JSON.stringify(evidence), "utf8");
-  cpSync("DADOS_FII_HANDOFF.md", handoffPath);
+  cpSync(HANDOFF_FIXTURE, handoffPath);
   const before = readFileSync(handoffPath, "utf8");
   const result = spawnSync(process.execPath, [SCRIPT, evidencePath, handoffPath], {
     encoding: "utf8",
