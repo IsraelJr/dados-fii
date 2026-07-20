@@ -1,0 +1,109 @@
+name: Sprint 3.5 Deployment Recovery
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: risk-lab-cohort-deploy-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RUN_ID: risk-lab-3-5-20260720-v1
+      PRODUCTION_ORIGIN: https://dadosfii.com.br
+      MARKER_PATH: docs/production-evidence/risk-lab/sprint-3-5-deploy-trigger.json
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Inspect production evidence
+        id: inspect
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="risk-lab-cohort-public-response.json"
+          http_code=$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --max-time 45 \
+            --output "$response_file" \
+            --write-out "%{http_code}" \
+            "${PRODUCTION_ORIGIN}/api/system/risk-lab-cohort-backtest" || true)
+
+          run_id=$(jq -r '.evidence.runId // ""' "$response_file" 2>/dev/null || true)
+          release=$(jq -r '.evidence.releaseCommit // ""' "$response_file" 2>/dev/null || true)
+          status=$(jq -r '.evidence.status // .status // "pending"' "$response_file" 2>/dev/null || echo pending)
+          evidence_hash=$(jq -r '.evidence.evidenceHash // ""' "$response_file" 2>/dev/null || true)
+
+          completed=false
+          if [[ "$http_code" == "200" \
+            && "$run_id" == "$RUN_ID" \
+            && ( "$status" == "passed" || "$status" == "failed" ) \
+            && ${#evidence_hash} -eq 64 ]]; then
+            completed=true
+          fi
+
+          echo "http_code=${http_code}" >> "$GITHUB_OUTPUT"
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "completed=${completed}" >> "$GITHUB_OUTPUT"
+
+      - name: Stop when final evidence already exists
+        if: steps.inspect.outputs.completed == 'true'
+        shell: bash
+        run: |
+          echo "A execução ${RUN_ID} já possui evidência final em Produção. Nenhum novo deploy será disparado."
+
+      - name: Retrigger production deployment with bounded marker
+        if: steps.inspect.outputs.completed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_attempt=$(jq -r '.attempt // 0' "$MARKER_PATH")
+          maximum_attempts=$(jq -r '.maximumAttempts // 6' "$MARKER_PATH")
+
+          if ! [[ "$current_attempt" =~ ^[0-9]+$ && "$maximum_attempts" =~ ^[0-9]+$ ]]; then
+            echo "Marcador de recuperação inválido."
+            exit 1
+          fi
+          if (( current_attempt >= maximum_attempts )); then
+            echo "Limite de ${maximum_attempts} tentativas automáticas atingido sem evidência final."
+            exit 1
+          fi
+
+          next_attempt=$((current_attempt + 1))
+          triggered_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          jq \
+            --argjson attempt "$next_attempt" \
+            --arg triggeredAt "$triggered_at" \
+            --arg httpStatus "${{ steps.inspect.outputs.http_code }}" \
+            --arg release "${{ steps.inspect.outputs.release }}" \
+            --arg status "${{ steps.inspect.outputs.status }}" \
+            '.attempt = $attempt
+             | .lastTriggeredAt = $triggeredAt
+             | .lastObservedHttpStatus = $httpStatus
+             | .lastObservedRelease = ($release | select(length > 0) // null)
+             | .lastObservedStatus = $status
+             | .reason = "Deployment exato ainda não produziu evidência final; novo push espaçado foi criado automaticamente."
+             | .completed = false' \
+            "$MARKER_PATH" > "${MARKER_PATH}.tmp"
+          mv "${MARKER_PATH}.tmp" "$MARKER_PATH"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$MARKER_PATH"
+          git commit -m "ci: reaciona deploy da Sprint 3.5 (${next_attempt}/${maximum_attempts})"
+          git pull --rebase origin main
+          git push origin HEAD:main
