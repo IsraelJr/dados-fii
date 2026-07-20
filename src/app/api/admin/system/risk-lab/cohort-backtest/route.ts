@@ -1,18 +1,16 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
-import { ConcurrentAutomaticDividendSeriesService } from "@/lib/risk-lab/ConcurrentAutomaticDividendSeriesService";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
-  RiskLabCohortBacktestV2Service,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
+import {
+  SEGMENTED_COHORT_TICKERS,
+  segmentedRiskLabCohortBacktestService,
+} from "@/lib/risk-lab/SegmentedRiskLabCohortBacktestService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-const riskLabCohortBacktestV2Service = new RiskLabCohortBacktestV2Service({
-  dividendSeries: new ConcurrentAutomaticDividendSeriesService({ yearConcurrency: 3 }),
-});
 
 function activeProductionRelease() {
   const release = process.env.VERCEL_GIT_COMMIT_SHA || "";
@@ -30,19 +28,20 @@ export async function GET(request: NextRequest) {
 
   try {
     const releaseCommit = activeProductionRelease();
-    const evidence = await riskLabCohortBacktestV2Service.getPublicEvidence();
+    const evidence = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
     return adminJson({
       ok: true,
       enabled: Boolean(releaseCommit),
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       releaseCommit,
+      tickers: SEGMENTED_COHORT_TICKERS,
       evidence,
     });
   } catch (error) {
     const message = error instanceof Error
       ? error.message
       : "Falha ao carregar o status do backtest da coorte.";
-    console.error("Risk Lab cohort v2 admin status error", {
+    console.error("Risk Lab segmented admin status error", {
       actor: authorization.identity.email,
       message,
     });
@@ -54,7 +53,7 @@ export async function POST(request: NextRequest) {
   const authorization = await authorizeAdminRequest(
     request,
     "risk-lab-cohort-backtest-execute",
-    { limit: 3, windowMs: 30 * 60_000 },
+    { limit: 12, windowMs: 30 * 60_000 },
   );
   if (authorization.rejection) return authorization.rejection;
 
@@ -68,34 +67,49 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const action = String(body?.action || "").trim().toLowerCase();
-  if (action !== "execute") {
-    return adminJson({ ok: false, error: "Ação inválida. Use execute." }, 400);
+  const ticker = String(body?.ticker || "").trim().toUpperCase();
+  if (!new Set(["initialize", "case", "finalize"]).has(action)) {
+    return adminJson({ ok: false, error: "Ação inválida. Use initialize, case ou finalize." }, 400);
+  }
+  if (action === "case" && !SEGMENTED_COHORT_TICKERS.includes(ticker)) {
+    return adminJson({ ok: false, error: "Ticker fora da coorte pré-registrada." }, 400);
   }
 
   try {
-    console.info("Risk Lab cohort v2 admin execution requested", {
+    console.info("Risk Lab segmented admin execution requested", {
       actor: authorization.identity.email,
       releaseCommit,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
+      action,
+      ticker: ticker || null,
     });
-    const evidence = await riskLabCohortBacktestV2Service.run();
+    const evidence = action === "initialize"
+      ? await segmentedRiskLabCohortBacktestService.initialize()
+      : action === "case"
+        ? await segmentedRiskLabCohortBacktestService.runTicker(ticker)
+        : await segmentedRiskLabCohortBacktestService.finalize();
     return adminJson({
-      ok: true,
+      ok: action === "finalize" ? evidence.status === "passed" : true,
       enabled: true,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       releaseCommit,
+      action,
+      ticker: ticker || null,
+      persistedCases: evidence.cases.length,
       evidence,
     }, evidence.status === "running" ? 202 : 200);
   } catch (error) {
     const message = error instanceof Error
       ? error.message
-      : "Falha ao executar o backtest da coorte.";
-    console.error("Risk Lab cohort v2 admin execution error", {
+      : "Falha ao executar etapa do backtest da coorte.";
+    console.error("Risk Lab segmented admin execution error", {
       actor: authorization.identity.email,
       releaseCommit,
+      action,
+      ticker: ticker || null,
       message,
     });
-    const status = /já está em execução/i.test(message) ? 409 : 500;
+    const status = /execução|inicializado|inicializada|incompleto/i.test(message) ? 409 : 500;
     return adminJson({ ok: false, error: message }, status);
   }
 }
