@@ -38,3 +38,20 @@ Não existe segredo em texto puro. O executor é idempotente, protegido por lock
 - scans: `RiskLabAutomaticScans` e `RiskLabAutomaticScanAudit`;
 - artifact do GitHub Actions com a resposta sanitizada;
 - Git: `docs/production-evidence/risk-lab/` após o resultado aprovado.
+
+
+## Resultado de Produção
+
+- Status: `passed`;
+- run: `risk-lab-3-4-20260720-v1`;
+- commit executado em Produção: `e9a5d6ec263c0aa87961133a361891f60175dba4`;
+- ambiente: `production`;
+- deployment: `https://www.dadosfii.com.br`;
+- checks: `11/11`;
+- casos obrigatórios: `6/6`;
+- blockers: `0`;
+- hash: `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f`;
+- Premium integrado: `false`;
+- notificações enviadas: `false`.
+
+Os casos reais `HCTR11`, `MCCI11` e `RBRY11` ficaram `inconclusive` por insuficiência de evidência estruturada, sem falsa classificação final. Isso aprova a segurança operacional e a semântica do pipeline, mas não substitui a verificação primária e o backtest da Sprint 3.5.
