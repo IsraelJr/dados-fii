@@ -1,7 +1,6 @@
 {
   "ok": false,
-  "status": "running",
-  "releaseCommit": "8a7bde015d04153818c4c905b5ef9e34398b364a",
-  "workflowRunId": "29717007679",
-  "startedAt": "2026-07-20T04:29:26Z"
+  "sprint": "3.4",
+  "status": "deployment_not_ready",
+  "error": "O commit solicitado ainda não é o deployment ativo de Produção ou o gatilho expirou."
 }
