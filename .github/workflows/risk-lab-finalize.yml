@@ -1,0 +1,64 @@
+name: Finalize Risk Lab Sprint 3.4
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - ".github/risk-lab-finalize.trigger"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-risk-lab-sprint-3-4-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'automation/risk-lab-3-4-release-0072ecf340e6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout evidence branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Merge latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Build canonical closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/finalize-risk-lab-3-4.py
+
+      - name: Validate closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --silent
+          npm run typecheck
+          npm run test:risk-lab
+          npm run test:sprint2
+
+      - name: Commit closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m "chore: formaliza conclusão da Sprint 3.4"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
