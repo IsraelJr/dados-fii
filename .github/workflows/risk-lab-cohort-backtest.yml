@@ -6,12 +6,18 @@ on:
       - main
     paths:
       - ".github/workflows/risk-lab-cohort-backtest.yml"
+      - "docs/production-evidence/risk-lab/sprint-3-5-deploy-trigger.json"
       - "src/app/api/system/risk-lab-cohort-backtest/**"
+      - "src/app/api/admin/system/risk-lab/cohort-backtest/**"
+      - "src/app/admin/risk-lab/CohortBacktestPanel.tsx"
+      - "src/app/admin/risk-lab/cohort-backtest/**"
+      - "src/app/admin/risk-lab/layout.tsx"
       - "src/lib/risk-lab/**"
       - "src/types/riskLabCohortBacktest.ts"
       - "src/types/riskLabDividendStress.ts"
       - "scripts/finalize-risk-lab-sprint-3-5.mjs"
       - "tests/risk-lab-cohort-backtest*"
+      - "tests/risk-lab-cohort-admin-architecture.test.mjs"
       - "tests/risk-lab-sprint-3-5-closure.test.mjs"
       - "package.json"
   workflow_dispatch:
