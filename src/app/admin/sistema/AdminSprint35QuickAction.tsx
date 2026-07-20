@@ -50,11 +50,11 @@ export default function AdminSprint35QuickAction() {
     setError("");
     try {
       const response = await executeSegmentedCohortBacktest((label) => setProgress(label));
-      if (!response.ok && response.evidence?.status !== "failed") throw new Error(response.error);
-      if (response.ok) {
-        setEnabled(response.enabled);
-        setEvidence(response.evidence);
+      if (!response.ok && response.evidence?.status !== "failed") {
+        throw new Error(response.error || "Falha ao consolidar a execução segmentada.");
       }
+      setEnabled(response.enabled);
+      setEvidence(response.evidence);
       setMessage(
         response.evidence?.status === "passed"
           ? "Execução concluída: todos os gates metodológicos foram aprovados."
