@@ -9,6 +9,12 @@ export const ADMIN_COHORT_TICKERS = [
   "RBRY11",
 ] as const;
 
+type AdminCohortBacktestFailure = {
+  ok: false;
+  error: string;
+  evidence?: PublicRiskLabCohortBacktestEvidence | null;
+};
+
 export type AdminCohortBacktestResponse =
   | {
       ok: true;
@@ -21,7 +27,7 @@ export type AdminCohortBacktestResponse =
       persistedCases?: number;
       evidence: PublicRiskLabCohortBacktestEvidence | null;
     }
-  | { ok: false; error: string };
+  | AdminCohortBacktestFailure;
 
 async function requestJson(init?: RequestInit): Promise<AdminCohortBacktestResponse> {
   const response = await fetch("/api/admin/system/risk-lab/cohort-backtest", {
