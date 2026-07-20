@@ -339,7 +339,7 @@ export class AutomaticCreditEventScreeningService {
       matches: [],
       verifiedEvents: [],
       ambiguousDocuments: [],
-      summary: "Nenhum evento material explícito foi localizado nos metadados e documentos críticos oficiais do intervalo; relatórios genéricos sem termos objetivos não bloqueiam a triagem.",
+      summary: "Nenhum evento material explícito foi localizado nos metadados e documentos críticos oficiais do intervalo; isso não equivale a uma certificação de ausência, e relatórios genéricos sem termos objetivos não bloqueiam a triagem.",
       classificationFinal: false,
     };
   }
