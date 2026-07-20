@@ -10,14 +10,9 @@ test("Sprint 2.12 cron is protected, bounded and delegates to one orchestrator",
   assert.match(route, /timingSafeEqual/);
   assert.match(route, /maxDuration = 300/);
   assert.match(route, /phase2ClosureService\.advance/);
-  assert.match(route, /export async function POST/);
-  assert.match(route, /createHash\("sha256"\)/);
-  assert.match(route, /catalog-20260719204643291-c845f739/);
-  assert.match(route, /c845f73907160e2814fefde0f8e199925c4268e40239c2f0da86bd4804c376cb/);
-  assert.match(route, /e9a0a763fc71dcf7ffac34871a9142e19776c036547aac727c307ea93ea082b6/);
   assert.match(route, /step < 3/);
   assert.match(route, /240_000/);
-  assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
+  assert.doesNotMatch(route, /export async function POST|TOKEN_HASH|x-phase2-revalidate-token|firebase-admin|adminDb|\.collection\(/);
 });
 
 test("Sprint 2.12 performs preview, protected apply, global validation and stratified reports", () => {
@@ -60,14 +55,36 @@ test("public closure evidence is read-only and does not expose credentials or ap
   assert.doesNotMatch(route, /approvalHash/);
 });
 
-test("temporary production schedule gives three resumable attempts and Sprint CI includes the gates", () => {
+test("production schedule has no temporary Phase 2 closure cron and Sprint CI includes the gates", () => {
   const vercel = read("vercel.json");
   const packageJson = read("package.json");
   const workflow = read(".github/workflows/phase-2-closure.yml");
-  assert.equal((vercel.match(/\/api\/cron\/phase-2-closure\?attempt=/g) || []).length, 3);
+  assert.equal((vercel.match(/\/api\/cron\/phase-2-closure/g) || []).length, 0);
   assert.match(packageJson, /phase-2-closure\.test\.ts/);
   assert.match(packageJson, /phase-2-closure-architecture\.test\.mjs/);
   assert.match(workflow, /npm run typecheck/);
   assert.match(workflow, /npm run test:sprint2/);
   assert.match(workflow, /npm run test:risk-lab/);
+});
+
+test("persisted Phase 2 evidence is schema v2, passed and covers standard plus edge cases", () => {
+  const document = JSON.parse(read("docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json"));
+  const evidence = document.evidence;
+  assert.equal(document.ok, true);
+  assert.equal(evidence.schemaVersion, 2);
+  assert.equal(evidence.status, "passed");
+  assert.equal(evidence.phase, "complete");
+  assert.equal(evidence.evidenceHash, "2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5");
+  assert.equal(evidence.checks.filter((check) => check.status !== "passed").length, 0);
+  assert.equal(evidence.smoke.samples.length, 5);
+  assert.deepEqual(
+    [...new Set(evidence.smoke.samples.map((sample) => sample.caseType))].sort(),
+    ["exceptional", "incomplete", "standard"],
+  );
+  for (const sample of evidence.smoke.samples) {
+    assert.equal(sample.basicDataComplete, true);
+    assert.equal(sample.freeReport, true);
+    assert.equal(sample.aiInsights, true);
+    assert.equal(sample.premiumReport, true);
+  }
 });

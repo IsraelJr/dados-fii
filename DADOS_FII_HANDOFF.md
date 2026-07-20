@@ -2,13 +2,13 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 6.0.0  
-**Data:** 19/07/2026  
+**Versão:** 6.1.0  
+**Data:** 20/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**Commit auditado em `main`:** `b42034f19620c93f0af4038a61afc5003b281758`  
-**Branch desta atualização:** `agent/canonical-handoff-v6`  
-**PR desta atualização:** #43 — `docs: atualiza handoff canônico v6` (draft)
+**Commit auditado em Produção:** `f4602e223e04c2d917b22a19391dbbd9e6f6286b`  
+**Branch desta atualização:** `agent/phase-2-formal-closure`  
+**PR desta atualização:** #50 — `chore: formaliza encerramento auditável da Fase 2`
 
 ## Como interpretar os status deste documento
 
@@ -24,9 +24,9 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 | Decisão vigente | Decisão substituída | Motivo |
 |---|---|---|
-| A Fase 2 está implementada e validada funcionalmente, mas seu encerramento formal permanece condicionado à Sprint 2.12. | “Fases 1 e 2 totalmente concluídas em Produção.” | A auditoria versionada de qualidade informa que a carga, o double check e a homologação estratificada em Produção ainda não foram persistidos como evidência. |
+| As Fases 1 e 2 estão formalmente concluídas em Produção sob a evidência schema v2 do run `catalog-20260719204643291-c845f739`. | “Fase 2 apenas validada funcionalmente, com encerramento condicionado à Sprint 2.12.” | A carga, o double check global, 25 checks e a homologação de cinco casos foram executados em Produção e persistidos no Git. |
 | Nenhuma fase será declarada 100% concluída sem código, CI, deployment do commit exato, smoke test, cobertura do universo e evidências no Git. | Conclusão baseada em testes de poucos tickers ou confirmação verbal. | Correções de cálculo, cadastro, IA e relatórios precisam ser generalizadas para todos os fundos aplicáveis. |
-| Sprint corrente canônica: **2.12 — Encerramento auditável das Fases 1 e 2**. | Sprint 3.4 como única prioridade imediata. | A integridade da base é pré-requisito para scores, IA, relatórios, Risk Lab e SEO em escala. |
+| Sprint corrente canônica: **3.4 — Risk Lab em Produção e smoke ponta a ponta**. | Sprint 2.12 como sprint corrente. | A Sprint 2.12 foi concluída; a próxima pendência operacional é homologar o Risk Lab sem integrá-lo ainda ao Premium ou às notificações. |
 | Fase 3 = **Risk Lab**; Fase 4 = **Radar/Acompanhar fundo fora da carteira**. | Radar como Fase 3. | O Risk Lab já possui implementação substancial e precisa ser homologado antes de alimentar decisões e alertas. |
 | Fluxo principal do Risk Lab = **ticker-only**; seleção de documento, fila de IDs e execução manual são ferramentas de diagnóstico. | Fluxos manuais como experiência principal. | O proprietário não deve resolver IDs nem validar documentos técnicos para usar o produto. |
 | O Relatório Premium usa cálculo determinístico e dados estruturados antes da IA; a IA explica, compara e contextualiza, mas não inventa nem decide regras. | IA produzindo análise diretamente de dados incompletos ou chamando OpenAI por endpoint. | Evita alucinação, inconsistência e custo repetido. |
@@ -44,20 +44,21 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 ### Resumo executivo
 
-- A fundação regulatória, a camada de serviços, os scores, as APIs administrativas, o Dashboard, a Timeline, os relatórios, a IA, a observabilidade, o monitor e as notificações possuem implementação no repositório.
-- O proprietário validou funcionalmente a Fase 2, inclusive correções recentes de P/VP, ágio/desconto, carteira, relatórios e Admin.
-- A auditoria global de 16/07/2026 conciliou localmente **511/511** candidatos B3/CVM, encontrou **504/504** ativos com cadastro básico, **491/502** com indicadores essenciais aplicáveis, zero CNPJ duplicado e 11 lacunas externas conhecidas.
-- O próprio documento `docs/data-quality-hardening.md` registra que a **carga e a auditoria pós-carga em Produção estão pendentes**. Portanto, a Fase 2 não recebe selo de encerramento formal nesta versão.
-- `main` está em `b42034f`, merge da PR #42. O status Vercel desse commit está `success`; não houve workflow GitHub Actions no commit documental e não foi localizado smoke autenticado persistido para o commit exato.
-- O Risk Lab está implementado em código até a PR #41, mas continua isolado do Premium e das notificações. A coorte externa permanece bloqueada por teste até verificação em fonte primária.
-- O Plano SEO de 90 dias foi incorporado como quatro sprints paralelas. Publicação em massa fica proibida enquanto qualidade e proveniência não estiverem homologadas.
+- A fundação regulatória, a camada de serviços, scores, APIs administrativas, Dashboard, Timeline, relatórios, IA, observabilidade, monitor e notificações estão implementados.
+- As Fases 1 e 2 estão **formalmente concluídas em Produção** pela Sprint 2.12.
+- O run `catalog-20260719204643291-c845f739` confirmou 100% de conciliação B3/CVM, 504/504 ativos com cadastro básico, 97,81% de cobertura essencial aplicável, zero CNPJ duplicado e diretório materializado com 504 ativos.
+- O smoke schema v2 aprovou 25/25 checks, Health 98 e Validation 100 com 384 fundos processados.
+- Relatório Gratuito, AI Insights e Premium foram aprovados em cinco casos: `MXRF11` (FII), `VGIA11` (FIAGRO), `BODB11` (FI-Infra), `RJDA11` (incompleto) e `HGPO11` (excepcional/inativo).
+- A evidência canônica está em `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json`, hash `2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5`.
+- O Risk Lab está implementado em código até a PR #41, mas continua isolado do Premium e das notificações. A coorte externa permanece bloqueada até verificação primária.
+- O Plano SEO de 90 dias segue como trilha paralela, sem autorizar publicação massiva de páginas rasas ou dados não homologados.
 
 ### Auditoria de conclusão
 
-| Área | Código | Testes no Git | Deployment identificado | Evidência operacional suficiente | Status canônico |
+| Área | Código | Testes no Git | Deployment identificado | Evidência operacional | Status canônico |
 |---|---:|---:|---:|---:|---|
-| Fase 1 — Engine regulatória | Sim | Sim | Sim, historicamente | Parcial para o commit atual | Implementação concluída; encerramento revalidado na 2.12 |
-| Fase 2 — Serviços e inteligência | Sim | Sim | Sim (`b42034f`, Vercel verde) | Não para universo + double check + amostra estratificada | Implementada e validada funcionalmente; conclusão formal pendente |
+| Fase 1 — Engine regulatória | Sim | Sim | Sim | Schema v2, publicação/backup/auditoria e smoke | Formalmente concluída |
+| Fase 2 — Serviços e inteligência | Sim | Sim | Sim (`f4602e`, Vercel verde) | 25/25 checks, universo global e cinco casos | Formalmente concluída |
 | Fase 3 — Risk Lab | Sim, até 3.3 | Sim | Deployment geral verde | Smoke autenticado e coorte ausentes | Em andamento |
 | SEO 90 dias | Plano pronto | Não se aplica ao plano | Não iniciado como trilha auditada | Search Console/KPIs não registrados | Pendente |
 
@@ -66,7 +67,7 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 - Abertura PF/PJ não publicada nas fontes estruturadas usadas: `BFCC11`, `BRHT11`, `BTML11`, `FINF11`, `IDUA11`, `MTOF11`, `PBLV11`, `REME11`, `RRES11` e `SPAF11`.
 - `RJDA11`: também sem cotas emitidas, patrimônio líquido e total de cotistas nos layouts usados.
 - Divergências históricas de ISIN em revisão: `KISU11`, `SPTW11` e `TRXF11`.
-- Inativação prevista e ainda dependente de aplicação/evidência: `HGPO11`.
+- `HGPO11` foi inativado com evidência oficial de liquidação/ausência na B3 e histórico preservado.
 - Lacuna externa deve ser `null`, com fonte, data e aviso; nunca zero ou informação inventada.
 
 ---
@@ -79,13 +80,13 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 **Evidências existentes:** código e testes versionados; homologações históricas em `TGAR11`, `VGIA11`, `MXRF11` e `KNCA11`; trilhas de backup/publicação/rollback.
 
-**Status rigoroso:** concluída quanto à implementação. O selo de “100% concluída no estado atual de Produção” será renovado na Sprint 2.12 com smoke do commit exato, auditoria do universo e evidências gravadas no Git.
+**Status rigoroso:** formalmente concluída em Produção. A Sprint 2.12 revalidou publicação, backup, auditoria, catálogo global e smoke, com evidência schema v2 persistida no Git.
 
 ### Fase 2 — Core Intelligence & Product Foundation
 
 **Escopo implementado:** RegulatoryDataService, Repository, Normalizer, Validator, Cache e Types; ScoreEngine; Health; Validation e histórico; Dashboard Admin; Timeline; Relatório Gratuito; AI Insights; Relatório Premium; observabilidade; monitor; catálogo e qualidade; notificações e jobs.
 
-**Status rigoroso:** implementação concluída e validação funcional declarada pelo proprietário. **Encerramento formal pendente**, pois a carga oficial do catálogo, o double check pós-carga, a homologação estratificada e o relatório de evidências de Produção ainda não estão versionados.
+**Status rigoroso:** formalmente concluída em Produção. A carga oficial, o double check, os 25 checks e a homologação estratificada de cinco casos estão versionados na evidência da Sprint 2.12.
 
 ### Fase 3 — Risk Lab
 
@@ -95,45 +96,39 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 ## 3. Sprint atual
 
-### Sprint 2.12 — Encerramento auditável das Fases 1 e 2
+### Sprint 3.4 — Risk Lab em Produção e smoke ponta a ponta
 
-**Objetivo:** converter “implementado e validado em casos observados” em “formalmente concluído sobre o universo aplicável”.
+**Objetivo:** homologar o fluxo automático do Risk Lab no ambiente real sem liberar resultados inconclusivos nem acoplar a funcionalidade prematuramente ao Premium ou às notificações.
 
 **Trabalho obrigatório:**
 
-1. identificar o commit de release e o deployment de Produção;
-2. executar a prévia do catálogo global no Admin;
-3. aplicar a atualização somente com 511/511 conciliados, 100% básico e zero duplicidade;
-4. persistir backups, versões, hashes e diretório materializado;
-5. executar e persistir o double check pós-carga;
-6. reconciliar ativos, inativos, sucessores e fundos em revisão com evidência oficial;
-7. homologar Fase 1 e Fase 2 numa amostra estratificada de FII, FIAGRO e FI-Infra, incluindo fundos completos, incompletos e excepcionais;
-8. testar cálculos globais de P/VP, ágio/desconto, liquidez, yield, dividendos mensais/anuais e patrimônio de carteira;
-9. testar Relatório Gratuito, Premium, AI Insights, Admin, Health, Validation, monitor e notificações;
-10. salvar `commit`, URL, horário, comandos, resultados, amostra, exceções e capturas sanitizadas em `docs/production-evidence/` no Git.
+1. identificar o commit e deployment exatos;
+2. conferir flags não secretas e autenticação administrativa;
+3. executar o fluxo ticker-only de identidade, fontes, validação, série mensal, detector e triagem;
+4. cobrir `HCTR11`, `MCCI11`, `RBRY11`, ticker inválido, dados insuficientes e ambiguidade;
+5. verificar persistência, locks, hashes, rate limit e auditoria;
+6. demonstrar zero efeito no Relatório Premium e nas notificações;
+7. salvar o smoke sanitizado em `docs/production-evidence/risk-lab/`.
 
-**Critério de aceite:** todos os dez itens concluídos, testes verdes, nenhuma correção limitada a ticker e nenhuma lacuna apresentada como fato. Enquanto isso, o status permanece “implementada, com encerramento formal pendente”.
-
----
+**Critério de aceite:** deployment saudável, testes verdes, fluxo autenticado aprovado, estados `validated`/`inconclusive`/`blocked` corretos, nenhuma recomendação automática e evidência persistida no Git.
 
 ## 4. Ordem oficial das próximas sprints
 
 ### Trilha principal de produto
 
-1. **Sprint 2.12 — Encerramento auditável das Fases 1 e 2.**
-2. **Sprint 3.4 — Risk Lab em Produção e smoke ponta a ponta.**
-3. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
-4. **Sprint 3.6 — Métricas, calibração e gate formal.**
-5. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
-6. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
-7. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
-8. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
-9. **Sprint 4.3 — Planos, preferências, canais e monetização.**
-10. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
-11. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
-12. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
-13. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
-14. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
+1. **Sprint 3.4 — Risk Lab em Produção e smoke ponta a ponta.**
+2. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
+3. **Sprint 3.6 — Métricas, calibração e gate formal.**
+4. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
+5. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
+6. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
+7. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
+8. **Sprint 4.3 — Planos, preferências, canais e monetização.**
+9. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
+10. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
+11. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
+12. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
+13. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
 
 ### Trilha SEO de 90 dias, em paralelo e sem furar gates de dados
 
@@ -148,11 +143,11 @@ Incidentes de segurança, integridade de dados e regressões de Produção sempr
 
 ## 5. Escopo e critérios de aceite de cada sprint
 
-### Sprint 2.12 — Encerramento auditável
+### Sprint 2.12 — Encerramento auditável (concluída)
 
-**Escopo:** carga controlada, double check, reconciliação de ciclo de vida, homologação estratificada e dossiê de Produção.
+**Escopo executado:** carga controlada, double check, reconciliação de ciclo de vida, homologação estratificada e dossiê de Produção.
 
-**Aceite:** 100% B3/CVM conciliado; 100% cadastro básico dos ativos; zero CNPJ duplicado; exceções externas documentadas; smoke do commit exato; comandos obrigatórios verdes; evidência no Git.
+**Aceite obtido:** 100% B3/CVM conciliado; 100% cadastro básico; 97,81% essencial; zero CNPJ duplicado; 25/25 checks; cinco casos homologados; evidência schema v2 no Git; crons e token temporários removidos.
 
 ### Sprint 3.4 — Risk Lab em Produção
 
@@ -289,10 +284,12 @@ Incidentes de segurança, integridade de dados e regressões de Produção sempr
 
 - Repositório privado: `IsraelJr/dados-fii`.
 - Branch canônica: `main`.
-- Commit auditado: `b42034f19620c93f0af4038a61afc5003b281758`, merge da PR #42.
-- Status do commit: Vercel `success`.
-- GitHub Actions no commit #42: nenhuma execução localizada, coerente com alteração documental.
-- Limitação da evidência: deployment verde não substitui smoke autenticado nem auditoria de dados.
+- Commit executado na homologação final: `f4602e223e04c2d917b22a19391dbbd9e6f6286b`.
+- Vercel do commit: `success`.
+- Run de catálogo: `catalog-20260719204643291-c845f739`.
+- Evidência pública: `https://www.dadosfii.com.br/api/system/phase-2-closure`.
+- Evidência persistida: `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json`.
+- Hash final: `2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5`.
 
 ### Arquivos canônicos e evidências centrais
 
@@ -300,6 +297,8 @@ Incidentes de segurança, integridade de dados e regressões de Produção sempr
 |---|---|
 | `DADOS_FII_HANDOFF.md` | Estado e roadmap canônicos. |
 | `docs/data-quality-hardening.md` | Contrato do catálogo, auditoria global e gate permanente de conclusão. |
+| `docs/phase-2-closure.md` | Dossiê da Sprint 2.12 e resultado final. |
+| `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json` | Evidência sanitizada e imutável do fechamento. |
 | `docs/risk-lab/README.md` | Princípios, escopo e isolamento do Risk Lab. |
 | `src/lib/featureFlags.ts` | Flags centrais das Fases 2/3. |
 | `vercel.json` | Jobs agendados e cadência operacional. |
@@ -322,22 +321,24 @@ Incidentes de segurança, integridade de dados e regressões de Produção sempr
 - PR #39: restauração do texto vigente da leitura rápida.
 - PRs #38, #40 e #41: fluxo ticker-only, série mensal/detector e eventos automáticos de crédito; substituem os fluxos manuais como principal.
 - PR #42: handoff v5; seu conteúdo é substituído integralmente por esta versão.
+- PR #43: handoff v6 e adoção da Sprint 2.12 como gate formal.
+- PRs #47 e #48: schema v2, casos incompleto/excepcional e janela de execução de Produção.
+- Commits `752bbfc`, `7af6781`, `3d7ae1b` e `f4602e2`: disparo protegido de revalidação e rotação do token temporário; o mecanismo é removido no fechamento.
 
 ### PRs abertas na data da auditoria
 
-- **#5 — “Adicionar ingestão operacional controlada de FIIs e presentes VIP”**: draft antigo; TGAR11 aprovado, VGIA11 pendente segundo o próprio texto. Deve ser reconciliado com o que já entrou em `main` e então fechado ou atualizado.
-- **#1 e #2 — correções automáticas de CVE em React Server Components**: antigas e potencialmente superadas pela versão atual `Next 16.2.9`/`React 19.1.0`; exigem revisão de segurança antes de fechar, nunca merge automático sem comparar dependências.
-- **#43 — atualização canônica v6:** draft aberta nesta auditoria; substitui o conteúdo da PR #42 após revisão e merge.
+- **#5 — “Adicionar ingestão operacional controlada de FIIs e presentes VIP”**: draft antigo e divergente do fluxo canônico atual; deve ser reconciliado com `main` e então fechado ou redefinido. É a única PR aberta localizada antes da abertura do PR desta atualização.
+- PR #49 foi fechada sem merge porque foi substituída pelo disparo temporário incorporado diretamente em `main`.
+- **#50 — encerramento formal da Fase 2:** PR atual; persiste a evidência schema v2, remove mecanismos temporários e promove o handoff para v6.1.0.
 
 ### Branches remotas
 
-Foram localizadas 44 branches. Além de `main`, permanecem branches históricas `agent/*`, `feat/*`, `feature/*`, `fix/*`, `docs/*` e duas `vercel/*`. As principais famílias são:
+Foram localizadas 54 branches, incluindo `main` e a branch atual `agent/phase-2-formal-closure`. Permanecem famílias históricas `agent/*`, `feat/*`, `feature/*`, `fix/*`, `docs/*` e `vercel/*`.
 
-- Fase 2 e correções: `agent/sprint-2-1-2-2-regulatory-admin`, `agent/data-quality-hardening`, `agent/fix-*`, `feature/portfolio-notifications`, `feature/free-friday-observability`;
-- Risk Lab: `feat/risk-lab-*`, `fix/risk-lab-*`;
-- documentação/rollback: `docs/canonical-handoff-v5`, `agent/rollback-pr-32`, `agent/rollback-quick-numbers`;
-- segurança automática: `vercel/react-server-components-cve-*`;
-- atualização atual: `agent/canonical-handoff-v6`.
+- Fase 2 e correções: `agent/sprint-2-*`, `agent/data-quality-hardening`, `agent/phase-2-*`, `agent/fix-*`, `feature/portfolio-notifications` e `feature/free-friday-observability`;
+- Risk Lab: `feat/risk-lab-*` e `fix/risk-lab-*`;
+- documentação/rollback: `docs/canonical-handoff-v5`, `agent/canonical-handoff-v6`, `agent/rollback-pr-32` e `agent/rollback-quick-numbers`;
+- segurança automática: `vercel/react-server-components-cve-*`.
 
 Não apagar branches em lote sem reconciliar PR, merge e necessidade de recuperação. Criar uma tarefa de higienização após a Sprint 2.12.
 
@@ -355,20 +356,17 @@ Não apagar branches em lote sem reconciliar PR, merge e necessidade de recupera
 - Carteira, snapshots, histórico, sincronização e notificações orientadas a eventos.
 - Cálculo global de P/VP e ágio/desconto, padronização visual e glossário.
 - Job IFIX na primeira semana de janeiro/maio/setembro e acionamento manual no Admin.
-- Catálogo normalizado, ciclo de vida, proveniência, materialização e double check em código.
+- Catálogo normalizado, ciclo de vida, proveniência, materialização e double check em código e Produção.
+- Sprint 2.12: carga protegida, 25 checks, homologação de cinco casos e evidência schema v2 persistida.
 - Risk Lab até descoberta por ticker, série mensal automática, detector, triagem de crédito, regras congeladas, autenticação e isolamento.
 
 ### Parciais ou pendentes de evidência operacional
 
-- Encerramento formal das Fases 1 e 2: falta Sprint 2.12.
-- Carga do catálogo e auditoria pós-carga em Produção.
-- Cobertura essencial: 11 lacunas externas conhecidas.
-- Validação de inativação/sucessão em Produção, inclusive `HGPO11`.
-- AI Insights e Premium: funcionais, mas o Prompt Premium v3 e a homologação estratificada ainda são necessários.
-- Política antirruído das notificações: implementada; eficácia deve ser observada e documentada em Produção.
+- Cobertura essencial permanece em 97,81% por lacunas legítimas das fontes; não é falha de cadastro básico nem bloqueador retroativo da Fase 2.
+- Política antirruído das notificações: implementada; eficácia, abertura, opt-out e falsos alertas devem continuar monitorados em Produção.
 - Risk Lab: código avançado, mas sem smoke autenticado e sem gate externo.
-- Coorte: pré-registrada, com execução explicitamente bloqueada.
-- Persistência/auditoria do fluxo automático: precisa de smoke e dossiê.
+- Coorte: pré-registrada, com execução explicitamente bloqueada até fonte primária.
+- Persistência/auditoria do fluxo automático do Risk Lab: precisa do dossiê da Sprint 3.4.
 - SEO: plano pronto, execução não auditada.
 
 ### Pendentes — prioridade de valor competitivo
@@ -499,9 +497,9 @@ npm run test:risk-lab
 npm run build
 ```
 
-O commit `b42034f` possui status Vercel verde, mas não teve workflow de Actions localizado porque a PR #42 foi documental. Isso não deve ser descrito como CI completo do release.
+O fechamento foi executado no commit `f4602e223e04c2d917b22a19391dbbd9e6f6286b`, com Vercel verde. A evidência schema v2 e o teste que a valida são obrigatórios no PR final de limpeza.
 
-### Cobertura obrigatória da Sprint 2.12
+### Cobertura executada na Sprint 2.12
 
 - parser v2 com ao menos um FII e um FIAGRO;
 - QA, reconciliação, publicação, backup, aprovação, hash e rollback;
@@ -558,55 +556,52 @@ Sem esse arquivo, o resultado pode ser considerado útil, mas não encerra forma
 
 ### Bloqueadores imediatos
 
-1. Executar a Sprint 2.12 e salvar o dossiê no Git.
-2. Aplicar e auditar o catálogo em Produção; fazer double check.
-3. Homologar amostra estratificada e confirmar que as correções são globais.
-4. Executar o smoke autenticado do Risk Lab no deployment de `b42034f` ou no commit de release que o substituir.
-5. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.
+1. Executar o smoke autenticado da Sprint 3.4 no commit de release do Risk Lab.
+2. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.
 
 ### Produto e monetização
 
-6. Definir preços, periodicidade, trial, cobrança, cancelamento, reembolso e impostos dos planos.
-7. Confirmar existência e proposta do `Super Premium`; até lá, apenas Grátis e Premium possuem planejamento concreto.
-8. Definir matriz final de entitlements, inclusive Radar, relatórios, limites de IA e personalização do limiar patrimonial.
-9. Confirmar se 1/10 significa fundos simultaneamente acompanhados — interpretação vigente — ou limite por período.
-10. Definir o modelo final do Premium e o limite entre informação personalizada e recomendação regulada.
-11. Definir cache distribuído, quotas de IA, TTL, reuso de insights e orçamento mensal.
+1. Definir preços, periodicidade, trial, cobrança, cancelamento, reembolso e impostos.
+2. Confirmar existência e proposta do `Super Premium`; até lá, apenas Grátis e Premium possuem planejamento concreto.
+3. Definir matriz final de entitlements, inclusive Radar, relatórios, limites de IA e limiar patrimonial.
+4. Confirmar se 1/10 significa fundos simultaneamente acompanhados — interpretação vigente — ou limite por período.
+5. Definir o limite entre informação personalizada e recomendação regulada.
+6. Definir cache distribuído, quotas de IA, TTL, reuso de insights e orçamento mensal.
 
 ### Canais e notificações
 
-12. WhatsApp: decidir se haverá, para quais planos, com qual provedor, custo, opt-in e templates.
-13. Telegram: adiado; não implementar agora.
-14. Medir em Produção a redução de ruído, taxa de abertura, opt-out, falsos alertas e consolidação de e-mail.
+7. WhatsApp: decidir planos, provedor, custo, opt-in e templates.
+8. Telegram: adiado; não implementar agora.
+9. Medir redução de ruído, abertura, opt-out, falsos alertas e consolidação de e-mail.
 
 ### Dados e fornecedores
 
-15. Resolver ou documentar permanentemente as 11 lacunas externas de indicadores essenciais.
-16. Confirmar identidade/ciclo de vida de fundos em revisão e aplicar inativação/sucessão com evidência oficial.
-17. Avaliar licenciamento e SLA de cotações, volume e liquidez; nenhuma fonte improvisada entra em Produção sem contrato de dados.
-18. Definir extração determinística de PDFs/FNET; documento não legível continua inconclusivo.
-19. Definir monitoramento em tempo real apenas quando o valor justificar custo; jobs atuais permanecem periódicos.
+10. Resolver ou documentar permanentemente as 11 lacunas externas de indicadores essenciais.
+11. Continuar monitorando identidade, ciclo de vida e sucessores; qualquer mudança exige evidência oficial.
+12. Avaliar licenciamento e SLA de cotações, volume e liquidez.
+13. Definir extração determinística de PDFs/FNET; documento não legível continua inconclusivo.
+14. Definir monitoramento em tempo real apenas quando o valor justificar custo; jobs atuais permanecem periódicos.
 
 ### Engenharia e operação
 
-20. Revisar e encerrar/atualizar as PRs abertas #1, #2 e #5.
-21. Higienizar branches remotas após reconciliação, preservando recuperação.
-22. Padronizar persistência e auditoria dos scans automáticos do Risk Lab.
-23. Decidir se regras futuras exigem `v0.2.0`; qualquer mudança repete toda a coorte.
-24. Mover ferramentas manuais antigas do Risk Lab para `/debug` ou removê-las após o fluxo automático ser homologado.
+15. Reconciliar e encerrar/redefinir a PR aberta #5.
+16. Higienizar branches remotas após reconciliação, preservando recuperação.
+17. Padronizar persistência e auditoria dos scans automáticos do Risk Lab.
+18. Decidir se regras futuras exigem `v0.2.0`; qualquer mudança repete toda a coorte.
+19. Mover ferramentas manuais antigas do Risk Lab para `/debug` ou removê-las após o fluxo automático ser homologado.
 
 ### SEO e crescimento
 
-25. Iniciar Sprint SEO 1 após inventário técnico e baseline.
-26. Definir os 20 fundos prioritários com base em demanda, qualidade de dados e oportunidade; não apenas popularidade.
-27. Medir conversão orgânica para carteira, Radar e Premium, além de posição média.
-28. Não comprar backlinks nem gerar páginas programáticas sem informação material própria.
+20. Iniciar Sprint SEO 1 após inventário técnico e baseline.
+21. Definir 20 fundos prioritários por demanda, qualidade e oportunidade.
+22. Medir conversão orgânica para carteira, Radar e Premium, além de posição média.
+23. Não comprar backlinks nem gerar páginas programáticas sem informação material própria.
 
 ### Prompt Premium v3
 
-29. Implementar o contrato detalhado em `Referencias Relatorio Premium/REFERENCIAS_PROMPT_PREMIUM_FII.md`.
-30. Validar por tipo de fundo, qualidade de dados, perfil de usuário e impacto na carteira.
-31. Manter análise técnica, stop-loss e sinais `buy/sell` fora do núcleo até existir série confiável, metodologia validada e decisão jurídica/produto.
+24. Implementar o contrato detalhado em `Referencias Relatorio Premium/REFERENCIAS_PROMPT_PREMIUM_FII.md`.
+25. Validar por tipo de fundo, qualidade de dados, perfil de usuário e impacto na carteira.
+26. Manter análise técnica, stop-loss e sinais `buy/sell` fora do núcleo até existir série confiável, metodologia validada e decisão jurídica/produto.
 
 ---
 
@@ -625,4 +620,4 @@ Uma fase só pode ser declarada integralmente concluída quando:
 9. segurança, custo, rollback e observabilidade estiverem validados;
 10. a evidência estiver salva no Git.
 
-Até a conclusão da Sprint 2.12, a formulação correta é: **Fase 1 concluída em implementação; Fase 2 implementada e validada funcionalmente; encerramento formal das duas em reauditoria.**
+Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint atual 3.4.**
