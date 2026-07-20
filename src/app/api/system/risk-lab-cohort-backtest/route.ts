@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ConcurrentAutomaticDividendSeriesService } from "@/lib/risk-lab/ConcurrentAutomaticDividendSeriesService";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
-  riskLabCohortBacktestV2Service,
+  RiskLabCohortBacktestV2Service,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+
+const productionBacktestService = new RiskLabCohortBacktestV2Service({
+  dividendSeries: new ConcurrentAutomaticDividendSeriesService({ yearConcurrency: 3 }),
+});
 
 function response(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
@@ -35,7 +40,7 @@ function authorizedExecution(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     if (authorizedExecution(request)) {
-      const evidence = await riskLabCohortBacktestV2Service.run();
+      const evidence = await productionBacktestService.run();
       return response({
         ok: evidence.status === "passed",
         sprint: "3.5",
@@ -44,7 +49,7 @@ export async function GET(request: NextRequest) {
       }, evidence.status === "running" ? 202 : 200);
     }
 
-    const evidence = await riskLabCohortBacktestV2Service.getPublicEvidence();
+    const evidence = await productionBacktestService.getPublicEvidence();
     return response({
       ok: evidence?.status === "passed",
       sprint: "3.5",
