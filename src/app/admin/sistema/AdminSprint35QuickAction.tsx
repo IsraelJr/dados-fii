@@ -3,32 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, PlayCircle, ShieldCheck } from "lucide-react";
+import {
+  executeSegmentedCohortBacktest,
+  getCohortBacktestStatus,
+} from "@/app/admin/risk-lab/cohortBacktestClient";
 import type { PublicRiskLabCohortBacktestEvidence } from "@/types/riskLabCohortBacktest";
-
-type BacktestResponse =
-  | {
-      ok: true;
-      enabled: boolean;
-      runId: string;
-      releaseCommit: string | null;
-      evidence: PublicRiskLabCohortBacktestEvidence | null;
-    }
-  | { ok: false; error: string };
-
-async function requestJson(init?: RequestInit): Promise<BacktestResponse> {
-  const response = await fetch("/api/admin/system/risk-lab/cohort-backtest", {
-    ...init,
-    credentials: "same-origin",
-    cache: "no-store",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
-  const payload = await response.json().catch(() => ({
-    ok: false,
-    error: "Resposta inválida do servidor.",
-  }));
-  if (!response.ok) throw new Error(String(payload?.error || `Falha HTTP ${response.status}`));
-  return payload as BacktestResponse;
-}
 
 function statusLabel(evidence: PublicRiskLabCohortBacktestEvidence | null) {
   if (!evidence) return "Pendente";
@@ -41,13 +20,14 @@ export default function AdminSprint35QuickAction() {
   const [visible, setVisible] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState("");
   const [evidence, setEvidence] = useState<PublicRiskLabCohortBacktestEvidence | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const response = await requestJson();
+      const response = await getCohortBacktestStatus();
       if (!response.ok) return;
       setVisible(true);
       setEnabled(response.enabled);
@@ -69,30 +49,28 @@ export default function AdminSprint35QuickAction() {
     setMessage("");
     setError("");
     try {
-      const response = await requestJson({
-        method: "POST",
-        body: JSON.stringify({ action: "execute" }),
-      });
-      if (!response.ok) throw new Error(response.error);
-      setEnabled(response.enabled);
-      setEvidence(response.evidence);
+      const response = await executeSegmentedCohortBacktest((label) => setProgress(label));
+      if (!response.ok && response.evidence?.status !== "failed") throw new Error(response.error);
+      if (response.ok) {
+        setEnabled(response.enabled);
+        setEvidence(response.evidence);
+      }
       setMessage(
         response.evidence?.status === "passed"
-          ? "Execução concluída: todos os gates foram aprovados."
-          : response.evidence?.status === "failed"
-            ? "Execução concluída com blockers objetivos registrados."
-            : "Execução iniciada e auditada.",
+          ? "Execução concluída: todos os gates metodológicos foram aprovados."
+          : "Execução concluída com blockers estruturados registrados.",
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível executar as pendências.");
+      await load();
     } finally {
       setRunning(false);
+      setProgress("");
     }
   }
 
   if (!visible) return null;
 
-  const isExecuting = running || evidence?.status === "running";
   const blockers = evidence?.blockers.length || 0;
 
   return (
@@ -104,19 +82,20 @@ export default function AdminSprint35QuickAction() {
           </p>
           <h2 className="mt-1 text-xl font-black">Backtest externo da coorte</h2>
           <p className="mt-1 text-sm text-violet-100">
-            Status: <strong>{statusLabel(evidence)}</strong> · cobertura {evidence?.metrics.coveragePercent ?? 0}% · blockers {blockers}.
+            Status: <strong>{statusLabel(evidence)}</strong> · fundos persistidos {evidence?.cases.length ?? 0}/6 · cobertura {evidence?.metrics.coveragePercent ?? 0}% · blockers {blockers}.
           </p>
+          {running && <p className="mt-2 text-xs font-extrabold text-violet-200">{progress || "Preparando execução segmentada…"}</p>}
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
             onClick={() => void execute()}
-            disabled={!enabled || isExecuting}
+            disabled={!enabled || running}
             className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-extrabold text-violet-900 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isExecuting ? <Loader2 className="animate-spin" size={17} /> : evidence?.status === "passed" ? <CheckCircle2 size={17} /> : <PlayCircle size={17} />}
-            {isExecuting ? "Executando e auditando…" : "Executar pendências automaticamente"}
+            {running ? <Loader2 className="animate-spin" size={17} /> : evidence?.status === "passed" ? <CheckCircle2 size={17} /> : <PlayCircle size={17} />}
+            {running ? "Executando etapas…" : "Executar pendências automaticamente"}
           </button>
           <Link
             href="/admin/risk-lab/cohort-backtest"
