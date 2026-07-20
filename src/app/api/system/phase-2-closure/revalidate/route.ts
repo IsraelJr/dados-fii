@@ -30,10 +30,17 @@ export async function POST(request: NextRequest) {
 
   const before = await phase2ClosureService.getStatus();
   if (Number(before?.schemaVersion) >= 2) {
-    return NextResponse.json({ ok: before?.status === "passed", status: before?.status, phase: before?.phase }, {
-      status: before?.status === "passed" ? 200 : 409,
-      headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" },
-    });
+    if (before?.status === "passed") {
+      return NextResponse.json({ ok: true, status: before.status, phase: before.phase }, {
+        headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" },
+      });
+    }
+    if (before?.status !== "failed" || before.phase !== "production-smoke") {
+      return NextResponse.json({ ok: false, status: before?.status, phase: before?.phase, failure: before?.error || null }, {
+        status: 409,
+        headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" },
+      });
+    }
   }
   if (
     before?.status !== "passed"
@@ -52,6 +59,7 @@ export async function POST(request: NextRequest) {
     runId: state.runId,
     blockers: state.blockers,
     evidenceHash: state.evidenceHash,
+    failure: state.status === "failed" ? state.error : null,
   }, {
     status: state.status === "failed" ? 500 : state.status === "blocked" ? 409 : 200,
     headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" },
