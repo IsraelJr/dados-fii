@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "sprint": "3.4",
+  "runId": "risk-lab-3-4-20260720-v1",
+  "status": "passed",
+  "releaseCommit": "e9a5d6ec263c0aa87961133a361891f60175dba4",
+  "deploymentUrl": "https://www.dadosfii.com.br",
+  "environment": "production",
+  "startedAt": "2026-07-20T03:58:59.531Z",
+  "completedAt": "2026-07-20T03:59:34.628Z",
+  "checks": [
+    {
+      "id": "deployment.production",
+      "status": "passed",
+      "message": "O smoke deve executar no deployment exato de Produção.",
+      "metadata": {
+        "production": true,
+        "releaseCommitPresent": true,
+        "deploymentUrlPresent": true
+      }
+    },
+    {
+      "id": "feature.automatic-discovery",
+      "status": "passed",
+      "message": "A pesquisa automática por ticker deve estar habilitada.",
+      "metadata": {
+        "enabled": true
+      }
+    },
+    {
+      "id": "rate-limit.contract",
+      "status": "passed",
+      "message": "O Admin deve preservar o limite de três pesquisas a cada quinze minutos.",
+      "metadata": {
+        "limit": 3,
+        "windowMs": 900000
+      }
+    },
+    {
+      "id": "live.ticker-only",
+      "status": "passed",
+      "message": "HCTR11, MCCI11 e RBRY11 devem completar o fluxo ticker-only sem estado bloqueado.",
+      "metadata": {
+        "passed": 3,
+        "total": 3
+      }
+    },
+    {
+      "id": "edge.invalid-ticker",
+      "status": "passed",
+      "message": "Ticker inválido deve ser rejeitado antes de consultas externas.",
+      "metadata": {}
+    },
+    {
+      "id": "edge.insufficient-data",
+      "status": "passed",
+      "message": "Dados insuficientes devem produzir estado inconclusivo e impedir o detector.",
+      "metadata": {}
+    },
+    {
+      "id": "edge.ambiguity",
+      "status": "passed",
+      "message": "Documento ambíguo deve interromper a classificação final.",
+      "metadata": {}
+    },
+    {
+      "id": "persistence.scans",
+      "status": "passed",
+      "message": "Os resultados finais dos casos reais devem ser persistidos.",
+      "metadata": {}
+    },
+    {
+      "id": "audit.scans",
+      "status": "passed",
+      "message": "Cada resultado real persistido deve possuir auditoria separada.",
+      "metadata": {}
+    },
+    {
+      "id": "isolation.external-effects",
+      "status": "passed",
+      "message": "O smoke não pode integrar Premium nem enviar notificações.",
+      "metadata": {}
+    },
+    {
+      "id": "integrity.scan-hashes",
+      "status": "passed",
+      "message": "Todos os identificadores de scan devem preservar hash determinístico.",
+      "metadata": {}
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "live-hctr11",
+      "ticker": "HCTR11",
+      "mode": "live",
+      "status": "inconclusive",
+      "analysisReadiness": "insufficient_official_evidence",
+      "scanId": "HCTR11_94a325c9e385bfad6743",
+      "sourceCount": 3,
+      "documentCount": 0,
+      "monthlyStatus": null,
+      "detectorExecuted": false,
+      "classificationFinal": false,
+      "persisted": true,
+      "audited": true,
+      "premiumIntegrated": false,
+      "notificationsSent": false,
+      "message": "Fluxo real aprovado e auditado."
+    },
+    {
+      "caseId": "live-mcci11",
+      "ticker": "MCCI11",
+      "mode": "live",
+      "status": "inconclusive",
+      "analysisReadiness": "structured_series_incomplete",
+      "scanId": "MCCI11_775e805a5380f902c9d3",
+      "sourceCount": 3,
+      "documentCount": 0,
+      "monthlyStatus": "incomplete",
+      "detectorExecuted": false,
+      "classificationFinal": false,
+      "persisted": true,
+      "audited": true,
+      "premiumIntegrated": false,
+      "notificationsSent": false,
+      "message": "Fluxo real aprovado e auditado."
+    },
+    {
+      "caseId": "live-rbry11",
+      "ticker": "RBRY11",
+      "mode": "live",
+      "status": "inconclusive",
+      "analysisReadiness": "structured_series_incomplete",
+      "scanId": "RBRY11_7d25945cc88d7ea0fea5",
+      "sourceCount": 3,
+      "documentCount": 0,
+      "monthlyStatus": "incomplete",
+      "detectorExecuted": false,
+      "classificationFinal": false,
+      "persisted": true,
+      "audited": true,
+      "premiumIntegrated": false,
+      "notificationsSent": false,
+      "message": "Fluxo real aprovado e auditado."
+    },
+    {
+      "caseId": "invalid-ticker",
+      "ticker": "INVALID",
+      "mode": "deterministic",
+      "status": "rejected",
+      "analysisReadiness": null,
+      "scanId": null,
+      "sourceCount": 0,
+      "documentCount": 0,
+      "monthlyStatus": null,
+      "detectorExecuted": false,
+      "classificationFinal": false,
+      "persisted": false,
+      "audited": false,
+      "premiumIntegrated": false,
+      "notificationsSent": false,
+      "message": "Ticker inválido rejeitado antes de qualquer consulta externa."
+    },
+    {
+      "caseId": "insufficient-series",
+      "ticker": "MCCI11",
+      "mode": "deterministic",
+      "status": "inconclusive",
+      "analysisReadiness": "structured_series_incomplete",
+      "scanId": "MCCI11_64160de64dfe468856a4",
+      "sourceCount": 1,
+      "documentCount": 0,
+      "monthlyStatus": "incomplete",
+      "detectorExecuted": false,
+      "classificationFinal": false,
+      "persisted": false,
+      "audited": false,
+      "premiumIntegrated": false,
+      "notificationsSent": false,
+      "message": "Evidência insuficiente interrompeu o detector corretamente."
+    },
+    {
+      "caseId": "ambiguous-credit-event",
+      "ticker": "MCCI11",
+      "mode": "deterministic",
+      "status": "inconclusive",
+      "analysisReadiness": "credit_event_screen_inconclusive",
+      "scanId": "MCCI11_bd28175fdcc8b0968168",
+      "sourceCount": 1,
+      "documentCount": 0,
+      "monthlyStatus": "ready",
+      "detectorExecuted": true,
+      "classificationFinal": false,
+      "persisted": false,
+      "audited": false,
+      "premiumIntegrated": false,
+      "notificationsSent": false,
+      "message": "Ambiguidade bloqueou a classificação final corretamente."
+    }
+  ],
+  "blockers": [],
+  "evidenceHash": "deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f"
+}
