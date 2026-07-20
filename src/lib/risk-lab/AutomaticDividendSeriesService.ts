@@ -14,8 +14,10 @@ import type { VerifiedDividendNotice } from "@/types/riskLabDividendStress";
 const FNET_ORIGIN = "https://fnet.bmfbovespa.com.br";
 const MAX_HTML_BYTES = 2_000_000;
 const FETCH_TIMEOUT_MS = 15_000;
-const MAX_DOCUMENTS = 48;
+const MAX_DOCUMENTS_PER_YEAR = 18;
+const MAX_TOTAL_DOCUMENTS = 108;
 const CONCURRENCY = 4;
+const FETCH_ATTEMPTS = 2;
 const PIPELINE = "risk-lab-fnet-automatic-v0.1.0";
 
 interface ValidatedNotice {
@@ -32,7 +34,24 @@ function normalize(value: string) {
 
 function isDividendDocument(document: AutomaticDocumentEvidence) {
   const text = normalize(`${document.documentType} ${document.fileName}`);
-  return text.includes("RENDIMENTO") || text.includes("AMORTIZACAO");
+  return text.includes("RENDIMENTO")
+    || text.includes("AMORTIZACAO")
+    || text.includes("PAGAMENTO DE PROVENTO")
+    || text.includes("INFORMACOES SOBRE PAGAMENTO DE PROVENTOS")
+    || (text.includes("AVISO AOS COTISTAS") && text.includes("PROVENTO"));
+}
+
+function selectCandidates(documents: AutomaticDocumentEvidence[]) {
+  const byYear = new Map<number, AutomaticDocumentEvidence[]>();
+  for (const document of documents.filter(isDividendDocument)) {
+    byYear.set(document.sourceYear, [...(byYear.get(document.sourceYear) || []), document]);
+  }
+  return [...byYear.entries()]
+    .sort(([left], [right]) => left - right)
+    .flatMap(([, entries]) => entries
+      .sort((left, right) => Date.parse(right.receivedAt) - Date.parse(left.receivedAt))
+      .slice(0, MAX_DOCUMENTS_PER_YEAR))
+    .slice(0, MAX_TOTAL_DOCUMENTS);
 }
 
 function monthIndex(value: string) {
@@ -68,7 +87,13 @@ function sha256(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-async function fetchHtml(fetchImpl: typeof fetch, url: string) {
+function retryable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /AbortError|HTTP (408|425|429|5\d\d)|network|fetch failed|socket/i.test(message)
+    || (error instanceof Error && error.name === "AbortError");
+}
+
+async function fetchHtmlOnce(fetchImpl: typeof fetch, url: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -95,6 +120,20 @@ async function fetchHtml(fetchImpl: typeof fetch, url: string) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchHtml(fetchImpl: typeof fetch, url: string) {
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      return await fetchHtmlOnce(fetchImpl, url);
+    } catch (error) {
+      lastError = error;
+      if (attempt === FETCH_ATTEMPTS || !retryable(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 200));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Falha desconhecida ao consultar o FNET.");
 }
 
 async function validateDocument(
@@ -193,7 +232,7 @@ export class AutomaticDividendSeriesService {
   }
 
   async build(ticker: string, documents: AutomaticDocumentEvidence[]): Promise<AutomaticMonthlySeries> {
-    const candidates = documents.filter(isDividendDocument).slice(0, MAX_DOCUMENTS);
+    const candidates = selectCandidates(documents);
     const reviewedAt = this.now().toISOString();
     const validated: ValidatedNotice[] = [];
     const failures: string[] = [];
@@ -235,7 +274,7 @@ export class AutomaticDividendSeriesService {
       observations,
       sources,
       missingMonths,
-      conflicts: [...conflicts, ...failures.slice(0, 20)],
+      conflicts: [...conflicts, ...failures.slice(0, 40)],
       longestContiguousSequence: longest,
       method: observations.length ? "direct_declared_per_share" : "unavailable",
       detectorResult,
