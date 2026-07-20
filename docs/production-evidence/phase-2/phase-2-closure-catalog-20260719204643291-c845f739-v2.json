@@ -1,0 +1,361 @@
+{
+  "ok": true,
+  "sprint": "2.12",
+  "status": "passed",
+  "evidence": {
+    "schemaVersion": 2,
+    "sprint": "2.12",
+    "status": "passed",
+    "phase": "complete",
+    "attempt": 6,
+    "releaseCommit": "f4602e223e04c2d917b22a19391dbbd9e6f6286b",
+    "deploymentUrl": "https://www.dadosfii.com.br",
+    "runId": "catalog-20260719204643291-c845f739",
+    "startedAt": "2026-07-19T20:46:41.237Z",
+    "updatedAt": "2026-07-20T02:30:56.365Z",
+    "completedAt": "2026-07-20T02:30:56.365Z",
+    "blockers": [],
+    "checks": [
+      {
+        "id": "audit.acceptance",
+        "status": "passed",
+        "message": "A auditoria pós-carga deve cumprir os critérios formais.",
+        "metadata": {
+          "acceptanceMet": true
+        }
+      },
+      {
+        "id": "audit.basic-coverage",
+        "status": "passed",
+        "message": "O double check deve confirmar 100% dos dados básicos.",
+        "metadata": {
+          "actual": 100,
+          "missingFunds": 0
+        }
+      },
+      {
+        "id": "audit.directory",
+        "status": "passed",
+        "message": "O diretório materializado deve conter todos os fundos ativos auditados.",
+        "metadata": {
+          "directoryTotal": 504,
+          "activeDocuments": 504
+        }
+      },
+      {
+        "id": "audit.duplicate-cnpj",
+        "status": "passed",
+        "message": "O double check não pode encontrar CNPJ duplicado.",
+        "metadata": {
+          "duplicateGroups": 0
+        }
+      },
+      {
+        "id": "audit.essential-coverage",
+        "status": "passed",
+        "message": "O double check deve confirmar a cobertura essencial mínima.",
+        "metadata": {
+          "actual": 97.81,
+          "target": 95
+        }
+      },
+      {
+        "id": "audit.run-id",
+        "status": "passed",
+        "message": "Auditoria e diretório devem apontar para a carga aprovada.",
+        "metadata": {
+          "auditRunMatches": true,
+          "directoryRunMatches": true
+        }
+      },
+      {
+        "id": "catalog.acceptance",
+        "status": "passed",
+        "message": "A prévia deve cumprir integralmente os critérios de aceite da engine.",
+        "metadata": {
+          "meetsTargets": true
+        }
+      },
+      {
+        "id": "catalog.basic-coverage",
+        "status": "passed",
+        "message": "Todos os fundos ativos devem ter os dados cadastrais básicos.",
+        "metadata": {
+          "actual": 100,
+          "target": 100
+        }
+      },
+      {
+        "id": "catalog.destructive-safety",
+        "status": "passed",
+        "message": "Inativações só são aceitas com evidência oficial suficiente.",
+        "metadata": {
+          "inactivated": 1,
+          "destructiveChangesAllowed": true
+        }
+      },
+      {
+        "id": "catalog.duplicate-cnpj",
+        "status": "passed",
+        "message": "Não pode existir CNPJ duplicado entre fundos ativos.",
+        "metadata": {
+          "duplicateGroups": 0
+        }
+      },
+      {
+        "id": "catalog.essential-coverage",
+        "status": "passed",
+        "message": "A cobertura essencial deve permanecer acima do piso formal.",
+        "metadata": {
+          "actual": 97.81,
+          "target": 95
+        }
+      },
+      {
+        "id": "catalog.safe-to-apply",
+        "status": "passed",
+        "message": "A engine deve autorizar explicitamente a aplicação.",
+        "metadata": {
+          "safeToApply": true
+        }
+      },
+      {
+        "id": "catalog.sentinels",
+        "status": "passed",
+        "message": "Os fundos sentinela precisam estar presentes antes da carga.",
+        "metadata": {
+          "sentinelsPresent": true
+        }
+      },
+      {
+        "id": "catalog.source-match",
+        "status": "passed",
+        "message": "Conciliação B3/CVM deve cobrir 100% dos candidatos.",
+        "metadata": {
+          "actual": 100,
+          "target": 100
+        }
+      },
+      {
+        "id": "catalog.universe-size",
+        "status": "passed",
+        "message": "O universo oficial não pode estar truncado.",
+        "metadata": {
+          "candidates": 511,
+          "minimum": 250
+        }
+      },
+      {
+        "id": "smoke.ai-insights",
+        "status": "passed",
+        "message": "AI Insights deve gerar conteúdo estruturado para as três classes.",
+        "metadata": {
+          "passed": 5,
+          "samples": 5
+        }
+      },
+      {
+        "id": "smoke.basic-data",
+        "status": "passed",
+        "message": "As três classes de fundos devem chegar aos relatórios com dados básicos completos.",
+        "metadata": {
+          "passed": 5,
+          "samples": 5
+        }
+      },
+      {
+        "id": "smoke.edge-universe",
+        "status": "passed",
+        "message": "A homologação deve conter um fundo incompleto e um caso excepcional de ciclo de vida.",
+        "metadata": {
+          "incomplete": true,
+          "exceptional": true
+        }
+      },
+      {
+        "id": "smoke.free-report",
+        "status": "passed",
+        "message": "O relatório gratuito deve ser gerado para as três classes.",
+        "metadata": {
+          "passed": 5,
+          "samples": 5
+        }
+      },
+      {
+        "id": "smoke.health",
+        "status": "passed",
+        "message": "Health deve confirmar o ambiente de Produção sem falha crítica.",
+        "metadata": {
+          "ok": true,
+          "score": 98,
+          "status": "healthy"
+        }
+      },
+      {
+        "id": "smoke.incomplete-report",
+        "status": "passed",
+        "message": "Um fundo com lacuna essencial deve gerar relatórios e IA sem transformar ausência externa em dado inventado.",
+        "metadata": {
+          "ticker": "RJDA11",
+          "missingFields": 4,
+          "reportsReady": true
+        }
+      },
+      {
+        "id": "smoke.lifecycle-exception",
+        "status": "passed",
+        "message": "Um fundo excepcional deve preservar status, motivo e geração segura dos relatórios.",
+        "metadata": {
+          "ticker": "HGPO11",
+          "lifecycleStatus": "inactive",
+          "hasReason": true,
+          "reportsReady": true
+        }
+      },
+      {
+        "id": "smoke.premium-report",
+        "status": "passed",
+        "message": "O relatório Premium deve gerar valuation, cenários, stress e análise para as três classes.",
+        "metadata": {
+          "passed": 5,
+          "samples": 5
+        }
+      },
+      {
+        "id": "smoke.stratified-universe",
+        "status": "passed",
+        "message": "A homologação deve conter um FII, um FIAGRO e um FI-Infra.",
+        "metadata": {
+          "samples": 3,
+          "required": 3
+        }
+      },
+      {
+        "id": "smoke.validation",
+        "status": "passed",
+        "message": "Validation deve concluir com saúde mínima de 90 pontos.",
+        "metadata": {
+          "status": "completed",
+          "healthScore": 100,
+          "processed": 384
+        }
+      }
+    ],
+    "catalog": {
+      "runId": "catalog-20260719204643291-c845f739",
+      "sourceHash": "c845f73907160e2814fefde0f8e199925c4268e40239c2f0da86bd4804c376cb",
+      "planHash": "e9a0a763fc71dcf7ffac34871a9142e19776c036547aac727c307ea93ea082b6",
+      "sourceMatchPercent": 100,
+      "basicCoveragePercent": 100,
+      "essentialCoveragePercent": 97.81,
+      "duplicateCnpjGroups": 0,
+      "activeFunds": 504,
+      "inactiveFunds": 58,
+      "underReviewFunds": 20,
+      "planned": 555,
+      "added": 0,
+      "updated": 554,
+      "inactivated": 1,
+      "reactivated": 0,
+      "directoryTotal": 504,
+      "auditGeneratedAt": "2026-07-19T20:48:06.145Z",
+      "verifiedAt": "2026-07-19T20:48:06.145Z"
+    },
+    "smoke": {
+      "validationRunId": "ztSjcmiME22LIacaDxzP",
+      "validationStatus": "completed",
+      "validationHealthScore": 100,
+      "validationProcessed": 384,
+      "systemHealthOk": true,
+      "systemHealthScore": 98,
+      "samples": [
+        {
+          "ticker": "MXRF11",
+          "kind": "FII",
+          "caseType": "standard",
+          "missingFields": [],
+          "lifecycleStatus": null,
+          "lifecycleReason": null,
+          "basicDataComplete": true,
+          "freeReport": true,
+          "aiInsights": true,
+          "premiumReport": true,
+          "aiModel": "gpt-4.1-mini",
+          "promptVersion": "fund-insights-v4",
+          "premiumReportVersion": "1.2.0"
+        },
+        {
+          "ticker": "VGIA11",
+          "kind": "FIAGRO",
+          "caseType": "standard",
+          "missingFields": [],
+          "lifecycleStatus": null,
+          "lifecycleReason": null,
+          "basicDataComplete": true,
+          "freeReport": true,
+          "aiInsights": true,
+          "premiumReport": true,
+          "aiModel": "gpt-4.1-mini",
+          "promptVersion": "fund-insights-v4",
+          "premiumReportVersion": "1.2.0"
+        },
+        {
+          "ticker": "BODB11",
+          "kind": "FI_INFRA",
+          "caseType": "standard",
+          "missingFields": [],
+          "lifecycleStatus": null,
+          "lifecycleReason": null,
+          "basicDataComplete": true,
+          "freeReport": true,
+          "aiInsights": true,
+          "premiumReport": true,
+          "aiModel": "gpt-4.1-mini",
+          "promptVersion": "fund-insights-v4",
+          "premiumReportVersion": "1.2.0"
+        },
+        {
+          "ticker": "RJDA11",
+          "kind": "FII",
+          "caseType": "incomplete",
+          "missingFields": [
+            "cotas emitidas",
+            "patrimônio líquido",
+            "total de cotistas",
+            "cotistas pessoa física"
+          ],
+          "lifecycleStatus": null,
+          "lifecycleReason": null,
+          "basicDataComplete": true,
+          "freeReport": true,
+          "aiInsights": true,
+          "premiumReport": true,
+          "aiModel": "gpt-4.1-mini",
+          "promptVersion": "fund-insights-v4",
+          "premiumReportVersion": "1.2.0"
+        },
+        {
+          "ticker": "HGPO11",
+          "kind": "FII",
+          "caseType": "exceptional",
+          "missingFields": [],
+          "lifecycleStatus": "inactive",
+          "lifecycleReason": "Ticker ausente do catálogo B3 e cadastro CVM em liquidação; inativado no produto sem apagar o histórico.",
+          "basicDataComplete": true,
+          "freeReport": true,
+          "aiInsights": true,
+          "premiumReport": true,
+          "aiModel": "gpt-4.1-mini",
+          "promptVersion": "fund-insights-v4",
+          "premiumReportVersion": "1.2.0"
+        }
+      ]
+    },
+    "evidenceHash": "2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5",
+    "persistedAt": {
+      "_seconds": 1784514656,
+      "_nanoseconds": 449000000
+    },
+    "evidenceUrl": "/api/system/phase-2-closure"
+  }
+}
