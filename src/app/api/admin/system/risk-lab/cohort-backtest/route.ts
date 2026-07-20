@@ -1,13 +1,18 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
+import { ConcurrentAutomaticDividendSeriesService } from "@/lib/risk-lab/ConcurrentAutomaticDividendSeriesService";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
-  riskLabCohortBacktestV2Service,
+  RiskLabCohortBacktestV2Service,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+
+const riskLabCohortBacktestV2Service = new RiskLabCohortBacktestV2Service({
+  dividendSeries: new ConcurrentAutomaticDividendSeriesService({ yearConcurrency: 3 }),
+});
 
 function activeProductionRelease() {
   const release = process.env.VERCEL_GIT_COMMIT_SHA || "";
