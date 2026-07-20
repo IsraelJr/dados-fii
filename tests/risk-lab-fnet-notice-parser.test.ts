@@ -20,6 +20,17 @@ const currentNotice = table([
   ["Rendimento isento de IR*", "Sim"],
 ]);
 
+const numericReferenceNotice = table([
+  ["Nome do Fundo:", "FUNDO DE INVESTIMENTO IMOBILIÁRIO VERSALHES RECEBÍVEIS IMOBILIÁRIOS"],
+  ["Data da Informação:", "31/03/2026"],
+  ["Código de negociação:", "VSLH11"],
+  ["Data-base (último dia de negociação “com” direito ao provento)", "31/03/2026"],
+  ["Valor do provento (R$/unidade)", "0,03"],
+  ["Data do pagamento", "14/04/2026"],
+  ["Período de referência", "03-2026"],
+  ["Rendimento isento de IR*", "Sim"],
+]);
+
 const legacyNotice = table([
   ["Nome do Fundo:", "FUNDO DE INVESTIMENTO IMOBILIÁRIO MAUÁ CAPITAL RECEBÍVEIS IMOBILIÁRIOS - FII"],
   ["Data da informação", "12/08/2020"],
@@ -38,6 +49,13 @@ const protocol = table([
   ["Data de Entrega", "10/07/2026 18:04"],
 ]);
 
+const proventProtocol = table([
+  ["Identificação do Documento", "Informações sobre Pagamento de Proventos"],
+  ["Versão", "2"],
+  ["Data de Referência", "31/03/2026"],
+  ["Data de Entrega", "31/03/2026 19:12"],
+]);
+
 test("interpreta aviso estruturado atual", () => {
   const parsed = parseFnetDividendNoticeHtml(currentNotice);
   assert.equal(parsed.ticker, "MCCI11");
@@ -47,6 +65,13 @@ test("interpreta aviso estruturado atual", () => {
   assert.equal(parsed.baseDate, "2026-07-10");
   assert.equal(parsed.paymentDate, "2026-07-17");
   assert.equal(parsed.incomeTaxExempt, true);
+});
+
+test("interpreta período de referência numérico usado pelo FNET", () => {
+  const parsed = parseFnetDividendNoticeHtml(numericReferenceNotice);
+  assert.equal(parsed.ticker, "VSLH11");
+  assert.equal(parsed.amountPerShare, 0.03);
+  assert.equal(parsed.competenceMonth, "2026-03");
 });
 
 test("interpreta formato legado sem inventar ano fora da data da informação", () => {
@@ -60,6 +85,13 @@ test("protocolo fornece horário exato da primeira entrega pública", () => {
   assert.equal(parsed.referenceDate, "2026-07-10");
   assert.equal(parsed.deliveredAt, "2026-07-10T18:04:00-03:00");
   assert.equal(parsed.version, 1);
+});
+
+test("aceita protocolo atual de pagamento de proventos", () => {
+  const parsed = parseFnetProtocolHtml(proventProtocol);
+  assert.equal(parsed.referenceDate, "2026-03-31");
+  assert.equal(parsed.deliveredAt, "2026-03-31T19:12:00-03:00");
+  assert.equal(parsed.version, 2);
 });
 
 test("rejeita documento que não é aviso estruturado de rendimentos", () => {

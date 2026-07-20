@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      RUN_ID: risk-lab-3-5-20260720-v1
+      RUN_ID: risk-lab-3-5-20260720-v2
       PRODUCTION_ORIGIN: https://dadosfii.com.br
       MARKER_PATH: docs/production-evidence/risk-lab/sprint-3-5-deploy-trigger.json
       GH_TOKEN: ${{ github.token }}
@@ -98,7 +98,7 @@ jobs:
              | .lastObservedHttpStatus = $httpStatus
              | .lastObservedRelease = ($release | select(length > 0) // null)
              | .lastObservedStatus = $status
-             | .reason = "Deployment exato ainda não produziu evidência final; novo push espaçado foi criado automaticamente."
+             | .reason = "Deployment metodológico v2 ainda não produziu evidência final; novo push espaçado foi criado automaticamente."
              | .completed = false' \
             "$MARKER_PATH" > "${MARKER_PATH}.tmp"
           mv "${MARKER_PATH}.tmp" "$MARKER_PATH"
@@ -106,7 +106,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$MARKER_PATH"
-          git commit -m "ci: reaciona deploy da Sprint 3.5 (${next_attempt}/${maximum_attempts})"
+          git commit -m "ci: reaciona deploy metodológico da Sprint 3.5 (${next_attempt}/${maximum_attempts})"
           git pull --rebase origin main
           git push origin HEAD:main
           gh workflow run risk-lab-cohort-backtest.yml --ref main

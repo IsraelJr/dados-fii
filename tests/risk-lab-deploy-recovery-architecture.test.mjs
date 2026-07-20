@@ -22,7 +22,8 @@ test("recuperação é espaçada, limitada e não exige ação do proprietário"
   assert.doesNotMatch(executable(workflow), /approval|approve|manual_document_review|ADMIN_EMAILS/);
 });
 
-test("recuperação para ao encontrar evidência final versionada", () => {
+test("recuperação v2 para ao encontrar evidência final versionada", () => {
+  assert.match(workflow, /risk-lab-3-5-20260720-v2/);
   assert.match(workflow, /run_id.*RUN_ID/);
   assert.match(workflow, /status.*passed/);
   assert.match(workflow, /status.*failed/);
@@ -30,9 +31,10 @@ test("recuperação para ao encontrar evidência final versionada", () => {
   assert.match(workflow, /completed=true/);
 });
 
-test("marcador possui limite explícito e representa o estado real da recuperação", () => {
+test("marcador v2 possui limite explícito e representa o estado real", () => {
+  assert.equal(marker.schemaVersion, 2);
   assert.equal(marker.sprint, "3.5");
-  assert.equal(marker.runId, "risk-lab-3-5-20260720-v1");
+  assert.equal(marker.runId, "risk-lab-3-5-20260720-v2");
   assert.ok(Number.isInteger(marker.attempt));
   assert.ok(marker.attempt >= 0);
   assert.ok(marker.attempt <= marker.maximumAttempts);
@@ -42,9 +44,11 @@ test("marcador possui limite explícito e representa o estado real da recuperaç
   assert.ok(marker.reason.length > 0);
 });
 
-test("workflow de Produção continua exigindo release exata e evidência completa", () => {
+test("workflow de Produção exige release exata e evidência metodológica completa", () => {
   assert.match(productionWorkflow, /RELEASE_COMMIT:\s*\$\{\{ github\.sha \}\}/);
   assert.match(productionWorkflow, /release.*RELEASE_COMMIT/);
+  assert.match(productionWorkflow, /schemaVersion == 2/);
+  assert.match(productionWorkflow, /methodologyVersion == "2\.0\.0"/);
   assert.match(productionWorkflow, /evidence\.cases \| length == 6/);
   assert.match(productionWorkflow, /premiumIntegrated == false/);
   assert.match(productionWorkflow, /notificationsSent == false/);

@@ -17,6 +17,8 @@ on:
       - "src/types/riskLabDividendStress.ts"
       - "scripts/finalize-risk-lab-sprint-3-5.mjs"
       - "tests/risk-lab-cohort-backtest*"
+      - "tests/risk-lab-credit-ambiguity-policy.test.ts"
+      - "tests/risk-lab-fnet-notice-parser.test.ts"
       - "tests/risk-lab-cohort-admin-architecture.test.mjs"
       - "tests/risk-lab-sprint-3-5-closure.test.mjs"
       - "package.json"
@@ -35,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      RUN_ID: risk-lab-3-5-20260720-v1
+      RUN_ID: risk-lab-3-5-20260720-v2
       PRODUCTION_ORIGIN: https://dadosfii.com.br
     steps:
       - name: Checkout
@@ -73,9 +75,10 @@ jobs:
 
             if [[ "$http_code" == "200" ]]; then
               release=$(jq -r '.evidence.releaseCommit // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
+              run_id=$(jq -r '.evidence.runId // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
               status=$(jq -r '.evidence.status // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
               hash=$(jq -r '.evidence.evidenceHash // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
-              if [[ "$release" == "$RELEASE_COMMIT" && ( "$status" == "passed" || "$status" == "failed" ) && ${#hash} -eq 64 ]]; then
+              if [[ "$run_id" == "$RUN_ID" && "$release" == "$RELEASE_COMMIT" && ( "$status" == "passed" || "$status" == "failed" ) && ${#hash} -eq 64 ]]; then
                 observed=true
                 break
               fi
@@ -93,8 +96,11 @@ jobs:
 
           jq -e '
             .sprint == "3.5"
+            and .evidence.schemaVersion == 2
+            and .evidence.methodologyVersion == "2.0.0"
+            and (.evidence.attemptId | test("^risk-lab-3-5-attempt-"))
             and (.evidence.cases | length == 6)
-            and (.evidence.checks | length >= 10)
+            and (.evidence.checks | length >= 12)
             and (.evidence.evidenceHash | test("^[a-f0-9]{64}$"))
             and (.evidence.premiumIntegrated == false)
             and (.evidence.notificationsSent == false)
@@ -104,7 +110,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: risk-lab-cohort-backtest-production
+          name: risk-lab-cohort-backtest-production-v2
           path: risk-lab-cohort-backtest-response.json
           if-no-files-found: error
           retention-days: 30
@@ -119,11 +125,12 @@ jobs:
           evidence_dir="docs/production-evidence/risk-lab"
           evidence_path="${evidence_dir}/${RUN_ID}.json"
           summary_path="docs/risk-lab/sprint-3-5-production-backtest.md"
-          branch="automation/sprint-3-5-evidence-${GITHUB_RUN_ID}"
+          branch="automation/sprint-3-5-evidence-v2-${GITHUB_RUN_ID}"
           mkdir -p "$evidence_dir" "$(dirname "$summary_path")"
 
           jq '.evidence' risk-lab-cohort-backtest-response.json > "$evidence_path"
           status=$(jq -r '.status' "$evidence_path")
+          attempt_id=$(jq -r '.attemptId' "$evidence_path")
           release=$(jq -r '.releaseCommit' "$evidence_path")
           evidence_hash=$(jq -r '.evidenceHash' "$evidence_path")
           coverage=$(jq -r '.metrics.coveragePercent' "$evidence_path")
@@ -131,22 +138,25 @@ jobs:
           false_negatives=$(jq -r '.metrics.falseNegatives' "$evidence_path")
           inconclusive=$(jq -r '.metrics.inconclusiveCases' "$evidence_path")
           blockers=$(jq -r '.blockers | length' "$evidence_path")
+          performance_review=$(jq -r '.performanceReviewRequired' "$evidence_path")
 
           cat > "$summary_path" <<EOF
           # Sprint 3.5 — Backtest externo em Produção
 
-          - Status: \`${status}\`
+          - Status metodológico: \`${status}\`
+          - Tentativa imutável: \`${attempt_id}\`
           - Release executado: \`${release}\`
           - Cobertura conclusiva: \`${coverage}%\`
           - Falsos positivos: \`${false_positives}\`
-          - Falsos negativos: \`${false_negatives}\`
+          - Falsos negativos medidos: \`${false_negatives}\`
           - Casos inconclusivos: \`${inconclusive}\`
-          - Blockers: \`${blockers}\`
+          - Blockers metodológicos: \`${blockers}\`
+          - Revisão de desempenho na Sprint 3.6: \`${performance_review}\`
           - Hash da evidência: \`${evidence_hash}\`
           - Premium integrado: \`false\`
           - Notificações enviadas: \`false\`
 
-          O resultado foi produzido automaticamente no deployment exato de Produção. A Sprint somente pode ser formalmente concluída quando o status for \`passed\` e todos os gates estiverem verdes.
+          O resultado foi produzido automaticamente no deployment exato de Produção. A Sprint 3.5 valida integridade, cobertura e ausência de look-ahead; a aprovação ou rejeição do ruleset pertence ao gate formal da Sprint 3.6.
           EOF
 
           if [[ "$status" == "passed" ]]; then
@@ -155,9 +165,9 @@ jobs:
             npm run test:risk-lab
             npm run test:sprint2
             node scripts/finalize-risk-lab-sprint-3-5.mjs "$evidence_path" DADOS_FII_HANDOFF.md
-            title="chore: formaliza evidência aprovada da Sprint 3.5"
+            title="chore: formaliza evidência metodológica da Sprint 3.5"
           else
-            title="audit: registra blockers da Sprint 3.5 em Produção"
+            title="audit: registra blockers metodológicos da Sprint 3.5"
           fi
 
           git config user.name "github-actions[bot]"
@@ -167,7 +177,7 @@ jobs:
           if [[ "$status" == "passed" ]]; then
             git add DADOS_FII_HANDOFF.md
           fi
-          git commit -m "docs: versiona evidência de Produção da Sprint 3.5"
+          git commit -m "docs: versiona evidência metodológica da Sprint 3.5"
           git push origin "$branch"
 
           pr_url=$(gh pr create \
@@ -176,16 +186,18 @@ jobs:
             --title "$title" \
             --body "## Auditoria automática de Produção
 
+          - tentativa: \`${attempt_id}\`
           - release: \`${release}\`
-          - status: \`${status}\`
+          - status metodológico: \`${status}\`
           - cobertura: \`${coverage}%\`
           - falsos positivos: \`${false_positives}\`
-          - falsos negativos: \`${false_negatives}\`
+          - falsos negativos medidos: \`${false_negatives}\`
           - inconclusivos: \`${inconclusive}\`
-          - blockers: \`${blockers}\`
+          - blockers metodológicos: \`${blockers}\`
+          - revisão de desempenho na Sprint 3.6: \`${performance_review}\`
           - hash: \`${evidence_hash}\`
 
-          Nenhuma aprovação técnica manual do proprietário foi usada.")
+          Nenhuma aprovação técnica manual do proprietário foi usada e o ruleset v0.1.0 não foi recalibrado com a mesma coorte.")
 
           if [[ "$status" != "passed" ]]; then
             echo "A evidência e os blockers foram versionados na PR ${pr_url}; a Sprint permanece aberta."

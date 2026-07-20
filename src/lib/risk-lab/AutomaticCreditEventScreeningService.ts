@@ -10,7 +10,7 @@ import type { VerifiedMaterialCreditEvent } from "@/types/riskLabDividendStress"
 const PIPELINE = "risk-lab-credit-screen-v0.1.0";
 const MAX_HTML_BYTES = 1_000_000;
 const FETCH_TIMEOUT_MS = 10_000;
-const MAX_DOCUMENTS = 20;
+const MAX_DOCUMENTS = 40;
 const ALLOWED_HOSTS = new Set([
   "dados.cvm.gov.br",
   "fnet.bmfbovespa.com.br",
@@ -30,15 +30,15 @@ const EVENT_PATTERNS: Array<{
   },
   {
     type: "default",
-    terms: ["INADIMPLENCIA", "VENCIMENTO ANTECIPADO", "NAO PAGAMENTO", "DEFAULT", "MORA MATERIAL"],
+    terms: ["INADIMPLENCIA", "VENCIMENTO ANTECIPADO", "NAO PAGAMENTO", "DEFAULT", "MORA MATERIAL", "CREDITO INADIMPLENTE"],
   },
   {
     type: "impairment",
-    terms: ["IMPAIRMENT", "PROVISAO PARA PERDA", "PERDA ESPERADA", "AJUSTE AO VALOR RECUPERAVEL"],
+    terms: ["IMPAIRMENT", "PROVISAO PARA PERDA", "PERDA ESPERADA", "AJUSTE AO VALOR RECUPERAVEL", "PERDA DE CREDITO"],
   },
   {
     type: "material_restructuring",
-    terms: ["REESTRUTURACAO", "RENEGOCIACAO", "REPERFILAMENTO", "WAIVER DE COVENANT"],
+    terms: ["REESTRUTURACAO", "RENEGOCIACAO", "REPERFILAMENTO", "WAIVER DE COVENANT", "CARACTERISTICAS DA DIVIDA ALTERADAS"],
   },
 ];
 
@@ -48,6 +48,16 @@ const POTENTIALLY_RELEVANT = [
   "OUTROS COMUNICADOS",
   "RELATORIO GERENCIAL",
   "RELATORIO MENSAL",
+  "RELATORIO DE RATING",
+  "RELATORIO DE CLASSIFICACAO DE RISCO",
+];
+
+const CRITICAL_DOCUMENTS = [
+  "FATO RELEVANTE",
+  "COMUNICADO AO MERCADO",
+  "OUTROS COMUNICADOS",
+  "RELATORIO DE RATING",
+  "RELATORIO DE CLASSIFICACAO DE RISCO",
 ];
 
 const EXCLUDED_DOCUMENTS = [
@@ -100,10 +110,19 @@ function officialUrl(value: string) {
   return parsed;
 }
 
+function documentText(document: AutomaticDocumentEvidence) {
+  return normalize(`${document.documentType} ${document.fileName} ${document.auditResult || ""}`);
+}
+
 function isPotentiallyRelevant(document: AutomaticDocumentEvidence) {
-  const text = normalize(`${document.documentType} ${document.fileName}`);
+  const text = documentText(document);
   if (EXCLUDED_DOCUMENTS.some((term) => text.includes(term))) return false;
   return POTENTIALLY_RELEVANT.some((term) => text.includes(term)) || Boolean(findEvent(text));
+}
+
+function isCriticalDocument(document: AutomaticDocumentEvidence) {
+  const text = documentText(document);
+  return Boolean(findEvent(text)) || CRITICAL_DOCUMENTS.some((term) => text.includes(term));
 }
 
 function inInterval(document: AutomaticDocumentEvidence, from: string, until: string) {
@@ -175,6 +194,17 @@ function matchToVerifiedEvent(
   };
 }
 
+function ambiguity(document: AutomaticDocumentEvidence, reason: string): AutomaticCreditAmbiguousDocument {
+  return {
+    documentId: document.documentId,
+    documentType: document.documentType,
+    fileName: document.fileName,
+    receivedAt: document.receivedAt,
+    sourceUrl: document.link,
+    reason,
+  };
+}
+
 export interface AutomaticCreditEventScreeningDependencies {
   fetchImpl?: typeof fetch;
   now?: () => Date;
@@ -205,7 +235,7 @@ export class AutomaticCreditEventScreeningService {
 
     const reviewedAt = this.now().toISOString();
     const years = requiredYears(relevantFrom, relevantUntil);
-    const sourceCoverageComplete = years.every((year) => sources.some((source) => source.year === year && source.fetched));
+    const sourceCoverageComplete = years.every((year) => sources.some((source) => source.year === year && source.fetched && Boolean(source.sourceHash)));
     const relevant = documents
       .filter((document) => inInterval(document, relevantFrom, relevantUntil) && isPotentiallyRelevant(document))
       .slice(0, MAX_DOCUMENTS);
@@ -214,9 +244,10 @@ export class AutomaticCreditEventScreeningService {
     const ambiguousDocuments: AutomaticCreditAmbiguousDocument[] = [];
 
     for (const document of relevant) {
+      const critical = isCriticalDocument(document);
       try {
         officialUrl(document.link);
-        const metadataMatch = findEvent(`${document.documentType} ${document.fileName} ${document.auditResult || ""}`);
+        const metadataMatch = findEvent(documentText(document));
         if (metadataMatch) {
           const match: AutomaticCreditEventMatch = {
             documentId: document.documentId,
@@ -234,27 +265,13 @@ export class AutomaticCreditEventScreeningService {
 
         const fetched = await fetchOfficialText(this.fetchImpl, document.link);
         if (!fetched.text) {
-          ambiguousDocuments.push({
-            documentId: document.documentId,
-            documentType: document.documentType,
-            fileName: document.fileName,
-            receivedAt: document.receivedAt,
-            sourceUrl: document.link,
-            reason: fetched.reason || "Conteúdo oficial não pôde ser analisado automaticamente.",
-          });
+          if (critical) ambiguousDocuments.push(ambiguity(document, fetched.reason || "Conteúdo oficial crítico não pôde ser analisado automaticamente."));
           continue;
         }
 
         const bodyMatch = findEvent(fetched.text);
         if (!bodyMatch) {
-          ambiguousDocuments.push({
-            documentId: document.documentId,
-            documentType: document.documentType,
-            fileName: document.fileName,
-            receivedAt: document.receivedAt,
-            sourceUrl: document.link,
-            reason: "Documento potencialmente relevante sem evento objetivo identificável pelas regras congeladas.",
-          });
+          if (critical) ambiguousDocuments.push(ambiguity(document, "Documento crítico sem evento objetivo identificável pelas regras congeladas."));
           continue;
         }
 
@@ -270,14 +287,12 @@ export class AutomaticCreditEventScreeningService {
         matches.push(match);
         verifiedEvents.push(matchToVerifiedEvent(ticker, document, match, reviewedAt));
       } catch (error) {
-        ambiguousDocuments.push({
-          documentId: document.documentId,
-          documentType: document.documentType,
-          fileName: document.fileName,
-          receivedAt: document.receivedAt,
-          sourceUrl: document.link,
-          reason: error instanceof Error ? error.message : "Falha desconhecida na triagem automática.",
-        });
+        if (critical) {
+          ambiguousDocuments.push(ambiguity(
+            document,
+            error instanceof Error ? error.message : "Falha desconhecida na triagem automática.",
+          ));
+        }
       }
     }
 
@@ -310,7 +325,7 @@ export class AutomaticCreditEventScreeningService {
         matches: [],
         verifiedEvents: [],
         ambiguousDocuments,
-        summary: "A triagem automática não encontrou evento explícito, mas não possui evidência suficiente para declarar ausência de evento material.",
+        summary: "A triagem automática não encontrou evento explícito, mas há lacuna de fonte ou documento crítico não analisado.",
         classificationFinal: false,
       };
     }
@@ -324,7 +339,7 @@ export class AutomaticCreditEventScreeningService {
       matches: [],
       verifiedEvents: [],
       ambiguousDocuments: [],
-      summary: "Nenhum evento material explícito foi localizado nos metadados oficiais do intervalo; isso não equivale a uma certificação de ausência.",
+      summary: "Nenhum evento material explícito foi localizado nos metadados e documentos críticos oficiais do intervalo; isso não equivale a uma certificação de ausência, e relatórios genéricos sem termos objetivos não bloqueiam a triagem.",
       classificationFinal: false,
     };
   }

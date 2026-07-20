@@ -1,6 +1,7 @@
 import type { RiskLabCohortBacktestEvidence } from "@/types/riskLabCohortBacktest";
 
 const RUN_COLLECTION = "RiskLabCohortBacktestRuns";
+const ATTEMPT_COLLECTION = "RiskLabCohortBacktestAttempts";
 const AUDIT_COLLECTION = "RiskLabCohortBacktestAudit";
 const LOCK_COLLECTION = "RiskLabCohortBacktestLocks";
 const LOCK_TTL_MS = 30 * 60_000;
@@ -12,6 +13,12 @@ function safeDocument<T>(value: T): T {
 function assertRunId(value: string) {
   if (!/^risk-lab-3-5-[a-z0-9-]{8,80}$/.test(value)) {
     throw new Error("Identificador do backtest da coorte inválido.");
+  }
+}
+
+function assertAttemptId(value: string) {
+  if (!/^risk-lab-3-5-attempt-\d{14}-[a-f0-9-]{8,36}$/.test(value)) {
+    throw new Error("Identificador imutável da tentativa inválido.");
   }
 }
 
@@ -69,12 +76,23 @@ export class RiskLabCohortBacktestStore {
     const db = await database();
     const safeEvidence = safeDocument(evidence);
     const batch = db.batch();
+
     batch.set(db.collection(RUN_COLLECTION).doc(evidence.runId), safeEvidence, { merge: false });
     batch.set(db.collection(RUN_COLLECTION).doc("latest"), safeEvidence, { merge: false });
+
+    if (evidence.status !== "running" && evidence.attemptId) {
+      assertAttemptId(evidence.attemptId);
+      batch.create(db.collection(ATTEMPT_COLLECTION).doc(evidence.attemptId), safeEvidence);
+    }
+
     batch.create(db.collection(AUDIT_COLLECTION).doc(), {
       action: "cohort-backtest",
       sprint: "3.5",
       runId: evidence.runId,
+      attemptId: evidence.attemptId || null,
+      supersedesRunId: evidence.supersedesRunId || null,
+      previousEvidenceHash: evidence.previousEvidenceHash || null,
+      methodologyVersion: evidence.methodologyVersion || "1.0.0",
       status: evidence.status,
       releaseCommit: evidence.releaseCommit,
       evidenceHash: evidence.evidenceHash,
@@ -85,7 +103,9 @@ export class RiskLabCohortBacktestStore {
       inconclusiveCases: evidence.metrics.inconclusiveCases,
       coveragePercent: evidence.metrics.coveragePercent,
       blockerCount: evidence.blockers.length,
+      sourceExecutionAllowed: evidence.sourceExecutionAllowed,
       executionAllowed: evidence.executionAllowed,
+      performanceReviewRequired: evidence.performanceReviewRequired || false,
       at: evidence.completedAt || evidence.startedAt,
       externalEffects: {
         premiumIntegrated: false,

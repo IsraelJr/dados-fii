@@ -77,13 +77,40 @@ function parseAmount(value: string) {
   return parsed;
 }
 
+function validMonth(value: string) {
+  const month = Number(value);
+  return Number.isInteger(month) && month >= 1 && month <= 12
+    ? String(month).padStart(2, "0")
+    : null;
+}
+
 function parseCompetence(value: string, informationDate: string) {
-  const cleaned = normalize(value);
+  const raw = decodeHtml(value).replace(/\s+/g, " ").trim();
+  const monthYear = raw.match(/\b(0?[1-9]|1[0-2])\s*[-\/.]\s*(20\d{2})\b/);
+  if (monthYear) return `${monthYear[2]}-${String(Number(monthYear[1])).padStart(2, "0")}`;
+
+  const yearMonth = raw.match(/\b(20\d{2})\s*[-\/.]\s*(0?[1-9]|1[0-2])\b/);
+  if (yearMonth) return `${yearMonth[1]}-${String(Number(yearMonth[2])).padStart(2, "0")}`;
+
+  const compact = raw.match(/\b(20\d{2})(0[1-9]|1[0-2])\b/);
+  if (compact) return `${compact[1]}-${compact[2]}`;
+
+  const cleaned = normalize(raw);
   const monthName = Object.keys(MONTHS).find((month) => cleaned.includes(month));
-  if (!monthName) throw new Error(`Período de referência FNET inválido: ${value}`);
-  const yearMatch = cleaned.match(/\b(20\d{2})\b/);
-  const year = yearMatch?.[1] || informationDate.slice(0, 4);
-  return `${year}-${MONTHS[monthName]}`;
+  if (monthName) {
+    const yearMatch = cleaned.match(/\b(20\d{2})\b/);
+    const year = yearMatch?.[1] || informationDate.slice(0, 4);
+    return `${year}-${MONTHS[monthName]}`;
+  }
+
+  const tokens = cleaned.split(" ").filter(Boolean);
+  if (tokens.length >= 2) {
+    const month = validMonth(tokens[0]);
+    const year = tokens.find((token) => /^20\d{2}$/.test(token));
+    if (month && year) return `${year}-${month}`;
+  }
+
+  throw new Error(`Período de referência FNET inválido: ${value}`);
 }
 
 export interface ParsedFnetNotice {
@@ -132,7 +159,10 @@ export function parseFnetProtocolHtml(html: string): ParsedFnetProtocol {
   if (!html || html.length < 100) throw new Error("HTML do protocolo FNET vazio ou incompleto.");
   const allCells = cells(html);
   const identification = field(allCells, ["Identificação do Documento"]);
-  if (!normalize(identification).includes("rendimentos e amortizacoes")) {
+  const normalizedIdentification = normalize(identification);
+  const isDividendProtocol = normalizedIdentification.includes("rendimentos e amortizacoes")
+    || normalizedIdentification.includes("pagamento de proventos");
+  if (!isDividendProtocol) {
     throw new Error(`Documento FNET não é aviso estruturado de rendimentos: ${identification}`);
   }
   const version = Number(field(allCells, ["Versão"]));

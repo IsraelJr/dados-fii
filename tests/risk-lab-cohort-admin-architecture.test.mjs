@@ -29,12 +29,13 @@ function executable(source) {
     .replace(/^\s*\/\/.*$/gm, "");
 }
 
-test("API da coorte reutiliza autenticação Admin e só executa em Produção", () => {
+test("API da coorte reutiliza autenticação Admin e só executa v2 em Produção", () => {
   assert.match(route, /authorizeAdminRequest/);
   assert.match(route, /risk-lab-cohort-backtest-execute/);
   assert.match(route, /VERCEL_ENV !== "production"/);
   assert.match(route, /VERCEL_GIT_COMMIT_SHA/);
-  assert.match(route, /riskLabCohortBacktestService\.run\(\)/);
+  assert.match(route, /riskLabCohortBacktestV2Service\.run\(\)/);
+  assert.match(route, /RiskLabCohortBacktestV2Service/);
   assert.match(route, /action !== "execute"/);
   assert.doesNotMatch(executable(route), /CRON_SECRET|ADMIN_EMAILS|firebaseAdmin|adminDb/);
 });
@@ -63,11 +64,12 @@ test("navegação do Admin torna o acionamento encontrável", () => {
   assert.match(layout, /Pendências Sprint 3\.5/);
 });
 
-test("push do marcador dispara o workflow de Produção sem depender de dispatch encadeado", () => {
+test("push do marcador dispara o workflow v2 sem depender de dispatch encadeado", () => {
   assert.match(
     workflow,
     /docs\/production-evidence\/risk-lab\/sprint-3-5-deploy-trigger\.json/,
   );
+  assert.match(workflow, /risk-lab-3-5-20260720-v2/);
   assert.match(workflow, /src\/app\/api\/admin\/system\/risk-lab\/cohort-backtest\/\*\*/);
   assert.match(workflow, /RELEASE_COMMIT:\s*\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /release.*RELEASE_COMMIT/);
