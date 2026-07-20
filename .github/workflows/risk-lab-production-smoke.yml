@@ -24,7 +24,7 @@ concurrency:
 jobs:
   production-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       RUN_ID: risk-lab-3-4-20260720-v1
       PRODUCTION_ORIGIN: https://dadosfii.com.br
@@ -47,10 +47,10 @@ jobs:
           observed=false
           http_code="000"
 
-          for attempt in $(seq 1 20); do
-            echo "Attempt ${attempt}/20 for release ${RELEASE_COMMIT}"
+          for attempt in $(seq 1 8); do
+            echo "Attempt ${attempt}/8 for release ${RELEASE_COMMIT}"
             http_code=$(curl --silent --show-error --location \
-              --max-time 320 \
+              --max-time 75 \
               --output "$response" \
               --write-out "%{http_code}" \
               "$endpoint" || true)
