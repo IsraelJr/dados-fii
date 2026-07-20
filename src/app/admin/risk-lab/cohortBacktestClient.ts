@@ -9,25 +9,21 @@ export const ADMIN_COHORT_TICKERS = [
   "RBRY11",
 ] as const;
 
-type AdminCohortBacktestFailure = {
-  ok: false;
-  error: string;
-  evidence?: PublicRiskLabCohortBacktestEvidence | null;
+type AdminCohortBacktestPayload = {
+  enabled: boolean;
+  runId: string;
+  releaseCommit: string | null;
+  tickers?: string[];
+  action?: string;
+  ticker?: string | null;
+  persistedCases?: number;
+  evidence: PublicRiskLabCohortBacktestEvidence | null;
 };
 
-export type AdminCohortBacktestResponse =
-  | {
-      ok: true;
-      enabled: boolean;
-      runId: string;
-      releaseCommit: string | null;
-      tickers?: string[];
-      action?: string;
-      ticker?: string | null;
-      persistedCases?: number;
-      evidence: PublicRiskLabCohortBacktestEvidence | null;
-    }
-  | AdminCohortBacktestFailure;
+export type AdminCohortBacktestResponse = AdminCohortBacktestPayload & (
+  | { ok: true }
+  | { ok: false; error?: string }
+);
 
 async function requestJson(init?: RequestInit): Promise<AdminCohortBacktestResponse> {
   const response = await fetch("/api/admin/system/risk-lab/cohort-backtest", {
@@ -61,18 +57,20 @@ export async function executeSegmentedCohortBacktest(
   const total = ADMIN_COHORT_TICKERS.length + 2;
   onProgress?.("Inicializando tentativa imutável…", 0, total);
   let response = await postStage("initialize");
-  if (!response.ok) throw new Error(response.error);
+  if (!response.ok) throw new Error(response.error || "Falha ao inicializar o backtest segmentado.");
 
   for (let index = 0; index < ADMIN_COHORT_TICKERS.length; index += 1) {
     const ticker = ADMIN_COHORT_TICKERS[index];
     onProgress?.(`Executando e persistindo ${ticker}…`, index + 1, total);
     response = await postStage("case", ticker);
-    if (!response.ok) throw new Error(response.error);
+    if (!response.ok) throw new Error(response.error || `Falha ao executar ${ticker}.`);
   }
 
   onProgress?.("Consolidando métricas e gates…", total - 1, total);
   response = await postStage("finalize");
-  if (!response.ok && response.evidence?.status !== "failed") throw new Error(response.error);
+  if (!response.ok && response.evidence?.status !== "failed") {
+    throw new Error(response.error || "Falha ao consolidar o backtest segmentado.");
+  }
   onProgress?.("Execução concluída.", total, total);
   return response;
 }
