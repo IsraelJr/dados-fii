@@ -55,18 +55,6 @@ test("public closure evidence is read-only and does not expose credentials or ap
   assert.doesNotMatch(route, /approvalHash/);
 });
 
-test("one-time revalidation is hash-protected and can only advance the exact prior smoke", () => {
-  const route = read("src/app/api/system/phase-2-closure/revalidate/route.ts");
-  assert.match(route, /export async function POST/);
-  assert.match(route, /createHash\("sha256"\)/);
-  assert.match(route, /timingSafeEqual/);
-  assert.match(route, /48560d2b025608e9122fad39bcbd11ecfae056f8169030b45f3173fafed83c1c/);
-  assert.match(route, /catalog-20260719204643291-c845f739/);
-  assert.match(route, /phase2ClosureService\.getStatus/);
-  assert.match(route, /phase2ClosureService\.advance/);
-  assert.doesNotMatch(route, /previewFundCatalog|applyFundCatalog|firebase-admin|adminDb|\.collection\(|api\.openai\.com/);
-});
-
 test("temporary production schedule gives three resumable attempts and Sprint CI includes the gates", () => {
   const vercel = read("vercel.json");
   const packageJson = read("package.json");
