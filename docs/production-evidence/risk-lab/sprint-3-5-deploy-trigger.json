@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "sprint": "3.5",
   "runId": "risk-lab-3-5-20260720-v1",
-  "attempt": 0,
+  "attempt": 1,
   "maximumAttempts": 6,
-  "lastTriggeredAt": null,
-  "lastObservedHttpStatus": null,
+  "lastTriggeredAt": "2026-07-20T11:14:01Z",
+  "lastObservedHttpStatus": "404",
   "lastObservedRelease": null,
   "lastObservedStatus": "pending",
-  "reason": "Vercel recusou o primeiro deployment por build-rate-limit.",
+  "reason": "Deployment exato ainda não produziu evidência final; novo push espaçado foi criado automaticamente.",
   "completed": false
 }
