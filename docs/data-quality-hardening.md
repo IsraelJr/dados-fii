@@ -2,7 +2,7 @@
 
 **Versão:** 1.0.0  
 **Data:** 16/07/2026  
-**Status:** código e auditoria externa local concluídos; carga e auditoria pós-carga em Produção pendentes.
+**Status:** carga, auditoria pós-carga e homologação estratificada concluídas em Produção; evidência schema v2 persistida no Git.
 
 ## Objetivo
 
@@ -113,14 +113,33 @@ Pendências essenciais das fontes:
 
 Essas exceções não impedem o cadastro básico, mas impedem afirmar 100% de cobertura essencial. Elas devem continuar visíveis no Admin e nos relatórios quando aplicável.
 
-## Procedimento de Produção
+## Auditoria de Produção de 19–20/07/2026
 
-1. publicar o código e confirmar CI/deploy;
-2. entrar em `/admin/sistema` com e-mail verificado e autorizado;
-3. clicar em **Analisar fontes oficiais**;
-4. confirmar 511/511, 100% básico, zero duplicidade e revisar todas as exceções/inativações;
-5. clicar em **Aplicar atualização** somente se a prévia estiver liberada;
-6. aguardar backups, versões e diretório materializado;
-7. clicar em **Fazer double check**;
-8. homologar relatórios e IA em amostra estratificada;
-9. somente então reavaliar a conclusão das Fases 1 e 2.
+A Sprint 2.12 executou a prévia, a aplicação protegida, o double check global e o smoke estratificado sem ação administrativa manual.
+
+| Métrica | Resultado |
+|---|---:|
+| Conciliação B3/CVM | 100% |
+| Cadastro básico | 100% |
+| Cobertura essencial aplicável | 97,81% |
+| CNPJ duplicado entre ativos | 0 |
+| Fundos ativos | 504 |
+| Fundos inativos | 58 |
+| Fundos em revisão | 20 |
+| Documentos planejados | 555 |
+| Documentos atualizados | 554 |
+| Inativações confirmadas | 1 |
+| Diretório materializado | 504 |
+| Health | 98 |
+| Validation | 100, 384 processados |
+| Checks de encerramento | 25/25 aprovados |
+
+A homologação gerou Relatório Gratuito, AI Insights e Relatório Premium para `MXRF11` (FII), `VGIA11` (FIAGRO), `BODB11` (FI-Infra), `RJDA11` (caso incompleto) e `HGPO11` (caso excepcional/inativo). O caso `RJDA11` demonstra que lacunas externas são explicitadas sem impedir o uso seguro dos dados básicos; `HGPO11` demonstra inativação sem apagar histórico.
+
+A evidência sanitizada está em `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json`, com hash `2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5`.
+
+## Operação recorrente
+
+O catálogo continua sendo atualizado pelo job operacional normal, com os mesmos gates, hashes, backup e auditoria. O encerramento da Fase 2 não elimina as lacunas legítimas das fontes externas: elas permanecem monitoradas no Admin e só mudam quando uma fonte oficial publicar evidência nova.
+
+Os agendamentos temporários usados exclusivamente para o fechamento foram removidos. Qualquer reexecução futura deve usar o fluxo protegido vigente e produzir uma nova evidência versionada; a evidência histórica acima nunca é sobrescrita.
