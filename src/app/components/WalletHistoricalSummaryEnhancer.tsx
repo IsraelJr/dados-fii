@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { closedMonthItems } from "../../lib/walletDividendPeriods";
 
 const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";
 
@@ -29,11 +30,6 @@ function formatMonthYear(monthKey: string) {
   const [year, month] = monthKey.split("-");
   const monthIndex = Number(month) - 1;
   return `${MONTHS_PT[monthIndex] || month}/${year}`;
-}
-
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function readSnapshots(): MonthPoint[] {
@@ -108,12 +104,11 @@ function applyHistoricalSummary() {
   const section = findSummarySection();
   if (!section) return false;
 
-  const snapshots = readSnapshots();
+  const snapshots = closedMonthItems(readSnapshots());
   if (!snapshots.length) return false;
 
   const currentYear = new Date().getFullYear();
-  const currentLimit = currentMonthKey();
-  const currentYearPoints = snapshots.filter((item) => Number(item.monthKey.slice(0, 4)) === currentYear && item.monthKey <= currentLimit);
+  const currentYearPoints = snapshots.filter((item) => Number(item.monthKey.slice(0, 4)) === currentYear);
 
   const currentBest = [...currentYearPoints].sort((a, b) => b.income - a.income)[0] || null;
   const currentWorst = [...currentYearPoints].sort((a, b) => a.income - b.income)[0] || null;
@@ -163,7 +158,7 @@ function applyHistoricalSummary() {
 
   const description = Array.from(section.querySelectorAll("p")).find((item) => textOf(item).includes("Resumo numérico e educativo"));
   if (description) {
-    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira.";
+    description.textContent = "Os cálculos de dividendos consideram apenas os meses já encerrados.";
   }
 
   return true;
