@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { closedMonthItems } from "../../lib/walletDividendPeriods";
 
 const LAST_VISIT_KEY = "dados-fii-wallet-last-visit-v1";
 const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";
@@ -51,11 +52,6 @@ function monthLabel(monthKey: string) {
   const index = Number(month) - 1;
   if (!year || !Number.isFinite(index) || index < 0 || index > 11) return monthKey || "-";
   return `${months[index]}/${year}`;
-}
-
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function currentShortDateLabel() {
@@ -110,9 +106,8 @@ function getBestDividendYear(items: Array<{ monthKey: string; value: number }>):
 function getCurrentYearDividendTotalToDate(items: Array<{ monthKey: string; value: number }>) {
   const now = new Date();
   const year = String(now.getFullYear());
-  const limitMonthKey = currentMonthKey();
   const value = items
-    .filter((item) => item.monthKey.startsWith(`${year}-`) && item.monthKey <= limitMonthKey)
+    .filter((item) => item.monthKey.startsWith(`${year}-`))
     .reduce((total, item) => total + item.value, 0);
   return { year, value };
 }
@@ -262,7 +257,7 @@ function replaceDividendExtremesSummary() {
   const section = findQuickSummarySection();
   if (!section || section.getAttribute("data-dividend-extremes-fixed") === "true") return;
 
-  const snapshots = readHistoricalDividendSnapshots();
+  const snapshots = closedMonthItems(readHistoricalDividendSnapshots());
   const currentYear = new Date().getFullYear();
   const currentYearSnapshots = snapshots.filter((snapshot) => snapshot.monthKey.startsWith(`${currentYear}-`));
   const currentYearExtremes = getExtremes(currentYearSnapshots);
@@ -272,7 +267,7 @@ function replaceDividendExtremesSummary() {
 
   const description = Array.from(section.querySelectorAll("p")).find((item) => textOf(item).includes("Resumo numérico"));
   if (description) {
-    description.textContent = "Dividendos consolidados pelo histórico mensal da carteira.";
+    description.textContent = "Os cálculos de dividendos consideram apenas os meses já encerrados.";
   }
 
   const grid = Array.from(section.querySelectorAll("div")).find((item) => {
@@ -385,4 +380,3 @@ export default function WalletPageUxEnhancer() {
     `}</style>
   );
 }
-
