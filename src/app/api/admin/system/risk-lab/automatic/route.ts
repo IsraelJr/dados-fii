@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
 import { RiskLabAutomaticOrchestrator } from "@/lib/risk-lab/RiskLabAutomaticOrchestrator";
+import { RISK_LAB_AUTOMATIC_RATE_LIMIT } from "@/lib/risk-lab/RiskLabAutomaticRateLimit";
+import { riskLabAutomaticScanStore } from "@/lib/risk-lab/RiskLabAutomaticScanStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +27,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authorization = await authorizeAdminRequest(request, "risk-lab-automatic-scan", { limit: 3, windowMs: 15 * 60_000 });
+  const authorization = await authorizeAdminRequest(
+    request,
+    "risk-lab-automatic-scan",
+    RISK_LAB_AUTOMATIC_RATE_LIMIT,
+  );
   if (authorization.rejection) return authorization.rejection;
   if (!enabled()) return adminJson({ ok: false, error: "Pesquisa automática por ticker desabilitada por feature flag." }, 503);
 
@@ -34,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (action !== "scan") return adminJson({ ok: false, error: "Ação inválida. Use scan." }, 400);
 
   try {
-    const orchestrator = new RiskLabAutomaticOrchestrator();
+    const orchestrator = new RiskLabAutomaticOrchestrator({ repository: riskLabAutomaticScanStore });
     const scan = await orchestrator.scan(String(body?.ticker || ""), authorization.identity.email);
     return adminJson({ ok: true, scan });
   } catch (error) {

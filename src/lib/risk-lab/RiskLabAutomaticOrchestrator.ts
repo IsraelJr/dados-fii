@@ -5,7 +5,10 @@ import {
 } from "@/lib/risk-lab/AutomaticCreditEventScreeningService";
 import { dividendStressWindowEngine } from "@/lib/risk-lab/DividendStressWindowEngine";
 import { RiskLabTickerOrchestrator } from "@/lib/risk-lab/RiskLabTickerOrchestrator";
-import type { RiskLabAutomaticScan } from "@/types/riskLabAutomatic";
+import type {
+  RiskLabAutomaticScan,
+  RiskLabAutomaticScanRepository,
+} from "@/types/riskLabAutomatic";
 
 function interval(scan: RiskLabAutomaticScan) {
   const series = scan.monthlySeries;
@@ -24,22 +27,31 @@ function interval(scan: RiskLabAutomaticScan) {
 export interface RiskLabAutomaticOrchestratorDependencies {
   base?: Pick<RiskLabTickerOrchestrator, "scan">;
   creditScreen?: Pick<AutomaticCreditEventScreeningService, "screen">;
+  repository?: RiskLabAutomaticScanRepository;
 }
 
 export class RiskLabAutomaticOrchestrator {
   private readonly base: Pick<RiskLabTickerOrchestrator, "scan">;
   private readonly creditScreen: Pick<AutomaticCreditEventScreeningService, "screen">;
+  private readonly repository?: RiskLabAutomaticScanRepository;
 
   constructor(dependencies: RiskLabAutomaticOrchestratorDependencies = {}) {
     this.base = dependencies.base || new RiskLabTickerOrchestrator();
     this.creditScreen = dependencies.creditScreen || automaticCreditEventScreeningService;
+    this.repository = dependencies.repository;
+  }
+
+  private persist(scan: RiskLabAutomaticScan) {
+    return this.repository ? this.repository.save(scan) : Promise.resolve(scan);
   }
 
   async scan(ticker: string, actor: string): Promise<RiskLabAutomaticScan> {
     const scan = await this.base.scan(ticker, actor);
     const series = scan.monthlySeries;
     const dates = interval(scan);
-    if (!series || series.status !== "ready" || !series.detectorResult || !dates) return scan;
+    if (!series || series.status !== "ready" || !series.detectorResult || !dates) {
+      return this.persist(scan);
+    }
 
     const creditEventScreen = await this.creditScreen.screen(
       scan.ticker,
@@ -104,7 +116,7 @@ export class RiskLabAutomaticOrchestrator {
       .digest("hex")
       .slice(0, 20)}`;
 
-    return {
+    return this.persist({
       ...scan,
       id,
       status,
@@ -115,6 +127,6 @@ export class RiskLabAutomaticOrchestrator {
       requiresHumanDocumentValidation: false,
       notificationsSent: false,
       premiumIntegrated: false,
-    };
+    });
   }
 }
