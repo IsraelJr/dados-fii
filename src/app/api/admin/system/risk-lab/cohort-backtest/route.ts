@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
-  riskLabCohortBacktestService,
-} from "@/lib/risk-lab/RiskLabCohortBacktestService";
+  riskLabCohortBacktestV2Service,
+} from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const releaseCommit = activeProductionRelease();
-    const evidence = await riskLabCohortBacktestService.getPublicEvidence();
+    const evidence = await riskLabCohortBacktestV2Service.getPublicEvidence();
     return adminJson({
       ok: true,
       enabled: Boolean(releaseCommit),
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const message = error instanceof Error
       ? error.message
       : "Falha ao carregar o status do backtest da coorte.";
-    console.error("Risk Lab cohort admin status error", {
+    console.error("Risk Lab cohort v2 admin status error", {
       actor: authorization.identity.email,
       message,
     });
@@ -68,12 +68,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    console.info("Risk Lab cohort admin execution requested", {
+    console.info("Risk Lab cohort v2 admin execution requested", {
       actor: authorization.identity.email,
       releaseCommit,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
     });
-    const evidence = await riskLabCohortBacktestService.run();
+    const evidence = await riskLabCohortBacktestV2Service.run();
     return adminJson({
       ok: true,
       enabled: true,
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error
       ? error.message
       : "Falha ao executar o backtest da coorte.";
-    console.error("Risk Lab cohort admin execution error", {
+    console.error("Risk Lab cohort v2 admin execution error", {
       actor: authorization.identity.email,
       releaseCommit,
       message,
