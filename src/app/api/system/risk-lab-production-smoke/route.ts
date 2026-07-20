@@ -1,22 +1,14 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { riskLabProductionSmokeService } from "@/lib/risk-lab/RiskLabProductionSmokeService";
+import {
+  RISK_LAB_PRODUCTION_SMOKE_RUN_ID,
+  riskLabProductionSmokeService,
+} from "@/lib/risk-lab/RiskLabProductionSmokeService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const ONE_TIME_TOKEN_HASH = "8142bee94ca8e3f123e37e7ac2f2c08cbabcf86e3bb9351bce807071ba81ade1";
-const ONE_TIME_TOKEN_EXPIRES_AT = "2026-07-21T06:00:00.000Z";
-
-function validOneTimeToken(request: NextRequest) {
-  if (Date.now() > Date.parse(ONE_TIME_TOKEN_EXPIRES_AT)) return false;
-  const token = request.nextUrl.searchParams.get("token") || "";
-  if (!token) return false;
-  const received = Buffer.from(createHash("sha256").update(token, "utf8").digest("hex"));
-  const expected = Buffer.from(ONE_TIME_TOKEN_HASH);
-  return received.length === expected.length && timingSafeEqual(received, expected);
-}
+const AUTOMATIC_TRIGGER_EXPIRES_AT = "2026-07-21T06:00:00.000Z";
 
 function response(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
@@ -30,9 +22,24 @@ function response(payload: unknown, status = 200) {
   });
 }
 
+function automaticTrigger(request: NextRequest) {
+  const runId = request.nextUrl.searchParams.get("runId") || "";
+  const release = request.nextUrl.searchParams.get("release") || "";
+  const source = request.nextUrl.searchParams.get("source") || "";
+  return {
+    requested: Boolean(runId || release || source),
+    valid: Date.now() <= Date.parse(AUTOMATIC_TRIGGER_EXPIRES_AT)
+      && process.env.VERCEL_ENV === "production"
+      && runId === RISK_LAB_PRODUCTION_SMOKE_RUN_ID
+      && release.length === 40
+      && release === process.env.VERCEL_GIT_COMMIT_SHA
+      && source === "github-actions",
+  };
+}
+
 export async function GET(request: NextRequest) {
-  const hasToken = request.nextUrl.searchParams.has("token");
-  if (!hasToken) {
+  const trigger = automaticTrigger(request);
+  if (!trigger.requested) {
     try {
       const evidence = await riskLabProductionSmokeService.getPublicEvidence();
       return response({
@@ -47,11 +54,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (process.env.VERCEL_ENV !== "production") {
-    return response({ ok: false, error: "O smoke da Sprint 3.4 só pode executar em Produção." }, 409);
-  }
-  if (!validOneTimeToken(request)) {
-    return response({ ok: false, error: "Token temporário inválido ou expirado." }, 401);
+  if (!trigger.valid) {
+    return response({
+      ok: false,
+      sprint: "3.4",
+      status: "deployment_not_ready",
+      error: "O commit solicitado ainda não é o deployment ativo de Produção ou o gatilho expirou.",
+    }, 409);
   }
 
   try {
