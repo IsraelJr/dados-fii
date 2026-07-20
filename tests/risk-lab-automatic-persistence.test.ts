@@ -71,13 +71,13 @@ function readyScan(): RiskLabAutomaticScan {
 }
 
 test("the final credit-screened scan is the version persisted", async () => {
-  let saved: RiskLabAutomaticScan | null = null;
+  const savedScans: RiskLabAutomaticScan[] = [];
   const repository: RiskLabAutomaticScanRepository = {
     save: async (scan) => {
-      saved = scan;
+      savedScans.push(scan);
       return scan;
     },
-    latest: async () => saved,
+    latest: async () => savedScans.at(-1) || null,
   };
   const orchestrator = new RiskLabAutomaticOrchestrator({
     base: { scan: async () => readyScan() },
@@ -106,10 +106,12 @@ test("the final credit-screened scan is the version persisted", async () => {
   });
 
   const result = await orchestrator.scan("MCCI11", "admin@example.com");
+  const saved = savedScans.at(-1);
+  assert.ok(saved);
   assert.equal(result.status, "inconclusive");
   assert.equal(result.analysisReadiness, "credit_event_screen_inconclusive");
-  assert.equal(saved?.id, result.id);
-  assert.equal(saved?.monthlySeries?.limitation, "material_credit_event_screen_inconclusive");
-  assert.equal(saved?.premiumIntegrated, false);
-  assert.equal(saved?.notificationsSent, false);
+  assert.equal(saved.id, result.id);
+  assert.equal(saved.monthlySeries?.limitation, "material_credit_event_screen_inconclusive");
+  assert.equal(saved.premiumIntegrated, false);
+  assert.equal(saved.notificationsSent, false);
 });
