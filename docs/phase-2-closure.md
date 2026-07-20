@@ -1,84 +1,70 @@
 # Sprint 2.12 — encerramento automatizado da Fase 2
 
+**Status:** concluída em Produção em 20/07/2026.  
+**Run:** `catalog-20260719204643291-c845f739`  
+**Schema da evidência:** `2`  
+**Commit executado:** `f4602e223e04c2d917b22a19391dbbd9e6f6286b`  
+**Deployment:** `https://www.dadosfii.com.br`  
+**Hash da evidência:** `2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5`
+
 ## Objetivo
 
-Encerrar a Fase 2 somente depois de executar em Produção a carga oficial do catálogo, o double check global e uma homologação estratificada. A automação não transforma ausência de evidência em dado e não exige clique administrativo.
+Encerrar as Fases 1 e 2 somente depois de executar em Produção a carga oficial do catálogo, o double check global e uma homologação estratificada. A automação não transforma ausência de evidência em dado e não depende de clique administrativo.
 
-## Fluxo retomável
+## Fluxo executado
 
-A rota protegida `GET /api/cron/phase-2-closure` pode avançar até três etapas na mesma chamada, interrompendo o encadeamento depois de quatro minutos para preservar margem no limite de cinco minutos da função. Três chamadas temporárias e espaçadas funcionam como redundância caso uma fonte externa fique lenta, a função seja interrompida ou a plataforma atrase um agendamento:
+A rota protegida `GET /api/cron/phase-2-closure` executou um fluxo retomável e idempotente:
 
-1. `catalog-preview`: baixa fontes oficiais, normaliza, concilia e cria uma prévia imutável vinculada por hash;
-2. `catalog-apply`: aplica exatamente a prévia aprovada pela engine, criando backup, versão, hash de publicação, auditoria e diretório materializado;
-3. `production-smoke`: executa Validation, Health e relatórios para FII, FIAGRO e FI-Infra.
+1. `catalog-preview`: fontes oficiais, normalização, conciliação e prévia vinculada por hashes;
+2. `catalog-apply`: aplicação exata da prévia aprovada, com backup, versão, publicação e auditoria;
+3. `production-smoke`: Validation, Health e relatórios estratificados;
+4. persistência da evidência sanitizada e verificação automatizada no Git;
+5. remoção dos três agendamentos temporários e do disparador de uso único.
 
-Cada etapa usa lock com expiração. Uma repetição retoma o passo pendente; a ordem dos horários não altera o resultado e, depois do estado `passed`, novas chamadas não fazem escrita regulatória.
+O estado final permanece consultável, em modo somente leitura, por `GET /api/system/phase-2-closure`.
 
-## Gates antes da publicação
+## Gates de catálogo aprovados
 
-A carga é bloqueada se qualquer item abaixo falhar:
+| Gate | Resultado |
+|---|---:|
+| Conciliação B3/CVM | 100% |
+| Cadastro básico dos ativos | 100% |
+| Cobertura essencial aplicável | 97,81% |
+| CNPJ duplicado entre ativos | 0 |
+| Fundos ativos | 504 |
+| Diretório público materializado | 504 |
+| Atualizados | 554 |
+| Inativados com evidência | 1 |
+| Health | 98 |
+| Validation | 100, 384 processados |
+| Checks finais | 25/25 aprovados |
 
-- conciliação B3/CVM inferior a 100%;
-- dados básicos dos fundos ativos inferiores a 100%;
-- cobertura essencial inferior a 95%;
-- qualquer grupo de CNPJ duplicado;
-- universo oficial suspeito de truncamento;
-- ausência dos fundos sentinela;
-- `safeToApply` falso;
-- inativação sem `destructiveChangesAllowed`;
-- qualquer gap formal da própria `FundCatalogEngine`.
-
-## Proteções da aplicação
-
-A Sprint reutiliza `RegulatoryDataService` e `RegulatoryRepository`. Não existe acesso direto ao Firestore nas rotas ou no orquestrador.
-
-A aplicação existente continua exigindo:
-
-- `runId` válido;
-- hash de aprovação de 64 caracteres;
-- igualdade entre o hash recebido e a prévia persistida;
-- recomputação e igualdade do `planHash`;
-- backup imutável por fundo alterado;
-- versão e `publicationHash`;
-- auditoria e diretório materializado após a carga.
-
-## Double check global
-
-Depois da carga, a auditoria relê todos os documentos do catálogo e confirma:
-
-- 100% de dados básicos;
-- pelo menos 95% de dados essenciais aplicáveis;
-- zero CNPJ duplicado;
-- zero fundo com campo básico ausente;
-- igualdade entre fundos ativos auditados e diretório público;
-- associação de auditoria e diretório ao mesmo `runId` aplicado.
-
-Campos que a fonte oficial não publica permanecem `null`, com proveniência e warning, e não são inventados.
+Lacunas não publicadas por fonte oficial permanecem `null`, acompanhadas de proveniência e aviso. Elas não são convertidas em zero nem em afirmações da IA.
 
 ## Homologação estratificada
 
-A seleção é determinística e cobre uma amostra ativa de cada classe. Quando disponíveis, os sentinelas são:
+| Caso | Classe | Papel | Gratuito | AI Insights | Premium |
+|---|---|---|---:|---:|---:|
+| MXRF11 | FII | padrão | aprovado | aprovado | aprovado |
+| VGIA11 | FIAGRO | padrão | aprovado | aprovado | aprovado |
+| BODB11 | FI-Infra | padrão | aprovado | aprovado | aprovado |
+| RJDA11 | FII | dados essenciais externos incompletos | aprovado | aprovado | aprovado |
+| HGPO11 | FII | inativo/liquidação, histórico preservado | aprovado | aprovado | aprovado |
 
-- FII: `MXRF11`;
-- FIAGRO: `VGIA11`;
-- FI-Infra: `BODB11`.
+A seleção cobre as três classes e também comportamentos incompleto e excepcional. O contrato exige cadastro básico, relatório gratuito, AI Insights e Premium para todos os cinco casos.
 
-Para cada amostra são exigidos cadastro básico, relatório gratuito, AI Insights e relatório Premium completo. A homologação também rejeita texto de IA que declare CNPJ, gestor ou administrador ausente quando esses dados estão presentes no objeto regulatório.
+## Proteções verificadas
 
-As chaves de requisição incluem `runId` e ticker. Assim, uma repetição da mesma carga reaproveita o cache e evita consumo duplicado de IA.
+- APIs e orquestrador delegam ao `RegulatoryDataService`/`RegulatoryRepository`;
+- nenhuma rota nova acessa Firestore diretamente;
+- aplicação vinculada por `runId`, `sourceHash`, `planHash`, aprovação e publicação;
+- backup imutável, versionamento, auditoria e rollback preservados;
+- lock e retomada impedem concorrência e repetição destrutiva;
+- cache por run/ticker evita consumo duplicado de IA;
+- evidência pública não expõe ator interno, erro bruto, segredo ou hash de aprovação.
 
-## Evidência e privacidade
+## Evidência canônica
 
-O estado completo e seu histórico ficam em `RegulatoryPhase2ClosureRuns`; cada transição também entra em `RegulatoryAuditLogs`. Antes da persistência, o objeto passa por serialização JSON para impedir valores `undefined` no Firestore.
+O arquivo versionado `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json` é validado pelo teste arquitetural da Sprint 2.12. Ele contém o resultado integral sanitizado, os 25 checks, as cinco amostras e o hash final.
 
-`GET /api/system/phase-2-closure` disponibiliza apenas a evidência sanitizada: commit, deployment, contagens, checks, amostras e hash final. A resposta não contém ator interno, erro bruto, segredo do cron, hash de aprovação ou dados de usuário.
-
-## Encerramento
-
-A Fase 2 só pode ser marcada como 100% concluída quando:
-
-1. CI e build do commit da Sprint estiverem verdes;
-2. deployment de Produção estiver verde;
-3. o endpoint de evidência retornar `status: passed`;
-4. o JSON sanitizado de Produção for salvo em `docs/production-evidence/phase-2/` e versionado no Git;
-5. os crons temporários forem removidos em um commit de limpeza.
+Com essa evidência persistida e os mecanismos temporários removidos, as Fases 1 e 2 atendem ao critério formal de conclusão.
