@@ -108,7 +108,7 @@ test("conflito entre exercícios permanece fail-closed", async () => {
   const service = new ConcurrentAutomaticDividendSeriesService({ base, yearConcurrency: 2 });
   const result = await service.build("MCCI11", [document(2024, 1), document(2025, 1)]);
 
-  assert.equal(result.status, "incomplete");
+  assert.equal(result.status, "blocked");
   assert.ok(result.conflicts.some((item) => item.includes("Valores conflitantes")));
   assert.equal(result.detectorExecuted, false);
 });
