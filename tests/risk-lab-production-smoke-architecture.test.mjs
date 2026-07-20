@@ -7,6 +7,7 @@ const smokeStore = readFileSync("src/lib/risk-lab/RiskLabProductionSmokeStore.ts
 const scanStore = readFileSync("src/lib/risk-lab/RiskLabAutomaticScanStore.ts", "utf8");
 const smokeRoute = readFileSync("src/app/api/system/risk-lab-production-smoke/route.ts", "utf8");
 const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/automatic/route.ts", "utf8");
+const smokeWorkflow = readFileSync(".github/workflows/risk-lab-production-smoke.yml", "utf8");
 
 function executable(source) {
   return source
@@ -50,13 +51,23 @@ test("automatic scans and smoke evidence use repositories with locks and audit",
   assert.match(adminRoute, /repository:\s*riskLabAutomaticScanStore/);
 });
 
-test("temporary production trigger is narrow, expiring and stores only the token hash", () => {
-  assert.match(smokeRoute, /timingSafeEqual/);
-  assert.match(smokeRoute, /ONE_TIME_TOKEN_HASH/);
-  assert.match(smokeRoute, /ONE_TIME_TOKEN_EXPIRES_AT/);
-  assert.match(smokeRoute, /VERCEL_ENV\s*!==\s*"production"/);
+test("temporary production trigger is bound to the exact deployed commit", () => {
+  assert.match(smokeRoute, /AUTOMATIC_TRIGGER_EXPIRES_AT/);
+  assert.match(smokeRoute, /VERCEL_ENV\s*===\s*"production"/);
+  assert.match(smokeRoute, /release\s*===\s*process\.env\.VERCEL_GIT_COMMIT_SHA/);
+  assert.match(smokeRoute, /runId\s*===\s*RISK_LAB_PRODUCTION_SMOKE_RUN_ID/);
+  assert.match(smokeRoute, /source\s*===\s*"github-actions"/);
   assert.match(smokeRoute, /maxDuration\s*=\s*300/);
-  assert.doesNotMatch(smokeRoute, /s72GVgOikaE_rYaIsCtiq06sI1aVLkUBO83Jkj0iiN8/);
+  assert.doesNotMatch(smokeRoute, /TOKEN|timingSafeEqual|createHash/);
+});
+
+test("GitHub workflow waits for Production and retains sanitized evidence", () => {
+  assert.match(smokeWorkflow, /github\.sha/);
+  assert.match(smokeWorkflow, /source=github-actions/);
+  assert.match(smokeWorkflow, /release=\$\{RELEASE_COMMIT\}/);
+  assert.match(smokeWorkflow, /http_code.*409/);
+  assert.match(smokeWorkflow, /upload-artifact@v4/);
+  assert.match(smokeWorkflow, /status.*passed/);
 });
 
 test("smoke remains isolated from Premium and notifications", () => {
