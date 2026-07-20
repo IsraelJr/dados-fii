@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const adminBacktestService = new RiskLabCohortBacktestV2Service({
+const riskLabCohortBacktestV2Service = new RiskLabCohortBacktestV2Service({
   dividendSeries: new ConcurrentAutomaticDividendSeriesService({ yearConcurrency: 3 }),
 });
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const releaseCommit = activeProductionRelease();
-    const evidence = await adminBacktestService.getPublicEvidence();
+    const evidence = await riskLabCohortBacktestV2Service.getPublicEvidence();
     return adminJson({
       ok: true,
       enabled: Boolean(releaseCommit),
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       releaseCommit,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
     });
-    const evidence = await adminBacktestService.run();
+    const evidence = await riskLabCohortBacktestV2Service.run();
     return adminJson({
       ok: true,
       enabled: true,
