@@ -26,14 +26,15 @@ Homologar o fluxo automático do Risk Lab no deployment real, sem exigir seleç�
 9. zero alerta ou notificação;
 10. evidência imutável com SHA-256.
 
-## Segurança do disparo inicial
+## Disparo automático inicial
 
-A primeira homologação usa uma rota temporária, válida apenas em Produção, protegida por token aleatório de uso operacional armazenado no código somente por hash e com expiração em 21/07/2026. O segredo em texto puro não é versionado.
+O workflow `Risk Lab Production Smoke` é acionado pelo merge em `main`, espera o commit exato tornar-se o deployment ativo de Produção e então dispara a execução. A rota temporária exige simultaneamente ambiente de Produção, `runId` congelado, SHA de 40 caracteres igual a `VERCEL_GIT_COMMIT_SHA`, origem declarada `github-actions` e validade até 21/07/2026.
 
-Após a execução, a rota deve ser convertida em leitura pública sanitizada da evidência. O mecanismo temporário e seu hash devem ser removidos.
+Não existe segredo em texto puro. O executor é idempotente, protegido por lock e limitado a uma evidência aprovada. Após a conclusão, o gatilho temporário deve ser removido e a rota deve permanecer somente para leitura pública sanitizada.
 
 ## Evidências
 
 - Firestore: `RiskLabProductionSmokeRuns`, `RiskLabProductionSmokeAudit` e `RiskLabProductionSmokeLocks`;
 - scans: `RiskLabAutomaticScans` e `RiskLabAutomaticScanAudit`;
+- artifact do GitHub Actions com a resposta sanitizada;
 - Git: `docs/production-evidence/risk-lab/` após o resultado aprovado.
