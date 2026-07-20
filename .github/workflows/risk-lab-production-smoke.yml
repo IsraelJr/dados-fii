@@ -14,7 +14,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 concurrency:
   group: risk-lab-production-smoke
@@ -23,18 +24,25 @@ concurrency:
 jobs:
   production-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      RUN_ID: risk-lab-3-4-20260720-v1
+      PRODUCTION_ORIGIN: https://dadosfii.com.br
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Wait for the exact production deployment and run smoke
         shell: bash
         env:
           RELEASE_COMMIT: ${{ github.sha }}
-          RUN_ID: risk-lab-3-4-20260720-v1
-          PRODUCTION_ORIGIN: https://dadosfii.com.br
         run: |
           set -euo pipefail
           endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-production-smoke?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
           : > risk-lab-production-smoke-response.json
+          passed=false
 
           for attempt in $(seq 1 30); do
             echo "Attempt ${attempt}/30 for release ${RELEASE_COMMIT}"
@@ -47,8 +55,8 @@ jobs:
             if [[ "$http_code" == "200" ]]; then
               status=$(jq -r '.status // "unknown"' risk-lab-production-smoke-response.json)
               if [[ "$status" == "passed" ]]; then
-                echo "Sprint 3.4 production smoke passed."
-                exit 0
+                passed=true
+                break
               fi
               echo "Unexpected successful response with status: ${status}"
               cat risk-lab-production-smoke-response.json
@@ -70,9 +78,14 @@ jobs:
             sleep 20
           done
 
-          echo "The exact production deployment was not observed within the allowed window."
-          cat risk-lab-production-smoke-response.json
-          exit 1
+          if [[ "$passed" != "true" ]]; then
+            echo "The exact production deployment was not observed within the allowed window."
+            cat risk-lab-production-smoke-response.json
+            exit 1
+          fi
+
+          jq -e '.ok == true and .status == "passed" and .evidence.status == "passed"' \
+            risk-lab-production-smoke-response.json >/dev/null
 
       - name: Upload sanitized production evidence
         if: always()
@@ -82,3 +95,43 @@ jobs:
           path: risk-lab-production-smoke-response.json
           if-no-files-found: error
           retention-days: 30
+
+      - name: Version evidence and open closure pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          evidence_dir="docs/production-evidence/risk-lab"
+          evidence_path="${evidence_dir}/${RUN_ID}.json"
+          branch="automation/risk-lab-3-4-evidence-${GITHUB_RUN_ID}"
+          mkdir -p "$evidence_dir"
+          jq '.evidence' risk-lab-production-smoke-response.json > "$evidence_path"
+          jq -e '.status == "passed" and (.evidenceHash | length == 64)' "$evidence_path" >/dev/null
+
+          evidence_hash=$(jq -r '.evidenceHash' "$evidence_path")
+          release_commit=$(jq -r '.releaseCommit' "$evidence_path")
+          check_count=$(jq -r '.checks | length' "$evidence_path")
+          case_count=$(jq -r '.cases | length' "$evidence_path")
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "$evidence_path"
+          git commit -m "docs: versiona evidência de Produção da Sprint 3.4"
+          git push origin "$branch"
+
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "chore: formaliza conclusão da Sprint 3.4" \
+            --body "## Evidência automatizada de Produção
+
+          - release: \`${release_commit}\`
+          - checks: ${check_count}/${check_count}
+          - casos: ${case_count}
+          - hash: \`${evidence_hash}\`
+          - Premium integrado: não
+          - notificações enviadas: não
+
+          A evidência foi gerada pelo workflow após o commit exato tornar-se o deployment ativo de Produção. Esta PR será complementada com a remoção do gatilho temporário e a atualização do handoff canônico."
