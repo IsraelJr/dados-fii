@@ -67,7 +67,9 @@ export default function CohortBacktestPanel() {
     setError("");
     try {
       const response = await getCohortBacktestStatus();
-      if (!response.ok) throw new Error(response.error);
+      if (!response.ok) {
+        throw new Error(response.error || "Não foi possível carregar o status do backtest.");
+      }
       setEnabled(response.enabled);
       setRunId(response.runId);
       setReleaseCommit(response.releaseCommit);
@@ -89,13 +91,13 @@ export default function CohortBacktestPanel() {
         setProgress(label);
         setProgressPercent(Math.round(completed / total * 100));
       });
-      if (!response.ok && response.evidence?.status !== "failed") throw new Error(response.error);
-      if (response.ok) {
-        setEnabled(response.enabled);
-        setRunId(response.runId);
-        setReleaseCommit(response.releaseCommit);
-        setEvidence(response.evidence);
+      if (!response.ok && response.evidence?.status !== "failed") {
+        throw new Error(response.error || "Falha ao consolidar a execução segmentada.");
       }
+      setEnabled(response.enabled);
+      setRunId(response.runId);
+      setReleaseCommit(response.releaseCommit);
+      setEvidence(response.evidence);
       setMessage(
         response.evidence?.status === "passed"
           ? "Todos os gates metodológicos da Sprint 3.5 foram aprovados."
