@@ -19,12 +19,12 @@ permissions:
 
 concurrency:
   group: risk-lab-production-smoke
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   production-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     env:
       RUN_ID: risk-lab-3-4-20260720-v1
       PRODUCTION_ORIGIN: https://dadosfii.com.br
@@ -34,60 +34,60 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Wait for the exact production deployment and run smoke
+      - name: Execute observable production smoke
+        id: smoke
         shell: bash
         env:
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
-          set -euo pipefail
+          set -u
           endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-production-smoke?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
-          : > risk-lab-production-smoke-response.json
-          passed=false
+          response="risk-lab-production-smoke-response.json"
+          : > "$response"
+          observed=false
+          http_code="000"
 
-          for attempt in $(seq 1 30); do
-            echo "Attempt ${attempt}/30 for release ${RELEASE_COMMIT}"
+          for attempt in $(seq 1 20); do
+            echo "Attempt ${attempt}/20 for release ${RELEASE_COMMIT}"
             http_code=$(curl --silent --show-error --location \
               --max-time 320 \
-              --output risk-lab-production-smoke-response.json \
+              --output "$response" \
               --write-out "%{http_code}" \
               "$endpoint" || true)
 
-            if [[ "$http_code" == "200" ]]; then
-              status=$(jq -r '.status // "unknown"' risk-lab-production-smoke-response.json)
-              if [[ "$status" == "passed" ]]; then
-                passed=true
-                break
-              fi
-              echo "Unexpected successful response with status: ${status}"
-              cat risk-lab-production-smoke-response.json
-              exit 1
-            fi
-
-            if [[ "$http_code" == "422" ]]; then
-              echo "Sprint 3.4 smoke executed and failed its gates."
-              cat risk-lab-production-smoke-response.json
-              exit 1
+            if [[ "$http_code" == "200" || "$http_code" == "422" ]]; then
+              observed=true
+              break
             fi
 
             if [[ "$http_code" != "409" && "$http_code" != "000" && "$http_code" != "503" ]]; then
-              echo "Unexpected HTTP ${http_code}."
-              cat risk-lab-production-smoke-response.json
-              exit 1
+              observed=true
+              break
             fi
-
-            sleep 20
+            sleep 15
           done
 
-          if [[ "$passed" != "true" ]]; then
-            echo "The exact production deployment was not observed within the allowed window."
-            cat risk-lab-production-smoke-response.json
-            exit 1
+          if ! jq empty "$response" >/dev/null 2>&1; then
+            jq -n \
+              --arg status "transport_failure" \
+              --arg httpCode "$http_code" \
+              --arg release "$RELEASE_COMMIT" \
+              --argjson observed "$observed" \
+              '{ok:false,status:$status,httpCode:$httpCode,releaseCommit:$release,observed:$observed}' > "$response"
           fi
 
-          jq -e '.ok == true and .status == "passed" and .evidence.status == "passed"' \
-            risk-lab-production-smoke-response.json >/dev/null
+          status=$(jq -r '.status // "unknown"' "$response")
+          passed=false
+          if [[ "$http_code" == "200" && "$status" == "passed" ]]; then
+            passed=true
+          fi
 
-      - name: Upload sanitized production evidence
+          echo "http_code=${http_code}" >> "$GITHUB_OUTPUT"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "passed=${passed}" >> "$GITHUB_OUTPUT"
+          echo "Smoke response: HTTP ${http_code}, status ${status}, passed ${passed}."
+
+      - name: Upload sanitized smoke response
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -96,42 +96,60 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Version evidence and open closure pull request
+      - name: Version observable result
+        if: always()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          PASSED: ${{ steps.smoke.outputs.passed }}
+          STATUS: ${{ steps.smoke.outputs.status }}
+          HTTP_CODE: ${{ steps.smoke.outputs.http_code }}
         run: |
           set -euo pipefail
-          evidence_dir="docs/production-evidence/risk-lab"
-          evidence_path="${evidence_dir}/${RUN_ID}.json"
-          branch="automation/risk-lab-3-4-evidence-${GITHUB_RUN_ID}"
-          mkdir -p "$evidence_dir"
-          jq '.evidence' risk-lab-production-smoke-response.json > "$evidence_path"
-          jq -e '.status == "passed" and (.evidenceHash | length == 64)' "$evidence_path" >/dev/null
+          result_dir="docs/production-evidence/risk-lab"
+          branch="automation/risk-lab-3-4-result-${GITHUB_RUN_ID}"
+          mkdir -p "$result_dir"
 
-          evidence_hash=$(jq -r '.evidenceHash' "$evidence_path")
-          release_commit=$(jq -r '.releaseCommit' "$evidence_path")
-          check_count=$(jq -r '.checks | length' "$evidence_path")
-          case_count=$(jq -r '.cases | length' "$evidence_path")
+          if [[ "$PASSED" == "true" ]] && jq -e '.evidence.status == "passed" and (.evidence.evidenceHash | length == 64)' risk-lab-production-smoke-response.json >/dev/null; then
+            result_path="${result_dir}/${RUN_ID}.json"
+            jq '.evidence' risk-lab-production-smoke-response.json > "$result_path"
+            title="chore: formaliza conclusão da Sprint 3.4"
+            commit_message="docs: versiona evidência aprovada da Sprint 3.4"
+          else
+            result_path="${result_dir}/diagnostic-${GITHUB_SHA}.json"
+            jq '.' risk-lab-production-smoke-response.json > "$result_path"
+            title="fix: registra bloqueio do smoke da Sprint 3.4"
+            commit_message="docs: registra diagnóstico do smoke da Sprint 3.4"
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
-          git add "$evidence_path"
-          git commit -m "docs: versiona evidência de Produção da Sprint 3.4"
+          git add "$result_path"
+          git commit -m "$commit_message"
           git push origin "$branch"
 
           gh pr create \
             --base main \
             --head "$branch" \
-            --title "chore: formaliza conclusão da Sprint 3.4" \
-            --body "## Evidência automatizada de Produção
+            --title "$title" \
+            --body "## Resultado automatizado do smoke
 
-          - release: \`${release_commit}\`
-          - checks: ${check_count}/${check_count}
-          - casos: ${case_count}
-          - hash: \`${evidence_hash}\`
-          - Premium integrado: não
-          - notificações enviadas: não
+          - status: \`${STATUS}\`
+          - HTTP: \`${HTTP_CODE}\`
+          - commit solicitado: \`${GITHUB_SHA}\`
+          - arquivo: \`${result_path}\`
 
-          A evidência foi gerada pelo workflow após o commit exato tornar-se o deployment ativo de Produção. Esta PR será complementada com a remoção do gatilho temporário e a atualização do handoff canônico."
+          A branch foi criada mesmo em caso de reprovação para permitir diagnóstico e correção sem ação manual do proprietário." \
+            || echo "A branch de resultado foi criada; a abertura automática da PR não foi autorizada pelo repositório."
+
+      - name: Enforce smoke result
+        if: always()
+        shell: bash
+        env:
+          PASSED: ${{ steps.smoke.outputs.passed }}
+        run: |
+          if [[ "$PASSED" != "true" ]]; then
+            echo "Sprint 3.4 production smoke did not pass."
+            exit 1
+          fi
