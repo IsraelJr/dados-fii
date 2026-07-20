@@ -124,16 +124,23 @@ async function validateDocument(
   if (Number.isFinite(receivedDifference) && receivedDifference > 36 * 60 * 60 * 1000) {
     throw new Error("Horário do protocolo diverge do catálogo CVM.");
   }
-  const source = {
+
+  const sourceHash = sha256(noticeHtml);
+  const protocolHash = sha256(protocolHtml);
+  const source: VerifiedDividendNotice["source"] = {
     documentId: id,
     sourceUrl,
     sourceType: "primary_regulatory",
     reviewMethod: "automatic_regulatory_validation",
     reviewedBy: PIPELINE,
     reviewedAt,
-    page: null,
+    page: 1,
     excerpt: `Aviso FNET validado automaticamente; competência ${notice.competenceMonth}; valor R$ ${notice.amountPerShare}; protocolo ${protocol.deliveredAt}; versão ${protocol.version}.`,
-  } as unknown as VerifiedDividendNotice["source"];
+    sourceHash,
+    protocolHash,
+    protocolVersion: protocol.version,
+  };
+
   return {
     observation: {
       ticker,
@@ -144,8 +151,8 @@ async function validateDocument(
     },
     version: protocol.version,
     sourceYear: document.sourceYear,
-    sourceHash: sha256(noticeHtml),
-    protocolHash: sha256(protocolHtml),
+    sourceHash,
+    protocolHash,
   };
 }
 

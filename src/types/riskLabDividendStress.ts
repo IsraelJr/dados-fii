@@ -13,6 +13,9 @@ export interface VerifiedDividendNoticeSource {
   reviewedAt: string;
   page: number | null;
   excerpt: string;
+  sourceHash?: string;
+  protocolHash?: string;
+  protocolVersion?: number;
 }
 
 export interface VerifiedDividendNotice {

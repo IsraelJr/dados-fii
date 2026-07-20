@@ -16,7 +16,13 @@ export interface CvmEventualDiscoveryResult {
   issues: AutomaticValidationIssue[];
 }
 
-async function fetchYear(fetchImpl: typeof fetch, cnpj: string, year: number) {
+interface CvmYearSource {
+  sourceUrl: string;
+  bytes: Uint8Array;
+  sourceHash: string;
+}
+
+async function fetchYearSource(fetchImpl: typeof fetch, year: number): Promise<CvmYearSource> {
   const sourceUrl = `${BASE_URL}/eventual_fi_${year}.csv`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -31,52 +37,78 @@ async function fetchYear(fetchImpl: typeof fetch, cnpj: string, year: number) {
     if (!response.ok) throw new Error(`CVM respondeu HTTP ${response.status}.`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength > MAX_BYTES) throw new Error("Arquivo CVM excede o limite seguro de 70 MB.");
-    const csv = new TextDecoder("windows-1252").decode(bytes);
-    const parsed = parseCvmEventualCsv(csv, cnpj, year);
     return {
-      documents: parsed.documents,
-      issues: parsed.issues,
-      summary: {
-        year,
-        sourceUrl,
-        sourceHash: createHash("sha256").update(bytes).digest("hex"),
-        fetched: true,
-        matchingRows: parsed.matchingRows,
-        acceptedDocuments: parsed.documents.length,
-        rejectedRows: parsed.rejectedRows,
-        error: null,
-      } satisfies AutomaticSourceSummary,
-    };
-  } catch (error) {
-    const message = error instanceof Error && error.name === "AbortError"
-      ? "Tempo limite ao consultar a CVM."
-      : error instanceof Error
-        ? error.message
-        : "Falha desconhecida ao consultar a CVM.";
-    return {
-      documents: [] as AutomaticDocumentEvidence[],
-      issues: [{ code: "source_unavailable", severity: "error" as const, message: `Fonte CVM ${year} indisponível: ${message}` }],
-      summary: {
-        year,
-        sourceUrl,
-        sourceHash: null,
-        fetched: false,
-        matchingRows: 0,
-        acceptedDocuments: 0,
-        rejectedRows: 0,
-        error: message,
-      } satisfies AutomaticSourceSummary,
+      sourceUrl,
+      bytes,
+      sourceHash: createHash("sha256").update(bytes).digest("hex"),
     };
   } finally {
     clearTimeout(timeout);
   }
 }
 
+function failureMessage(error: unknown) {
+  if (error instanceof Error && error.name === "AbortError") return "Tempo limite ao consultar a CVM.";
+  return error instanceof Error ? error.message : "Falha desconhecida ao consultar a CVM.";
+}
+
 export class CvmEventualDocumentDiscovery {
   private readonly fetchImpl: typeof fetch;
+  private readonly yearCache = new Map<number, Promise<CvmYearSource>>();
 
   constructor(fetchImpl: typeof fetch = fetch) {
     this.fetchImpl = fetchImpl;
+  }
+
+  private sourceForYear(year: number) {
+    const existing = this.yearCache.get(year);
+    if (existing) return existing;
+    const pending = fetchYearSource(this.fetchImpl, year);
+    this.yearCache.set(year, pending);
+    return pending;
+  }
+
+  private async fetchYear(cnpj: string, year: number) {
+    const sourceUrl = `${BASE_URL}/eventual_fi_${year}.csv`;
+    try {
+      const source = await this.sourceForYear(year);
+      const csv = new TextDecoder("windows-1252").decode(source.bytes);
+      const parsed = parseCvmEventualCsv(csv, cnpj, year);
+      return {
+        documents: parsed.documents,
+        issues: parsed.issues,
+        summary: {
+          year,
+          sourceUrl: source.sourceUrl,
+          sourceHash: source.sourceHash,
+          fetched: true,
+          matchingRows: parsed.matchingRows,
+          acceptedDocuments: parsed.documents.length,
+          rejectedRows: parsed.rejectedRows,
+          error: null,
+        } satisfies AutomaticSourceSummary,
+      };
+    } catch (error) {
+      const message = failureMessage(error);
+      return {
+        documents: [] as AutomaticDocumentEvidence[],
+        issues: [{
+          code: "source_unavailable",
+          severity: "error" as const,
+          message: `Fonte CVM ${year} indisponível: ${message}`,
+        }],
+        summary: {
+          year,
+          sourceUrl,
+          sourceHash: null,
+          fetched: false,
+          matchingRows: 0,
+          acceptedDocuments: 0,
+          rejectedRows: 0,
+          error: message,
+        } satisfies AutomaticSourceSummary,
+      };
+    }
   }
 
   async discover(cnpj: string, years: number[]): Promise<CvmEventualDiscoveryResult> {
@@ -88,7 +120,7 @@ export class CvmEventualDocumentDiscovery {
     if (!selectedYears.length) throw new Error("Nenhum ano válido foi informado para a pesquisa CVM.");
 
     const results = [];
-    for (const year of selectedYears) results.push(await fetchYear(this.fetchImpl, cnpj, year));
+    for (const year of selectedYears) results.push(await this.fetchYear(cnpj, year));
 
     const documents = new Map<string, AutomaticDocumentEvidence>();
     for (const result of results) {
