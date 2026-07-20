@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sprint": "3.5",
+  "runId": "risk-lab-3-5-20260720-v1",
+  "attempt": 0,
+  "maximumAttempts": 6,
+  "lastTriggeredAt": null,
+  "lastObservedHttpStatus": null,
+  "lastObservedRelease": null,
+  "lastObservedStatus": "pending",
+  "reason": "Vercel recusou o primeiro deployment por build-rate-limit.",
+  "completed": false
+}
