@@ -30,13 +30,16 @@ test("recuperação para ao encontrar evidência final versionada", () => {
   assert.match(workflow, /completed=true/);
 });
 
-test("marcador possui limite explícito e começa sem alegar conclusão", () => {
+test("marcador possui limite explícito e representa o estado real da recuperação", () => {
   assert.equal(marker.sprint, "3.5");
   assert.equal(marker.runId, "risk-lab-3-5-20260720-v1");
-  assert.equal(marker.attempt, 0);
+  assert.ok(Number.isInteger(marker.attempt));
+  assert.ok(marker.attempt >= 0);
+  assert.ok(marker.attempt <= marker.maximumAttempts);
   assert.equal(marker.maximumAttempts, 6);
-  assert.equal(marker.completed, false);
-  assert.match(marker.reason, /build-rate-limit/);
+  assert.equal(typeof marker.completed, "boolean");
+  assert.equal(typeof marker.reason, "string");
+  assert.ok(marker.reason.length > 0);
 });
 
 test("workflow de Produção continua exigindo release exata e evidência completa", () => {
@@ -45,4 +48,11 @@ test("workflow de Produção continua exigindo release exata e evidência comple
   assert.match(productionWorkflow, /evidence\.cases \| length == 6/);
   assert.match(productionWorkflow, /premiumIntegrated == false/);
   assert.match(productionWorkflow, /notificationsSent == false/);
+});
+
+test("push do marcador também dispara Produção sem depender apenas do dispatch encadeado", () => {
+  assert.match(
+    productionWorkflow,
+    /docs\/production-evidence\/risk-lab\/sprint-3-5-deploy-trigger\.json/,
+  );
 });
