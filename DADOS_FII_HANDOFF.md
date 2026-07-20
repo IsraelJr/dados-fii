@@ -8,7 +8,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 **Branch principal:** `main`  
 **Commit auditado em Produção:** `f4602e223e04c2d917b22a19391dbbd9e6f6286b`  
 **Branch desta atualização:** `agent/phase-2-formal-closure`  
-**PR desta atualização:** encerramento formal da Fase 2 (a registrar após abertura)
+**PR desta atualização:** #50 — `chore: formaliza encerramento auditável da Fase 2`
 
 ## Como interpretar os status deste documento
 
@@ -329,7 +329,7 @@ Incidentes de segurança, integridade de dados e regressões de Produção sempr
 
 - **#5 — “Adicionar ingestão operacional controlada de FIIs e presentes VIP”**: draft antigo e divergente do fluxo canônico atual; deve ser reconciliado com `main` e então fechado ou redefinido. É a única PR aberta localizada antes da abertura do PR desta atualização.
 - PR #49 foi fechada sem merge porque foi substituída pelo disparo temporário incorporado diretamente em `main`.
-- O PR de encerramento formal desta versão será registrado neste cabeçalho após sua abertura.
+- **#50 — encerramento formal da Fase 2:** PR atual; persiste a evidência schema v2, remove mecanismos temporários e promove o handoff para v6.1.0.
 
 ### Branches remotas
 
