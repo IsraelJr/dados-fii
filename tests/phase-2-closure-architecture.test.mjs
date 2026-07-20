@@ -10,11 +10,7 @@ test("Sprint 2.12 cron is protected, bounded and delegates to one orchestrator",
   assert.match(route, /timingSafeEqual/);
   assert.match(route, /maxDuration = 300/);
   assert.match(route, /phase2ClosureService\.advance/);
-  assert.match(route, /export async function POST/);
   assert.match(route, /createHash\("sha256"\)/);
-  assert.match(route, /catalog-20260719204643291-c845f739/);
-  assert.match(route, /c845f73907160e2814fefde0f8e199925c4268e40239c2f0da86bd4804c376cb/);
-  assert.match(route, /e9a0a763fc71dcf7ffac34871a9142e19776c036547aac727c307ea93ea082b6/);
   assert.match(route, /step < 3/);
   assert.match(route, /240_000/);
   assert.doesNotMatch(route, /firebase-admin|adminDb|\.collection\(/);
@@ -60,7 +56,7 @@ test("public closure evidence is read-only and does not expose credentials or ap
   assert.doesNotMatch(route, /approvalHash/);
 });
 
-test("temporary production schedule gives three resumable attempts and Sprint CI includes the gates", () => {
+test("production schedule has no temporary Phase 2 closure cron and Sprint CI includes the gates", () => {
   const vercel = read("vercel.json");
   const packageJson = read("package.json");
   const workflow = read(".github/workflows/phase-2-closure.yml");
