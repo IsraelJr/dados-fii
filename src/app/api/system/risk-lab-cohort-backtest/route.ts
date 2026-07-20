@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
-  riskLabCohortBacktestService,
-} from "@/lib/risk-lab/RiskLabCohortBacktestService";
+  riskLabCohortBacktestV2Service,
+} from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ function authorizedExecution(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     if (authorizedExecution(request)) {
-      const evidence = await riskLabCohortBacktestService.run();
+      const evidence = await riskLabCohortBacktestV2Service.run();
       return response({
         ok: evidence.status === "passed",
         sprint: "3.5",
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       }, evidence.status === "running" ? 202 : 200);
     }
 
-    const evidence = await riskLabCohortBacktestService.getPublicEvidence();
+    const evidence = await riskLabCohortBacktestV2Service.getPublicEvidence();
     return response({
       ok: evidence?.status === "passed",
       sprint: "3.5",
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error(
-      "Risk Lab cohort backtest error",
+      "Risk Lab cohort backtest v2 error",
       error instanceof Error ? error.message : "unknown",
     );
     return response({ ok: false, sprint: "3.5", status: "unavailable" }, 503);
