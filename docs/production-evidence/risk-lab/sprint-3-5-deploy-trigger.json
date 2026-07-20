@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "sprint": "3.5",
   "runId": "risk-lab-3-5-20260720-v2",
-  "attempt": 1,
+  "attempt": 2,
   "maximumAttempts": 6,
-  "lastTriggeredAt": "2026-07-20T22:28:00Z",
+  "lastTriggeredAt": "2026-07-20T22:55:00Z",
   "lastObservedHttpStatus": null,
-  "lastObservedRelease": "6da7748dc8587542488f285f9ccc81dd920bc2e5",
+  "lastObservedRelease": "e30843eea7fec509d1f27710215d4fd0481a1119",
   "lastObservedStatus": "pending",
-  "reason": "Primeiro gatilho explícito da execução metodológica v2 após deployment verde da correção.",
+  "reason": "Gatilho explícito do runtime concorrente após a execução monolítica não produzir evidência final.",
   "completed": false
 }
