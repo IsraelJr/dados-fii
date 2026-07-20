@@ -1,6 +1,15 @@
 name: Risk Lab Production Smoke
 
 on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - ".github/risk-lab-production-smoke.trigger"
   push:
     branches:
       - main
@@ -18,7 +27,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: risk-lab-production-smoke
+  group: risk-lab-production-smoke-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'main' }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +37,7 @@ jobs:
     env:
       RUN_ID: risk-lab-3-4-20260720-v1
       PRODUCTION_ORIGIN: https://dadosfii.com.br
+      RELEASE_COMMIT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,8 +47,6 @@ jobs:
       - name: Initialize deterministic result branch
         id: result_branch
         shell: bash
-        env:
-          RELEASE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           short_sha="${RELEASE_COMMIT:0:12}"
@@ -75,8 +83,6 @@ jobs:
       - name: Execute observable production smoke
         id: smoke
         shell: bash
-        env:
-          RELEASE_COMMIT: ${{ github.sha }}
         run: |
           set -u
           endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-production-smoke?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
@@ -129,7 +135,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: risk-lab-production-smoke-${{ github.sha }}
+          name: risk-lab-production-smoke-${{ env.RELEASE_COMMIT }}
           path: risk-lab-production-smoke-response.json
           if-no-files-found: error
           retention-days: 30
@@ -175,7 +181,7 @@ jobs:
 
           - status: \`${STATUS}\`
           - HTTP: \`${HTTP_CODE}\`
-          - commit solicitado: \`${GITHUB_SHA}\`
+          - commit solicitado: \`${RELEASE_COMMIT}\`
           - arquivo: \`${result_path}\`
 
           A branch determinística é criada no início da execução e atualizada com o resultado final, inclusive em caso de reprovação." \
