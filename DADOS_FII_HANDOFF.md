@@ -2,13 +2,13 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 6.1.0  
+**Versão:** 6.2.0  
 **Data:** 20/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**Commit auditado em Produção:** `f4602e223e04c2d917b22a19391dbbd9e6f6286b`  
-**Branch desta atualização:** `agent/phase-2-formal-closure`  
-**PR desta atualização:** #50 — `chore: formaliza encerramento auditável da Fase 2`
+**Commit auditado em Produção:** `e9a5d6ec263c0aa87961133a361891f60175dba4`  
+**Branch desta atualização:** `automation/risk-lab-3-4-release-0072ecf340e6`  
+**PR desta atualização:** #59 — `chore: formaliza conclusão da Sprint 3.4`
 
 ## Como interpretar os status deste documento
 
@@ -26,7 +26,7 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 |---|---|---|
 | As Fases 1 e 2 estão formalmente concluídas em Produção sob a evidência schema v2 do run `catalog-20260719204643291-c845f739`. | “Fase 2 apenas validada funcionalmente, com encerramento condicionado à Sprint 2.12.” | A carga, o double check global, 25 checks e a homologação de cinco casos foram executados em Produção e persistidos no Git. |
 | Nenhuma fase será declarada 100% concluída sem código, CI, deployment do commit exato, smoke test, cobertura do universo e evidências no Git. | Conclusão baseada em testes de poucos tickers ou confirmação verbal. | Correções de cálculo, cadastro, IA e relatórios precisam ser generalizadas para todos os fundos aplicáveis. |
-| Sprint corrente canônica: **3.4 — Risk Lab em Produção e smoke ponta a ponta**. | Sprint 2.12 como sprint corrente. | A Sprint 2.12 foi concluída; a próxima pendência operacional é homologar o Risk Lab sem integrá-lo ainda ao Premium ou às notificações. |
+| Sprint corrente canônica: **3.5 — Coorte externa e backtest sem informação futura**. | Sprint 3.4 como sprint corrente. | A Sprint 3.4 foi homologada em Produção com evidência auditável, mantendo o Risk Lab isolado do Premium e das notificações. |
 | Fase 3 = **Risk Lab**; Fase 4 = **Radar/Acompanhar fundo fora da carteira**. | Radar como Fase 3. | O Risk Lab já possui implementação substancial e precisa ser homologado antes de alimentar decisões e alertas. |
 | Fluxo principal do Risk Lab = **ticker-only**; seleção de documento, fila de IDs e execução manual são ferramentas de diagnóstico. | Fluxos manuais como experiência principal. | O proprietário não deve resolver IDs nem validar documentos técnicos para usar o produto. |
 | O Relatório Premium usa cálculo determinístico e dados estruturados antes da IA; a IA explica, compara e contextualiza, mas não inventa nem decide regras. | IA produzindo análise diretamente de dados incompletos ou chamando OpenAI por endpoint. | Evita alucinação, inconsistência e custo repetido. |
@@ -50,7 +50,7 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 - O smoke schema v2 aprovou 25/25 checks, Health 98 e Validation 100 com 384 fundos processados.
 - Relatório Gratuito, AI Insights e Premium foram aprovados em cinco casos: `MXRF11` (FII), `VGIA11` (FIAGRO), `BODB11` (FI-Infra), `RJDA11` (incompleto) e `HGPO11` (excepcional/inativo).
 - A evidência canônica está em `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json`, hash `2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5`.
-- O Risk Lab está implementado em código até a PR #41, mas continua isolado do Premium e das notificações. A coorte externa permanece bloqueada até verificação primária.
+- A Sprint 3.4 do Risk Lab foi concluída em Produção com 11/11 checks, 6/6 casos obrigatórios e zero blockers; evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f`. O Risk Lab continua isolado do Premium e das notificações; a coorte externa permanece bloqueada até verificação primária.
 - O Plano SEO de 90 dias segue como trilha paralela, sem autorizar publicação massiva de páginas rasas ou dados não homologados.
 
 ### Auditoria de conclusão
@@ -59,7 +59,7 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 |---|---:|---:|---:|---:|---|
 | Fase 1 — Engine regulatória | Sim | Sim | Sim | Schema v2, publicação/backup/auditoria e smoke | Formalmente concluída |
 | Fase 2 — Serviços e inteligência | Sim | Sim | Sim (`f4602e`, Vercel verde) | 25/25 checks, universo global e cinco casos | Formalmente concluída |
-| Fase 3 — Risk Lab | Sim, até 3.3 | Sim | Deployment geral verde | Smoke autenticado e coorte ausentes | Em andamento |
+| Fase 3 — Risk Lab | Sim, até 3.4 | Sim | Sim (`e9a5d6e`, Vercel verde) | Smoke 3.4: 11/11 checks e 6/6 casos; coorte externa pendente | Em andamento |
 | SEO 90 dias | Plano pronto | Não se aplica ao plano | Não iniciado como trilha auditada | Search Console/KPIs não registrados | Pendente |
 
 ### Pendências de dados já conhecidas
@@ -90,46 +90,41 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 ### Fase 3 — Risk Lab
 
-**Em andamento.** As Sprints 3.0 a 3.3 possuem código e testes. A Sprint 3.4 precisa executar o smoke autenticado; a 3.5 está bloqueada até verificação primária da coorte.
+**Em andamento.** As Sprints 3.0 a 3.4 possuem código, testes e homologação de Produção. A Sprint 3.5 continua bloqueada até a verificação primária da coorte externa.
 
 ---
 
 ## 3. Sprint atual
 
-### Sprint 3.4 — Risk Lab em Produção e smoke ponta a ponta
+### Sprint 3.5 — Coorte externa e backtest sem informação futura
 
-**Objetivo:** homologar o fluxo automático do Risk Lab no ambiente real sem liberar resultados inconclusivos nem acoplar a funcionalidade prematuramente ao Premium ou às notificações.
+**Objetivo:** verificar a coorte pré-registrada em fontes primárias e executar o backtest sem informação futura, preservando integralmente o ruleset `v0.1.0`.
 
 **Trabalho obrigatório:**
 
-1. identificar o commit e deployment exatos;
-2. conferir flags não secretas e autenticação administrativa;
-3. executar o fluxo ticker-only de identidade, fontes, validação, série mensal, detector e triagem;
-4. cobrir `HCTR11`, `MCCI11`, `RBRY11`, ticker inválido, dados insuficientes e ambiguidade;
-5. verificar persistência, locks, hashes, rate limit e auditoria;
-6. demonstrar zero efeito no Relatório Premium e nas notificações;
-7. salvar o smoke sanitizado em `docs/production-evidence/risk-lab/`.
+1. confirmar `knownAt`, URL, trecho, página, hash e versão por observação;
+2. executar `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11` e `RBRY11` sem look-ahead;
+3. medir antecedência, falsos positivos, falsos negativos, inconclusão e cobertura;
+4. manter `executionAllowed=false` enquanto faltar verificação primária;
+5. versionar a evidência e preservar o ruleset congelado.
 
-**Critério de aceite:** deployment saudável, testes verdes, fluxo autenticado aprovado, estados `validated`/`inconclusive`/`blocked` corretos, nenhuma recomendação automática e evidência persistida no Git.
-
+**Critério de aceite:** nenhuma conclusão final sustentada apenas por fonte secundária; controles saudáveis sem vermelho injustificado; ambiguidades como inconclusivas; métricas e evidências persistidas no Git.
 ## 4. Ordem oficial das próximas sprints
 
 ### Trilha principal de produto
 
-1. **Sprint 3.4 — Risk Lab em Produção e smoke ponta a ponta.**
-2. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
-3. **Sprint 3.6 — Métricas, calibração e gate formal.**
-4. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
-5. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
-6. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
-7. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
-8. **Sprint 4.3 — Planos, preferências, canais e monetização.**
-9. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
-10. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
-11. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
-12. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
-13. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
-
+1. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
+2. **Sprint 3.6 — Métricas, calibração e gate formal.**
+3. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
+4. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
+5. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
+6. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
+7. **Sprint 4.3 — Planos, preferências, canais e monetização.**
+8. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
+9. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
+10. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
+11. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
+12. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
 ### Trilha SEO de 90 dias, em paralelo e sem furar gates de dados
 
 1. **Sprint SEO 1 — Dias 1–15: fundação técnica e indexação.**
@@ -149,11 +144,11 @@ Incidentes de segurança, integridade de dados e regressões de Produção sempr
 
 **Aceite obtido:** 100% B3/CVM conciliado; 100% cadastro básico; 97,81% essencial; zero CNPJ duplicado; 25/25 checks; cinco casos homologados; evidência schema v2 no Git; crons e token temporários removidos.
 
-### Sprint 3.4 — Risk Lab em Produção
+### Sprint 3.4 — Risk Lab em Produção (concluída)
 
 **Escopo:** homologar o fluxo `ticker → identidade/CNPJ → fontes oficiais → validação → série mensal → detector → triagem de crédito → validated/inconclusive/blocked`.
 
-**Aceite:** deployment `Ready`; flags explicitamente conferidas; Admin autenticado e ticker-only; casos `HCTR11`, `MCCI11`, `RBRY11`, ticker inválido, insuficiência e ambiguidade; persistência/auditoria conferidas; zero efeito no Premium e nas notificações; smoke salvo no Git.
+**Aceite obtido:** deployment exato `e9a5d6ec263c0aa87961133a361891f60175dba4` em Produção; 11/11 checks; 6/6 casos; zero blockers; persistência, auditoria, locks, hashes e rate limit conferidos; zero efeito no Premium e nas notificações; evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f` salva no Git. Os casos reais ficaram inconclusivos com segurança por insuficiência de evidência estruturada, sem falsa classificação final.
 
 ### Sprint 3.5 — Coorte externa
 
@@ -556,8 +551,7 @@ Sem esse arquivo, o resultado pode ser considerado útil, mas não encerra forma
 
 ### Bloqueadores imediatos
 
-1. Executar o smoke autenticado da Sprint 3.4 no commit de release do Risk Lab.
-2. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.
+1. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.
 
 ### Produto e monetização
 
@@ -586,9 +580,8 @@ Sem esse arquivo, o resultado pode ser considerado útil, mas não encerra forma
 
 15. Reconciliar e encerrar/redefinir a PR aberta #5.
 16. Higienizar branches remotas após reconciliação, preservando recuperação.
-17. Padronizar persistência e auditoria dos scans automáticos do Risk Lab.
-18. Decidir se regras futuras exigem `v0.2.0`; qualquer mudança repete toda a coorte.
-19. Mover ferramentas manuais antigas do Risk Lab para `/debug` ou removê-las após o fluxo automático ser homologado.
+17. Decidir se regras futuras exigem `v0.2.0`; qualquer mudança repete toda a coorte.
+18. Mover ferramentas manuais antigas do Risk Lab para `/debug` ou removê-las após o fluxo automático ser homologado.
 
 ### SEO e crescimento
 
@@ -620,4 +613,4 @@ Uma fase só pode ser declarada integralmente concluída quando:
 9. segurança, custo, rollback e observabilidade estiverem validados;
 10. a evidência estiver salva no Git.
 
-Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint atual 3.4.**
+Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint 3.4 concluída e Sprint atual 3.5.**
