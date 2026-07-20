@@ -2,12 +2,12 @@
   "schemaVersion": 2,
   "sprint": "3.5",
   "runId": "risk-lab-3-5-20260720-v2",
-  "attempt": 0,
+  "attempt": 1,
   "maximumAttempts": 6,
-  "lastTriggeredAt": null,
+  "lastTriggeredAt": "2026-07-20T22:28:00Z",
   "lastObservedHttpStatus": null,
-  "lastObservedRelease": null,
+  "lastObservedRelease": "6da7748dc8587542488f285f9ccc81dd920bc2e5",
   "lastObservedStatus": "pending",
-  "reason": "Aguardando o primeiro deployment da execução metodológica v2.",
+  "reason": "Primeiro gatilho explícito da execução metodológica v2 após deployment verde da correção.",
   "completed": false
 }
