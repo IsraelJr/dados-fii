@@ -1,0 +1,341 @@
+name: Risk Lab Sprint 3.4 Closure Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - ".github/risk-lab-closure-fix.trigger"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: risk-lab-sprint-3-4-closure-fix-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  close-sprint:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'automation/risk-lab-3-4-release-0072ecf340e6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout evidence branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Merge latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+
+      - name: Prepare corrected canonical closure
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_path="docs/production-evidence/risk-lab/risk-lab-3-4-20260720-v1.json"
+
+          jq -e '
+            .status == "passed"
+            and .sprint == "3.4"
+            and (.checks | length) == 11
+            and ([.checks[].status] | all(. == "passed"))
+            and (.cases | length) == 6
+            and (.blockers | length) == 0
+            and (.evidenceHash | length) == 64
+            and ([.cases[].premiumIntegrated] | all(. == false))
+            and ([.cases[].notificationsSent] | all(. == false))
+          ' "$evidence_path" >/dev/null
+
+          mkdir -p docs/production-evidence/risk-lab
+          cat > docs/production-evidence/risk-lab/README.md <<'EOF'
+          # Evidências de Produção — Risk Lab
+
+          Este diretório contém evidências sanitizadas, versionadas e reproduzíveis das homologações do Risk Lab.
+
+          A Sprint 3.4 somente é considerada concluída quando a evidência registra `status: passed`, o commit exato de Produção, todos os casos obrigatórios, persistência e auditoria dos scans, ausência de blockers e zero integração com Premium ou notificações.
+          EOF
+
+          cat > src/app/api/system/risk-lab-production-smoke/route.ts <<'EOF'
+          import { NextResponse } from "next/server";
+          import { riskLabProductionSmokeService } from "@/lib/risk-lab/RiskLabProductionSmokeService";
+
+          export const runtime = "nodejs";
+          export const dynamic = "force-dynamic";
+
+          function response(payload: unknown, status = 200) {
+            return NextResponse.json(payload, {
+              status,
+              headers: {
+                "Cache-Control": "no-store",
+                "Pragma": "no-cache",
+                "X-Robots-Tag": "noindex, nofollow",
+                "X-Content-Type-Options": "nosniff",
+              },
+            });
+          }
+
+          export async function GET() {
+            try {
+              const evidence = await riskLabProductionSmokeService.getPublicEvidence();
+              return response({
+                ok: evidence?.status === "passed",
+                sprint: "3.4",
+                status: evidence?.status || "pending",
+                evidence,
+              });
+            } catch (error) {
+              console.error(
+                "Risk Lab production smoke evidence error",
+                error instanceof Error ? error.message : "unknown",
+              );
+              return response({ ok: false, sprint: "3.4", status: "unavailable" }, 503);
+            }
+          }
+          EOF
+
+          cat > tests/risk-lab-production-smoke-architecture.test.mjs <<'EOF'
+          import assert from "node:assert/strict";
+          import { existsSync, readFileSync } from "node:fs";
+          import test from "node:test";
+
+          const smokeService = readFileSync("src/lib/risk-lab/RiskLabProductionSmokeService.ts", "utf8");
+          const smokeStore = readFileSync("src/lib/risk-lab/RiskLabProductionSmokeStore.ts", "utf8");
+          const scanStore = readFileSync("src/lib/risk-lab/RiskLabAutomaticScanStore.ts", "utf8");
+          const smokeRoute = readFileSync("src/app/api/system/risk-lab-production-smoke/route.ts", "utf8");
+          const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/automatic/route.ts", "utf8");
+
+          function executable(source) {
+            return source
+              .replace(/\/\*[\s\S]*?\*\//g, "")
+              .replace(/^\s*\/\/.*$/gm, "");
+          }
+
+          test("production smoke covers the official Sprint 3.4 matrix", () => {
+            for (const value of [
+              "HCTR11",
+              "MCCI11",
+              "RBRY11",
+              "invalid-ticker",
+              "insufficient-series",
+              "ambiguous-credit-event",
+            ]) {
+              assert.match(smokeService, new RegExp(value));
+            }
+
+            for (const checkId of [
+              "deployment.production",
+              "feature.automatic-discovery",
+              "rate-limit.contract",
+              "persistence.scans",
+              "audit.scans",
+              "isolation.external-effects",
+              "integrity.scan-hashes",
+            ]) {
+              assert.match(smokeService, new RegExp(checkId.replaceAll(".", "\\.")));
+            }
+          });
+
+          test("automatic scans and smoke evidence use repositories with locks and audit", () => {
+            assert.match(scanStore, /RiskLabAutomaticScans/);
+            assert.match(scanStore, /RiskLabAutomaticScanAudit/);
+            assert.match(scanStore, /runTransaction/);
+            assert.match(smokeStore, /RiskLabProductionSmokeRuns/);
+            assert.match(smokeStore, /RiskLabProductionSmokeAudit/);
+            assert.match(smokeStore, /RiskLabProductionSmokeLocks/);
+            assert.match(smokeStore, /acquireLock/);
+            assert.match(smokeStore, /releaseLock/);
+            assert.match(adminRoute, /repository:\s*riskLabAutomaticScanStore/);
+          });
+
+          test("production evidence endpoint is permanently read-only after closure", () => {
+            assert.match(smokeRoute, /export async function GET\(\)/);
+            assert.match(smokeRoute, /getPublicEvidence/);
+            assert.doesNotMatch(
+              smokeRoute,
+              /NextRequest|searchParams|run\(\)|VERCEL_GIT_COMMIT_SHA|github-actions|TOKEN|AUTOMATIC_TRIGGER/,
+            );
+
+            for (const temporaryPath of [
+              ".github/workflows/risk-lab-production-smoke.yml",
+              ".github/workflows/risk-lab-production-smoke-release.yml",
+              ".github/workflows/risk-lab-closure.yml",
+              ".github/workflows/risk-lab-closure-fix.yml",
+              ".github/risk-lab-production-smoke.trigger",
+              ".github/risk-lab-production-smoke-release.trigger",
+              ".github/risk-lab-closure.trigger",
+              ".github/risk-lab-closure-fix.trigger",
+            ]) {
+              assert.equal(existsSync(temporaryPath), false, `${temporaryPath} should be removed`);
+            }
+          });
+
+          test("smoke remains isolated from Premium and notifications", () => {
+            const source = executable(smokeService);
+            assert.doesNotMatch(
+              source,
+              /getPremiumReport|AIInsights|sendEmail|sendNotification|createAlert/,
+            );
+            assert.match(source, /premiumIntegrated:\s*false/);
+            assert.match(source, /notificationsSent:\s*false/);
+            assert.match(adminRoute, /RISK_LAB_AUTOMATIC_RATE_LIMIT/);
+          });
+          EOF
+
+          python <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          evidence = json.loads(
+              Path("docs/production-evidence/risk-lab/risk-lab-3-4-20260720-v1.json").read_text()
+          )
+          release = evidence["releaseCommit"]
+          evidence_hash = evidence["evidenceHash"]
+          check_count = len(evidence["checks"])
+          case_count = len(evidence["cases"])
+
+          handoff = Path("DADOS_FII_HANDOFF.md")
+          text = handoff.read_text()
+
+          current_sprint_pattern = re.compile(
+              r"### Sprint 3\.4 — Risk Lab em Produção e smoke ponta a ponta\n.*?(?=\n## 4\. Ordem oficial das próximas sprints)",
+              re.S,
+          )
+          current_sprint_replacement = """### Sprint 3.5 — Coorte externa e backtest sem informação futura
+
+          **Objetivo:** verificar a coorte pré-registrada em fontes primárias e executar o backtest sem informação futura, preservando integralmente o ruleset `v0.1.0`.
+
+          **Trabalho obrigatório:**
+
+          1. confirmar `knownAt`, URL, trecho, página, hash e versão por observação;
+          2. executar `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11` e `RBRY11` sem look-ahead;
+          3. medir antecedência, falsos positivos, falsos negativos, inconclusão e cobertura;
+          4. manter `executionAllowed=false` enquanto faltar verificação primária;
+          5. versionar a evidência e preservar o ruleset congelado.
+
+          **Critério de aceite:** nenhuma conclusão final sustentada apenas por fonte secundária; controles saudáveis sem vermelho injustificado; ambiguidades como inconclusivas; métricas e evidências persistidas no Git.
+          """
+          text, current_count = current_sprint_pattern.subn(
+              current_sprint_replacement.rstrip(),
+              text,
+              count=1,
+          )
+          if current_count != 1:
+              raise SystemExit("Current Sprint 3.4 section was not replaced exactly once")
+
+          track_pattern = re.compile(
+              r"### Trilha principal de produto\n\n.*?(?=\n### Trilha SEO de 90 dias)",
+              re.S,
+          )
+          track_replacement = """### Trilha principal de produto
+
+          1. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
+          2. **Sprint 3.6 — Métricas, calibração e gate formal.**
+          3. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
+          4. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
+          5. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
+          6. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
+          7. **Sprint 4.3 — Planos, preferências, canais e monetização.**
+          8. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
+          9. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
+          10. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
+          11. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
+          12. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
+          """
+          text, track_count = track_pattern.subn(track_replacement.rstrip(), text, count=1)
+          if track_count != 1:
+              raise SystemExit("Official sprint order was not replaced exactly once")
+
+          exact_replacements = {
+              "**Versão:** 6.1.0": "**Versão:** 6.2.0",
+              "**Commit auditado em Produção:** `f4602e223e04c2d917b22a19391dbbd9e6f6286b`": f"**Commit auditado em Produção:** `{release}`",
+              "**Branch desta atualização:** `agent/phase-2-formal-closure`": "**Branch desta atualização:** `automation/risk-lab-3-4-release-0072ecf340e6`",
+              "**PR desta atualização:** #50 — `chore: formaliza encerramento auditável da Fase 2`": "**PR desta atualização:** #59 — `chore: formaliza conclusão da Sprint 3.4`",
+              "| Sprint corrente canônica: **3.4 — Risk Lab em Produção e smoke ponta a ponta**. | Sprint 2.12 como sprint corrente. | A Sprint 2.12 foi concluída; a próxima pendência operacional é homologar o Risk Lab sem integrá-lo ainda ao Premium ou às notificações. |": "| Sprint corrente canônica: **3.5 — Coorte externa e backtest sem informação futura**. | Sprint 3.4 como sprint corrente. | A Sprint 3.4 foi homologada em Produção com evidência auditável, mantendo o Risk Lab isolado do Premium e das notificações. |",
+              "- O Risk Lab está implementado em código até a PR #41, mas continua isolado do Premium e das notificações. A coorte externa permanece bloqueada até verificação primária.": f"- A Sprint 3.4 do Risk Lab foi concluída em Produção com {check_count}/{check_count} checks, {case_count} casos obrigatórios e zero blockers; evidência `{evidence_hash}`. O Risk Lab continua isolado do Premium e das notificações, e a coorte externa permanece bloqueada até verificação primária.",
+              "| Fase 3 — Risk Lab | Sim, até 3.3 | Sim | Deployment geral verde | Smoke autenticado e coorte ausentes | Em andamento |": f"| Fase 3 — Risk Lab | Sim, até 3.4 | Sim | Sim (`{release[:7]}`, Vercel verde) | Smoke 3.4 aprovado; coorte externa pendente | Em andamento |",
+              "**Em andamento.** As Sprints 3.0 a 3.3 possuem código e testes. A Sprint 3.4 precisa executar o smoke autenticado; a 3.5 está bloqueada até verificação primária da coorte.": "**Em andamento.** As Sprints 3.0 a 3.4 possuem código, testes e homologação de Produção. A Sprint 3.5 continua bloqueada até a verificação primária da coorte externa.",
+              "**Aceite:** deployment `Ready`; flags explicitamente conferidas; Admin autenticado e ticker-only; casos `HCTR11`, `MCCI11`, `RBRY11`, ticker inválido, insuficiência e ambiguidade; persistência/auditoria conferidas; zero efeito no Premium e nas notificações; smoke salvo no Git.": f"**Aceite obtido:** deployment exato `{release}` em Produção; {check_count}/{check_count} checks; {case_count} casos; zero blockers; persistência, auditoria, locks, hashes e rate limit conferidos; zero efeito no Premium e nas notificações; evidência `{evidence_hash}` salva no Git.",
+          }
+          for old, new in exact_replacements.items():
+              if old not in text:
+                  raise SystemExit(f"Canonical handoff marker not found: {old[:100]}")
+              text = text.replace(old, new, 1)
+
+          section5_anchor = "## 5. Escopo e critérios de aceite de cada sprint"
+          before, separator, after = text.partition(section5_anchor)
+          if not separator:
+              raise SystemExit("Sprint scope section anchor was not found")
+          section5_heading = "### Sprint 3.4 — Risk Lab em Produção\n"
+          if section5_heading not in after:
+              raise SystemExit("Sprint 3.4 scope heading was not found")
+          after = after.replace(
+              section5_heading,
+              "### Sprint 3.4 — Risk Lab em Produção (concluída)\n",
+              1,
+          )
+          text = before + separator + after
+          handoff.write_text(text)
+
+          dossier = Path("docs/risk-lab/sprint-3-4-production-smoke.md")
+          dossier_text = dossier.read_text()
+          if "## Resultado de Produção" not in dossier_text:
+              dossier_text += f"""
+
+          ## Resultado de Produção
+
+          - Status: `passed`;
+          - Commit executado em Produção: `{release}`;
+          - Checks: `{check_count}/{check_count}`;
+          - Casos obrigatórios: `{case_count}`;
+          - Blockers: `0`;
+          - Hash da evidência: `{evidence_hash}`;
+          - Premium integrado: `false`;
+          - Notificações enviadas: `false`.
+          """
+              dossier.write_text(dossier_text)
+          PY
+
+          rm -f \
+            .github/workflows/risk-lab-production-smoke.yml \
+            .github/workflows/risk-lab-production-smoke-release.yml \
+            .github/workflows/risk-lab-closure.yml \
+            .github/workflows/risk-lab-closure-fix.yml \
+            .github/risk-lab-production-smoke.trigger \
+            .github/risk-lab-production-smoke-release.trigger \
+            .github/risk-lab-closure.trigger \
+            .github/risk-lab-closure-fix.trigger
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate corrected closure
+        if: steps.prepare.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --silent
+          npm run typecheck
+          npm run test:risk-lab
+          npm run test:sprint2
+
+      - name: Commit corrected closure
+        if: steps.prepare.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m "chore: formaliza conclusão da Sprint 3.4"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
