@@ -1,0 +1,68 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const smokeService = readFileSync("src/lib/risk-lab/RiskLabProductionSmokeService.ts", "utf8");
+const smokeStore = readFileSync("src/lib/risk-lab/RiskLabProductionSmokeStore.ts", "utf8");
+const scanStore = readFileSync("src/lib/risk-lab/RiskLabAutomaticScanStore.ts", "utf8");
+const smokeRoute = readFileSync("src/app/api/system/risk-lab-production-smoke/route.ts", "utf8");
+const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/automatic/route.ts", "utf8");
+
+function executable(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
+
+test("production smoke covers the official Sprint 3.4 matrix", () => {
+  for (const value of [
+    "HCTR11",
+    "MCCI11",
+    "RBRY11",
+    "invalid-ticker",
+    "insufficient-series",
+    "ambiguous-credit-event",
+  ]) {
+    assert.match(smokeService, new RegExp(value));
+  }
+  for (const checkId of [
+    "deployment.production",
+    "feature.automatic-discovery",
+    "rate-limit.contract",
+    "persistence.scans",
+    "audit.scans",
+    "isolation.external-effects",
+    "integrity.scan-hashes",
+  ]) {
+    assert.match(smokeService, new RegExp(checkId.replaceAll(".", "\\.")));
+  }
+});
+
+test("automatic scans and smoke evidence use repositories with locks and audit", () => {
+  assert.match(scanStore, /RiskLabAutomaticScans/);
+  assert.match(scanStore, /RiskLabAutomaticScanAudit/);
+  assert.match(scanStore, /runTransaction/);
+  assert.match(smokeStore, /RiskLabProductionSmokeRuns/);
+  assert.match(smokeStore, /RiskLabProductionSmokeAudit/);
+  assert.match(smokeStore, /RiskLabProductionSmokeLocks/);
+  assert.match(smokeStore, /acquireLock/);
+  assert.match(smokeStore, /releaseLock/);
+  assert.match(adminRoute, /repository:\s*riskLabAutomaticScanStore/);
+});
+
+test("temporary production trigger is narrow, expiring and stores only the token hash", () => {
+  assert.match(smokeRoute, /timingSafeEqual/);
+  assert.match(smokeRoute, /ONE_TIME_TOKEN_HASH/);
+  assert.match(smokeRoute, /ONE_TIME_TOKEN_EXPIRES_AT/);
+  assert.match(smokeRoute, /VERCEL_ENV\s*!==\s*"production"/);
+  assert.match(smokeRoute, /maxDuration\s*=\s*300/);
+  assert.doesNotMatch(smokeRoute, /s72GVgOikaE_rYaIsCtiq06sI1aVLkUBO83Jkj0iiN8/);
+});
+
+test("smoke remains isolated from Premium and notifications", () => {
+  const source = executable(smokeService);
+  assert.doesNotMatch(source, /getPremiumReport|AIInsights|sendEmail|sendNotification|createAlert/);
+  assert.match(source, /premiumIntegrated:\s*false/);
+  assert.match(source, /notificationsSent:\s*false/);
+  assert.match(adminRoute, /RISK_LAB_AUTOMATIC_RATE_LIMIT/);
+});
