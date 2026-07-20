@@ -2,9 +2,7 @@ import type {
   AutomaticCreditEventScreenStatus,
   AutomaticValidationStatus,
 } from "./riskLabAutomatic";
-import type {
-  DividendStressStatus,
-} from "./riskLabDividendStress";
+import type { DividendStressStatus } from "./riskLabDividendStress";
 import type { ValidationCaseRole } from "./riskLabValidation";
 
 export type CohortBacktestOutcome =
@@ -16,6 +14,7 @@ export type CohortBacktestOutcome =
 
 export type CohortBacktestStatus = "running" | "passed" | "failed";
 export type CohortBacktestCheckStatus = "passed" | "failed";
+export type CohortPrimaryVerificationStatus = "verified" | "blocked";
 
 export interface CohortPrimaryEvidence {
   observationId: string;
@@ -31,6 +30,27 @@ export interface CohortPrimaryEvidence {
   protocolVersion: number | null;
 }
 
+export interface CohortStructuredBlocker {
+  code: string;
+  stage: "catalog" | "source" | "dividend-series" | "credit-screen" | "ground-truth" | "detector" | "methodology";
+  message: string;
+  sourceUrl: string | null;
+  year: number | null;
+}
+
+export interface CohortGroundTruth {
+  status: CohortPrimaryVerificationStatus;
+  eventAt: string | null;
+  stressAt: string | null;
+  recoveryAt: string | null;
+  sourceCoveragePercent: number;
+  dividendObservationCount: number;
+  longestContiguousSequence: number;
+  verificationHash: string;
+  evidence: CohortPrimaryEvidence[];
+  blockers: CohortStructuredBlocker[];
+}
+
 export interface CohortBacktestCaseResult {
   ticker: string;
   role: ValidationCaseRole;
@@ -38,12 +58,15 @@ export interface CohortBacktestCaseResult {
   outcome: CohortBacktestOutcome;
   detectorStatus: DividendStressStatus | null;
   creditScreenStatus: AutomaticCreditEventScreenStatus;
+  firstSignalAt?: string | null;
   leadTimeDays: number | null;
   sourceCoveragePercent: number;
   primaryEvidenceComplete: boolean;
   lookAheadDetected: boolean;
   evidence: CohortPrimaryEvidence[];
   blockers: string[];
+  structuredBlockers?: CohortStructuredBlocker[];
+  groundTruth?: CohortGroundTruth;
   premiumIntegrated: false;
   notificationsSent: false;
 }
@@ -70,9 +93,13 @@ export interface CohortBacktestCheck {
 }
 
 export interface RiskLabCohortBacktestEvidence {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   sprint: "3.5";
   runId: string;
+  attemptId?: string;
+  supersedesRunId?: string | null;
+  previousEvidenceHash?: string | null;
+  methodologyVersion?: "2.0.0";
   status: CohortBacktestStatus;
   releaseCommit: string | null;
   deploymentUrl: string | null;
@@ -81,14 +108,16 @@ export interface RiskLabCohortBacktestEvidence {
   cohortId: "risk-lab-credit-oos-v0.1";
   cohortVersion: "0.1.0";
   cohortIdentityHash: string;
-  sourceExecutionAllowed: false;
+  sourceExecutionAllowed: boolean;
   executionAllowed: boolean;
+  performanceReviewRequired?: boolean;
   startedAt: string;
   completedAt: string | null;
   cases: CohortBacktestCaseResult[];
   metrics: CohortBacktestMetrics;
   checks: CohortBacktestCheck[];
   blockers: string[];
+  structuredBlockers?: CohortStructuredBlocker[];
   premiumIntegrated: false;
   notificationsSent: false;
   evidenceHash: string | null;
