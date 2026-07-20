@@ -1,0 +1,142 @@
+name: Risk Lab Production Smoke Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - ".github/risk-lab-production-smoke-release.trigger"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: risk-lab-production-smoke-release
+  cancel-in-progress: true
+
+jobs:
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      RUN_ID: risk-lab-3-4-20260720-v1
+      RELEASE_COMMIT: 0072ecf340e6935bb549d14844de26adcac33262
+      PRODUCTION_ORIGIN: https://dadosfii.com.br
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Initialize result branch
+        id: result_branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="automation/risk-lab-3-4-release-${RELEASE_COMMIT:0:12}"
+          result_dir="docs/production-evidence/risk-lab"
+          diagnostic_path="${result_dir}/diagnostic-${RELEASE_COMMIT}.json"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          mkdir -p "$result_dir"
+          jq -n \
+            --arg status "running" \
+            --arg releaseCommit "$RELEASE_COMMIT" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg startedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{ok:false,status:$status,releaseCommit:$releaseCommit,workflowRunId:$workflowRunId,startedAt:$startedAt}' \
+            > "$diagnostic_path"
+          git add "$diagnostic_path"
+          git commit -m "docs: inicia smoke de Produção da Sprint 3.4"
+          git push --set-upstream origin "$branch"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "diagnostic_path=${diagnostic_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Run production smoke
+        id: smoke
+        shell: bash
+        run: |
+          set -u
+          response="risk-lab-production-smoke-response.json"
+          endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-production-smoke?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
+          http_code=$(curl --silent --show-error --location \
+            --max-time 90 \
+            --output "$response" \
+            --write-out "%{http_code}" \
+            "$endpoint" || true)
+
+          if ! jq empty "$response" >/dev/null 2>&1; then
+            jq -n \
+              --arg status "transport_failure" \
+              --arg httpCode "$http_code" \
+              --arg releaseCommit "$RELEASE_COMMIT" \
+              '{ok:false,status:$status,httpCode:$httpCode,releaseCommit:$releaseCommit}' > "$response"
+          fi
+
+          status=$(jq -r '.status // "unknown"' "$response")
+          passed=false
+          if [[ "$http_code" == "200" && "$status" == "passed" ]]; then
+            passed=true
+          fi
+          echo "http_code=${http_code}" >> "$GITHUB_OUTPUT"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "passed=${passed}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-production-smoke-release
+          path: risk-lab-production-smoke-response.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Persist result
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PASSED: ${{ steps.smoke.outputs.passed }}
+          STATUS: ${{ steps.smoke.outputs.status }}
+          HTTP_CODE: ${{ steps.smoke.outputs.http_code }}
+          RESULT_BRANCH: ${{ steps.result_branch.outputs.branch }}
+          DIAGNOSTIC_PATH: ${{ steps.result_branch.outputs.diagnostic_path }}
+        run: |
+          set -euo pipefail
+          result_dir="docs/production-evidence/risk-lab"
+          if [[ "$PASSED" == "true" ]] && jq -e '.evidence.status == "passed" and (.evidence.evidenceHash | length == 64)' risk-lab-production-smoke-response.json >/dev/null; then
+            result_path="${result_dir}/${RUN_ID}.json"
+            jq '.evidence' risk-lab-production-smoke-response.json > "$result_path"
+            rm -f "$DIAGNOSTIC_PATH"
+            title="chore: formaliza conclusão da Sprint 3.4"
+            message="docs: versiona evidência aprovada da Sprint 3.4"
+          else
+            result_path="$DIAGNOSTIC_PATH"
+            jq '.' risk-lab-production-smoke-response.json > "$result_path"
+            title="fix: registra bloqueio do smoke da Sprint 3.4"
+            message="docs: registra diagnóstico do smoke da Sprint 3.4"
+          fi
+          git add -A "$result_dir"
+          git commit -m "$message" || true
+          git push origin "$RESULT_BRANCH"
+          gh pr create \
+            --base main \
+            --head "$RESULT_BRANCH" \
+            --title "$title" \
+            --body "Resultado automatizado: status \`${STATUS}\`, HTTP \`${HTTP_CODE}\`, release \`${RELEASE_COMMIT}\`, arquivo \`${result_path}\`." \
+            || true
+
+      - name: Enforce result
+        if: always()
+        shell: bash
+        env:
+          PASSED: ${{ steps.smoke.outputs.passed }}
+        run: |
+          test "$PASSED" = "true"
