@@ -245,7 +245,9 @@ function buildDividendHistory(items: EnrichedFii[]): DividendHistory {
   const year = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
   const byTicker: Record<string, number> = {};
-  const months = MONTHS.slice(0, currentMonthIndex + 1).map((month) => {
+  // Historical summaries are based only on completed calendar months.
+  // The current month remains provisional until the monthly snapshot closes.
+  const months = MONTHS.slice(0, currentMonthIndex).map((month) => {
     const value = items.reduce((acc, item) => {
       const earning = getYearData(item.data, year)?.[month]?.earnings;
       const amount = parseCurrency(earning) * item.quotas;
