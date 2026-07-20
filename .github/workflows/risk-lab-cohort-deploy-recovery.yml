@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -20,6 +21,7 @@ jobs:
       RUN_ID: risk-lab-3-5-20260720-v1
       PRODUCTION_ORIGIN: https://dadosfii.com.br
       MARKER_PATH: docs/production-evidence/risk-lab/sprint-3-5-deploy-trigger.json
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -107,3 +109,4 @@ jobs:
           git commit -m "ci: reaciona deploy da Sprint 3.5 (${next_attempt}/${maximum_attempts})"
           git pull --rebase origin main
           git push origin HEAD:main
+          gh workflow run risk-lab-cohort-backtest.yml --ref main
