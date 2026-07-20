@@ -10,7 +10,9 @@ on:
       - "src/lib/risk-lab/**"
       - "src/types/riskLabCohortBacktest.ts"
       - "src/types/riskLabDividendStress.ts"
+      - "scripts/finalize-risk-lab-sprint-3-5.mjs"
       - "tests/risk-lab-cohort-backtest*"
+      - "tests/risk-lab-sprint-3-5-closure.test.mjs"
       - "package.json"
   workflow_dispatch:
 
@@ -25,7 +27,7 @@ concurrency:
 jobs:
   production-backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       RUN_ID: risk-lab-3-5-20260720-v1
       PRODUCTION_ORIGIN: https://dadosfii.com.br
@@ -34,6 +36,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
       - name: Wait for exact production deployment and execute cohort
         id: production
@@ -95,7 +103,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Version evidence and open audit pull request
+      - name: Version, validate and formalize production evidence
         if: steps.production.outcome == 'success'
         shell: bash
         env:
@@ -135,20 +143,28 @@ jobs:
           O resultado foi produzido automaticamente no deployment exato de Produção. A Sprint somente pode ser formalmente concluída quando o status for \`passed\` e todos os gates estiverem verdes.
           EOF
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add "$evidence_path" "$summary_path"
-          git commit -m "docs: versiona evidência de Produção da Sprint 3.5"
-          git push origin "$branch"
-
           if [[ "$status" == "passed" ]]; then
+            npm install --silent
+            npm run typecheck
+            npm run test:risk-lab
+            npm run test:sprint2
+            node scripts/finalize-risk-lab-sprint-3-5.mjs "$evidence_path" DADOS_FII_HANDOFF.md
             title="chore: formaliza evidência aprovada da Sprint 3.5"
           else
             title="audit: registra blockers da Sprint 3.5 em Produção"
           fi
 
-          gh pr create \
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "$evidence_path" "$summary_path"
+          if [[ "$status" == "passed" ]]; then
+            git add DADOS_FII_HANDOFF.md
+          fi
+          git commit -m "docs: versiona evidência de Produção da Sprint 3.5"
+          git push origin "$branch"
+
+          pr_url=$(gh pr create \
             --base main \
             --head "$branch" \
             --title "$title" \
@@ -163,9 +179,13 @@ jobs:
           - blockers: \`${blockers}\`
           - hash: \`${evidence_hash}\`
 
-          Nenhuma aprovação técnica manual do proprietário foi usada."
+          Nenhuma aprovação técnica manual do proprietário foi usada.")
 
           if [[ "$status" != "passed" ]]; then
-            echo "A evidência foi versionada, mas os gates não permitem concluir a Sprint."
+            echo "A evidência e os blockers foram versionados na PR ${pr_url}; a Sprint permanece aberta."
             exit 1
+          fi
+
+          if ! gh pr merge "$pr_url" --squash --delete-branch; then
+            gh pr merge "$pr_url" --auto --squash --delete-branch
           fi
