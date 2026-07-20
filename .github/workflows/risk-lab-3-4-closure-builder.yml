@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: risk-lab-3-4-formal-closure
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-closure:
@@ -34,7 +34,7 @@ jobs:
           result_branch="automation/risk-lab-3-4-result-0072ecf340e6"
           evidence_path="docs/production-evidence/risk-lab/risk-lab-3-4-20260720-v1.json"
 
-          git fetch origin "$result_branch"
+          git fetch origin "$result_branch:refs/remotes/origin/$result_branch"
           mkdir -p "$(dirname "$evidence_path")"
           git show "origin/${result_branch}:${evidence_path}" > "$evidence_path"
           jq -e '.status == "passed" and .sprint == "3.4" and (.evidenceHash | length == 64) and (.blockers | length == 0)' "$evidence_path" >/dev/null
@@ -164,7 +164,7 @@ jobs:
           path = Path("DADOS_FII_HANDOFF.md")
           text = path.read_text()
 
-          replacements = {
+          initial_replacements = {
               "**Versão:** 6.1.0": "**Versão:** 6.2.0",
               "**Commit auditado em Produção:** `f4602e223e04c2d917b22a19391dbbd9e6f6286b`": "**Commit auditado em Produção:** `e9a5d6ec263c0aa87961133a361891f60175dba4`",
               "**Branch desta atualização:** `agent/phase-2-formal-closure`": "**Branch desta atualização:** `agent/risk-lab-3-4-formal-closure`",
@@ -173,32 +173,27 @@ jobs:
               "- O Risk Lab está implementado em código até a PR #41, mas continua isolado do Premium e das notificações. A coorte externa permanece bloqueada até verificação primária.": "- A Sprint 3.4 do Risk Lab foi concluída em Produção com 11/11 checks e 6/6 casos, evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f`. O Risk Lab continua isolado do Premium e das notificações; a coorte externa permanece bloqueada até verificação primária.",
               "| Fase 3 — Risk Lab | Sim, até 3.3 | Sim | Deployment geral verde | Smoke autenticado e coorte ausentes | Em andamento |": "| Fase 3 — Risk Lab | Sim, até 3.4 | Sim | Sim (`e9a5d6e`, Vercel verde) | Smoke 3.4: 11/11 checks e 6/6 casos; coorte externa pendente | Em andamento |",
               "**Em andamento.** As Sprints 3.0 a 3.3 possuem código e testes. A Sprint 3.4 precisa executar o smoke autenticado; a 3.5 está bloqueada até verificação primária da coorte.": "**Em andamento.** As Sprints 3.0 a 3.4 possuem código, testes e homologação de Produção. A Sprint 3.5 continua bloqueada até a verificação primária da coorte externa.",
-              "### Sprint 3.4 — Risk Lab em Produção": "### Sprint 3.4 — Risk Lab em Produção (concluída)",
-              "**Aceite:** deployment `Ready`; flags explicitamente conferidas; Admin autenticado e ticker-only; casos `HCTR11`, `MCCI11`, `RBRY11`, ticker inválido, insuficiência e ambiguidade; persistência/auditoria conferidas; zero efeito no Premium e nas notificações; smoke salvo no Git.": "**Aceite obtido:** deployment de Produção identificado; 11/11 checks; 6/6 casos; persistência, auditoria, locks, hashes e rate limit conferidos; zero efeito no Premium e nas notificações; evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f` salva no Git. Os casos reais ficaram inconclusivos com segurança por insuficiência de evidência estruturada, sem falsa classificação final.",
-              "1. Executar o smoke autenticado da Sprint 3.4 no commit de release do Risk Lab.\n2. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.": "1. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.",
-              "Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint atual 3.4.**": "Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint 3.4 concluída e Sprint atual 3.5.**",
           }
-
-          for old, new in replacements.items():
+          for old, new in initial_replacements.items():
               if old not in text:
-                  raise SystemExit(f"Handoff marker not found: {old[:100]}")
+                  raise SystemExit(f"Initial handoff marker not found: {old[:100]}")
               text = text.replace(old, new, 1)
 
           current = re.compile(r"### Sprint 3\.4 — Risk Lab em Produção e smoke ponta a ponta\n.*?(?=\n## 4\.)", re.S)
           current_text = """### Sprint 3.5 — Coorte externa e backtest sem informação futura
 
-          **Objetivo:** verificar a coorte pré-registrada em fontes primárias e executar o backtest sem informação futura, preservando integralmente o ruleset `v0.1.0`.
+**Objetivo:** verificar a coorte pré-registrada em fontes primárias e executar o backtest sem informação futura, preservando integralmente o ruleset `v0.1.0`.
 
-          **Trabalho obrigatório:**
+**Trabalho obrigatório:**
 
-          1. confirmar `knownAt`, URL, trecho, página, hash e versão por observação;
-          2. executar `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11` e `RBRY11` sem look-ahead;
-          3. medir antecedência, falsos positivos, falsos negativos, inconclusão e cobertura;
-          4. manter `executionAllowed=false` enquanto faltar verificação primária;
-          5. versionar a evidência e preservar o ruleset congelado.
+1. confirmar `knownAt`, URL, trecho, página, hash e versão por observação;
+2. executar `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11` e `RBRY11` sem look-ahead;
+3. medir antecedência, falsos positivos, falsos negativos, inconclusão e cobertura;
+4. manter `executionAllowed=false` enquanto faltar verificação primária;
+5. versionar a evidência e preservar o ruleset congelado.
 
-          **Critério de aceite:** nenhuma conclusão final sustentada apenas por fonte secundária; controles saudáveis sem vermelho injustificado; ambiguidades como inconclusivas; métricas e evidências persistidas no Git.
-          """
+**Critério de aceite:** nenhuma conclusão final sustentada apenas por fonte secundária; controles saudáveis sem vermelho injustificado; ambiguidades como inconclusivas; métricas e evidências persistidas no Git.
+"""
           text, count = current.subn(current_text.rstrip(), text, count=1)
           if count != 1:
               raise SystemExit("Current Sprint 3.4 section was not replaced exactly once")
@@ -206,22 +201,33 @@ jobs:
           track = re.compile(r"### Trilha principal de produto\n\n.*?(?=\n### Trilha SEO)", re.S)
           track_text = """### Trilha principal de produto
 
-          1. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
-          2. **Sprint 3.6 — Métricas, calibração e gate formal.**
-          3. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
-          4. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
-          5. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
-          6. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
-          7. **Sprint 4.3 — Planos, preferências, canais e monetização.**
-          8. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
-          9. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
-          10. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
-          11. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
-          12. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
-          """
+1. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
+2. **Sprint 3.6 — Métricas, calibração e gate formal.**
+3. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
+4. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
+5. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
+6. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
+7. **Sprint 4.3 — Planos, preferências, canais e monetização.**
+8. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
+9. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
+10. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
+11. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
+12. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
+"""
           text, count = track.subn(track_text.rstrip(), text, count=1)
           if count != 1:
               raise SystemExit("Official sprint order was not replaced exactly once")
+
+          final_replacements = {
+              "### Sprint 3.4 — Risk Lab em Produção\n\n**Escopo:**": "### Sprint 3.4 — Risk Lab em Produção (concluída)\n\n**Escopo:**",
+              "**Aceite:** deployment `Ready`; flags explicitamente conferidas; Admin autenticado e ticker-only; casos `HCTR11`, `MCCI11`, `RBRY11`, ticker inválido, insuficiência e ambiguidade; persistência/auditoria conferidas; zero efeito no Premium e nas notificações; smoke salvo no Git.": "**Aceite obtido:** deployment de Produção identificado; 11/11 checks; 6/6 casos; persistência, auditoria, locks, hashes e rate limit conferidos; zero efeito no Premium e nas notificações; evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f` salva no Git. Os casos reais ficaram inconclusivos com segurança por insuficiência de evidência estruturada, sem falsa classificação final.",
+              "1. Executar o smoke autenticado da Sprint 3.4 no commit de release do Risk Lab.\n2. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.": "1. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.",
+              "Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint atual 3.4.**": "Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint 3.4 concluída e Sprint atual 3.5.**",
+          }
+          for old, new in final_replacements.items():
+              if old not in text:
+                  raise SystemExit(f"Final handoff marker not found: {old[:100]}")
+              text = text.replace(old, new, 1)
 
           path.write_text(text)
           PY
@@ -251,11 +257,15 @@ jobs:
           git commit -m "chore: formaliza conclusão da Sprint 3.4"
           git push origin agent/risk-lab-3-4-formal-closure
 
-          pr_url=$(gh pr create \
-            --base main \
-            --head agent/risk-lab-3-4-formal-closure \
-            --title "chore: formaliza conclusão da Sprint 3.4" \
-            --body "## Encerramento auditável
+          existing_pr=$(gh pr list --base main --head agent/risk-lab-3-4-formal-closure --state open --json number,url --jq '.[0] // empty')
+          if [[ -n "$existing_pr" ]]; then
+            pr_number=$(jq -r '.number' <<< "$existing_pr")
+          else
+            pr_url=$(gh pr create \
+              --base main \
+              --head agent/risk-lab-3-4-formal-closure \
+              --title "chore: formaliza conclusão da Sprint 3.4" \
+              --body "## Encerramento auditável
 
           - smoke de Produção: 11/11 checks;
           - matriz: 6/6 casos;
@@ -265,8 +275,9 @@ jobs:
           - gatilho temporário removido;
           - rota pública mantida somente leitura;
           - Sprint corrente atualizada para 3.5.")
+            pr_number="${pr_url##*/}"
+          fi
 
-          pr_number="${pr_url##*/}"
           sed -i "s/#PENDING/#${pr_number}/" DADOS_FII_HANDOFF.md
           git add DADOS_FII_HANDOFF.md
           git commit -m "docs: registra PR de encerramento da Sprint 3.4"
