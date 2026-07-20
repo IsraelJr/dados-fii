@@ -1,0 +1,84 @@
+name: Risk Lab Production Smoke
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/risk-lab-production-smoke.yml"
+      - "src/app/api/system/risk-lab-production-smoke/**"
+      - "src/lib/risk-lab/RiskLabProductionSmokeService.ts"
+      - "src/lib/risk-lab/RiskLabProductionSmokeStore.ts"
+      - "src/lib/risk-lab/RiskLabAutomaticOrchestrator.ts"
+      - "src/lib/risk-lab/RiskLabAutomaticScanStore.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: risk-lab-production-smoke
+  cancel-in-progress: false
+
+jobs:
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Wait for the exact production deployment and run smoke
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          RUN_ID: risk-lab-3-4-20260720-v1
+          PRODUCTION_ORIGIN: https://dadosfii.com.br
+        run: |
+          set -euo pipefail
+          endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-production-smoke?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
+          : > risk-lab-production-smoke-response.json
+
+          for attempt in $(seq 1 30); do
+            echo "Attempt ${attempt}/30 for release ${RELEASE_COMMIT}"
+            http_code=$(curl --silent --show-error --location \
+              --max-time 320 \
+              --output risk-lab-production-smoke-response.json \
+              --write-out "%{http_code}" \
+              "$endpoint" || true)
+
+            if [[ "$http_code" == "200" ]]; then
+              status=$(jq -r '.status // "unknown"' risk-lab-production-smoke-response.json)
+              if [[ "$status" == "passed" ]]; then
+                echo "Sprint 3.4 production smoke passed."
+                exit 0
+              fi
+              echo "Unexpected successful response with status: ${status}"
+              cat risk-lab-production-smoke-response.json
+              exit 1
+            fi
+
+            if [[ "$http_code" == "422" ]]; then
+              echo "Sprint 3.4 smoke executed and failed its gates."
+              cat risk-lab-production-smoke-response.json
+              exit 1
+            fi
+
+            if [[ "$http_code" != "409" && "$http_code" != "000" && "$http_code" != "503" ]]; then
+              echo "Unexpected HTTP ${http_code}."
+              cat risk-lab-production-smoke-response.json
+              exit 1
+            fi
+
+            sleep 20
+          done
+
+          echo "The exact production deployment was not observed within the allowed window."
+          cat risk-lab-production-smoke-response.json
+          exit 1
+
+      - name: Upload sanitized production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-production-smoke-${{ github.sha }}
+          path: risk-lab-production-smoke-response.json
+          if-no-files-found: error
+          retention-days: 30
