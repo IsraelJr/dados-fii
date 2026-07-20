@@ -1,0 +1,171 @@
+name: Sprint 3.5 Production Backtest
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/risk-lab-cohort-backtest.yml"
+      - "src/app/api/system/risk-lab-cohort-backtest/**"
+      - "src/lib/risk-lab/**"
+      - "src/types/riskLabCohortBacktest.ts"
+      - "src/types/riskLabDividendStress.ts"
+      - "tests/risk-lab-cohort-backtest*"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: risk-lab-cohort-backtest-production
+  cancel-in-progress: true
+
+jobs:
+  production-backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUN_ID: risk-lab-3-5-20260720-v1
+      PRODUCTION_ORIGIN: https://dadosfii.com.br
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for exact production deployment and execute cohort
+        id: production
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-cohort-backtest?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
+          : > risk-lab-cohort-backtest-response.json
+          observed=false
+
+          for attempt in $(seq 1 10); do
+            echo "Attempt ${attempt}/10 for release ${RELEASE_COMMIT}"
+            http_code=$(curl \
+              --silent \
+              --show-error \
+              --location \
+              --max-time 310 \
+              --output risk-lab-cohort-backtest-response.json \
+              --write-out "%{http_code}" \
+              "$endpoint" || true)
+
+            if [[ "$http_code" == "200" ]]; then
+              release=$(jq -r '.evidence.releaseCommit // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
+              status=$(jq -r '.evidence.status // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
+              hash=$(jq -r '.evidence.evidenceHash // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
+              if [[ "$release" == "$RELEASE_COMMIT" && ( "$status" == "passed" || "$status" == "failed" ) && ${#hash} -eq 64 ]]; then
+                observed=true
+                break
+              fi
+            fi
+
+            echo "Deployment exato ainda não observado (HTTP ${http_code})."
+            cat risk-lab-cohort-backtest-response.json || true
+            sleep 30
+          done
+
+          if [[ "$observed" != "true" ]]; then
+            echo "O deployment exato não produziu evidência final no intervalo permitido."
+            exit 1
+          fi
+
+          jq -e '
+            .sprint == "3.5"
+            and (.evidence.cases | length == 6)
+            and (.evidence.checks | length >= 10)
+            and (.evidence.evidenceHash | test("^[a-f0-9]{64}$"))
+            and (.evidence.premiumIntegrated == false)
+            and (.evidence.notificationsSent == false)
+          ' risk-lab-cohort-backtest-response.json >/dev/null
+
+      - name: Upload production response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-cohort-backtest-production
+          path: risk-lab-cohort-backtest-response.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Version evidence and open audit pull request
+        if: steps.production.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          evidence_dir="docs/production-evidence/risk-lab"
+          evidence_path="${evidence_dir}/${RUN_ID}.json"
+          summary_path="docs/risk-lab/sprint-3-5-production-backtest.md"
+          branch="automation/sprint-3-5-evidence-${GITHUB_RUN_ID}"
+          mkdir -p "$evidence_dir" "$(dirname "$summary_path")"
+
+          jq '.evidence' risk-lab-cohort-backtest-response.json > "$evidence_path"
+          status=$(jq -r '.status' "$evidence_path")
+          release=$(jq -r '.releaseCommit' "$evidence_path")
+          evidence_hash=$(jq -r '.evidenceHash' "$evidence_path")
+          coverage=$(jq -r '.metrics.coveragePercent' "$evidence_path")
+          false_positives=$(jq -r '.metrics.falsePositives' "$evidence_path")
+          false_negatives=$(jq -r '.metrics.falseNegatives' "$evidence_path")
+          inconclusive=$(jq -r '.metrics.inconclusiveCases' "$evidence_path")
+          blockers=$(jq -r '.blockers | length' "$evidence_path")
+
+          cat > "$summary_path" <<EOF
+          # Sprint 3.5 — Backtest externo em Produção
+
+          - Status: \`${status}\`
+          - Release executado: \`${release}\`
+          - Cobertura conclusiva: \`${coverage}%\`
+          - Falsos positivos: \`${false_positives}\`
+          - Falsos negativos: \`${false_negatives}\`
+          - Casos inconclusivos: \`${inconclusive}\`
+          - Blockers: \`${blockers}\`
+          - Hash da evidência: \`${evidence_hash}\`
+          - Premium integrado: \`false\`
+          - Notificações enviadas: \`false\`
+
+          O resultado foi produzido automaticamente no deployment exato de Produção. A Sprint somente pode ser formalmente concluída quando o status for \`passed\` e todos os gates estiverem verdes.
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add "$evidence_path" "$summary_path"
+          git commit -m "docs: versiona evidência de Produção da Sprint 3.5"
+          git push origin "$branch"
+
+          if [[ "$status" == "passed" ]]; then
+            title="chore: formaliza evidência aprovada da Sprint 3.5"
+          else
+            title="audit: registra blockers da Sprint 3.5 em Produção"
+          fi
+
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "$title" \
+            --body "## Auditoria automática de Produção
+
+          - release: \`${release}\`
+          - status: \`${status}\`
+          - cobertura: \`${coverage}%\`
+          - falsos positivos: \`${false_positives}\`
+          - falsos negativos: \`${false_negatives}\`
+          - inconclusivos: \`${inconclusive}\`
+          - blockers: \`${blockers}\`
+          - hash: \`${evidence_hash}\`
+
+          Nenhuma aprovação técnica manual do proprietário foi usada."
+
+          if [[ "$status" != "passed" ]]; then
+            echo "A evidência foi versionada, mas os gates não permitem concluir a Sprint."
+            exit 1
+          fi
