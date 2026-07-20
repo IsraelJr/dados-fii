@@ -1,0 +1,615 @@
+{
+  "schemaVersion": 1,
+  "sprint": "3.5",
+  "runId": "risk-lab-3-5-20260720-v1",
+  "status": "failed",
+  "releaseCommit": "2d75e2f8a8a9a80e6730024fff0cc92e50b9827c",
+  "deploymentUrl": "https://www.dadosfii.com.br",
+  "environment": "production",
+  "rulesetVersion": "0.1.0",
+  "cohortId": "risk-lab-credit-oos-v0.1",
+  "cohortVersion": "0.1.0",
+  "cohortIdentityHash": "620c26abbf30b4f96ef3de9dbfd8eb6c7b9e6d1fe56851d70079d39d0f490fd1",
+  "sourceExecutionAllowed": false,
+  "executionAllowed": false,
+  "startedAt": "2026-07-20T11:15:25.151Z",
+  "completedAt": "2026-07-20T11:16:23.801Z",
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "role": "severe_deterioration",
+      "status": "validated",
+      "outcome": "false_negative",
+      "detectorStatus": null,
+      "creditScreenStatus": "no_explicit_event_found",
+      "leadTimeDays": null,
+      "sourceCoveragePercent": 100,
+      "primaryEvidenceComplete": true,
+      "lookAheadDetected": false,
+      "evidence": [
+        {
+          "observationId": "CVM:EVENTUAL:2021",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2021.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2021.csv",
+          "excerpt": "Catálogo oficial CVM 2021: 0 linha(s) do fundo, 0 documento(s) aceito(s), 8 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "4eebbc9109c225ae0271896cf1b8e057066b2855fdae6bc21bbdd09239416660",
+          "sourceVersion": "eventual_fi_2021.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2022",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2022.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2022.csv",
+          "excerpt": "Catálogo oficial CVM 2022: 18 linha(s) do fundo, 0 documento(s) aceito(s), 18 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "b759e71fa86cb91dbaabe826c74e96b81e90cd03a6ba133bc09f9af0ff3d1780",
+          "sourceVersion": "eventual_fi_2022.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2023",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2023.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2023.csv",
+          "excerpt": "Catálogo oficial CVM 2023: 21 linha(s) do fundo, 0 documento(s) aceito(s), 21 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "e0140897ca12af5d15ed24f701f0d5af796d01a10db8d9646b2dad1f4e3dc27d",
+          "sourceVersion": "eventual_fi_2023.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2024",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2024.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2024.csv",
+          "excerpt": "Catálogo oficial CVM 2024: 15 linha(s) do fundo, 0 documento(s) aceito(s), 15 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "bef141cbeb86a7b3cbb0495207a19bcfcfe40c60e3e0a917210013518dbea918",
+          "sourceVersion": "eventual_fi_2024.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2025",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2025.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2025.csv",
+          "excerpt": "Catálogo oficial CVM 2025: 17 linha(s) do fundo, 0 documento(s) aceito(s), 17 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "1932377eae369cfa72159446dc003cca6330feddb317b5d98b1814944f243971",
+          "sourceVersion": "eventual_fi_2025.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2026",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2026.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2026.csv",
+          "excerpt": "Catálogo oficial CVM 2026: 4 linha(s) do fundo, 0 documento(s) aceito(s), 4 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "ec518ab85906625eb628697e1154346c11a2f6804a337303b144447db6a6c7ef",
+          "sourceVersion": "eventual_fi_2026.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        }
+      ],
+      "blockers": [
+        "Caso grave pré-registrado sem evento material detectado na janela oficial completa."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "VSLH11",
+      "role": "severe_deterioration",
+      "status": "validated",
+      "outcome": "false_negative",
+      "detectorStatus": null,
+      "creditScreenStatus": "no_explicit_event_found",
+      "leadTimeDays": null,
+      "sourceCoveragePercent": 100,
+      "primaryEvidenceComplete": true,
+      "lookAheadDetected": false,
+      "evidence": [
+        {
+          "observationId": "CVM:EVENTUAL:2021",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2021.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2021.csv",
+          "excerpt": "Catálogo oficial CVM 2021: 0 linha(s) do fundo, 0 documento(s) aceito(s), 8 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "4eebbc9109c225ae0271896cf1b8e057066b2855fdae6bc21bbdd09239416660",
+          "sourceVersion": "eventual_fi_2021.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2022",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2022.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2022.csv",
+          "excerpt": "Catálogo oficial CVM 2022: 21 linha(s) do fundo, 0 documento(s) aceito(s), 21 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "b759e71fa86cb91dbaabe826c74e96b81e90cd03a6ba133bc09f9af0ff3d1780",
+          "sourceVersion": "eventual_fi_2022.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2023",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2023.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2023.csv",
+          "excerpt": "Catálogo oficial CVM 2023: 24 linha(s) do fundo, 0 documento(s) aceito(s), 24 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "e0140897ca12af5d15ed24f701f0d5af796d01a10db8d9646b2dad1f4e3dc27d",
+          "sourceVersion": "eventual_fi_2023.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2024",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2024.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2024.csv",
+          "excerpt": "Catálogo oficial CVM 2024: 17 linha(s) do fundo, 0 documento(s) aceito(s), 17 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "bef141cbeb86a7b3cbb0495207a19bcfcfe40c60e3e0a917210013518dbea918",
+          "sourceVersion": "eventual_fi_2024.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2025",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2025.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2025.csv",
+          "excerpt": "Catálogo oficial CVM 2025: 19 linha(s) do fundo, 0 documento(s) aceito(s), 19 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "1932377eae369cfa72159446dc003cca6330feddb317b5d98b1814944f243971",
+          "sourceVersion": "eventual_fi_2025.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2026",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2026.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2026.csv",
+          "excerpt": "Catálogo oficial CVM 2026: 5 linha(s) do fundo, 0 documento(s) aceito(s), 5 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "ec518ab85906625eb628697e1154346c11a2f6804a337303b144447db6a6c7ef",
+          "sourceVersion": "eventual_fi_2026.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        }
+      ],
+      "blockers": [
+        "Caso grave pré-registrado sem evento material detectado na janela oficial completa."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "KNCR11",
+      "role": "healthy_control",
+      "status": "inconclusive",
+      "outcome": "inconclusive",
+      "detectorStatus": null,
+      "creditScreenStatus": "no_explicit_event_found",
+      "leadTimeDays": null,
+      "sourceCoveragePercent": 100,
+      "primaryEvidenceComplete": true,
+      "lookAheadDetected": false,
+      "evidence": [
+        {
+          "observationId": "CVM:EVENTUAL:2022",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2022.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2022.csv",
+          "excerpt": "Catálogo oficial CVM 2022: 22 linha(s) do fundo, 0 documento(s) aceito(s), 22 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "b759e71fa86cb91dbaabe826c74e96b81e90cd03a6ba133bc09f9af0ff3d1780",
+          "sourceVersion": "eventual_fi_2022.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2023",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2023.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2023.csv",
+          "excerpt": "Catálogo oficial CVM 2023: 15 linha(s) do fundo, 0 documento(s) aceito(s), 15 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "e0140897ca12af5d15ed24f701f0d5af796d01a10db8d9646b2dad1f4e3dc27d",
+          "sourceVersion": "eventual_fi_2023.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2024",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2024.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2024.csv",
+          "excerpt": "Catálogo oficial CVM 2024: 28 linha(s) do fundo, 0 documento(s) aceito(s), 28 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "bef141cbeb86a7b3cbb0495207a19bcfcfe40c60e3e0a917210013518dbea918",
+          "sourceVersion": "eventual_fi_2024.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2025",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2025.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2025.csv",
+          "excerpt": "Catálogo oficial CVM 2025: 25 linha(s) do fundo, 0 documento(s) aceito(s), 25 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "1932377eae369cfa72159446dc003cca6330feddb317b5d98b1814944f243971",
+          "sourceVersion": "eventual_fi_2025.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        }
+      ],
+      "blockers": [
+        "Série primária insuficiente para executar o detector temporal."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "KNSC11",
+      "role": "healthy_control",
+      "status": "inconclusive",
+      "outcome": "inconclusive",
+      "detectorStatus": null,
+      "creditScreenStatus": "no_explicit_event_found",
+      "leadTimeDays": null,
+      "sourceCoveragePercent": 100,
+      "primaryEvidenceComplete": true,
+      "lookAheadDetected": false,
+      "evidence": [
+        {
+          "observationId": "CVM:EVENTUAL:2022",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2022.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2022.csv",
+          "excerpt": "Catálogo oficial CVM 2022: 26 linha(s) do fundo, 0 documento(s) aceito(s), 26 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "b759e71fa86cb91dbaabe826c74e96b81e90cd03a6ba133bc09f9af0ff3d1780",
+          "sourceVersion": "eventual_fi_2022.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2023",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2023.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2023.csv",
+          "excerpt": "Catálogo oficial CVM 2023: 20 linha(s) do fundo, 0 documento(s) aceito(s), 20 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "e0140897ca12af5d15ed24f701f0d5af796d01a10db8d9646b2dad1f4e3dc27d",
+          "sourceVersion": "eventual_fi_2023.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2024",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2024.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2024.csv",
+          "excerpt": "Catálogo oficial CVM 2024: 21 linha(s) do fundo, 0 documento(s) aceito(s), 21 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "bef141cbeb86a7b3cbb0495207a19bcfcfe40c60e3e0a917210013518dbea918",
+          "sourceVersion": "eventual_fi_2024.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2025",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2025.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2025.csv",
+          "excerpt": "Catálogo oficial CVM 2025: 18 linha(s) do fundo, 0 documento(s) aceito(s), 18 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "1932377eae369cfa72159446dc003cca6330feddb317b5d98b1814944f243971",
+          "sourceVersion": "eventual_fi_2025.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        }
+      ],
+      "blockers": [
+        "Série primária insuficiente para executar o detector temporal."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "MCCI11",
+      "role": "reversible_stress",
+      "status": "inconclusive",
+      "outcome": "inconclusive",
+      "detectorStatus": null,
+      "creditScreenStatus": "no_explicit_event_found",
+      "leadTimeDays": null,
+      "sourceCoveragePercent": 100,
+      "primaryEvidenceComplete": true,
+      "lookAheadDetected": false,
+      "evidence": [
+        {
+          "observationId": "CVM:EVENTUAL:2022",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2022.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2022.csv",
+          "excerpt": "Catálogo oficial CVM 2022: 35 linha(s) do fundo, 0 documento(s) aceito(s), 35 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "b759e71fa86cb91dbaabe826c74e96b81e90cd03a6ba133bc09f9af0ff3d1780",
+          "sourceVersion": "eventual_fi_2022.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2023",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2023.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2023.csv",
+          "excerpt": "Catálogo oficial CVM 2023: 26 linha(s) do fundo, 0 documento(s) aceito(s), 26 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "e0140897ca12af5d15ed24f701f0d5af796d01a10db8d9646b2dad1f4e3dc27d",
+          "sourceVersion": "eventual_fi_2023.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2024",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2024.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2024.csv",
+          "excerpt": "Catálogo oficial CVM 2024: 19 linha(s) do fundo, 0 documento(s) aceito(s), 19 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "bef141cbeb86a7b3cbb0495207a19bcfcfe40c60e3e0a917210013518dbea918",
+          "sourceVersion": "eventual_fi_2024.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2025",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2025.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2025.csv",
+          "excerpt": "Catálogo oficial CVM 2025: 21 linha(s) do fundo, 0 documento(s) aceito(s), 21 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "1932377eae369cfa72159446dc003cca6330feddb317b5d98b1814944f243971",
+          "sourceVersion": "eventual_fi_2025.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        }
+      ],
+      "blockers": [
+        "Série primária insuficiente para executar o detector temporal."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "RBRY11",
+      "role": "reversible_stress",
+      "status": "inconclusive",
+      "outcome": "inconclusive",
+      "detectorStatus": null,
+      "creditScreenStatus": "no_explicit_event_found",
+      "leadTimeDays": null,
+      "sourceCoveragePercent": 100,
+      "primaryEvidenceComplete": true,
+      "lookAheadDetected": false,
+      "evidence": [
+        {
+          "observationId": "CVM:EVENTUAL:2022",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2022.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2022.csv",
+          "excerpt": "Catálogo oficial CVM 2022: 39 linha(s) do fundo, 0 documento(s) aceito(s), 39 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "b759e71fa86cb91dbaabe826c74e96b81e90cd03a6ba133bc09f9af0ff3d1780",
+          "sourceVersion": "eventual_fi_2022.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2023",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2023.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2023.csv",
+          "excerpt": "Catálogo oficial CVM 2023: 29 linha(s) do fundo, 0 documento(s) aceito(s), 29 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "e0140897ca12af5d15ed24f701f0d5af796d01a10db8d9646b2dad1f4e3dc27d",
+          "sourceVersion": "eventual_fi_2023.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2024",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2024.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2024.csv",
+          "excerpt": "Catálogo oficial CVM 2024: 28 linha(s) do fundo, 0 documento(s) aceito(s), 28 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "bef141cbeb86a7b3cbb0495207a19bcfcfe40c60e3e0a917210013518dbea918",
+          "sourceVersion": "eventual_fi_2024.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        },
+        {
+          "observationId": "CVM:EVENTUAL:2025",
+          "kind": "source_coverage",
+          "documentId": "eventual_fi_2025.csv",
+          "knownAt": "2026-07-20T11:15:25.151Z",
+          "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/eventual_fi_2025.csv",
+          "excerpt": "Catálogo oficial CVM 2025: 21 linha(s) do fundo, 0 documento(s) aceito(s), 21 rejeitado(s).",
+          "page": 1,
+          "sourceHash": "1932377eae369cfa72159446dc003cca6330feddb317b5d98b1814944f243971",
+          "sourceVersion": "eventual_fi_2025.csv",
+          "protocolHash": null,
+          "protocolVersion": null
+        }
+      ],
+      "blockers": [
+        "Série primária insuficiente para executar o detector temporal."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    }
+  ],
+  "metrics": {
+    "totalCases": 6,
+    "conclusiveCases": 2,
+    "truePositives": 0,
+    "trueNegatives": 0,
+    "falsePositives": 0,
+    "falseNegatives": 2,
+    "inconclusiveCases": 4,
+    "coveragePercent": 33.33,
+    "averageLeadTimeDays": null,
+    "minimumLeadTimeDays": null,
+    "maximumLeadTimeDays": null
+  },
+  "checks": [
+    {
+      "id": "deployment.production",
+      "status": "passed",
+      "message": "O backtest deve executar no deployment exato de Produção.",
+      "metadata": {
+        "production": true,
+        "releaseCommitPresent": true,
+        "deploymentUrlPresent": true
+      }
+    },
+    {
+      "id": "cohort.identity",
+      "status": "passed",
+      "message": "A identidade pré-registrada da coorte deve permanecer imutável.",
+      "metadata": {
+        "identityHash": "620c26abbf30b4f96ef3de9dbfd8eb6c7b9e6d1fe56851d70079d39d0f490fd1"
+      }
+    },
+    {
+      "id": "ruleset.frozen",
+      "status": "passed",
+      "message": "Todas as regras executadas devem permanecer na versão 0.1.0.",
+      "metadata": {}
+    },
+    {
+      "id": "cohort.six-cases",
+      "status": "passed",
+      "message": "Os seis fundos pré-registrados devem ser executados.",
+      "metadata": {
+        "total": 6
+      }
+    },
+    {
+      "id": "evidence.primary-complete",
+      "status": "passed",
+      "message": "Cada observação deve possuir fonte primária, knownAt, URL, trecho, página, hash e versão.",
+      "metadata": {}
+    },
+    {
+      "id": "look-ahead.none",
+      "status": "passed",
+      "message": "Nenhuma observação posterior à data simulada pode influenciar o resultado.",
+      "metadata": {}
+    },
+    {
+      "id": "controls.no-unjustified-alert",
+      "status": "failed",
+      "message": "KNCR11 e KNSC11 não podem receber deterioração injustificada.",
+      "metadata": {}
+    },
+    {
+      "id": "metrics.no-false-positive",
+      "status": "passed",
+      "message": "O backtest não pode encerrar com falso positivo.",
+      "metadata": {
+        "falsePositives": 0
+      }
+    },
+    {
+      "id": "metrics.no-false-negative",
+      "status": "failed",
+      "message": "O backtest não pode encerrar com falso negativo.",
+      "metadata": {
+        "falseNegatives": 2
+      }
+    },
+    {
+      "id": "metrics.no-inconclusive",
+      "status": "failed",
+      "message": "Casos ambíguos ou incompletos impedem a conclusão da Sprint.",
+      "metadata": {
+        "inconclusiveCases": 4
+      }
+    },
+    {
+      "id": "metrics.coverage",
+      "status": "failed",
+      "message": "A coorte inteira deve possuir resultado conclusivo.",
+      "metadata": {
+        "coveragePercent": 33.33
+      }
+    },
+    {
+      "id": "isolation.external-effects",
+      "status": "passed",
+      "message": "O backtest não pode integrar Premium nem enviar notificações.",
+      "metadata": {}
+    }
+  ],
+  "blockers": [
+    "KNCR11 e KNSC11 não podem receber deterioração injustificada.",
+    "O backtest não pode encerrar com falso negativo.",
+    "Casos ambíguos ou incompletos impedem a conclusão da Sprint.",
+    "A coorte inteira deve possuir resultado conclusivo.",
+    "DEVA11: Caso grave pré-registrado sem evento material detectado na janela oficial completa.",
+    "VSLH11: Caso grave pré-registrado sem evento material detectado na janela oficial completa.",
+    "KNCR11: Série primária insuficiente para executar o detector temporal.",
+    "KNSC11: Série primária insuficiente para executar o detector temporal.",
+    "MCCI11: Série primária insuficiente para executar o detector temporal.",
+    "RBRY11: Série primária insuficiente para executar o detector temporal."
+  ],
+  "premiumIntegrated": false,
+  "notificationsSent": false,
+  "evidenceHash": "6337254b60cb132de31488231c3e9c35ca0dc264114e50d85ecbd036a525048a"
+}
