@@ -4,7 +4,8 @@ const RUN_COLLECTION = "RiskLabCohortBacktestRuns";
 const ATTEMPT_COLLECTION = "RiskLabCohortBacktestAttempts";
 const AUDIT_COLLECTION = "RiskLabCohortBacktestAudit";
 const LOCK_COLLECTION = "RiskLabCohortBacktestLocks";
-const LOCK_TTL_MS = 30 * 60_000;
+const LOCK_TTL_MS = 8 * 60_000;
+export const COHORT_LOCK_STALE_AFTER_MS = 7 * 60_000;
 
 function safeDocument<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -20,6 +21,23 @@ function assertAttemptId(value: string) {
   if (!/^risk-lab-3-5-attempt-\d{14}-[a-f0-9-]{8,36}$/.test(value)) {
     throw new Error("Identificador imutável da tentativa inválido.");
   }
+}
+
+export interface CohortBacktestLockState {
+  owner?: string;
+  acquiredAt?: string;
+  expiresAt?: string;
+}
+
+export function isCohortBacktestLockActive(
+  current: CohortBacktestLockState | undefined,
+  nowMs = Date.now(),
+) {
+  if (!current?.expiresAt || !current.acquiredAt) return false;
+  const expiresAt = Date.parse(current.expiresAt);
+  const acquiredAt = Date.parse(current.acquiredAt);
+  if (!Number.isFinite(expiresAt) || !Number.isFinite(acquiredAt)) return false;
+  return expiresAt > nowMs && acquiredAt > nowMs - COHORT_LOCK_STALE_AFTER_MS;
 }
 
 async function database() {
@@ -47,14 +65,16 @@ export class RiskLabCohortBacktestStore {
     const reference = db.collection(LOCK_COLLECTION).doc(runId);
     return db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(reference);
-      const current = snapshot.data() as { owner?: string; expiresAt?: string } | undefined;
-      const active = Boolean(current?.expiresAt && Date.parse(current.expiresAt) > Date.now());
+      const current = snapshot.data() as CohortBacktestLockState | undefined;
+      const nowMs = Date.now();
+      const active = isCohortBacktestLockActive(current, nowMs);
       if (active && current?.owner !== owner) return false;
       transaction.set(reference, {
         runId,
         owner,
-        acquiredAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + LOCK_TTL_MS).toISOString(),
+        acquiredAt: new Date(nowMs).toISOString(),
+        expiresAt: new Date(nowMs + LOCK_TTL_MS).toISOString(),
+        recoveredStaleOwner: current?.owner && !active ? current.owner : null,
       }, { merge: false });
       return true;
     });
