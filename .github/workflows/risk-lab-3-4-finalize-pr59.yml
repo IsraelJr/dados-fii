@@ -1,0 +1,294 @@
+name: Finalize Risk Lab Sprint 3.4 PR 59
+
+on:
+  push:
+    branches:
+      - automation/risk-lab-3-4-release-0072ecf340e6
+    paths:
+      - ".github/workflows/risk-lab-3-4-finalize-pr59.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: finalize-risk-lab-3-4-pr59
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: automation/risk-lab-3-4-release-0072ecf340e6
+          fetch-depth: 0
+
+      - name: Publish running status
+        id: baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_path="docs/production-evidence/risk-lab/finalization-status.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          jq -n \
+            --arg status "running" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg startedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{status:$status,workflowRunId:$workflowRunId,startedAt:$startedAt}' > "$status_path"
+          git add "$status_path"
+          git commit -m "docs: inicia fechamento formal da Sprint 3.4" || true
+          git push origin automation/risk-lab-3-4-release-0072ecf340e6
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and validate closure
+        id: build
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "failure at line ${LINENO}: ${BASH_COMMAND}" > /tmp/risk-lab-finalize-error.txt' ERR
+
+          evidence_path="docs/production-evidence/risk-lab/risk-lab-3-4-20260720-v1.json"
+          jq -e '.status == "passed" and .sprint == "3.4" and (.checks | length == 11) and (.cases | length == 6) and (.blockers | length == 0) and (.evidenceHash | length == 64)' "$evidence_path" >/dev/null
+
+          cat > src/app/api/system/risk-lab-production-smoke/route.ts <<'EOF'
+          import { NextResponse } from "next/server";
+          import { riskLabProductionSmokeService } from "@/lib/risk-lab/RiskLabProductionSmokeService";
+
+          export const runtime = "nodejs";
+          export const dynamic = "force-dynamic";
+
+          function response(payload: unknown, status = 200) {
+            return NextResponse.json(payload, {
+              status,
+              headers: {
+                "Cache-Control": "no-store",
+                "Pragma": "no-cache",
+                "X-Robots-Tag": "noindex, nofollow",
+                "X-Content-Type-Options": "nosniff",
+              },
+            });
+          }
+
+          export async function GET() {
+            try {
+              const evidence = await riskLabProductionSmokeService.getPublicEvidence();
+              return response({
+                ok: evidence?.status === "passed",
+                sprint: "3.4",
+                status: evidence?.status || "pending",
+                evidence,
+              });
+            } catch (error) {
+              console.error("Risk Lab production smoke evidence error", error instanceof Error ? error.message : "unknown");
+              return response({ ok: false, sprint: "3.4", status: "unavailable" }, 503);
+            }
+          }
+          EOF
+
+          cat > tests/risk-lab-production-smoke-architecture.test.mjs <<'EOF'
+          import assert from "node:assert/strict";
+          import { existsSync, readFileSync } from "node:fs";
+          import test from "node:test";
+
+          const smokeService = readFileSync("src/lib/risk-lab/RiskLabProductionSmokeService.ts", "utf8");
+          const smokeStore = readFileSync("src/lib/risk-lab/RiskLabProductionSmokeStore.ts", "utf8");
+          const scanStore = readFileSync("src/lib/risk-lab/RiskLabAutomaticScanStore.ts", "utf8");
+          const smokeRoute = readFileSync("src/app/api/system/risk-lab-production-smoke/route.ts", "utf8");
+          const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/automatic/route.ts", "utf8");
+          const evidence = JSON.parse(readFileSync("docs/production-evidence/risk-lab/risk-lab-3-4-20260720-v1.json", "utf8"));
+
+          function executable(source) {
+            return source
+              .replace(/\/\*[\s\S]*?\*\//g, "")
+              .replace(/^\s*\/\/.*$/gm, "");
+          }
+
+          test("production smoke covers the official Sprint 3.4 matrix", () => {
+            for (const value of ["HCTR11", "MCCI11", "RBRY11", "invalid-ticker", "insufficient-series", "ambiguous-credit-event"]) {
+              assert.match(smokeService, new RegExp(value));
+            }
+            for (const checkId of ["deployment.production", "feature.automatic-discovery", "rate-limit.contract", "persistence.scans", "audit.scans", "isolation.external-effects", "integrity.scan-hashes"]) {
+              assert.match(smokeService, new RegExp(checkId.replaceAll(".", "\\.")));
+            }
+          });
+
+          test("automatic scans and smoke evidence use repositories with locks and audit", () => {
+            assert.match(scanStore, /RiskLabAutomaticScans/);
+            assert.match(scanStore, /RiskLabAutomaticScanAudit/);
+            assert.match(scanStore, /runTransaction/);
+            assert.match(smokeStore, /RiskLabProductionSmokeRuns/);
+            assert.match(smokeStore, /RiskLabProductionSmokeAudit/);
+            assert.match(smokeStore, /RiskLabProductionSmokeLocks/);
+            assert.match(smokeStore, /acquireLock/);
+            assert.match(smokeStore, /releaseLock/);
+            assert.match(adminRoute, /repository:\s*riskLabAutomaticScanStore/);
+          });
+
+          test("production evidence route is permanently read-only after closure", () => {
+            assert.match(smokeRoute, /export async function GET\(\)/);
+            assert.match(smokeRoute, /getPublicEvidence/);
+            assert.doesNotMatch(smokeRoute, /NextRequest|searchParams|run\(\)|VERCEL_GIT_COMMIT_SHA|github-actions|AUTOMATIC_TRIGGER|TOKEN/);
+            assert.equal(existsSync(".github/workflows/risk-lab-production-smoke.yml"), false);
+          });
+
+          test("approved production evidence is immutable and complete", () => {
+            assert.equal(evidence.status, "passed");
+            assert.equal(evidence.sprint, "3.4");
+            assert.equal(evidence.checks.length, 11);
+            assert.equal(evidence.cases.length, 6);
+            assert.equal(evidence.blockers.length, 0);
+            assert.match(evidence.evidenceHash, /^[a-f0-9]{64}$/);
+            assert.equal(evidence.cases.every((item) => item.premiumIntegrated === false && item.notificationsSent === false), true);
+          });
+
+          test("smoke remains isolated from Premium and notifications", () => {
+            const source = executable(smokeService);
+            assert.doesNotMatch(source, /getPremiumReport|AIInsights|sendEmail|sendNotification|createAlert/);
+            assert.match(source, /premiumIntegrated:\s*false/);
+            assert.match(source, /notificationsSent:\s*false/);
+            assert.match(adminRoute, /RISK_LAB_AUTOMATIC_RATE_LIMIT/);
+          });
+          EOF
+
+          python <<'PY'
+          from pathlib import Path
+
+          doc = Path("docs/risk-lab/sprint-3-4-production-smoke.md")
+          text = doc.read_text()
+          if "## Resultado de Produção" not in text:
+              text += """
+
+## Resultado de Produção
+
+- Status: `passed`;
+- run: `risk-lab-3-4-20260720-v1`;
+- commit auditado: `e9a5d6ec263c0aa87961133a361891f60175dba4`;
+- ambiente: `production`;
+- deployment: `https://www.dadosfii.com.br`;
+- checks: `11/11`;
+- casos: `6/6`;
+- hash: `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f`;
+- Premium integrado: `false`;
+- notificações enviadas: `false`.
+
+Os três casos reais (`HCTR11`, `MCCI11` e `RBRY11`) terminaram como `inconclusive`, sem falsa classificação final, porque as fontes consultadas não produziram evidência estruturada suficiente. Isso aprova a segurança operacional e a semântica do pipeline, mas não substitui a verificação primária e o backtest da Sprint 3.5.
+"""
+          doc.write_text(text)
+          PY
+
+          python <<'PY'
+          import re
+          from pathlib import Path
+
+          path = Path("DADOS_FII_HANDOFF.md")
+          text = path.read_text()
+
+          def sub_once(pattern, replacement, label, flags=0):
+              global text
+              text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+              if count != 1:
+                  raise SystemExit(f"handoff marker not found: {label}")
+
+          sub_once(r"\*\*Versão:\*\* 6\.1\.0", "**Versão:** 6.2.0", "version")
+          sub_once(r"\*\*Commit auditado em Produção:\*\* `[^`]+`", "**Commit auditado em Produção:** `e9a5d6ec263c0aa87961133a361891f60175dba4`", "production commit")
+          sub_once(r"\*\*Branch desta atualização:\*\* `[^`]+`", "**Branch desta atualização:** `automation/risk-lab-3-4-release-0072ecf340e6`", "branch")
+          sub_once(r"\*\*PR desta atualização:\*\* .*", "**PR desta atualização:** #59 — `chore: formaliza conclusão da Sprint 3.4`", "pr", re.M)
+          sub_once(r"^\| Sprint corrente canônica:.*$", "| Sprint corrente canônica: **3.5 — Coorte externa e backtest sem informação futura**. | Sprint 3.4 como sprint corrente. | A Sprint 3.4 foi homologada em Produção com evidência auditável, mantendo o Risk Lab isolado do Premium e das notificações. |", "current decision", re.M)
+          sub_once(r"^- O Risk Lab está implementado.*$", "- A Sprint 3.4 do Risk Lab foi concluída em Produção com 11/11 checks e 6/6 casos, evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f`. O Risk Lab continua isolado do Premium e das notificações; a coorte externa permanece bloqueada até verificação primária.", "summary", re.M)
+          sub_once(r"^\| Fase 3 — Risk Lab \|.*$", "| Fase 3 — Risk Lab | Sim, até 3.4 | Sim | Sim (`e9a5d6e`, Vercel verde) | Smoke 3.4: 11/11 checks e 6/6 casos; coorte externa pendente | Em andamento |", "audit row", re.M)
+          sub_once(r"^\*\*Em andamento\.\*\* As Sprints 3\.0 a 3\.3.*$", "**Em andamento.** As Sprints 3.0 a 3.4 possuem código, testes e homologação de Produção. A Sprint 3.5 continua bloqueada até a verificação primária da coorte externa.", "phase status", re.M)
+
+          current = """### Sprint 3.5 — Coorte externa e backtest sem informação futura
+
+**Objetivo:** verificar a coorte pré-registrada em fontes primárias e executar o backtest sem informação futura, preservando integralmente o ruleset `v0.1.0`.
+
+**Trabalho obrigatório:**
+
+1. confirmar `knownAt`, URL, trecho, página, hash e versão por observação;
+2. executar `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11` e `RBRY11` sem look-ahead;
+3. medir antecedência, falsos positivos, falsos negativos, inconclusão e cobertura;
+4. manter `executionAllowed=false` enquanto faltar verificação primária;
+5. versionar a evidência e preservar o ruleset congelado.
+
+**Critério de aceite:** nenhuma conclusão final sustentada apenas por fonte secundária; controles saudáveis sem vermelho injustificado; ambiguidades como inconclusivas; métricas e evidências persistidas no Git."""
+          sub_once(r"### Sprint 3\.4 — Risk Lab em Produção e smoke ponta a ponta\n.*?(?=\n## 4\.)", current, "current sprint section", re.S)
+
+          track = """### Trilha principal de produto
+
+1. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
+2. **Sprint 3.6 — Métricas, calibração e gate formal.**
+3. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
+4. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
+5. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
+6. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
+7. **Sprint 4.3 — Planos, preferências, canais e monetização.**
+8. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
+9. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
+10. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
+11. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
+12. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**"""
+          sub_once(r"### Trilha principal de produto\n\n.*?(?=\n### Trilha SEO)", track, "sprint order", re.S)
+          sub_once(r"### Sprint 3\.4 — Risk Lab em Produção\n\n\*\*Escopo:\*\*", "### Sprint 3.4 — Risk Lab em Produção (concluída)\n\n**Escopo:**", "3.4 scope heading")
+          sub_once(r"^\*\*Aceite:\*\* deployment `Ready`.*smoke salvo no Git\.$", "**Aceite obtido:** deployment de Produção identificado; 11/11 checks; 6/6 casos; persistência, auditoria, locks, hashes e rate limit conferidos; zero efeito no Premium e nas notificações; evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f` salva no Git. Os casos reais ficaram inconclusivos com segurança por insuficiência de evidência estruturada, sem falsa classificação final.", "3.4 acceptance", re.M)
+          sub_once(r"1\. Executar o smoke autenticado da Sprint 3\.4 no commit de release do Risk Lab\.\n2\. Verificar fontes primárias da coorte e só então remover o bloqueio de execução\.", "1. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.", "blockers")
+          sub_once(r"^17\. Padronizar persistência e auditoria dos scans automáticos do Risk Lab\.\n", "", "completed engineering item", re.M)
+          text = text.replace("18. Decidir se regras futuras", "17. Decidir se regras futuras", 1)
+          text = text.replace("19. Mover ferramentas manuais", "18. Mover ferramentas manuais", 1)
+          sub_once(r"Formulação vigente: \*\*Fases 1 e 2 formalmente concluídas.*Sprint atual 3\.4\.\*\*", "Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint 3.4 concluída e Sprint atual 3.5.**", "final formula")
+
+          path.write_text(text)
+          PY
+
+          rm -f .github/workflows/risk-lab-production-smoke.yml
+          rm -f .github/risk-lab-production-smoke-release.trigger
+          rm -f .github/workflows/risk-lab-3-4-finalize-pr59.yml
+          rm -f docs/production-evidence/risk-lab/finalization-status.json
+
+          npm install --silent
+          npm run typecheck 2>&1 | tee /tmp/risk-lab-finalize-typecheck.log
+          npm run test:risk-lab 2>&1 | tee /tmp/risk-lab-finalize-risk.log
+          npm run test:sprint2 2>&1 | tee /tmp/risk-lab-finalize-phase2.log
+
+      - name: Persist finalization result
+        if: always()
+        shell: bash
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          BASELINE_SHA: ${{ steps.baseline.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [[ "$BUILD_OUTCOME" == "success" ]]; then
+            git add -A
+            git commit -m "chore: formaliza conclusão da Sprint 3.4"
+          else
+            error_message=$(cat /tmp/risk-lab-finalize-error.txt 2>/dev/null || echo "Falha sem detalhe capturado.")
+            git reset --hard "$BASELINE_SHA"
+            jq -n \
+              --arg status "failed" \
+              --arg workflowRunId "$GITHUB_RUN_ID" \
+              --arg completedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --arg error "$error_message" \
+              '{status:$status,workflowRunId:$workflowRunId,completedAt:$completedAt,error:$error}' \
+              > docs/production-evidence/risk-lab/finalization-status.json
+            git add docs/production-evidence/risk-lab/finalization-status.json
+            git commit -m "docs: registra falha no fechamento da Sprint 3.4"
+          fi
+
+          git push origin automation/risk-lab-3-4-release-0072ecf340e6
+
+      - name: Enforce finalization
+        if: always()
+        shell: bash
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        run: |
+          test "$BUILD_OUTCOME" = "success"
