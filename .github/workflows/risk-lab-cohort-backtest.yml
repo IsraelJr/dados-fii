@@ -9,14 +9,14 @@ on:
       - "docs/production-evidence/risk-lab/sprint-3-5-deploy-trigger.json"
       - "src/app/api/system/risk-lab-cohort-backtest/**"
       - "src/app/api/admin/system/risk-lab/cohort-backtest/**"
-      - "src/app/admin/risk-lab/CohortBacktestPanel.tsx"
-      - "src/app/admin/risk-lab/cohort-backtest/**"
-      - "src/app/admin/risk-lab/layout.tsx"
+      - "src/app/admin/risk-lab/**"
+      - "src/app/admin/sistema/AdminSprint35QuickAction.tsx"
       - "src/lib/risk-lab/**"
       - "src/types/riskLabCohortBacktest.ts"
       - "src/types/riskLabDividendStress.ts"
       - "scripts/finalize-risk-lab-sprint-3-5.mjs"
       - "tests/risk-lab-cohort-backtest*"
+      - "tests/risk-lab-segmented-cohort*"
       - "tests/risk-lab-credit-ambiguity-policy.test.ts"
       - "tests/risk-lab-fnet-notice-parser.test.ts"
       - "tests/risk-lab-cohort-admin-architecture.test.mjs"
@@ -35,7 +35,7 @@ concurrency:
 jobs:
   production-backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       RUN_ID: risk-lab-3-5-20260720-v2
       PRODUCTION_ORIGIN: https://dadosfii.com.br
@@ -51,54 +51,101 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Wait for exact production deployment and execute cohort
-        id: production
+      - name: Wait for exact deployment and initialize immutable attempt
+        id: initialize
         shell: bash
         env:
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
-          endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-cohort-backtest?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
-          : > risk-lab-cohort-backtest-response.json
-          observed=false
+          base="${PRODUCTION_ORIGIN}/api/system/risk-lab-cohort-backtest?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}"
+          initialized=false
+          : > risk-lab-cohort-initialize.json
 
-          for attempt in $(seq 1 10); do
-            echo "Attempt ${attempt}/10 for release ${RELEASE_COMMIT}"
-            http_code=$(curl \
-              --silent \
-              --show-error \
-              --location \
-              --max-time 310 \
-              --output risk-lab-cohort-backtest-response.json \
-              --write-out "%{http_code}" \
-              "$endpoint" || true)
-
-            if [[ "$http_code" == "200" ]]; then
-              release=$(jq -r '.evidence.releaseCommit // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
-              run_id=$(jq -r '.evidence.runId // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
-              status=$(jq -r '.evidence.status // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
-              hash=$(jq -r '.evidence.evidenceHash // ""' risk-lab-cohort-backtest-response.json 2>/dev/null || true)
-              if [[ "$run_id" == "$RUN_ID" && "$release" == "$RELEASE_COMMIT" && ( "$status" == "passed" || "$status" == "failed" ) && ${#hash} -eq 64 ]]; then
-                observed=true
-                break
-              fi
+          for attempt in $(seq 1 12); do
+            echo "Initialize attempt ${attempt}/12 for release ${RELEASE_COMMIT}"
+            http_code=$(curl --silent --show-error --location --max-time 310 \
+              --output risk-lab-cohort-initialize.json --write-out "%{http_code}" \
+              "${base}&action=initialize" || true)
+            release=$(jq -r '.evidence.releaseCommit // ""' risk-lab-cohort-initialize.json 2>/dev/null || true)
+            run_id=$(jq -r '.evidence.runId // ""' risk-lab-cohort-initialize.json 2>/dev/null || true)
+            status=$(jq -r '.evidence.status // ""' risk-lab-cohort-initialize.json 2>/dev/null || true)
+            if [[ "$http_code" == "200" && "$release" == "$RELEASE_COMMIT" && "$run_id" == "$RUN_ID" && ( "$status" == "running" || "$status" == "passed" || "$status" == "failed" ) ]]; then
+              initialized=true
+              break
             fi
-
-            echo "Deployment exato ainda não observado (HTTP ${http_code})."
-            cat risk-lab-cohort-backtest-response.json || true
+            echo "Deployment exato ainda não inicializado (HTTP ${http_code})."
+            cat risk-lab-cohort-initialize.json || true
             sleep 30
           done
 
-          if [[ "$observed" != "true" ]]; then
-            echo "O deployment exato não produziu evidência final no intervalo permitido."
+          if [[ "$initialized" != "true" ]]; then
+            echo "O deployment exato não inicializou a tentativa segmentada."
+            exit 1
+          fi
+          echo "base=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Execute and persist each cohort fund
+        id: cases
+        shell: bash
+        env:
+          BASE_ENDPOINT: ${{ steps.initialize.outputs.base }}
+        run: |
+          set -euo pipefail
+          mkdir -p risk-lab-segmented-cases
+          tickers=(DEVA11 VSLH11 KNCR11 KNSC11 MCCI11 RBRY11)
+
+          for ticker in "${tickers[@]}"; do
+            completed=false
+            for attempt in 1 2; do
+              echo "Executing ${ticker}, attempt ${attempt}/2"
+              output="risk-lab-segmented-cases/${ticker}.json"
+              http_code=$(curl --silent --show-error --location --max-time 310 \
+                --output "$output" --write-out "%{http_code}" \
+                "${BASE_ENDPOINT}&action=case&ticker=${ticker}" || true)
+              persisted=$(jq -r --arg ticker "$ticker" '.evidence.cases | map(select(.ticker == $ticker)) | length' "$output" 2>/dev/null || echo 0)
+              if [[ "$http_code" == "200" && "$persisted" == "1" ]]; then
+                completed=true
+                break
+              fi
+              echo "${ticker} não foi persistido (HTTP ${http_code})."
+              cat "$output" || true
+              if [[ "$attempt" == "1" ]]; then
+                echo "Aguardando expiração segura de eventual lock órfão."
+                sleep 430
+              fi
+            done
+            if [[ "$completed" != "true" ]]; then
+              echo "Falha definitiva ao persistir ${ticker}."
+              exit 1
+            fi
+          done
+
+      - name: Finalize metrics and methodological gates
+        id: production
+        shell: bash
+        env:
+          BASE_ENDPOINT: ${{ steps.initialize.outputs.base }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          http_code=$(curl --silent --show-error --location --max-time 310 \
+            --output risk-lab-cohort-backtest-response.json --write-out "%{http_code}" \
+            "${BASE_ENDPOINT}&action=finalize" || true)
+          if [[ "$http_code" != "200" ]]; then
+            cat risk-lab-cohort-backtest-response.json || true
+            echo "A consolidação final respondeu HTTP ${http_code}."
             exit 1
           fi
 
-          jq -e '
+          jq -e --arg release "$RELEASE_COMMIT" --arg runId "$RUN_ID" '
             .sprint == "3.5"
             and .evidence.schemaVersion == 2
             and .evidence.methodologyVersion == "2.0.0"
+            and .evidence.runId == $runId
+            and .evidence.releaseCommit == $release
             and (.evidence.attemptId | test("^risk-lab-3-5-attempt-"))
+            and (.evidence.status == "passed" or .evidence.status == "failed")
             and (.evidence.cases | length == 6)
             and (.evidence.checks | length >= 12)
             and (.evidence.evidenceHash | test("^[a-f0-9]{64}$"))
@@ -106,13 +153,16 @@ jobs:
             and (.evidence.notificationsSent == false)
           ' risk-lab-cohort-backtest-response.json >/dev/null
 
-      - name: Upload production response
+      - name: Upload segmented production evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: risk-lab-cohort-backtest-production-v2
-          path: risk-lab-cohort-backtest-response.json
-          if-no-files-found: error
+          path: |
+            risk-lab-cohort-initialize.json
+            risk-lab-segmented-cases/*.json
+            risk-lab-cohort-backtest-response.json
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Version, validate and formalize production evidence
@@ -146,6 +196,7 @@ jobs:
           - Status metodológico: \`${status}\`
           - Tentativa imutável: \`${attempt_id}\`
           - Release executado: \`${release}\`
+          - Execução: \`segmentada e persistente por fundo\`
           - Cobertura conclusiva: \`${coverage}%\`
           - Falsos positivos: \`${false_positives}\`
           - Falsos negativos medidos: \`${false_negatives}\`
@@ -156,7 +207,7 @@ jobs:
           - Premium integrado: \`false\`
           - Notificações enviadas: \`false\`
 
-          O resultado foi produzido automaticamente no deployment exato de Produção. A Sprint 3.5 valida integridade, cobertura e ausência de look-ahead; a aprovação ou rejeição do ruleset pertence ao gate formal da Sprint 3.6.
+          O resultado foi produzido automaticamente no deployment exato de Produção. Cada fundo foi persistido antes da etapa seguinte; a Sprint 3.5 valida integridade, cobertura e ausência de look-ahead, enquanto a decisão sobre o ruleset pertence à Sprint 3.6.
           EOF
 
           if [[ "$status" == "passed" ]]; then
@@ -174,20 +225,15 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
           git add "$evidence_path" "$summary_path"
-          if [[ "$status" == "passed" ]]; then
-            git add DADOS_FII_HANDOFF.md
-          fi
+          if [[ "$status" == "passed" ]]; then git add DADOS_FII_HANDOFF.md; fi
           git commit -m "docs: versiona evidência metodológica da Sprint 3.5"
           git push origin "$branch"
 
-          pr_url=$(gh pr create \
-            --base main \
-            --head "$branch" \
-            --title "$title" \
-            --body "## Auditoria automática de Produção
+          pr_url=$(gh pr create --base main --head "$branch" --title "$title" --body "## Auditoria automática de Produção
 
           - tentativa: \`${attempt_id}\`
           - release: \`${release}\`
+          - execução: segmentada por fundo
           - status metodológico: \`${status}\`
           - cobertura: \`${coverage}%\`
           - falsos positivos: \`${false_positives}\`
