@@ -29,7 +29,7 @@ async function request(url: URL, accept = "application/json,text/plain;q=0.9,*/*
       headers: {
         Accept: accept,
         Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.7)",
+        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.8)",
         "X-Requested-With": "XMLHttpRequest",
       },
     });
@@ -85,7 +85,7 @@ function query(parameters: Record<string, string>) {
 }
 
 const result: Record<string, unknown> = {
-  schemaVersion: 8,
+  schemaVersion: 9,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
@@ -94,7 +94,6 @@ const result: Record<string, unknown> = {
 
 try {
   const specs = [
-    { name: "legacy_digits_category", params: { cnpjFundo: CNPJ, idCategoriaDocumento: "6", idTipoDocumento: "45" } },
     { name: "cnpjFundo_digits", params: { cnpjFundo: CNPJ } },
     { name: "cnpjFundo_formatted", params: { cnpjFundo: CNPJ_FORMATTED } },
     { name: "both_formatted", params: { cnpj: CNPJ_FORMATTED, cnpjFundo: CNPJ_FORMATTED } },
@@ -125,23 +124,28 @@ try {
   }));
 
   result.probes = probes.map((probe) => ({ ...probe, items: undefined }));
-  const selected = probes.find((probe) => {
-    if (!("response" in probe) || probe.response.recordsFiltered < 1 || probe.response.recordsFiltered > 5_000) return false;
-    return probe.items.every((item) => String(item.descricaoFundo || "").toUpperCase().includes("KINEA RENDIMENTOS"));
-  });
-  if (!selected) throw new Error("Nenhum filtro por CNPJ restringiu a consulta ao KNCR11 com paginação válida.");
+  const selected = probes.find((probe) => probe.name === "cnpjFundo_digits"
+    && "response" in probe
+    && probe.response.recordsFiltered >= 1
+    && probe.response.recordsFiltered <= 5_000)
+    || probes.find((probe) => probe.name === "cnpjFundo_formatted"
+      && "response" in probe
+      && probe.response.recordsFiltered >= 1
+      && probe.response.recordsFiltered <= 5_000);
+  if (!selected) throw new Error("O filtro geral por cnpjFundo não restringiu a consulta ao KNCR11.");
 
   const documents = mapFnetDividendRows(selected.items, FROM, UNTIL);
   result.selectedFilter = selected.name;
   result.documentCountOnFirstPage = documents.length;
   result.latestDocuments = documents.slice(-4);
-  if (!documents.length) throw new Error("O filtro correto não retornou avisos estruturados na primeira página.");
+  if (!documents.length) throw new Error("A página geral do fundo não contém avisos estruturados reconhecidos.");
 
   const series = await new AutomaticDividendSeriesService().build(TICKER, documents.slice(-4));
   result.stage = "completed";
   result.series = {
     status: series.status,
     observationCount: series.observations.length,
+    longestContiguousSequence: series.longestContiguousSequence,
     conflicts: series.conflicts,
     sources: series.sources,
     observations: series.observations,
