@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { AutomaticDividendSeriesService } from "../src/lib/risk-lab/AutomaticDividendSeriesService";
-import { FnetDividendDocumentDiscovery } from "../src/lib/risk-lab/FnetDividendDocumentDiscovery";
+import { mapFnetDividendRows } from "../src/lib/risk-lab/FnetDividendDocumentDiscovery";
 
 const CNPJ = "16706958000132";
 const CNPJ_FORMATTED = "16.706.958/0001-32";
@@ -19,116 +19,152 @@ function errorRecord(error: unknown) {
   };
 }
 
-function attrs(source: string) {
-  const values: Record<string, string> = {};
-  for (const match of source.matchAll(/([\w:-]+)\s*=\s*["']([^"']*)["']/g)) values[match[1].toLowerCase()] = match[2];
-  return values;
-}
-
-async function fetchText(url: string, timeoutMs = 45_000) {
+async function request(url: URL, accept = "application/json,text/plain;q=0.9,*/*;q=0.1") {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), 60_000);
   try {
     const response = await fetch(url, {
       redirect: "follow",
       cache: "no-store",
       signal: controller.signal,
       headers: {
-        Accept: "text/html,application/xhtml+xml,application/javascript,*/*;q=0.1",
-        "User-Agent": "DadosFII-RiskLab-Diagnostic/1.2",
+        Accept: accept,
+        Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
+        "User-Agent": "DadosFII-RiskLab-Diagnostic/1.3",
+        "X-Requested-With": "XMLHttpRequest",
       },
     });
-    return { response, text: await response.text() };
+    const text = await response.text();
+    let json: unknown = null;
+    try { json = JSON.parse(text); } catch { /* exposto no retorno */ }
+    return {
+      requestedUrl: url.toString(),
+      httpStatus: response.status,
+      finalUrl: response.url,
+      contentType: response.headers.get("content-type"),
+      bytes: Buffer.byteLength(text, "utf8"),
+      json,
+      textSample: json === null ? text.slice(0, 2500) : null,
+    };
   } finally {
     clearTimeout(timer);
   }
 }
 
-async function inspectUrl(url: string) {
-  try {
-    const { response, text } = await fetchText(url, 30_000);
-    return {
-      requestedUrl: url,
-      httpStatus: response.status,
-      redirected: response.redirected,
-      finalUrl: response.url,
-      contentType: response.headers.get("content-type"),
-      bytes: Buffer.byteLength(text, "utf8"),
-      title: text.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim() || null,
-      bodySample: text.slice(0, 1600),
-    };
-  } catch (error) {
-    return { requestedUrl: url, error: errorRecord(error) };
-  }
+function optionRows(payload: unknown): Array<{ id: string; text: string }> {
+  const record = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+  const values = Array.isArray(payload)
+    ? payload
+    : Array.isArray(record.results)
+      ? record.results
+      : Array.isArray(record.data)
+        ? record.data
+        : [];
+  return values.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const id = String(row.id || row.value || "").trim();
+    const text = String(row.text || row.label || row.nome || row.descricao || "").trim();
+    return /^\d{1,12}$/.test(id) ? [{ id, text }] : [];
+  });
 }
 
-async function inspectManager(url: string) {
-  try {
-    const { response, text } = await fetchText(url);
-    const inputs = [...text.matchAll(/<input\b([^>]*)>/gi)].map((match) => attrs(match[1]));
-    const numericHiddenIds = inputs
-      .filter((item) => String(item.type || "").toLowerCase() === "hidden")
-      .map((item) => item.id || "")
-      .filter((id) => /^\d{2,12}$/.test(id));
-    return {
-      requestedUrl: url,
-      httpStatus: response.status,
-      finalUrl: response.url,
-      contentType: response.headers.get("content-type"),
-      bytes: Buffer.byteLength(text, "utf8"),
-      numericHiddenIds,
-      inputs: inputs.map((item) => ({ id: item.id || null, name: item.name || null, value: item.value || null, type: item.type || null })).slice(0, 100),
-      scriptSources: [...text.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((match) => match[1]),
-      containsCnpjDigits: text.includes(CNPJ),
-      containsCnpjFormatted: text.includes(CNPJ_FORMATTED),
-      bodySample: text.slice(0, 2200),
-    };
-  } catch (error) {
-    return { requestedUrl: url, error: errorRecord(error) };
-  }
+function normalize(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 }
 
-async function inspectManagerScript() {
-  const url = `${ORIGIN}/fnet/resources/js/paginas/publico/gerenciador-documentos-cvm.js`;
-  try {
-    const { response, text } = await fetchText(url, 90_000);
-    const needles = ["idFundo", "cnpjFundo", "autocomplete", "pesquisarGerenciadorDocumentosDados", "listarFundo", "buscarFundo"];
-    return {
-      requestedUrl: url,
-      httpStatus: response.status,
-      contentType: response.headers.get("content-type"),
-      bytes: Buffer.byteLength(text, "utf8"),
-      contexts: Object.fromEntries(needles.map((needle) => {
-        const index = text.indexOf(needle);
-        return [needle, index >= 0 ? text.slice(Math.max(0, index - 1800), index + 4500) : null];
-      })),
-    };
-  } catch (error) {
-    return { requestedUrl: url, error: errorRecord(error) };
+async function inspectHtml(documentId: string, protocol = false) {
+  const url = new URL(
+    protocol ? "/fnet/publico/visualizarProtocoloDocumentoCVM" : "/fnet/publico/exibirDocumento",
+    ORIGIN,
+  );
+  if (protocol) url.searchParams.set("idDocumento", documentId);
+  else {
+    url.searchParams.set("cvm", "true");
+    url.searchParams.set("id", documentId);
   }
+  return request(url, "text/html,application/xhtml+xml,*/*;q=0.1");
 }
 
 let result: Record<string, unknown> = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
-  stage: "discovery",
+  stage: "list-funds",
 };
 
 try {
-  const discovery = await new FnetDividendDocumentDiscovery().discover(CNPJ, FROM, UNTIL);
-  const latest = discovery.documents.slice(-4);
+  const searches = [];
+  const options = new Map<string, { id: string; text: string }>();
+  for (const term of [TICKER, CNPJ, CNPJ_FORMATTED]) {
+    const url = new URL("/fnet/publico/listarFundos", ORIGIN);
+    for (const [key, value] of Object.entries({
+      term,
+      page: "1",
+      idTipoFundo: "1",
+      idAdm: "0",
+      paraCerts: "false",
+    })) url.searchParams.set(key, value);
+    const response = await request(url);
+    const rows = optionRows(response.json);
+    rows.forEach((row) => options.set(row.id, row));
+    searches.push({ term, response, rows });
+  }
+
+  const candidates = [...options.values()];
+  const selected = candidates.find((item) => normalize(item.text).includes(TICKER))
+    || candidates.find((item) => item.text.replace(/\D/g, "").includes(CNPJ));
+  if (!selected) throw new Error(`listarFundos não resolveu ${TICKER}/${CNPJ}; ${candidates.length} candidato(s).`);
+
+  result = { ...result, stage: "documents", searches, candidates, selected };
+  const url = new URL("/fnet/publico/pesquisarGerenciadorDocumentosDados", ORIGIN);
+  const parameters = {
+    paginaCertificados: "false",
+    tipoFundo: "1",
+    administrador: "",
+    idFundo: selected.id,
+    idCategoriaDocumento: "0",
+    idTipoDocumento: "0",
+    idEspecieDocumento: "0",
+    situacao: "",
+    cnpj: CNPJ_FORMATTED,
+    cnpjFundo: CNPJ_FORMATTED,
+    dataReferencia: "",
+    ultimaDataReferencia: "false",
+    dataInicial: "01/01/2022",
+    dataFinal: "31/12/2025",
+    idModalidade: "",
+    palavraChave: "",
+    paginaCertificadosFlag: "false",
+    isSession: "false",
+    d: "1",
+    s: "0",
+    l: "500",
+  };
+  for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
+  const documentResponse = await request(url);
+  const payload = documentResponse.json && typeof documentResponse.json === "object"
+    ? documentResponse.json as Record<string, unknown>
+    : {};
+  const rows = Array.isArray(payload.data) ? payload.data as Record<string, unknown>[] : [];
+  const documents = mapFnetDividendRows(rows, FROM, UNTIL);
+  if (!documents.length) throw new Error(`Consulta filtrada retornou ${rows.length} linha(s), mas nenhum aviso de rendimento válido.`);
+
+  const latest = documents.slice(-4);
   result = {
     ...result,
     stage: "series",
-    discovery: {
-      internalFundId: discovery.internalFundId,
-      recordsInspected: discovery.recordsInspected,
-      documentCount: discovery.documents.length,
-      sourceUrl: discovery.sourceUrl,
-      latestDocuments: latest,
+    documentResponse: {
+      requestedUrl: documentResponse.requestedUrl,
+      httpStatus: documentResponse.httpStatus,
+      contentType: documentResponse.contentType,
+      recordsTotal: payload.recordsTotal || null,
+      recordsFiltered: payload.recordsFiltered || null,
+      rowCount: rows.length,
     },
+    documentCount: documents.length,
+    latest,
   };
 
   const series = await new AutomaticDividendSeriesService().build(TICKER, latest);
@@ -136,11 +172,10 @@ try {
   for (const document of latest.slice(-2)) {
     endpoints.push({
       documentId: document.documentId,
-      notice: await inspectUrl(`${ORIGIN}/fnet/publico/exibirDocumento?cvm=true&id=${document.documentId}`),
-      protocol: await inspectUrl(`${ORIGIN}/fnet/publico/visualizarProtocoloDocumentoCVM?idDocumento=${document.documentId}`),
+      notice: await inspectHtml(document.documentId),
+      protocol: await inspectHtml(document.documentId, true),
     });
   }
-
   result = {
     ...result,
     stage: "completed",
@@ -155,19 +190,7 @@ try {
     endpoints,
   };
 } catch (error) {
-  const managerUrls = [
-    `${ORIGIN}/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1&cnpjFundo=${CNPJ}`,
-    `${ORIGIN}/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1&cnpjFundo=${encodeURIComponent(CNPJ_FORMATTED)}`,
-    `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1&cnpjFundo=${CNPJ}`,
-    `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1&cnpjFundo=${encodeURIComponent(CNPJ_FORMATTED)}`,
-  ];
-  result = {
-    ...result,
-    stage: `${String(result.stage)}_failed`,
-    error: errorRecord(error),
-    managerPages: await Promise.all(managerUrls.map(inspectManager)),
-    managerScript: await inspectManagerScript(),
-  };
+  result = { ...result, stage: `${String(result.stage)}_failed`, error: errorRecord(error) };
 }
 
 await writeFile(OUTPUT, `${JSON.stringify(result, null, 2)}\n`, "utf8");
