@@ -9,6 +9,7 @@ const FROM = "2022-01-01";
 const UNTIL = "2025-12-31";
 const ORIGIN = "https://fnet.bmfbovespa.com.br";
 const OUTPUT = "risk-lab-fnet-parser-diagnostic.json";
+let sessionCookie = "";
 
 function errorRecord(error: unknown) {
   return {
@@ -19,9 +20,25 @@ function errorRecord(error: unknown) {
   };
 }
 
-async function request(url: URL, accept = "application/json,text/plain;q=0.9,*/*;q=0.1") {
+function cookieFrom(response: Response) {
+  const headers = response.headers as Headers & { getSetCookie?: () => string[] };
+  const values = typeof headers.getSetCookie === "function"
+    ? headers.getSetCookie()
+    : [response.headers.get("set-cookie") || ""];
+  return values
+    .flatMap((value) => value.split(/,(?=[^;,]+=)/))
+    .map((value) => value.split(";", 1)[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+async function request(
+  url: URL,
+  accept = "application/json,text/plain;q=0.9,*/*;q=0.1",
+  timeoutMs = 90_000,
+) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60_000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       redirect: "follow",
@@ -30,10 +47,13 @@ async function request(url: URL, accept = "application/json,text/plain;q=0.9,*/*
       headers: {
         Accept: accept,
         Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-        "User-Agent": "DadosFII-RiskLab-Diagnostic/1.3",
+        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.4)",
         "X-Requested-With": "XMLHttpRequest",
+        ...(sessionCookie ? { Cookie: sessionCookie } : {}),
       },
     });
+    const discoveredCookie = cookieFrom(response);
+    if (discoveredCookie) sessionCookie = discoveredCookie;
     const text = await response.text();
     let json: unknown = null;
     try { json = JSON.parse(text); } catch { /* exposto no retorno */ }
@@ -43,6 +63,7 @@ async function request(url: URL, accept = "application/json,text/plain;q=0.9,*/*
       finalUrl: response.url,
       contentType: response.headers.get("content-type"),
       bytes: Buffer.byteLength(text, "utf8"),
+      hasSessionCookie: Boolean(sessionCookie),
       json,
       textSample: json === null ? text.slice(0, 2500) : null,
     };
@@ -83,21 +104,29 @@ async function inspectHtml(documentId: string, protocol = false) {
     url.searchParams.set("cvm", "true");
     url.searchParams.set("id", documentId);
   }
-  return request(url, "text/html,application/xhtml+xml,*/*;q=0.1");
+  return request(url, "text/html,application/xhtml+xml,*/*;q=0.1", 45_000);
 }
 
 let result: Record<string, unknown> = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
-  stage: "list-funds",
+  stage: "bootstrap",
 };
 
 try {
+  const manager = new URL("/fnet/publico/abrirGerenciadorDocumentosCVM", ORIGIN);
+  manager.searchParams.set("paginaCertificados", "false");
+  manager.searchParams.set("tipoFundo", "1");
+  manager.searchParams.set("cnpjFundo", CNPJ_FORMATTED);
+  const bootstrap = await request(manager, "text/html,application/xhtml+xml", 120_000);
+  if (bootstrap.httpStatus !== 200) throw new Error(`Gerenciador respondeu HTTP ${bootstrap.httpStatus}.`);
+
+  result = { ...result, stage: "list-funds", bootstrap };
   const searches = [];
   const options = new Map<string, { id: string; text: string }>();
-  for (const term of [TICKER, CNPJ, CNPJ_FORMATTED]) {
+  for (const term of [CNPJ_FORMATTED, TICKER]) {
     const url = new URL("/fnet/publico/listarFundos", ORIGIN);
     for (const [key, value] of Object.entries({
       term,
@@ -106,10 +135,14 @@ try {
       idAdm: "0",
       paraCerts: "false",
     })) url.searchParams.set(key, value);
-    const response = await request(url);
-    const rows = optionRows(response.json);
-    rows.forEach((row) => options.set(row.id, row));
-    searches.push({ term, response, rows });
+    try {
+      const response = await request(url, undefined, 120_000);
+      const rows = optionRows(response.json);
+      rows.forEach((row) => options.set(row.id, row));
+      searches.push({ term, response, rows });
+    } catch (error) {
+      searches.push({ term, error: errorRecord(error), rows: [] });
+    }
   }
 
   const candidates = [...options.values()];
@@ -143,7 +176,7 @@ try {
     l: "500",
   };
   for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-  const documentResponse = await request(url);
+  const documentResponse = await request(url, undefined, 120_000);
   const payload = documentResponse.json && typeof documentResponse.json === "object"
     ? documentResponse.json as Record<string, unknown>
     : {};
