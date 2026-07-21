@@ -14,6 +14,7 @@ export interface VerifiedDividendNoticeSource {
   page: number | null;
   excerpt: string;
   sourceHash?: string;
+  sourceVersion?: string;
   protocolHash?: string;
   protocolVersion?: number;
 }
