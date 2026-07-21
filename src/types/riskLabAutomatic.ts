@@ -3,6 +3,7 @@ import type {
   VerifiedDividendNotice,
   VerifiedMaterialCreditEvent,
 } from "./riskLabDividendStress";
+import type { FrozenDividendReconciliation } from "./riskLabFrozenDividendDataset";
 
 export type AutomaticValidationStatus = "validated" | "inconclusive" | "blocked";
 
@@ -107,10 +108,15 @@ export interface AutomaticMonthlySeries {
   missingMonths: string[];
   conflicts: string[];
   longestContiguousSequence: number;
-  method: "direct_declared_per_share" | "official_monthly_liability_per_share" | "unavailable";
+  method:
+    | "direct_declared_per_share"
+    | "frozen_primary_declared_per_share"
+    | "official_monthly_liability_per_share"
+    | "unavailable";
   detectorResult: DividendStressWindow | null;
   detectorExecuted: boolean;
   creditEventScreen?: AutomaticCreditEventScreen | null;
+  reconciliation?: FrozenDividendReconciliation | null;
   classificationFinal: boolean;
   limitation:
     | "material_credit_events_not_automatically_validated"
