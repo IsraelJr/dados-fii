@@ -9,7 +9,6 @@ const FROM = "2022-01-01";
 const UNTIL = "2025-12-31";
 const ORIGIN = "https://fnet.bmfbovespa.com.br";
 const OUTPUT = "risk-lab-fnet-parser-diagnostic.json";
-let sessionCookie = "";
 
 function errorRecord(error: unknown) {
   return {
@@ -20,22 +19,10 @@ function errorRecord(error: unknown) {
   };
 }
 
-function cookieFrom(response: Response) {
-  const headers = response.headers as Headers & { getSetCookie?: () => string[] };
-  const values = typeof headers.getSetCookie === "function"
-    ? headers.getSetCookie()
-    : [response.headers.get("set-cookie") || ""];
-  return values
-    .flatMap((value) => value.split(/,(?=[^;,]+=)/))
-    .map((value) => value.split(";", 1)[0].trim())
-    .filter(Boolean)
-    .join("; ");
-}
-
 async function request(
   url: URL,
   accept = "application/json,text/plain;q=0.9,*/*;q=0.1",
-  timeoutMs = 75_000,
+  timeoutMs = 60_000,
 ) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -47,13 +34,10 @@ async function request(
       headers: {
         Accept: accept,
         Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.5)",
+        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.6)",
         "X-Requested-With": "XMLHttpRequest",
-        ...(sessionCookie ? { Cookie: sessionCookie } : {}),
       },
     });
-    const discoveredCookie = cookieFrom(response);
-    if (discoveredCookie) sessionCookie = discoveredCookie;
     const text = await response.text();
     let json: unknown = null;
     try { json = JSON.parse(text); } catch { /* diagnóstico abaixo */ }
@@ -63,7 +47,6 @@ async function request(
       finalUrl: response.url,
       contentType: response.headers.get("content-type"),
       bytes: Buffer.byteLength(text, "utf8"),
-      hasSessionCookie: Boolean(sessionCookie),
       json,
       textSample: json === null ? text.slice(0, 1800) : null,
     };
@@ -99,7 +82,7 @@ function documentUrl(parameters: Record<string, string>) {
     idModalidade: "",
     palavraChave: "",
     isSession: "false",
-    d: "1",
+    d: "0",
     s: "0",
     l: "500",
     ...parameters,
@@ -122,36 +105,36 @@ async function inspectHtml(documentId: string, protocol = false) {
 }
 
 let result: Record<string, unknown> = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
-  stage: "bootstrap",
+  stage: "direct-filters",
 };
 
 try {
-  const manager = new URL("/fnet/publico/abrirGerenciadorDocumentosCVM", ORIGIN);
-  manager.searchParams.set("paginaCertificados", "false");
-  manager.searchParams.set("tipoFundo", "1");
-  manager.searchParams.set("cnpjFundo", CNPJ_FORMATTED);
-  let bootstrap: unknown = null;
-  try {
-    bootstrap = await request(manager, "text/html,application/xhtml+xml", 90_000);
-  } catch (error) {
-    bootstrap = { error: errorRecord(error) };
-  }
-
-  result = { ...result, stage: "direct-filters", bootstrap };
   const specifications = [
-    { name: "cnpjFundo_digits", params: { cnpjFundo: CNPJ } },
-    { name: "cnpjFundo_formatted", params: { cnpjFundo: CNPJ_FORMATTED } },
-    { name: "both_formatted", params: { cnpj: CNPJ_FORMATTED, cnpjFundo: CNPJ_FORMATTED } },
-    { name: "both_digits", params: { cnpj: CNPJ, cnpjFundo: CNPJ } },
-    { name: "keyword_ticker", params: { cnpjFundo: CNPJ, palavraChave: TICKER } },
+    {
+      name: "legacy_digits_category",
+      params: { cnpjFundo: CNPJ, idCategoriaDocumento: "6", idTipoDocumento: "45" },
+    },
+    {
+      name: "cnpjFundo_digits",
+      params: { cnpjFundo: CNPJ },
+    },
+    {
+      name: "cnpjFundo_formatted",
+      params: { cnpjFundo: CNPJ_FORMATTED },
+    },
+    {
+      name: "both_formatted",
+      params: { cnpj: CNPJ_FORMATTED, cnpjFundo: CNPJ_FORMATTED },
+    },
   ];
+
   const probes = await Promise.all(specifications.map(async (specification) => {
     try {
-      const response = await request(documentUrl(specification.params), undefined, 90_000);
+      const response = await request(documentUrl(specification.params));
       const payload = payloadRecord(response.json);
       const rows = rowsFrom(response.json);
       const fundNames = [...new Set(rows.map((row) => String(row.descricaoFundo || "").trim()).filter(Boolean))];
@@ -165,8 +148,9 @@ try {
           recordsTotal: Number(payload.recordsTotal ?? 0),
           recordsFiltered: Number(payload.recordsFiltered ?? 0),
           rowCount: rows.length,
-          fundNames: fundNames.slice(0, 10),
-          tradeNames: tradeNames.slice(0, 10),
+          fundNames: fundNames.slice(0, 20),
+          tradeNames: tradeNames.slice(0, 20),
+          textSample: response.textSample,
         },
         rows,
       };
@@ -174,6 +158,11 @@ try {
       return { name: specification.name, error: errorRecord(error), rows: [] as Record<string, unknown>[] };
     }
   }));
+
+  result = {
+    ...result,
+    probes: probes.map((probe) => ({ ...probe, rows: undefined })),
+  };
 
   const selected = probes.find((probe) => {
     const response = "response" in probe ? probe.response : null;
@@ -191,7 +180,6 @@ try {
   result = {
     ...result,
     stage: "series",
-    probes: probes.map((probe) => ({ ...probe, rows: undefined })),
     selectedFilter: selected.name,
     documentCount: documents.length,
     latest,
