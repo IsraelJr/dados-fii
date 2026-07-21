@@ -1,12 +1,12 @@
 import { writeFile } from "node:fs/promises";
 
 const ORIGIN = "https://fnet.bmfbovespa.com.br";
-const CNPJ = "11026627000138";
+const CNPJ = "16706958000132"; // KNCR11, fundo ativo com histórico estruturado público.
 const TIMEOUT_MS = 20_000;
 
 function summarizeRecord(record) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return record;
-  return Object.fromEntries(Object.entries(record).slice(0, 40));
+  return Object.fromEntries(Object.entries(record).slice(0, 50));
 }
 
 function rowsFrom(parsed) {
@@ -27,7 +27,7 @@ async function requestText(url, init = {}) {
       headers: {
         Accept: "application/json,text/plain;q=0.9,text/html;q=0.8,*/*;q=0.1",
         Referer: `${ORIGIN}/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-        "User-Agent": "DadosFII-RiskLab-Probe/1.1",
+        "User-Agent": "DadosFII-RiskLab-Probe/1.2",
         "X-Requested-With": "XMLHttpRequest",
         ...(init.headers || {}),
       },
@@ -81,8 +81,8 @@ const common = {
   situacao: "0",
   dataReferencia: "",
   ultimaDataReferencia: "false",
-  dataEntregaDe: "",
-  dataEntregaAte: "",
+  dataEntregaDe: "01/01/2022",
+  dataEntregaAte: "31/12/2025",
   modalidadeEnvio: "0",
   palavraChave: "",
   d: "1",
@@ -112,6 +112,14 @@ async function probePost(name, params) {
   return summarize(name, "POST", url, response, text);
 }
 
+function inputSnapshot(html) {
+  return [...html.matchAll(/<input\b([^>]*)>/gi)].map((match) => {
+    const attrs = match[1];
+    const read = (name) => attrs.match(new RegExp(`${name}=["']([^"']*)["']`, "i"))?.[1] || null;
+    return { id: read("id"), name: read("name"), value: read("value"), type: read("type") };
+  }).filter((item) => item.id || item.name).slice(0, 80);
+}
+
 async function probeManagerHtml() {
   const url = new URL("/fnet/publico/pesquisarGerenciadorDocumentosCVM", ORIGIN);
   url.searchParams.set("paginaCertificados", "false");
@@ -128,19 +136,38 @@ async function probeManagerHtml() {
     contentType: response.headers.get("content-type"),
     bodyBytes: Buffer.byteLength(text, "utf8"),
     scriptSources: [...text.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((match) => match[1]).slice(-30),
-    containsDataEndpoint: text.includes("pesquisarGerenciadorDocumentosDados"),
-    endpointContext: text.includes("pesquisarGerenciadorDocumentosDados")
-      ? text.slice(Math.max(0, text.indexOf("pesquisarGerenciadorDocumentosDados") - 1000), text.indexOf("pesquisarGerenciadorDocumentosDados") + 2500)
-      : null,
+    inputs: inputSnapshot(text),
+    cnpjContext: text.includes(CNPJ) ? text.slice(Math.max(0, text.indexOf(CNPJ) - 1000), text.indexOf(CNPJ) + 1500) : null,
+  };
+}
+
+async function probeManagerScript() {
+  const url = new URL("/fnet/resources/js/paginas/publico/gerenciador-documentos-cvm.js", ORIGIN);
+  const { response, text } = await requestText(url, {
+    headers: { Accept: "application/javascript,text/javascript,*/*;q=0.1" },
+  });
+  const needles = ["pesquisarGerenciadorDocumentosDados", "ajax", "cnpjFundo", "idFundo", "serverSide"];
+  return {
+    name: "manager_javascript",
+    method: "GET",
+    url: url.toString(),
+    httpStatus: response.status,
+    contentType: response.headers.get("content-type"),
+    bodyBytes: Buffer.byteLength(text, "utf8"),
+    contexts: Object.fromEntries(needles.map((needle) => {
+      const index = text.indexOf(needle);
+      return [needle, index >= 0 ? text.slice(Math.max(0, index - 1800), index + 4500) : null];
+    })),
   };
 }
 
 const probes = [];
 for (const specification of [
+  { name: "manager_html", run: probeManagerHtml },
+  { name: "manager_javascript", run: probeManagerScript },
   { name: "get_complete_contract", run: () => probeGet("get_complete_contract", common) },
   { name: "post_complete_contract", run: () => probePost("post_complete_contract", common) },
   { name: "get_legacy_category", run: () => probeGet("get_legacy_category", { ...common, idCategoriaDocumento: "6", idTipoDocumento: "45" }) },
-  { name: "manager_html", run: probeManagerHtml },
 ]) {
   try {
     probes.push(await specification.run());
@@ -153,7 +180,7 @@ for (const specification of [
 }
 
 const result = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   generatedAt: new Date().toISOString(),
   source: "Fundos.NET público",
   cnpjProbe: CNPJ,
