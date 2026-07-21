@@ -1,5 +1,6 @@
 import { AutomaticDividendSeriesService } from "@/lib/risk-lab/AutomaticDividendSeriesService";
 import { dividendStressWindowEngine } from "@/lib/risk-lab/DividendStressWindowEngine";
+import { FnetDividendDocumentDiscovery } from "@/lib/risk-lab/FnetDividendDocumentDiscovery";
 import type {
   AutomaticDocumentEvidence,
   AutomaticMonthlySeries,
@@ -78,31 +79,110 @@ async function mapWithConcurrency<T, R>(
   return result;
 }
 
+function normalize(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+}
+
+function hasDividendDocument(documents: AutomaticDocumentEvidence[]) {
+  return documents.some((document) => {
+    const text = normalize(`${document.documentType} ${document.fileName}`);
+    return text.includes("RENDIMENTO")
+      || text.includes("AMORTIZACAO")
+      || text.includes("PAGAMENTO DE PROVENTO");
+  });
+}
+
+function digits(value: unknown) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+async function defaultResolveCnpj(ticker: string) {
+  const { regulatoryDataService } = await import("@/lib/regulatoryDataService");
+  const fund = await regulatoryDataService.getByTicker(ticker, { bypassCache: true });
+  if (!fund) return null;
+  const record = fund as unknown as Record<string, unknown>;
+  const cnpj = digits(record.cnpj || record.CNPJ || record.cnpjFundo || record.cnpj_fundo);
+  return cnpj.length === 14 ? cnpj : null;
+}
+
+function unavailable(message: string): AutomaticMonthlySeries {
+  return {
+    status: "blocked",
+    observations: [],
+    sources: [],
+    missingMonths: [],
+    conflicts: [message],
+    longestContiguousSequence: 0,
+    method: "unavailable",
+    detectorResult: null,
+    detectorExecuted: false,
+    classificationFinal: false,
+    limitation: "insufficient_structured_series",
+  };
+}
+
 export interface ConcurrentAutomaticDividendSeriesDependencies {
   base?: Pick<AutomaticDividendSeriesService, "build">;
+  discovery?: Pick<FnetDividendDocumentDiscovery, "discover">;
+  resolveCnpj?: (ticker: string) => Promise<string | null>;
   yearConcurrency?: number;
+  now?: () => Date;
 }
 
 /**
  * Mantém o mesmo parser e os mesmos gates do serviço FNET, mas processa
  * exercícios independentes em paralelo para caber na janela da função Vercel.
+ * Quando o catálogo eventual não contém avisos estruturados, descobre os IDs
+ * diretamente no gerenciador público do Fundos.NET, sem entrada manual.
  */
 export class ConcurrentAutomaticDividendSeriesService {
   private readonly base: Pick<AutomaticDividendSeriesService, "build">;
+  private readonly discovery: Pick<FnetDividendDocumentDiscovery, "discover">;
+  private readonly resolveCnpj: (ticker: string) => Promise<string | null>;
   private readonly yearConcurrency: number;
+  private readonly now: () => Date;
 
   constructor(dependencies: ConcurrentAutomaticDividendSeriesDependencies = {}) {
     this.base = dependencies.base || new AutomaticDividendSeriesService();
+    this.discovery = dependencies.discovery || new FnetDividendDocumentDiscovery();
+    this.resolveCnpj = dependencies.resolveCnpj || defaultResolveCnpj;
     this.yearConcurrency = Math.max(1, Math.min(4, dependencies.yearConcurrency || DEFAULT_YEAR_CONCURRENCY));
+    this.now = dependencies.now || (() => new Date());
+  }
+
+  private async resolveDocuments(ticker: string, documents: AutomaticDocumentEvidence[]) {
+    if (hasDividendDocument(documents)) return documents;
+    const years = [...new Set(documents.map((document) => document.sourceYear))]
+      .filter((year) => Number.isInteger(year) && year >= 2005)
+      .sort((left, right) => left - right);
+    if (!years.length) return documents;
+    const cnpj = await this.resolveCnpj(ticker);
+    if (!cnpj) throw new Error(`CNPJ não resolvido para descoberta de rendimentos de ${ticker}.`);
+    const today = this.now().toISOString().slice(0, 10);
+    const fromDate = `${years[0]}-01-01`;
+    const nominalUntil = `${years.at(-1)}-12-31`;
+    const untilDate = nominalUntil > today ? today : nominalUntil;
+    const result = await this.discovery.discover(cnpj, fromDate, untilDate);
+    if (!result.documents.length) {
+      throw new Error(`Fundos.NET não retornou avisos estruturados de rendimentos para ${ticker} entre ${fromDate} e ${untilDate}.`);
+    }
+    return result.documents;
   }
 
   async build(ticker: string, documents: AutomaticDocumentEvidence[]): Promise<AutomaticMonthlySeries> {
+    let resolvedDocuments: AutomaticDocumentEvidence[];
+    try {
+      resolvedDocuments = await this.resolveDocuments(ticker, documents);
+    } catch (error) {
+      return unavailable(error instanceof Error ? error.message : "Falha desconhecida na descoberta de rendimentos.");
+    }
+
     const byYear = new Map<number, AutomaticDocumentEvidence[]>();
-    for (const document of documents) {
+    for (const document of resolvedDocuments) {
       byYear.set(document.sourceYear, [...(byYear.get(document.sourceYear) || []), document]);
     }
     const years = [...byYear.keys()].sort((left, right) => left - right);
-    if (!years.length) return this.base.build(ticker, documents);
+    if (!years.length) return this.base.build(ticker, resolvedDocuments);
 
     const partials = await mapWithConcurrency(
       years,
