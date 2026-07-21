@@ -13,15 +13,38 @@ const MONTHS: Record<string, string> = {
   dezembro: "12",
 };
 
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  quot: '"',
+  apos: "'",
+  lt: "<",
+  gt: ">",
+  aacute: "á",
+  agrave: "à",
+  acirc: "â",
+  atilde: "ã",
+  eacute: "é",
+  ecirc: "ê",
+  iacute: "í",
+  oacute: "ó",
+  ocirc: "ô",
+  otilde: "õ",
+  uacute: "ú",
+  ccedil: "ç",
+  ldquo: "“",
+  rdquo: "”",
+  lsquo: "‘",
+  rsquo: "’",
+  ndash: "–",
+  mdash: "—",
+};
+
 function decodeHtml(value: string) {
   return value
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&([a-z]+);/gi, (entity, name) => NAMED_ENTITIES[String(name).toLowerCase()] ?? entity);
 }
 
 function cleanCell(value: string) {
@@ -63,9 +86,9 @@ function parseBrazilianDate(value: string) {
 }
 
 function parseDelivery(value: string) {
-  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})$/);
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
   if (!match) throw new Error(`Data de entrega FNET inválida: ${value}`);
-  return `${match[3]}-${match[2]}-${match[1]}T${match[4]}:${match[5]}:00-03:00`;
+  return `${match[3]}-${match[2]}-${match[1]}T${match[4]}:${match[5]}:${match[6] || "00"}-03:00`;
 }
 
 function parseAmount(value: string) {
