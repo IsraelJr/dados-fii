@@ -74,6 +74,31 @@ test("parser deriva rendimento por cota com hash, versão e Data_Entrega oficiai
   assert.equal(result.observations[0].source.protocolVersion, 1);
 });
 
+test("revisão futura não substitui a versão conhecida na data simulada", () => {
+  const archive = parseCvmMonthlyArchive(
+    2023,
+    "https://dados.cvm.gov.br/inf_mensal_fii_2023.zip",
+    archiveZip(2023, [
+      { month: 1, amount: 1.2, version: 1, deliveredAt: "2023-01-15 18:00:00" },
+      { month: 1, amount: 0.5, version: 2, deliveredAt: "2024-01-10 12:00:00" },
+    ]),
+  );
+  const result = deriveCvmMonthlyYear(
+    "KNCR11",
+    CNPJ_DIGITS,
+    archive,
+    "2023-01-01",
+    "2023-12-31",
+    "2026-07-21T12:00:00-03:00",
+  );
+
+  assert.equal(result.conflicts.length, 0);
+  assert.equal(result.observations.length, 1);
+  assert.equal(result.observations[0].amountPerShare, 1.2);
+  assert.equal(result.observations[0].source.protocolVersion, 1);
+  assert.equal(result.observations[0].source.sourceVersion, "inf_mensal_fii_2023.zip:v1");
+});
+
 test("Data_Entrega posterior à janela simulada é excluída sem virar zero", () => {
   const archive = parseCvmMonthlyArchive(
     2023,
