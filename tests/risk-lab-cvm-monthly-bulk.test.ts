@@ -129,11 +129,12 @@ test("serviço anual usa cache e produz série pronta com doze competências", a
     month: index + 1,
     amount: index < 6 ? 1 : 0.9,
   })));
+  const body = zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength) as ArrayBuffer;
   let calls = 0;
   const service = new CvmMonthlyDividendSeriesService({
     fetchImpl: (async () => {
       calls += 1;
-      return new Response(zip, {
+      return new Response(body, {
         status: 200,
         headers: { "content-type": "application/zip" },
       });
