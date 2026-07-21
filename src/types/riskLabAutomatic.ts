@@ -107,7 +107,7 @@ export interface AutomaticMonthlySeries {
   missingMonths: string[];
   conflicts: string[];
   longestContiguousSequence: number;
-  method: "direct_declared_per_share" | "unavailable";
+  method: "direct_declared_per_share" | "official_monthly_liability_per_share" | "unavailable";
   detectorResult: DividendStressWindow | null;
   detectorExecuted: boolean;
   creditEventScreen?: AutomaticCreditEventScreen | null;
