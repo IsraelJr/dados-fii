@@ -40,11 +40,17 @@ const NAMED_ENTITIES: Record<string, string> = {
   mdash: "—",
 };
 
+function decodeNamedEntity(entity: string, rawName: string) {
+  const decoded = NAMED_ENTITIES[rawName.toLowerCase()];
+  if (!decoded) return entity;
+  return /^[A-Z]/.test(rawName) && decoded.length === 1 ? decoded.toUpperCase() : decoded;
+}
+
 function decodeHtml(value: string) {
   return value
     .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-    .replace(/&([a-z]+);/gi, (entity, name) => NAMED_ENTITIES[String(name).toLowerCase()] ?? entity);
+    .replace(/&([a-z]+);/gi, decodeNamedEntity);
 }
 
 function cleanCell(value: string) {
