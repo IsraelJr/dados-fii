@@ -31,13 +31,14 @@ const numericReferenceNotice = table([
   ["Rendimento isento de IR*", "Sim"],
 ]);
 
-const noticeWithoutInformationDate = table([
-  ["Nome do Fundo:", "KINEA RENDIMENTOS IMOBILIÁRIOS FUNDO DE INVESTIMENTO IMOBILIÁRIO - FII"],
-  ["Código de negociação:", "KNCR11"],
-  ["Data-base (último dia de negociação “com” direito ao provento)", "31/08/2023"],
-  ["Valor do provento (R$/unidade)", "1,20"],
+const entityEncodedNotice = table([
+  ["Nome do Fundo:", "KINEA RENDIMENTOS IMOBILIARIOS FUNDO DE INVESTIMENTO IMOBILIARIO - FII"],
+  ["Data da Informa&ccedil;&atilde;o:", "31/08/2023"],
+  ["C&oacute;digo de negocia&ccedil;&atilde;o:", "KNCR11"],
+  ["Data-base (&uacute;ltimo dia de negocia&ccedil;&atilde;o &ldquo;com&rdquo; direito ao provento)", "31/08/2023"],
+  ["Valor do provento (R$/unidade)", "1,2"],
   ["Data do pagamento", "14/09/2023"],
-  ["Período de referência", "Agosto-2023"],
+  ["Per&iacute;odo de refer&ecirc;ncia", "AGOSTO 2023"],
   ["Rendimento isento de IR*", "Sim"],
 ]);
 
@@ -57,6 +58,13 @@ const protocol = table([
   ["Versão", "1"],
   ["Data de Referência", "10/07/2026"],
   ["Data de Entrega", "10/07/2026 18:04"],
+]);
+
+const encodedProtocol = table([
+  ["Identifica&ccedil;&atilde;o do Documento", "Aviso aos Cotistas - Estruturado - Rendimentos e Amortiza&ccedil;&otilde;es"],
+  ["Vers&atilde;o", "1"],
+  ["Data de Refer&ecirc;ncia", "31/08/2023"],
+  ["Data de Entrega", "31/08/2023 17:25"],
 ]);
 
 const proventProtocol = table([
@@ -84,8 +92,8 @@ test("interpreta período de referência numérico usado pelo FNET", () => {
   assert.equal(parsed.competenceMonth, "2026-03");
 });
 
-test("usa a data-base quando aviso estruturado omite Data da Informação", () => {
-  const parsed = parseFnetDividendNoticeHtml(noticeWithoutInformationDate);
+test("decodifica entidades HTML reais dos avisos Fundos.NET", () => {
+  const parsed = parseFnetDividendNoticeHtml(entityEncodedNotice);
   assert.equal(parsed.ticker, "KNCR11");
   assert.equal(parsed.informationDate, "2023-08-31");
   assert.equal(parsed.baseDate, "2023-08-31");
@@ -107,6 +115,13 @@ test("protocolo fornece horário exato da primeira entrega pública", () => {
   assert.equal(parsed.version, 1);
 });
 
+test("decodifica entidades HTML reais do protocolo Fundos.NET", () => {
+  const parsed = parseFnetProtocolHtml(encodedProtocol);
+  assert.equal(parsed.referenceDate, "2023-08-31");
+  assert.equal(parsed.deliveredAt, "2023-08-31T17:25:00-03:00");
+  assert.equal(parsed.version, 1);
+});
+
 test("aceita protocolo atual de pagamento de proventos", () => {
   const parsed = parseFnetProtocolHtml(proventProtocol);
   assert.equal(parsed.referenceDate, "2026-03-31");
@@ -124,12 +139,17 @@ test("rejeita documento que não é aviso estruturado de rendimentos", () => {
   assert.throws(() => parseFnetProtocolHtml(invalid), /não é aviso estruturado de rendimentos/);
 });
 
-test("não inventa data quando aviso omite Data da Informação e Data-base", () => {
-  const invalid = noticeWithoutInformationDate.replace(
+test("mantém Data da Informação e Data-base obrigatórias", () => {
+  const withoutInformation = entityEncodedNotice.replace(
+    /<tr><td>Data da Informa&ccedil;&atilde;o:[\s\S]*?<\/tr>/,
+    "",
+  );
+  const withoutBase = entityEncodedNotice.replace(
     /<tr><td>Data-base[\s\S]*?<\/tr>/,
     "",
   );
-  assert.throws(() => parseFnetDividendNoticeHtml(invalid), /Campo FNET ausente: Data-base/);
+  assert.throws(() => parseFnetDividendNoticeHtml(withoutInformation), /Campo FNET ausente: Data da Informação/);
+  assert.throws(() => parseFnetDividendNoticeHtml(withoutBase), /Campo FNET ausente: Data-base/);
 });
 
 test("rejeita valor de provento inválido", () => {
