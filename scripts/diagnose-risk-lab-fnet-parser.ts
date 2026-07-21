@@ -35,7 +35,7 @@ function cookieFrom(response: Response) {
 async function request(
   url: URL,
   accept = "application/json,text/plain;q=0.9,*/*;q=0.1",
-  timeoutMs = 90_000,
+  timeoutMs = 75_000,
 ) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -47,7 +47,7 @@ async function request(
       headers: {
         Accept: accept,
         Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.4)",
+        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.5)",
         "X-Requested-With": "XMLHttpRequest",
         ...(sessionCookie ? { Cookie: sessionCookie } : {}),
       },
@@ -56,7 +56,7 @@ async function request(
     if (discoveredCookie) sessionCookie = discoveredCookie;
     const text = await response.text();
     let json: unknown = null;
-    try { json = JSON.parse(text); } catch { /* exposto no retorno */ }
+    try { json = JSON.parse(text); } catch { /* diagnóstico abaixo */ }
     return {
       requestedUrl: url.toString(),
       httpStatus: response.status,
@@ -65,33 +65,47 @@ async function request(
       bytes: Buffer.byteLength(text, "utf8"),
       hasSessionCookie: Boolean(sessionCookie),
       json,
-      textSample: json === null ? text.slice(0, 2500) : null,
+      textSample: json === null ? text.slice(0, 1800) : null,
     };
   } finally {
     clearTimeout(timer);
   }
 }
 
-function optionRows(payload: unknown): Array<{ id: string; text: string }> {
-  const record = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
-  const values = Array.isArray(payload)
-    ? payload
-    : Array.isArray(record.results)
-      ? record.results
-      : Array.isArray(record.data)
-        ? record.data
-        : [];
-  return values.flatMap((item) => {
-    if (!item || typeof item !== "object") return [];
-    const row = item as Record<string, unknown>;
-    const id = String(row.id || row.value || "").trim();
-    const text = String(row.text || row.label || row.nome || row.descricao || "").trim();
-    return /^\d{1,12}$/.test(id) ? [{ id, text }] : [];
-  });
+function payloadRecord(value: unknown) {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
 }
 
-function normalize(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+function rowsFrom(value: unknown) {
+  const payload = payloadRecord(value);
+  return Array.isArray(payload.data) ? payload.data as Record<string, unknown>[] : [];
+}
+
+function documentUrl(parameters: Record<string, string>) {
+  const url = new URL("/fnet/publico/pesquisarGerenciadorDocumentosDados", ORIGIN);
+  const common = {
+    paginaCertificados: "false",
+    tipoFundo: "1",
+    administrador: "",
+    idFundo: "",
+    idCategoriaDocumento: "0",
+    idTipoDocumento: "0",
+    idEspecieDocumento: "0",
+    situacao: "",
+    dataReferencia: "",
+    ultimaDataReferencia: "false",
+    dataInicial: "01/01/2022",
+    dataFinal: "31/12/2025",
+    idModalidade: "",
+    palavraChave: "",
+    isSession: "false",
+    d: "1",
+    s: "0",
+    l: "500",
+    ...parameters,
+  };
+  for (const [key, value] of Object.entries(common)) url.searchParams.set(key, value);
+  return url;
 }
 
 async function inspectHtml(documentId: string, protocol = false) {
@@ -108,7 +122,7 @@ async function inspectHtml(documentId: string, protocol = false) {
 }
 
 let result: Record<string, unknown> = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
@@ -120,82 +134,65 @@ try {
   manager.searchParams.set("paginaCertificados", "false");
   manager.searchParams.set("tipoFundo", "1");
   manager.searchParams.set("cnpjFundo", CNPJ_FORMATTED);
-  const bootstrap = await request(manager, "text/html,application/xhtml+xml", 120_000);
-  if (bootstrap.httpStatus !== 200) throw new Error(`Gerenciador respondeu HTTP ${bootstrap.httpStatus}.`);
-
-  result = { ...result, stage: "list-funds", bootstrap };
-  const searches = [];
-  const options = new Map<string, { id: string; text: string }>();
-  for (const term of [CNPJ_FORMATTED, TICKER]) {
-    const url = new URL("/fnet/publico/listarFundos", ORIGIN);
-    for (const [key, value] of Object.entries({
-      term,
-      page: "1",
-      idTipoFundo: "1",
-      idAdm: "0",
-      paraCerts: "false",
-    })) url.searchParams.set(key, value);
-    try {
-      const response = await request(url, undefined, 120_000);
-      const rows = optionRows(response.json);
-      rows.forEach((row) => options.set(row.id, row));
-      searches.push({ term, response, rows });
-    } catch (error) {
-      searches.push({ term, error: errorRecord(error), rows: [] });
-    }
+  let bootstrap: unknown = null;
+  try {
+    bootstrap = await request(manager, "text/html,application/xhtml+xml", 90_000);
+  } catch (error) {
+    bootstrap = { error: errorRecord(error) };
   }
 
-  const candidates = [...options.values()];
-  const selected = candidates.find((item) => normalize(item.text).includes(TICKER))
-    || candidates.find((item) => item.text.replace(/\D/g, "").includes(CNPJ));
-  if (!selected) throw new Error(`listarFundos não resolveu ${TICKER}/${CNPJ}; ${candidates.length} candidato(s).`);
+  result = { ...result, stage: "direct-filters", bootstrap };
+  const specifications = [
+    { name: "cnpjFundo_digits", params: { cnpjFundo: CNPJ } },
+    { name: "cnpjFundo_formatted", params: { cnpjFundo: CNPJ_FORMATTED } },
+    { name: "both_formatted", params: { cnpj: CNPJ_FORMATTED, cnpjFundo: CNPJ_FORMATTED } },
+    { name: "both_digits", params: { cnpj: CNPJ, cnpjFundo: CNPJ } },
+    { name: "keyword_ticker", params: { cnpjFundo: CNPJ, palavraChave: TICKER } },
+  ];
+  const probes = await Promise.all(specifications.map(async (specification) => {
+    try {
+      const response = await request(documentUrl(specification.params), undefined, 90_000);
+      const payload = payloadRecord(response.json);
+      const rows = rowsFrom(response.json);
+      const fundNames = [...new Set(rows.map((row) => String(row.descricaoFundo || "").trim()).filter(Boolean))];
+      const tradeNames = [...new Set(rows.map((row) => String(row.nomePregao || "").trim()).filter(Boolean))];
+      return {
+        name: specification.name,
+        response: {
+          requestedUrl: response.requestedUrl,
+          httpStatus: response.httpStatus,
+          contentType: response.contentType,
+          recordsTotal: Number(payload.recordsTotal ?? 0),
+          recordsFiltered: Number(payload.recordsFiltered ?? 0),
+          rowCount: rows.length,
+          fundNames: fundNames.slice(0, 10),
+          tradeNames: tradeNames.slice(0, 10),
+        },
+        rows,
+      };
+    } catch (error) {
+      return { name: specification.name, error: errorRecord(error), rows: [] as Record<string, unknown>[] };
+    }
+  }));
 
-  result = { ...result, stage: "documents", searches, candidates, selected };
-  const url = new URL("/fnet/publico/pesquisarGerenciadorDocumentosDados", ORIGIN);
-  const parameters = {
-    paginaCertificados: "false",
-    tipoFundo: "1",
-    administrador: "",
-    idFundo: selected.id,
-    idCategoriaDocumento: "0",
-    idTipoDocumento: "0",
-    idEspecieDocumento: "0",
-    situacao: "",
-    cnpj: CNPJ_FORMATTED,
-    cnpjFundo: CNPJ_FORMATTED,
-    dataReferencia: "",
-    ultimaDataReferencia: "false",
-    dataInicial: "01/01/2022",
-    dataFinal: "31/12/2025",
-    idModalidade: "",
-    palavraChave: "",
-    paginaCertificadosFlag: "false",
-    isSession: "false",
-    d: "1",
-    s: "0",
-    l: "500",
-  };
-  for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-  const documentResponse = await request(url, undefined, 120_000);
-  const payload = documentResponse.json && typeof documentResponse.json === "object"
-    ? documentResponse.json as Record<string, unknown>
-    : {};
-  const rows = Array.isArray(payload.data) ? payload.data as Record<string, unknown>[] : [];
-  const documents = mapFnetDividendRows(rows, FROM, UNTIL);
-  if (!documents.length) throw new Error(`Consulta filtrada retornou ${rows.length} linha(s), mas nenhum aviso de rendimento válido.`);
+  const selected = probes.find((probe) => {
+    const response = "response" in probe ? probe.response : null;
+    if (!response || response.recordsFiltered < 1 || response.recordsFiltered > 5_000) return false;
+    return probe.rows.some((row) => {
+      const searchable = `${row.nomePregao || ""} ${row.informacoesAdicionais || ""} ${row.descricaoFundo || ""}`.toUpperCase();
+      return searchable.includes("KINEA RENDIMENTOS") || searchable.includes("FII KINEA RI");
+    });
+  });
+  if (!selected) throw new Error("Nenhuma combinação direta de CNPJ restringiu a consulta ao KNCR11.");
 
+  const documents = mapFnetDividendRows(selected.rows, FROM, UNTIL);
+  if (!documents.length) throw new Error(`Filtro ${selected.name} retornou linhas do fundo, mas nenhum aviso estruturado válido.`);
   const latest = documents.slice(-4);
   result = {
     ...result,
     stage: "series",
-    documentResponse: {
-      requestedUrl: documentResponse.requestedUrl,
-      httpStatus: documentResponse.httpStatus,
-      contentType: documentResponse.contentType,
-      recordsTotal: payload.recordsTotal || null,
-      recordsFiltered: payload.recordsFiltered || null,
-      rowCount: rows.length,
-    },
+    probes: probes.map((probe) => ({ ...probe, rows: undefined })),
+    selectedFilter: selected.name,
     documentCount: documents.length,
     latest,
   };
