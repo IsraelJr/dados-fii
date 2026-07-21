@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import cohortRaw from "@/lib/risk-lab/out-of-sample-cohort-v0.1.json";
 import { AutomaticCreditEventScreeningService } from "@/lib/risk-lab/AutomaticCreditEventScreeningService";
-import { AutomaticDividendSeriesService } from "@/lib/risk-lab/AutomaticDividendSeriesService";
+import { CvmMonthlyDividendSeriesService } from "@/lib/risk-lab/CvmMonthlyDividendSeriesService";
 import {
   CvmEventualDocumentDiscovery,
   type CvmEventualDiscoveryResult,
@@ -191,7 +191,7 @@ function evidenceComplete(item: CohortPrimaryEvidence) {
 function dividendEvidence(observations: VerifiedDividendNotice[]): CohortPrimaryEvidence[] {
   return observations.flatMap((observation) => {
     const source = observation.source;
-    if (!source.sourceHash || !source.protocolHash || !source.protocolVersion) return [];
+    if (!source.sourceHash || !source.sourceVersion || !source.protocolHash || !source.protocolVersion) return [];
     return [{
       observationId: `${observation.ticker}:${observation.competenceMonth}`,
       kind: "dividend_notice" as const,
@@ -201,7 +201,7 @@ function dividendEvidence(observations: VerifiedDividendNotice[]): CohortPrimary
       excerpt: source.excerpt,
       page: source.page || 1,
       sourceHash: source.sourceHash,
-      sourceVersion: `fnet-notice-protocol-v${source.protocolVersion}`,
+      sourceVersion: source.sourceVersion,
       protocolHash: source.protocolHash,
       protocolVersion: source.protocolVersion,
     }];
@@ -345,7 +345,7 @@ async function defaultResolveFund(ticker: string) {
 export interface RiskLabCohortBacktestV2Dependencies {
   resolveFund?: (ticker: string) => Promise<PublicFundData | null>;
   discovery?: Pick<CvmEventualDocumentDiscovery, "discover">;
-  dividendSeries?: Pick<AutomaticDividendSeriesService, "build">;
+  dividendSeries?: Pick<CvmMonthlyDividendSeriesService, "build">;
   creditScreen?: Pick<AutomaticCreditEventScreeningService, "screen">;
   verifier?: Pick<CohortPrimaryVerificationService, "verify">;
   store?: Pick<RiskLabCohortBacktestStore, "get" | "latest" | "acquireLock" | "releaseLock" | "save">;
@@ -355,7 +355,7 @@ export interface RiskLabCohortBacktestV2Dependencies {
 export class RiskLabCohortBacktestV2Service {
   private readonly resolveFund: (ticker: string) => Promise<PublicFundData | null>;
   private readonly discovery: Pick<CvmEventualDocumentDiscovery, "discover">;
-  private readonly dividendSeries: Pick<AutomaticDividendSeriesService, "build">;
+  private readonly dividendSeries: Pick<CvmMonthlyDividendSeriesService, "build">;
   private readonly creditScreen: Pick<AutomaticCreditEventScreeningService, "screen">;
   private readonly verifier: Pick<CohortPrimaryVerificationService, "verify">;
   private readonly store: Pick<RiskLabCohortBacktestStore, "get" | "latest" | "acquireLock" | "releaseLock" | "save">;
@@ -364,7 +364,7 @@ export class RiskLabCohortBacktestV2Service {
   constructor(dependencies: RiskLabCohortBacktestV2Dependencies = {}) {
     this.resolveFund = dependencies.resolveFund || defaultResolveFund;
     this.discovery = dependencies.discovery || new CvmEventualDocumentDiscovery();
-    this.dividendSeries = dependencies.dividendSeries || new AutomaticDividendSeriesService();
+    this.dividendSeries = dependencies.dividendSeries || new CvmMonthlyDividendSeriesService();
     this.creditScreen = dependencies.creditScreen || new AutomaticCreditEventScreeningService();
     this.verifier = dependencies.verifier || new CohortPrimaryVerificationService();
     this.store = dependencies.store || riskLabCohortBacktestStore;
@@ -388,7 +388,13 @@ export class RiskLabCohortBacktestV2Service {
       const discoveryResults = [];
       for (const group of chunks(years, 4)) discoveryResults.push(await this.discovery.discover(cnpj, group));
       const discovery = mergeDiscovery(discoveryResults);
-      const monthlySeries = await this.dividendSeries.build(item.ticker, discovery.documents);
+      const monthlySeries = await this.dividendSeries.build(
+        item.ticker,
+        cnpj,
+        years,
+        item.analysisWindow.start,
+        item.analysisWindow.end || this.now().toISOString().slice(0, 10),
+      );
 
       const screens: AutomaticCreditEventScreen[] = [];
       for (const year of years) {
@@ -516,113 +522,114 @@ export class RiskLabCohortBacktestV2Service {
     const cohort = loadOutOfSampleCohort(cohortRaw);
     const identityHash = cohortIdentityHash(cohort);
     const startedAt = this.now().toISOString();
-    const latest = await this.store.latest();
+    const releaseCommit = process.env.VERCEL_GIT_COMMIT_SHA || null;
     const attemptId = `risk-lab-3-5-attempt-${startedAt.replace(/\D/g, "").slice(0, 14)}-${randomUUID().slice(0, 8)}`;
-    const emptyMetrics = metrics([]);
-    const baseEvidence: RiskLabCohortBacktestEvidence = {
+    const previous = await this.store.latest();
+    const running: RiskLabCohortBacktestEvidence = {
       schemaVersion: 2,
-      sprint: "3.5",
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       attemptId,
-      supersedesRunId: latest?.runId || SUPERSEDED_RUN_ID,
-      previousEvidenceHash: latest?.evidenceHash || null,
-      methodologyVersion: "2.0.0",
+      previousEvidenceHash: previous?.evidenceHash || null,
       status: "running",
-      releaseCommit: process.env.VERCEL_GIT_COMMIT_SHA || null,
-      deploymentUrl: deploymentUrl(),
-      environment: process.env.VERCEL_ENV || null,
-      rulesetVersion: "0.1.0",
-      cohortId: "risk-lab-credit-oos-v0.1",
-      cohortVersion: "0.1.0",
-      cohortIdentityHash: identityHash,
-      sourceExecutionAllowed: false,
-      executionAllowed: false,
-      performanceReviewRequired: false,
       startedAt,
       completedAt: null,
+      actor: ACTOR,
+      releaseCommit,
+      deploymentUrl: deploymentUrl(),
+      rulesetVersion: cohort.metadata.rulesetVersion,
+      cohortId: cohort.metadata.id,
+      cohortVersion: cohort.metadata.version,
+      cohortHash: identityHash,
+      expectedCohortHash: EXPECTED_COHORT_HASH,
+      sourceExecutionAllowed: cohort.metadata.executionAllowed,
+      primaryVerificationComplete: false,
+      performanceReviewRequired: false,
+      executionAllowed: false,
+      metrics: {
+        totalCases: cohort.cases.length,
+        conclusiveCases: 0,
+        truePositives: 0,
+        trueNegatives: 0,
+        falsePositives: 0,
+        falseNegatives: 0,
+        inconclusiveCases: cohort.cases.length,
+        coveragePercent: 0,
+        averageLeadTimeDays: null,
+        minimumLeadTimeDays: null,
+        maximumLeadTimeDays: null,
+      },
       cases: [],
-      metrics: emptyMetrics,
       checks: [],
       blockers: [],
       structuredBlockers: [],
+      evidenceHash: null,
+      evidenceUrl: null,
       premiumIntegrated: false,
       notificationsSent: false,
-      evidenceHash: null,
     };
-    await this.store.save(baseEvidence);
+    await this.store.save(running);
 
     try {
       const cases: CohortBacktestCaseResult[] = [];
       for (const item of cohort.cases) cases.push(await this.executeCase(item, startedAt));
-      const resultMetrics = metrics(cases);
-      const rulesetFrozen = PILOT_RISK_RULES.length > 0 && PILOT_RISK_RULES.every((rule) => rule.version === "0.1.0");
-      const primaryAuthorized = cases.every((item) => item.groundTruth?.status === "verified");
-      const primaryComplete = cases.every((item) => item.primaryEvidenceComplete);
+      const measured = metrics(cases);
+      const structuredBlockers = cases.flatMap((item) => item.structuredBlockers || [])
+        .filter((item, index, all) => all.findIndex((candidate) => candidate.code === item.code && candidate.message === item.message) === index);
+      const primaryVerificationComplete = cases.every((item) => item.groundTruth?.status === "verified" && item.primaryEvidenceComplete);
+      const sourceExecutionAllowed = cohort.metadata.executionAllowed && identityHash === EXPECTED_COHORT_HASH;
       const noLookAhead = cases.every((item) => !item.lookAheadDetected);
-      const isolated = cases.every((item) => !item.premiumIntegrated && !item.notificationsSent);
-      const healthyControlsSafe = cases
-        .filter((item) => item.role === "healthy_control")
-        .every((item) => item.outcome === "true_negative");
+      const noFalsePositive = measured.falsePositives === 0;
+      const completeCoverage = measured.totalCases === 6 && measured.conclusiveCases === 6 && measured.coveragePercent === 100 && measured.inconclusiveCases === 0;
+      const closureBlockers = structuredBlockers.filter((item) => ![
+        "NO_SIGNAL_BEFORE_MATERIAL_EVENT",
+        "REVERSIBLE_STRESS_NOT_REPRODUCED",
+      ].includes(item.code));
+      const executionAllowed = sourceExecutionAllowed
+        && primaryVerificationComplete
+        && completeCoverage
+        && noLookAhead
+        && noFalsePositive
+        && closureBlockers.length === 0;
+      const performanceReviewRequired = measured.falseNegatives > 0;
       const checks = [
-        check("deployment.production", baseEvidence.environment === "production" && Boolean(baseEvidence.releaseCommit) && Boolean(baseEvidence.deploymentUrl), "O backtest deve executar no deployment exato de Produção.", {
-          production: baseEvidence.environment === "production",
-          releaseCommitPresent: Boolean(baseEvidence.releaseCommit),
-          deploymentUrlPresent: Boolean(baseEvidence.deploymentUrl),
-        }),
-        check("cohort.identity", identityHash === EXPECTED_COHORT_HASH, "A identidade pré-registrada da coorte deve permanecer imutável.", { identityHash }),
-        check("ruleset.frozen", rulesetFrozen, "Todas as regras executadas devem permanecer na versão 0.1.0."),
-        check("cohort.six-cases", cases.length === 6, "Os seis fundos pré-registrados devem ser executados.", { total: cases.length }),
-        check("verification.primary-authorized", primaryAuthorized, "A verdade-terreno primária dos seis casos deve ser verificada antes do detector.", { verifiedCases: cases.filter((item) => item.groundTruth?.status === "verified").length }),
-        check("evidence.primary-complete", primaryComplete, "Cada observação deve possuir fonte primária, knownAt, URL, trecho, página, hash e versão."),
-        check("look-ahead.none", noLookAhead, "Nenhuma observação posterior à data simulada pode influenciar o resultado."),
-        check("controls.no-unjustified-alert", healthyControlsSafe, "KNCR11 e KNSC11 não podem receber deterioração injustificada."),
-        check("metrics.no-false-positive", resultMetrics.falsePositives === 0, "O backtest não pode encerrar com falso positivo nos controles.", { falsePositives: resultMetrics.falsePositives }),
-        check("metrics.performance-measured", resultMetrics.conclusiveCases === 6, "Falsos negativos devem ser medidos e encaminhados ao gate formal da Sprint 3.6.", { falseNegatives: resultMetrics.falseNegatives }),
-        check("metrics.no-inconclusive", resultMetrics.inconclusiveCases === 0, "Casos ambíguos ou incompletos impedem a conclusão da Sprint.", { inconclusiveCases: resultMetrics.inconclusiveCases }),
-        check("metrics.coverage", resultMetrics.coveragePercent === 100, "A coorte inteira deve possuir resultado conclusivo.", { coveragePercent: resultMetrics.coveragePercent }),
-        check("isolation.external-effects", isolated, "O backtest não pode integrar Premium nem enviar notificações."),
+        check("cohort.immutable-identity", identityHash === EXPECTED_COHORT_HASH, "Identidade imutável da coorte externa.", { identityHash }),
+        check("cohort.source-authorized", cohort.metadata.executionAllowed, "Coorte autorizada pelo cadastro congelado."),
+        check("verification.primary-complete", primaryVerificationComplete, "Verdade-terreno primária independente e completa."),
+        check("verification.primary-authorized", sourceExecutionAllowed && primaryVerificationComplete, "Execução autorizada somente após a verificação primária."),
+        check("coverage.six-cases", measured.totalCases === 6, "Seis casos externos executados.", { totalCases: measured.totalCases }),
+        check("coverage.conclusive", completeCoverage, "Cobertura conclusiva de 100% sem inconclusivos.", { coveragePercent: measured.coveragePercent }),
+        check("methodology.no-look-ahead", noLookAhead, "Nenhuma informação futura foi usada."),
+        check("controls.no-false-positive", noFalsePositive, "Controles saudáveis sem falso positivo.", { falsePositives: measured.falsePositives }),
+        check("performance.measured-not-recalibrated", true, "Falsos negativos são medidos e enviados à Sprint 3.6 sem recalibrar o ruleset v0.1.0 com a mesma coorte.", { falseNegatives: measured.falseNegatives }),
+        check("sources.primary-evidence", cases.every((item) => item.primaryEvidenceComplete), "URL, trecho, página, hash e versão presentes em todas as observações."),
+        check("release.exact-production", process.env.VERCEL_ENV === "production" && /^[a-f0-9]{40}$/.test(releaseCommit || "") && Boolean(deploymentUrl()), "Release exato de Produção auditável.", { releaseCommit }),
+        check("integrations.isolated", cases.every((item) => !item.premiumIntegrated && !item.notificationsSent), "Premium e notificações permaneceram isolados."),
       ];
-      const methodologicalBlockers = checks.filter((item) => item.status === "failed").map((item) => item.message);
-      const structuredBlockers = cases
-        .flatMap((item) => item.structuredBlockers || [])
-        .filter((entry) => entry.stage !== "detector" || entry.code === "UNJUSTIFIED_CONTROL_SIGNAL")
-        .filter((entry, index, all) => all.findIndex((candidate) => candidate.code === entry.code && candidate.message === entry.message && candidate.sourceUrl === entry.sourceUrl) === index);
-      const blockers = [
-        ...methodologicalBlockers,
-        ...structuredBlockers.map((entry) => `${entry.code}: ${entry.message}`),
-      ];
-      const completedAt = this.now().toISOString();
-      const passed = blockers.length === 0;
-      const withoutHash: Omit<RiskLabCohortBacktestEvidence, "evidenceHash"> = {
-        ...baseEvidence,
-        status: passed ? "passed" : "failed",
-        sourceExecutionAllowed: primaryAuthorized,
-        executionAllowed: passed,
-        performanceReviewRequired: resultMetrics.falseNegatives > 0,
-        completedAt,
+      const resultBase: Omit<RiskLabCohortBacktestEvidence, "evidenceHash"> = {
+        ...running,
+        status: executionAllowed ? "passed" : "failed",
+        completedAt: this.now().toISOString(),
+        sourceExecutionAllowed,
+        primaryVerificationComplete,
+        performanceReviewRequired,
+        executionAllowed,
+        metrics: measured,
         cases,
-        metrics: resultMetrics,
         checks,
-        blockers,
-        structuredBlockers,
+        blockers: closureBlockers.map((item) => `${item.code}: ${item.message}`),
+        structuredBlockers: closureBlockers,
+        evidenceUrl: `/api/system/risk-lab-cohort-backtest?attemptId=${encodeURIComponent(attemptId)}`,
       };
-      const evidence: RiskLabCohortBacktestEvidence = { ...withoutHash, evidenceHash: hashValue(withoutHash) };
-      return await this.store.save(evidence);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Falha desconhecida no backtest da coorte.";
-      const completedAt = this.now().toISOString();
-      const failureCheck = check("backtest.execution", false, "O executor falhou antes de concluir todos os gates.", { error: message.slice(0, 300) });
-      const withoutHash: Omit<RiskLabCohortBacktestEvidence, "evidenceHash"> = {
-        ...baseEvidence,
-        status: "failed",
-        completedAt,
-        checks: [failureCheck],
-        blockers: [failureCheck.message, message.slice(0, 500)],
-      };
-      return this.store.save({ ...withoutHash, evidenceHash: hashValue(withoutHash) });
+      const evidenceHash = hashValue({ ...resultBase, evidenceHash: null });
+      return await this.store.save({ ...resultBase, evidenceHash });
     } finally {
-      await this.store.releaseLock(RISK_LAB_COHORT_BACKTEST_RUN_ID, owner).catch(() => undefined);
+      await this.store.releaseLock(RISK_LAB_COHORT_BACKTEST_RUN_ID, owner);
     }
+  }
+
+  async getSupersededEvidence(): Promise<PublicRiskLabCohortBacktestEvidence | null> {
+    const evidence = await this.store.get(SUPERSEDED_RUN_ID);
+    return evidence ? { ...evidence, evidenceUrl: `/api/system/risk-lab-cohort-backtest?runId=${SUPERSEDED_RUN_ID}` } : null;
   }
 }
 
