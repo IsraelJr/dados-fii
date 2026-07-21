@@ -29,6 +29,7 @@ jobs:
         run: node scripts/probe-fnet-discovery.mjs
 
       - name: Upload sanitized probe
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fnet-discovery-probe
