@@ -4,11 +4,174 @@
   "datasetVersion": "0.1.0",
   "collectorVersion": "1.0.0",
   "status": "pending",
-  "generatedAt": null,
-  "releaseCommit": null,
+  "generatedAt": "2026-07-21T23:58:54.953Z",
+  "releaseCommit": "9c96b701e311de68e56357c5fc46000a3a304014",
   "cohortId": "risk-lab-credit-oos-v0.1",
   "cohortVersion": "0.1.0",
   "rulesetVersion": "0.1.0",
-  "cases": [],
-  "datasetHash": null
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "cnpj": "37087810000137",
+      "role": "severe_deterioration",
+      "fromDate": "2021-01-01",
+      "untilDate": "2026-07-21",
+      "status": "incomplete",
+      "documentsDiscovered": 1,
+      "documentsProcessed": 0,
+      "pendingDocumentIds": [
+        "DISCOVERY"
+      ],
+      "failures": [
+        {
+          "documentId": "DISCOVERY",
+          "message": "Fundos.NET não resolveu um idFundo único para o CNPJ consultado (0 candidato(s)).",
+          "attempts": 1,
+          "retryable": false,
+          "lastAttemptAt": "2026-07-21T23:58:06.691Z"
+        }
+      ],
+      "conflicts": [],
+      "missingMonths": [],
+      "longestContiguousSequence": 0,
+      "observations": [],
+      "caseHash": "65ac7bdb7753f1ceb4517108cf136020d16d63854d786074f55d5bbc831c385b"
+    },
+    {
+      "ticker": "VSLH11",
+      "cnpj": "36244015000142",
+      "role": "severe_deterioration",
+      "fromDate": "2021-01-01",
+      "untilDate": "2026-07-21",
+      "status": "incomplete",
+      "documentsDiscovered": 1,
+      "documentsProcessed": 0,
+      "pendingDocumentIds": [
+        "DISCOVERY"
+      ],
+      "failures": [
+        {
+          "documentId": "DISCOVERY",
+          "message": "Fundos.NET não resolveu um idFundo único para o CNPJ consultado (0 candidato(s)).",
+          "attempts": 1,
+          "retryable": false,
+          "lastAttemptAt": "2026-07-21T23:58:07.346Z"
+        }
+      ],
+      "conflicts": [],
+      "missingMonths": [],
+      "longestContiguousSequence": 0,
+      "observations": [],
+      "caseHash": "c86d58324254b227da3130f045711220d424ba1f42a72977e030ae561a58b4e9"
+    },
+    {
+      "ticker": "KNCR11",
+      "cnpj": "16706958000132",
+      "role": "healthy_control",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "status": "incomplete",
+      "documentsDiscovered": 1,
+      "documentsProcessed": 0,
+      "pendingDocumentIds": [
+        "DISCOVERY"
+      ],
+      "failures": [
+        {
+          "documentId": "DISCOVERY",
+          "message": "Fundos.NET não resolveu um idFundo único para o CNPJ consultado (0 candidato(s)).",
+          "attempts": 1,
+          "retryable": false,
+          "lastAttemptAt": "2026-07-21T23:58:07.999Z"
+        }
+      ],
+      "conflicts": [],
+      "missingMonths": [],
+      "longestContiguousSequence": 0,
+      "observations": [],
+      "caseHash": "f94d9281e30e86fe2a94d914bab3e0a594e8b146a5d89415f0fe9aaecf7e8389"
+    },
+    {
+      "ticker": "KNSC11",
+      "cnpj": "35864448000138",
+      "role": "healthy_control",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "status": "incomplete",
+      "documentsDiscovered": 1,
+      "documentsProcessed": 0,
+      "pendingDocumentIds": [
+        "DISCOVERY"
+      ],
+      "failures": [
+        {
+          "documentId": "DISCOVERY",
+          "message": "Fundos.NET não resolveu um idFundo único para o CNPJ consultado (0 candidato(s)).",
+          "attempts": 1,
+          "retryable": false,
+          "lastAttemptAt": "2026-07-21T23:58:08.641Z"
+        }
+      ],
+      "conflicts": [],
+      "missingMonths": [],
+      "longestContiguousSequence": 0,
+      "observations": [],
+      "caseHash": "538e44c14cb9be2d17c197876f5ea0a699a235c0af838db8ed840086e25b7b71"
+    },
+    {
+      "ticker": "MCCI11",
+      "cnpj": "23648935000184",
+      "role": "reversible_stress",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "status": "incomplete",
+      "documentsDiscovered": 1,
+      "documentsProcessed": 0,
+      "pendingDocumentIds": [
+        "DISCOVERY"
+      ],
+      "failures": [
+        {
+          "documentId": "DISCOVERY",
+          "message": "Fundos.NET não resolveu um idFundo único para o CNPJ consultado (0 candidato(s)).",
+          "attempts": 1,
+          "retryable": false,
+          "lastAttemptAt": "2026-07-21T23:58:54.300Z"
+        }
+      ],
+      "conflicts": [],
+      "missingMonths": [],
+      "longestContiguousSequence": 0,
+      "observations": [],
+      "caseHash": "f7e6fc07d03c8461e73438e50aa3004c99be3259d0ff1c2f05d861e4c1fa3541"
+    },
+    {
+      "ticker": "RBRY11",
+      "cnpj": "30166700000111",
+      "role": "reversible_stress",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "status": "incomplete",
+      "documentsDiscovered": 1,
+      "documentsProcessed": 0,
+      "pendingDocumentIds": [
+        "DISCOVERY"
+      ],
+      "failures": [
+        {
+          "documentId": "DISCOVERY",
+          "message": "Fundos.NET não resolveu um idFundo único para o CNPJ consultado (0 candidato(s)).",
+          "attempts": 1,
+          "retryable": false,
+          "lastAttemptAt": "2026-07-21T23:58:54.944Z"
+        }
+      ],
+      "conflicts": [],
+      "missingMonths": [],
+      "longestContiguousSequence": 0,
+      "observations": [],
+      "caseHash": "daa51d522fc37dd9e13b50e7ade606cc67223bf620777cfffe14b1a0c69e4bdf"
+    }
+  ],
+  "datasetHash": "cdc1051ae10ea769c3940a624a321c19816f7dbfb967b3134fca523c65b2ae0a"
 }
