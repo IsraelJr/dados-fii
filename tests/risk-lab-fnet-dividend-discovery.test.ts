@@ -16,6 +16,8 @@ function row(overrides: Record<string, unknown> = {}) {
     tipoDocumento: "Rendimentos e Amortizações",
     dataReferencia: "31/01/2022",
     dataEntrega: "31/01/2022 18:02",
+    descricaoFundo: "FUNDO GENÉRICO",
+    nomePregao: "FII GENERICO",
     descricaoStatus: "Ativo com visualização",
     descricaoModalidade: "Apresentação",
     situacaoDocumento: "A",
@@ -63,7 +65,7 @@ function monthlySeries(year: number): AutomaticMonthlySeries {
   };
 }
 
-test("resolve idFundo interno sem depender de ticker", () => {
+test("helper legado de idFundo permanece isolado e fail-closed", () => {
   const html = `<input name="paginaCertificados" value="false" type="hidden"><input id="20031" type="hidden"><input id="cnpj" name="cnpj" type="text">`;
   assert.equal(resolveFnetInternalFundId(html), "20031");
   assert.throws(() => resolveFnetInternalFundId("<input id='1' type='hidden'><input id='2' type='hidden'>"), /idFundo único/);
@@ -84,24 +86,26 @@ test("mapeia somente avisos estruturados válidos dentro da janela conhecida", (
   assert.match(documents[1].auditResult || "", /versão 2/);
 });
 
-test("descoberta usa idFundo mais CNPJ, pagina e preserva documentos oficiais", async () => {
+test("descoberta usa cnpjFundo, pagina em blocos de cem e não consulta o gerenciador", async () => {
   const calls: URL[] = [];
+  const allRows = Array.from({ length: 101 }, (_, index) => row({
+    id: 300000 + index,
+    dataReferencia: `${String(index % 12 + 1).padStart(2, "0")}/2022`,
+    dataEntrega: `${String(index % 27 + 1).padStart(2, "0")}/${String(index % 12 + 1).padStart(2, "0")}/2022 18:00`,
+  }));
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(String(input));
     calls.push(url);
-    if (url.pathname.endsWith("pesquisarGerenciadorDocumentosCVM")) {
-      return new Response(`<html><input id="20031" type="hidden"></html>`, {
-        status: 200,
-        headers: { "content-type": "text/html" },
-      });
-    }
-    assert.equal(url.searchParams.get("idFundo"), "20031");
+    assert.ok(url.pathname.endsWith("pesquisarGerenciadorDocumentosDados"));
+    assert.equal(url.searchParams.get("idFundo"), "");
+    assert.equal(url.searchParams.get("cnpjFundo"), "16706958000132");
     assert.equal(url.searchParams.get("cnpj"), "16.706.958/0001-32");
+    assert.equal(url.searchParams.get("l"), "100");
     assert.equal(url.searchParams.get("dataInicial"), "01/01/2022");
     assert.equal(url.searchParams.get("dataFinal"), "31/12/2025");
     const start = Number(url.searchParams.get("s"));
-    const data = start === 0 ? [row()] : [row({ id: 261399, dataReferencia: "28/02/2022", dataEntrega: "28/02/2022 18:00" })];
-    return Response.json({ data, draw: start === 0 ? 1 : 2, recordsFiltered: 2, recordsTotal: 2 });
+    const data = allRows.slice(start, start + 100);
+    return Response.json({ data, draw: Number(url.searchParams.get("d")), recordsFiltered: 101, recordsTotal: 101 });
   }) as typeof fetch;
 
   const result = await new FnetDividendDocumentDiscovery({ fetchImpl }).discover(
@@ -110,24 +114,58 @@ test("descoberta usa idFundo mais CNPJ, pagina e preserva documentos oficiais", 
     "2025-12-31",
   );
 
-  assert.equal(result.internalFundId, "20031");
-  assert.equal(result.recordsInspected, 2);
-  assert.deepEqual(result.documents.map((item) => item.documentId), ["261398", "261399"]);
-  assert.equal(calls.filter((url) => url.pathname.endsWith("pesquisarGerenciadorDocumentosDados")).length, 2);
+  assert.equal(result.internalFundId, null);
+  assert.equal(result.filterMode, "cnpjFundo");
+  assert.equal(result.recordsInspected, 101);
+  assert.equal(result.documents.length, 101);
+  assert.equal(calls.length, 2);
 });
 
-test("descoberta bloqueia endpoint que ignorou o filtro do fundo", async () => {
-  const fetchImpl = (async (input: string | URL | Request) => {
-    const url = new URL(String(input));
-    if (url.pathname.endsWith("pesquisarGerenciadorDocumentosCVM")) {
-      return new Response(`<input id="20031" type="hidden">`, { status: 200 });
-    }
-    return Response.json({ data: [row()], draw: 1, recordsFiltered: 164880, recordsTotal: 164880 });
-  }) as typeof fetch;
+test("descoberta bloqueia endpoint que ignorou o CNPJ e devolveu o universo global", async () => {
+  const fetchImpl = (async () => Response.json({
+    data: [row()],
+    draw: 1,
+    recordsFiltered: 164880,
+    recordsTotal: 164880,
+  })) as typeof fetch;
 
   await assert.rejects(
     () => new FnetDividendDocumentDiscovery({ fetchImpl }).discover("16706958000132", "2022-01-01", "2025-12-31"),
     /não ficou restrita ao fundo/,
+  );
+});
+
+test("descoberta bloqueia página repetida antes de entrar em loop", async () => {
+  const repeated = Array.from({ length: 100 }, (_, index) => row({ id: 400000 + index }));
+  const fetchImpl = (async () => Response.json({
+    data: repeated,
+    draw: 1,
+    recordsFiltered: 150,
+    recordsTotal: 150,
+  })) as typeof fetch;
+
+  await assert.rejects(
+    () => new FnetDividendDocumentDiscovery({ fetchImpl }).discover("16706958000132", "2022-01-01", "2025-12-31"),
+    /repetiu uma página/,
+  );
+});
+
+test("descoberta bloqueia alteração do total entre páginas", async () => {
+  let call = 0;
+  const first = Array.from({ length: 100 }, (_, index) => row({ id: 500000 + index }));
+  const fetchImpl = (async () => {
+    call += 1;
+    return Response.json({
+      data: call === 1 ? first : [row({ id: 600000 })],
+      draw: call,
+      recordsFiltered: call === 1 ? 101 : 102,
+      recordsTotal: call === 1 ? 101 : 102,
+    });
+  }) as typeof fetch;
+
+  await assert.rejects(
+    () => new FnetDividendDocumentDiscovery({ fetchImpl }).discover("16706958000132", "2022-01-01", "2025-12-31"),
+    /mudou durante a paginação/,
   );
 });
 
@@ -141,7 +179,8 @@ test("série concorrente descobre documentos quando o catálogo eventual não co
       async discover(...input) {
         discoveryInput = input;
         return {
-          internalFundId: "20031",
+          internalFundId: null,
+          filterMode: "cnpjFundo" as const,
           recordsInspected: 1,
           sourceUrl: "https://fnet.bmfbovespa.com.br",
           documents: [mapFnetDividendRows([row()], "2022-01-01", "2023-12-31")[0]],
@@ -163,12 +202,15 @@ test("série concorrente descobre documentos quando o catálogo eventual não co
   assert.equal(baseDocuments[0].documentId, "261398");
 });
 
-test("implementação é generalizada e não contém exceções da coorte", () => {
+test("implementação é generalizada e a execução ativa não depende de idFundo", () => {
   const discovery = readFileSync("src/lib/risk-lab/FnetDividendDocumentDiscovery.ts", "utf8");
   const concurrent = readFileSync("src/lib/risk-lab/ConcurrentAutomaticDividendSeriesService.ts", "utf8");
   for (const ticker of ["DEVA11", "VSLH11", "KNCR11", "KNSC11", "MCCI11", "RBRY11"]) {
     assert.doesNotMatch(discovery, new RegExp(ticker));
     assert.doesNotMatch(concurrent, new RegExp(ticker));
   }
+  const activeMethod = discovery.slice(discovery.indexOf("async discover("));
+  assert.match(activeMethod, /cnpjFundo/);
+  assert.doesNotMatch(activeMethod, /resolveFundId|pesquisarGerenciadorDocumentosCVM/);
   assert.doesNotMatch(`${discovery}\n${concurrent}`, /manual_document_review|approve\(|confirm\(/);
 });
