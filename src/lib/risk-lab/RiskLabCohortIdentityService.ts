@@ -13,17 +13,31 @@ export interface RiskLabCohortIdentity {
   untilDate: string;
 }
 
+export interface RiskLabCohortIdentityServiceDependencies {
+  resolveFund?: (ticker: string) => Promise<Record<string, unknown> | null>;
+}
+
+async function defaultResolveFund(ticker: string) {
+  const { regulatoryDataService } = await import("@/lib/regulatoryDataService");
+  const fund = await regulatoryDataService.getByTicker(ticker, { bypassCache: true });
+  return fund as unknown as Record<string, unknown> | null;
+}
+
 export class RiskLabCohortIdentityService {
+  private readonly resolveFund: (ticker: string) => Promise<Record<string, unknown> | null>;
+
+  constructor(dependencies: RiskLabCohortIdentityServiceDependencies = {}) {
+    this.resolveFund = dependencies.resolveFund || defaultResolveFund;
+  }
+
   async list(now = new Date()): Promise<RiskLabCohortIdentity[]> {
     const cohort = loadOutOfSampleCohort(cohortRaw);
-    const { regulatoryDataService } = await import("@/lib/regulatoryDataService");
     const identities: RiskLabCohortIdentity[] = [];
 
     for (const item of cohort.cases) {
-      const fund = await regulatoryDataService.getByTicker(item.ticker, { bypassCache: true });
+      const fund = await this.resolveFund(item.ticker);
       if (!fund) throw new Error(`Ticker ${item.ticker} ausente no catálogo oficial.`);
-      const record = fund as unknown as Record<string, unknown>;
-      const cnpj = digits(record.cnpj || record.CNPJ || record.cnpjFundo || record.cnpj_fundo);
+      const cnpj = digits(fund.cnpj || fund.CNPJ || fund.cnpjFundo || fund.cnpj_fundo);
       if (cnpj.length !== 14) throw new Error(`CNPJ inválido para ${item.ticker}.`);
       identities.push({
         ticker: item.ticker,
