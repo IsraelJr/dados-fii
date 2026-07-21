@@ -7,6 +7,16 @@ const TICKER = "KNCR11";
 const FROM = "2022-01-01";
 const UNTIL = "2025-12-31";
 const ORIGIN = "https://fnet.bmfbovespa.com.br";
+const OUTPUT = "risk-lab-fnet-parser-diagnostic.json";
+
+function errorRecord(error: unknown) {
+  return {
+    name: error instanceof Error ? error.name : null,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : null,
+    cause: error instanceof Error && error.cause ? String(error.cause) : null,
+  };
+}
 
 async function inspectUrl(url: string) {
   const controller = new AbortController();
@@ -18,7 +28,7 @@ async function inspectUrl(url: string) {
       signal: controller.signal,
       headers: {
         Accept: "text/html,application/xhtml+xml,*/*;q=0.1",
-        "User-Agent": "DadosFII-RiskLab-Diagnostic/1.0",
+        "User-Agent": "DadosFII-RiskLab-Diagnostic/1.1",
       },
     });
     const text = await response.text();
@@ -33,49 +43,61 @@ async function inspectUrl(url: string) {
       bodySample: text.slice(0, 1200),
     };
   } catch (error) {
-    return {
-      requestedUrl: url,
-      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-    };
+    return { requestedUrl: url, error: errorRecord(error) };
   } finally {
     clearTimeout(timer);
   }
 }
 
-const discovery = await new FnetDividendDocumentDiscovery().discover(CNPJ, FROM, UNTIL);
-const latest = discovery.documents.slice(-4);
-const series = await new AutomaticDividendSeriesService().build(TICKER, latest);
-const endpoints = [];
-for (const document of latest.slice(-2)) {
-  endpoints.push({
-    documentId: document.documentId,
-    notice: await inspectUrl(`${ORIGIN}/fnet/publico/exibirDocumento?cvm=true&id=${document.documentId}`),
-    protocol: await inspectUrl(`${ORIGIN}/fnet/publico/visualizarProtocoloDocumentoCVM?idDocumento=${document.documentId}`),
-  });
-}
-
-const result = {
-  schemaVersion: 1,
+let result: Record<string, unknown> = {
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
-  discovery: {
-    internalFundId: discovery.internalFundId,
-    recordsInspected: discovery.recordsInspected,
-    documentCount: discovery.documents.length,
-    sourceUrl: discovery.sourceUrl,
-    latestDocuments: latest,
-  },
-  series: {
-    status: series.status,
-    observationCount: series.observations.length,
-    longestContiguousSequence: series.longestContiguousSequence,
-    conflicts: series.conflicts,
-    sources: series.sources,
-    observations: series.observations,
-  },
-  endpoints,
+  stage: "discovery",
 };
 
-await writeFile("risk-lab-fnet-parser-diagnostic.json", `${JSON.stringify(result, null, 2)}\n`, "utf8");
+try {
+  const discovery = await new FnetDividendDocumentDiscovery().discover(CNPJ, FROM, UNTIL);
+  const latest = discovery.documents.slice(-4);
+  result = {
+    ...result,
+    stage: "series",
+    discovery: {
+      internalFundId: discovery.internalFundId,
+      recordsInspected: discovery.recordsInspected,
+      documentCount: discovery.documents.length,
+      sourceUrl: discovery.sourceUrl,
+      latestDocuments: latest,
+    },
+  };
+
+  const series = await new AutomaticDividendSeriesService().build(TICKER, latest);
+  const endpoints = [];
+  for (const document of latest.slice(-2)) {
+    endpoints.push({
+      documentId: document.documentId,
+      notice: await inspectUrl(`${ORIGIN}/fnet/publico/exibirDocumento?cvm=true&id=${document.documentId}`),
+      protocol: await inspectUrl(`${ORIGIN}/fnet/publico/visualizarProtocoloDocumentoCVM?idDocumento=${document.documentId}`),
+    });
+  }
+
+  result = {
+    ...result,
+    stage: "completed",
+    series: {
+      status: series.status,
+      observationCount: series.observations.length,
+      longestContiguousSequence: series.longestContiguousSequence,
+      conflicts: series.conflicts,
+      sources: series.sources,
+      observations: series.observations,
+    },
+    endpoints,
+  };
+} catch (error) {
+  result = { ...result, stage: `${String(result.stage)}_failed`, error: errorRecord(error) };
+}
+
+await writeFile(OUTPUT, `${JSON.stringify(result, null, 2)}\n`, "utf8");
 console.log(JSON.stringify(result, null, 2));
