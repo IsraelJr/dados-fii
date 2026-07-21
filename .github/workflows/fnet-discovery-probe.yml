@@ -1,0 +1,37 @@
+name: FNET Discovery Probe
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/fnet-discovery-probe.yml"
+      - "scripts/probe-fnet-discovery.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Probe public Fundos.NET discovery schema
+        run: node scripts/probe-fnet-discovery.mjs
+
+      - name: Upload sanitized probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: fnet-discovery-probe
+          path: fnet-discovery-probe.json
+          if-no-files-found: error
+          retention-days: 7
