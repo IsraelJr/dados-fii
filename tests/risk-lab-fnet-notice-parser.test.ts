@@ -31,6 +31,16 @@ const numericReferenceNotice = table([
   ["Rendimento isento de IR*", "Sim"],
 ]);
 
+const noticeWithoutInformationDate = table([
+  ["Nome do Fundo:", "KINEA RENDIMENTOS IMOBILIÁRIOS FUNDO DE INVESTIMENTO IMOBILIÁRIO - FII"],
+  ["Código de negociação:", "KNCR11"],
+  ["Data-base (último dia de negociação “com” direito ao provento)", "31/08/2023"],
+  ["Valor do provento (R$/unidade)", "1,20"],
+  ["Data do pagamento", "14/09/2023"],
+  ["Período de referência", "Agosto-2023"],
+  ["Rendimento isento de IR*", "Sim"],
+]);
+
 const legacyNotice = table([
   ["Nome do Fundo:", "FUNDO DE INVESTIMENTO IMOBILIÁRIO MAUÁ CAPITAL RECEBÍVEIS IMOBILIÁRIOS - FII"],
   ["Data da informação", "12/08/2020"],
@@ -74,6 +84,16 @@ test("interpreta período de referência numérico usado pelo FNET", () => {
   assert.equal(parsed.competenceMonth, "2026-03");
 });
 
+test("usa a data-base quando aviso estruturado omite Data da Informação", () => {
+  const parsed = parseFnetDividendNoticeHtml(noticeWithoutInformationDate);
+  assert.equal(parsed.ticker, "KNCR11");
+  assert.equal(parsed.informationDate, "2023-08-31");
+  assert.equal(parsed.baseDate, "2023-08-31");
+  assert.equal(parsed.paymentDate, "2023-09-14");
+  assert.equal(parsed.competenceMonth, "2023-08");
+  assert.equal(parsed.amountPerShare, 1.2);
+});
+
 test("interpreta formato legado sem inventar ano fora da data da informação", () => {
   const parsed = parseFnetDividendNoticeHtml(legacyNotice);
   assert.equal(parsed.amountPerShare, 0.6);
@@ -102,6 +122,14 @@ test("rejeita documento que não é aviso estruturado de rendimentos", () => {
     ["Data de Entrega", "10/07/2026 18:04"],
   ]);
   assert.throws(() => parseFnetProtocolHtml(invalid), /não é aviso estruturado de rendimentos/);
+});
+
+test("não inventa data quando aviso omite Data da Informação e Data-base", () => {
+  const invalid = noticeWithoutInformationDate.replace(
+    /<tr><td>Data-base[\s\S]*?<\/tr>/,
+    "",
+  );
+  assert.throws(() => parseFnetDividendNoticeHtml(invalid), /Campo FNET ausente: Data-base/);
 });
 
 test("rejeita valor de provento inválido", () => {
