@@ -21,6 +21,13 @@ function series(ticker: string): AutomaticMonthlySeries {
   };
 }
 
+function primarySeries(): AutomaticMonthlySeries {
+  return {
+    ...series("PRIMARY"),
+    method: "frozen_primary_declared_per_share",
+  };
+}
+
 test("adaptador usa CNPJ, anos e janela congelada do controle KNCR11", async () => {
   const calls: unknown[][] = [];
   const adapter = new CvmMonthlyCohortDividendSeriesAdapter({
@@ -90,9 +97,10 @@ test("ticker fora da coorte falha fechado antes de consultar qualquer fonte", as
   assert.equal(calls, 0);
 });
 
-test("serviço concorrente preserva contrato legado e delega ao lote oficial", async () => {
+test("serviço preserva a série primária congelada e usa o lote CVM apenas para reconciliação", async () => {
   let captured: unknown[] = [];
   const service = new ConcurrentAutomaticDividendSeriesService({
+    primary: { build: async () => primarySeries() },
     resolveCnpj: async () => "16706958000132",
     monthly: {
       async build(...args) {
@@ -105,7 +113,8 @@ test("serviço concorrente preserva contrato legado e delega ao lote oficial", a
   });
 
   const result = await service.build("KNSC11", []);
-  assert.equal(result.method, "official_monthly_liability_per_share");
+  assert.equal(result.method, "frozen_primary_declared_per_share");
+  assert.equal(result.reconciliation?.status, "available");
   assert.deepEqual(captured, [
     "KNSC11",
     "16706958000132",
@@ -115,13 +124,15 @@ test("serviço concorrente preserva contrato legado e delega ao lote oficial", a
   ]);
 });
 
-test("caminho crítico não usa scraping FNET, aprovação manual, Premium ou notificações", () => {
+test("caminho crítico não faz scraping em Produção, aprovação manual, Premium ou notificações", () => {
   const concurrent = readFileSync("src/lib/risk-lab/ConcurrentAutomaticDividendSeriesService.ts", "utf8");
   const adapter = readFileSync("src/lib/risk-lab/CvmMonthlyCohortDividendSeriesAdapter.ts", "utf8");
   const monthly = readFileSync("src/lib/risk-lab/CvmMonthlyDividendSeriesService.ts", "utf8");
   const source = `${concurrent}\n${adapter}\n${monthly}`;
 
-  assert.doesNotMatch(source, /fnet\.bmfbovespa|exibirDocumento|visualizarProtocolo/);
+  assert.match(concurrent, /FrozenDividendNoticeSeriesService/);
+  assert.match(concurrent, /reconciliação contábil auxiliar/);
+  assert.doesNotMatch(source, /exibirDocumento|visualizarProtocolo/);
   assert.doesNotMatch(source, /manual_document_review|confirm\(|approve\(|sendNotification|sendEmail|premiumIntegrated/);
   assert.match(source, /inf_mensal_fii_/);
   assert.match(source, /dados\.cvm\.gov\.br/);

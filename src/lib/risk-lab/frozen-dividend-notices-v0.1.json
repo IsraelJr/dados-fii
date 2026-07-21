@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "risk-lab-fnet-dividend-notices-v0.1",
+  "datasetVersion": "0.1.0",
+  "collectorVersion": "1.0.0",
+  "status": "pending",
+  "generatedAt": null,
+  "releaseCommit": null,
+  "cohortId": "risk-lab-credit-oos-v0.1",
+  "cohortVersion": "0.1.0",
+  "rulesetVersion": "0.1.0",
+  "cases": [],
+  "datasetHash": null
+}

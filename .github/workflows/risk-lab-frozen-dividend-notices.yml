@@ -1,0 +1,239 @@
+name: Sprint 3.5 Frozen Dividend Notices
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/risk-lab-frozen-dividend-notices.yml"
+      - "scripts/collect-risk-lab-dividend-notices.ts"
+      - "src/app/api/system/risk-lab-cohort-backtest/route.ts"
+      - "src/lib/risk-lab/FnetDividendDocumentDiscovery.ts"
+      - "src/lib/risk-lab/FnetDividendNoticeParser.ts"
+      - "src/lib/risk-lab/FrozenDividendDatasetIntegrity.ts"
+      - "src/lib/risk-lab/FrozenDividendNoticeCollector.ts"
+      - "src/lib/risk-lab/RiskLabCohortIdentityService.ts"
+      - "src/types/riskLabFrozenDividendDataset.ts"
+      - "tests/risk-lab-frozen-dividend-*.test.ts"
+      - "tests/risk-lab-frozen-dividend-*.test.mjs"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: risk-lab-frozen-dividend-notices
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      RUN_ID: risk-lab-3-5-20260720-v2
+      PRODUCTION_ORIGIN: https://dadosfii.com.br
+      OUTPUT_PATH: src/lib/risk-lab/frozen-dividend-notices-v0.1.json
+      CHECKPOINT_PATH: .tmp/risk-lab-dividend-notices-checkpoint.json
+      SUMMARY_PATH: docs/risk-lab/sprint-3-5-frozen-dividend-notices.md
+      CHECKPOINT_ARTIFACT: risk-lab-frozen-dividend-checkpoint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --silent
+
+      - name: Locate previous checkpoint
+        id: previous
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${CHECKPOINT_ARTIFACT}&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false) | select((.workflow_run.id | tostring) != env.GITHUB_RUN_ID) | .workflow_run.id] | .[0] // empty' || true)
+          echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore previous checkpoint
+        if: steps.previous.outputs.run_id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.CHECKPOINT_ARTIFACT }}
+          path: .checkpoint-restore
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.previous.outputs.run_id }}
+
+      - name: Normalize restored checkpoint
+        if: steps.previous.outputs.run_id != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$CHECKPOINT_PATH")"
+          restored=$(find .checkpoint-restore -type f -name 'risk-lab-dividend-notices-checkpoint.json' -print -quit || true)
+          if [[ -n "$restored" ]]; then
+            cp "$restored" "$CHECKPOINT_PATH"
+            echo "Checkpoint anterior restaurado de ${restored}."
+          fi
+
+      - name: Wait for exact production deployment and fetch identities
+        id: identities
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          base="${PRODUCTION_ORIGIN}/api/system/risk-lab-cohort-backtest?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}&action=identities"
+          ready=false
+          mkdir -p .tmp
+          for attempt in $(seq 1 20); do
+            echo "Identity attempt ${attempt}/20 for ${RELEASE_COMMIT}"
+            http_code=$(curl --silent --show-error --location --max-time 310 \
+              --output .tmp/risk-lab-cohort-identities.json --write-out "%{http_code}" \
+              "$base" || true)
+            release=$(jq -r '.releaseCommit // ""' .tmp/risk-lab-cohort-identities.json 2>/dev/null || true)
+            count=$(jq -r '.identities | length' .tmp/risk-lab-cohort-identities.json 2>/dev/null || echo 0)
+            if [[ "$http_code" == "200" && "$release" == "$RELEASE_COMMIT" && "$count" == "6" ]]; then
+              ready=true
+              break
+            fi
+            cat .tmp/risk-lab-cohort-identities.json || true
+            sleep 30
+          done
+          if [[ "$ready" != "true" ]]; then
+            echo "O deployment exato não expôs as seis identidades congeladas."
+            exit 1
+          fi
+          echo "endpoint=${base}" >> "$GITHUB_OUTPUT"
+
+      - name: Collect structured notices sequentially
+        id: collection
+        continue-on-error: true
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+          IDENTITIES_ENDPOINT: ${{ steps.identities.outputs.endpoint }}
+        run: |
+          set -o pipefail
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types \
+            scripts/collect-risk-lab-dividend-notices.ts 2>&1 | tee .tmp/risk-lab-frozen-dividend-collection.log
+
+      - name: Upload resumable checkpoint and collection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.CHECKPOINT_ARTIFACT }}
+          path: |
+            .tmp/risk-lab-dividend-notices-checkpoint.json
+            .tmp/risk-lab-cohort-identities.json
+            .tmp/risk-lab-frozen-dividend-collection.log
+            src/lib/risk-lab/frozen-dividend-notices-v0.1.json
+            docs/risk-lab/sprint-3-5-frozen-dividend-notices.md
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Validate complete dataset
+        id: validation
+        if: steps.collection.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          jq -e '
+            .schemaVersion == 1
+            and .datasetId == "risk-lab-fnet-dividend-notices-v0.1"
+            and .datasetVersion == "0.1.0"
+            and .status == "complete"
+            and (.releaseCommit == "${{ github.sha }}")
+            and (.cases | length == 6)
+            and ([.cases[] | select(.status != "complete" or (.pendingDocumentIds | length) != 0 or (.conflicts | length) != 0)] | length == 0)
+            and (.datasetHash | test("^[a-f0-9]{64}$"))
+          ' "$OUTPUT_PATH"
+          npm run typecheck
+          npm run test:risk-lab
+          npm run test:sprint2
+
+      - name: Prepare immutable dataset branch
+        if: always() && hashFiles('src/lib/risk-lab/frozen-dividend-notices-v0.1.json') != ''
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(jq -r '.status // "blocked"' "$OUTPUT_PATH")
+          dataset_hash=$(jq -r '.datasetHash // "none"' "$OUTPUT_PATH")
+          observations=$(jq '[.cases[].observations[]] | length' "$OUTPUT_PATH")
+          pending=$(jq '[.cases[].pendingDocumentIds[]] | length' "$OUTPUT_PATH")
+          branch="automation/sprint-3-5-frozen-dividends-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ "$status" == "complete" && "${{ steps.validation.outcome }}" == "success" ]]; then
+            title="data: congela avisos primários de dividendos da Sprint 3.5"
+          else
+            title="audit: registra coleta inconclusiva de dividendos da Sprint 3.5"
+          fi
+          cat > .tmp/risk-lab-frozen-dividend-pr-body.md <<BODY
+          ## Coleta automática fora da Vercel
+
+          - release: \`${{ github.sha }}\`
+          - status do dataset: \`${status}\`
+          - observações primárias: \`${observations}\`
+          - documentos pendentes: \`${pending}\`
+          - hash: \`${dataset_hash}\`
+          - validação completa: \`${{ steps.validation.outcome }}\`
+          - Premium integrado: \`false\`
+          - notificações enviadas: \`false\`
+
+          A coleta foi sequencial por fundo e documento, com retentativas, backoff, checkpoint reutilizável, validação de aviso/protocolo, exclusão temporal e hashes SHA-256. O ruleset \`v0.1.0\` não foi alterado.
+          BODY
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish immutable dataset branch
+        if: steps.prepare.outcome == 'success'
+        id: publish
+        shell: bash
+        env:
+          DATASET_BRANCH: ${{ steps.prepare.outputs.branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$DATASET_BRANCH"
+          git add -f "$OUTPUT_PATH" "$SUMMARY_PATH"
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração de dataset foi produzida."
+            exit 1
+          fi
+          git commit -m "data: versiona avisos primários congelados da Sprint 3.5"
+          git push --force-with-lease origin "HEAD:${DATASET_BRANCH}"
+
+      - name: Create dataset pull request
+        if: steps.publish.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATASET_BRANCH: ${{ steps.prepare.outputs.branch }}
+          DATASET_TITLE: ${{ steps.prepare.outputs.title }}
+        run: |
+          set -euo pipefail
+          existing=$(gh pr list --base main --head "$DATASET_BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [[ -n "$existing" ]]; then
+            echo "$existing"
+          else
+            gh pr create --base main --head "$DATASET_BRANCH" --title "$DATASET_TITLE" --body-file .tmp/risk-lab-frozen-dividend-pr-body.md
+          fi
+
+      - name: Enforce complete collection
+        if: steps.collection.outcome != 'success' || steps.validation.outcome != 'success'
+        run: exit 1
