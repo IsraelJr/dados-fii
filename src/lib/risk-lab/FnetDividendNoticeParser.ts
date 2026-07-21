@@ -48,11 +48,17 @@ function cells(html: string) {
     .filter(Boolean);
 }
 
-function field(allCells: string[], labels: string[]) {
+function optionalField(allCells: string[], labels: string[]) {
   const normalizedLabels = labels.map(normalize);
   for (let index = 0; index < allCells.length - 1; index += 1) {
     if (normalizedLabels.includes(normalize(allCells[index]))) return allCells[index + 1];
   }
+  return null;
+}
+
+function field(allCells: string[], labels: string[]) {
+  const value = optionalField(allCells, labels);
+  if (value !== null) return value;
   throw new Error(`Campo FNET ausente: ${labels[0]}`);
 }
 
@@ -135,7 +141,12 @@ export interface ParsedFnetProtocol {
 export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
   if (!html || html.length < 100) throw new Error("HTML do aviso FNET vazio ou incompleto.");
   const allCells = cells(html);
-  const informationDate = parseBrazilianDate(field(allCells, ["Data da Informação:", "Data da informação"]));
+  const baseDate = parseBrazilianDate(field(allCells, [
+    "Data-base (último dia de negociação “com” direito ao provento)",
+    "Data-base (último dia de negociação com direito ao provento)",
+  ]));
+  const informationDateRaw = optionalField(allCells, ["Data da Informação:", "Data da informação"]);
+  const informationDate = informationDateRaw ? parseBrazilianDate(informationDateRaw) : baseDate;
   const periodReferenceRaw = field(allCells, ["Período de referência"]);
   const exemptRaw = field(allCells, ["Rendimento isento de IR*"]).toLowerCase();
   const ticker = field(allCells, ["Código de negociação:", "Código de negociação da cota:"]).toUpperCase();
@@ -146,7 +157,7 @@ export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
     ticker,
     fundName: field(allCells, ["Nome do Fundo:"]),
     informationDate,
-    baseDate: parseBrazilianDate(field(allCells, ["Data-base (último dia de negociação “com” direito ao provento)", "Data-base (último dia de negociação com direito ao provento)"])),
+    baseDate,
     paymentDate: parseBrazilianDate(field(allCells, ["Data do pagamento"])),
     competenceMonth: parseCompetence(periodReferenceRaw, informationDate),
     periodReferenceRaw,
