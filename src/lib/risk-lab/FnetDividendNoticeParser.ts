@@ -13,15 +13,50 @@ const MONTHS: Record<string, string> = {
   dezembro: "12",
 };
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  nbsp: " ",
+  amp: "&",
+  quot: '"',
+  apos: "'",
+  lt: "<",
+  gt: ">",
+  aacute: "á",
+  agrave: "à",
+  acirc: "â",
+  atilde: "ã",
+  auml: "ä",
+  eacute: "é",
+  egrave: "è",
+  ecirc: "ê",
+  euml: "ë",
+  iacute: "í",
+  igrave: "ì",
+  icirc: "î",
+  iuml: "ï",
+  oacute: "ó",
+  ograve: "ò",
+  ocirc: "ô",
+  otilde: "õ",
+  ouml: "ö",
+  uacute: "ú",
+  ugrave: "ù",
+  ucirc: "û",
+  uuml: "ü",
+  ccedil: "ç",
+  ldquo: "“",
+  rdquo: "”",
+  lsquo: "‘",
+  rsquo: "’",
+  ndash: "–",
+  mdash: "—",
+  ordm: "º",
+};
+
 function decodeHtml(value: string) {
   return value
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&([a-z]+);/gi, (entity, name: string) => NAMED_HTML_ENTITIES[name.toLowerCase()] ?? entity);
 }
 
 function cleanCell(value: string) {
@@ -48,17 +83,11 @@ function cells(html: string) {
     .filter(Boolean);
 }
 
-function optionalField(allCells: string[], labels: string[]) {
+function field(allCells: string[], labels: string[]) {
   const normalizedLabels = labels.map(normalize);
   for (let index = 0; index < allCells.length - 1; index += 1) {
     if (normalizedLabels.includes(normalize(allCells[index]))) return allCells[index + 1];
   }
-  return null;
-}
-
-function field(allCells: string[], labels: string[]) {
-  const value = optionalField(allCells, labels);
-  if (value !== null) return value;
   throw new Error(`Campo FNET ausente: ${labels[0]}`);
 }
 
@@ -141,12 +170,7 @@ export interface ParsedFnetProtocol {
 export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
   if (!html || html.length < 100) throw new Error("HTML do aviso FNET vazio ou incompleto.");
   const allCells = cells(html);
-  const baseDate = parseBrazilianDate(field(allCells, [
-    "Data-base (último dia de negociação “com” direito ao provento)",
-    "Data-base (último dia de negociação com direito ao provento)",
-  ]));
-  const informationDateRaw = optionalField(allCells, ["Data da Informação:", "Data da informação"]);
-  const informationDate = informationDateRaw ? parseBrazilianDate(informationDateRaw) : baseDate;
+  const informationDate = parseBrazilianDate(field(allCells, ["Data da Informação:", "Data da informação"]));
   const periodReferenceRaw = field(allCells, ["Período de referência"]);
   const exemptRaw = field(allCells, ["Rendimento isento de IR*"]).toLowerCase();
   const ticker = field(allCells, ["Código de negociação:", "Código de negociação da cota:"]).toUpperCase();
@@ -157,7 +181,10 @@ export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
     ticker,
     fundName: field(allCells, ["Nome do Fundo:"]),
     informationDate,
-    baseDate,
+    baseDate: parseBrazilianDate(field(allCells, [
+      "Data-base (último dia de negociação “com” direito ao provento)",
+      "Data-base (último dia de negociação com direito ao provento)",
+    ])),
     paymentDate: parseBrazilianDate(field(allCells, ["Data do pagamento"])),
     competenceMonth: parseCompetence(periodReferenceRaw, informationDate),
     periodReferenceRaw,
