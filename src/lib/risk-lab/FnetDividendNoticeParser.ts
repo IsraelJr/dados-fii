@@ -13,15 +13,21 @@ const MONTHS: Record<string, string> = {
   dezembro: "12",
 };
 
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  nbsp: " ", amp: "&", quot: '"', apos: "'", lt: "<", gt: ">",
+  aacute: "á", agrave: "à", acirc: "â", atilde: "ã", auml: "ä",
+  eacute: "é", egrave: "è", ecirc: "ê", euml: "ë",
+  iacute: "í", igrave: "ì", icirc: "î", iuml: "ï",
+  oacute: "ó", ograve: "ò", ocirc: "ô", otilde: "õ", ouml: "ö",
+  uacute: "ú", ugrave: "ù", ucirc: "û", uuml: "ü", ccedil: "ç",
+  ldquo: "“", rdquo: "”", lsquo: "‘", rsquo: "’", ndash: "–", mdash: "—", ordm: "º",
+};
+
 function decodeHtml(value: string) {
   return value
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&([a-z]+);/gi, (entity, name: string) => NAMED_HTML_ENTITIES[name.toLowerCase()] ?? entity);
 }
 
 function cleanCell(value: string) {
@@ -34,31 +40,18 @@ function cleanCell(value: string) {
 }
 
 function normalize(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, " ")
-    .trim()
-    .toLowerCase();
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").trim().toLowerCase();
 }
 
 function cells(html: string) {
-  return [...html.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
-    .map((match) => cleanCell(match[1]))
-    .filter(Boolean);
+  return [...html.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((match) => cleanCell(match[1])).filter(Boolean);
 }
 
-function optionalField(allCells: string[], labels: string[]) {
+function field(allCells: string[], labels: string[]) {
   const normalizedLabels = labels.map(normalize);
   for (let index = 0; index < allCells.length - 1; index += 1) {
     if (normalizedLabels.includes(normalize(allCells[index]))) return allCells[index + 1];
   }
-  return null;
-}
-
-function field(allCells: string[], labels: string[]) {
-  const value = optionalField(allCells, labels);
-  if (value !== null) return value;
   throw new Error(`Campo FNET ausente: ${labels[0]}`);
 }
 
@@ -77,87 +70,57 @@ function parseDelivery(value: string) {
 function parseAmount(value: string) {
   const normalized = value.replace(/R\$\s*/gi, "").replace(/\./g, "").replace(",", ".").trim();
   const parsed = Number(normalized);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1000) {
-    throw new Error(`Valor de provento FNET inválido: ${value}`);
-  }
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1000) throw new Error(`Valor de provento FNET inválido: ${value}`);
   return parsed;
 }
 
 function validMonth(value: string) {
   const month = Number(value);
-  return Number.isInteger(month) && month >= 1 && month <= 12
-    ? String(month).padStart(2, "0")
-    : null;
+  return Number.isInteger(month) && month >= 1 && month <= 12 ? String(month).padStart(2, "0") : null;
 }
 
 function parseCompetence(value: string, informationDate: string) {
   const raw = decodeHtml(value).replace(/\s+/g, " ").trim();
   const monthYear = raw.match(/\b(0?[1-9]|1[0-2])\s*[-\/.]\s*(20\d{2})\b/);
   if (monthYear) return `${monthYear[2]}-${String(Number(monthYear[1])).padStart(2, "0")}`;
-
   const yearMonth = raw.match(/\b(20\d{2})\s*[-\/.]\s*(0?[1-9]|1[0-2])\b/);
   if (yearMonth) return `${yearMonth[1]}-${String(Number(yearMonth[2])).padStart(2, "0")}`;
-
   const compact = raw.match(/\b(20\d{2})(0[1-9]|1[0-2])\b/);
   if (compact) return `${compact[1]}-${compact[2]}`;
-
   const cleaned = normalize(raw);
   const monthName = Object.keys(MONTHS).find((month) => cleaned.includes(month));
   if (monthName) {
     const yearMatch = cleaned.match(/\b(20\d{2})\b/);
-    const year = yearMatch?.[1] || informationDate.slice(0, 4);
-    return `${year}-${MONTHS[monthName]}`;
+    return `${yearMatch?.[1] || informationDate.slice(0, 4)}-${MONTHS[monthName]}`;
   }
-
   const tokens = cleaned.split(" ").filter(Boolean);
   if (tokens.length >= 2) {
     const month = validMonth(tokens[0]);
     const year = tokens.find((token) => /^20\d{2}$/.test(token));
     if (month && year) return `${year}-${month}`;
   }
-
   throw new Error(`Período de referência FNET inválido: ${value}`);
 }
 
 export interface ParsedFnetNotice {
-  ticker: string;
-  fundName: string;
-  informationDate: string;
-  baseDate: string;
-  paymentDate: string;
-  competenceMonth: string;
-  periodReferenceRaw: string;
-  amountPerShare: number;
-  incomeTaxExempt: boolean | null;
+  ticker: string; fundName: string; informationDate: string; baseDate: string; paymentDate: string;
+  competenceMonth: string; periodReferenceRaw: string; amountPerShare: number; incomeTaxExempt: boolean | null;
 }
-
-export interface ParsedFnetProtocol {
-  referenceDate: string;
-  deliveredAt: string;
-  documentIdentification: string;
-  version: number;
-}
+export interface ParsedFnetProtocol { referenceDate: string; deliveredAt: string; documentIdentification: string; version: number; }
 
 export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
   if (!html || html.length < 100) throw new Error("HTML do aviso FNET vazio ou incompleto.");
   const allCells = cells(html);
-  const baseDate = parseBrazilianDate(field(allCells, [
-    "Data-base (último dia de negociação “com” direito ao provento)",
-    "Data-base (último dia de negociação com direito ao provento)",
-  ]));
-  const informationDateRaw = optionalField(allCells, ["Data da Informação:", "Data da informação"]);
-  const informationDate = informationDateRaw ? parseBrazilianDate(informationDateRaw) : baseDate;
+  const informationDate = parseBrazilianDate(field(allCells, ["Data da Informação:", "Data da informação"]));
   const periodReferenceRaw = field(allCells, ["Período de referência"]);
   const exemptRaw = field(allCells, ["Rendimento isento de IR*"]).toLowerCase();
   const ticker = field(allCells, ["Código de negociação:", "Código de negociação da cota:"]).toUpperCase();
-
   if (!/^[A-Z]{4}11$/.test(ticker)) throw new Error(`Ticker FNET inválido: ${ticker}`);
-
   return {
     ticker,
     fundName: field(allCells, ["Nome do Fundo:"]),
     informationDate,
-    baseDate,
+    baseDate: parseBrazilianDate(field(allCells, ["Data-base (último dia de negociação “com” direito ao provento)", "Data-base (último dia de negociação com direito ao provento)"])),
     paymentDate: parseBrazilianDate(field(allCells, ["Data do pagamento"])),
     competenceMonth: parseCompetence(periodReferenceRaw, informationDate),
     periodReferenceRaw,
@@ -171,14 +134,11 @@ export function parseFnetProtocolHtml(html: string): ParsedFnetProtocol {
   const allCells = cells(html);
   const identification = field(allCells, ["Identificação do Documento"]);
   const normalizedIdentification = normalize(identification);
-  const isDividendProtocol = normalizedIdentification.includes("rendimentos e amortizacoes")
-    || normalizedIdentification.includes("pagamento de proventos");
-  if (!isDividendProtocol) {
+  if (!normalizedIdentification.includes("rendimentos e amortizacoes") && !normalizedIdentification.includes("pagamento de proventos")) {
     throw new Error(`Documento FNET não é aviso estruturado de rendimentos: ${identification}`);
   }
   const version = Number(field(allCells, ["Versão"]));
   if (!Number.isInteger(version) || version < 1) throw new Error("Versão FNET inválida.");
-
   return {
     referenceDate: parseBrazilianDate(field(allCells, ["Data de Referência"])),
     deliveredAt: parseDelivery(field(allCells, ["Data de Entrega"])),
