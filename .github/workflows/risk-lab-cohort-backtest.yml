@@ -17,10 +17,12 @@ on:
       - "scripts/finalize-risk-lab-sprint-3-5.mjs"
       - "tests/risk-lab-cohort-backtest*"
       - "tests/risk-lab-segmented-cohort*"
+      - "tests/risk-lab-cvm-current-schema.test.ts"
       - "tests/risk-lab-credit-ambiguity-policy.test.ts"
       - "tests/risk-lab-fnet-notice-parser.test.ts"
       - "tests/risk-lab-cohort-admin-architecture.test.mjs"
       - "tests/risk-lab-sprint-3-5-closure.test.mjs"
+      - "tests/risk-lab-evidence-formalization-architecture.test.mjs"
       - "package.json"
   workflow_dispatch:
 
@@ -165,17 +167,16 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Version, validate and formalize production evidence
+      - name: Prepare evidence files and closure gates
         if: steps.production.outcome == 'success'
+        id: prepare
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           evidence_dir="docs/production-evidence/risk-lab"
           evidence_path="${evidence_dir}/${RUN_ID}.json"
           summary_path="docs/risk-lab/sprint-3-5-production-backtest.md"
-          branch="automation/sprint-3-5-evidence-v2-${GITHUB_RUN_ID}"
+          branch="automation/sprint-3-5-evidence-v2-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           mkdir -p "$evidence_dir" "$(dirname "$summary_path")"
 
           jq '.evidence' risk-lab-cohort-backtest-response.json > "$evidence_path"
@@ -221,15 +222,8 @@ jobs:
             title="audit: registra blockers metodológicos da Sprint 3.5"
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add "$evidence_path" "$summary_path"
-          if [[ "$status" == "passed" ]]; then git add DADOS_FII_HANDOFF.md; fi
-          git commit -m "docs: versiona evidência metodológica da Sprint 3.5"
-          git push origin "$branch"
-
-          pr_url=$(gh pr create --base main --head "$branch" --title "$title" --body "## Auditoria automática de Produção
+          cat > risk-lab-evidence-pr-body.md <<EOF
+          ## Auditoria automática de Produção
 
           - tentativa: \`${attempt_id}\`
           - release: \`${release}\`
@@ -243,13 +237,74 @@ jobs:
           - revisão de desempenho na Sprint 3.6: \`${performance_review}\`
           - hash: \`${evidence_hash}\`
 
-          Nenhuma aprovação técnica manual do proprietário foi usada e o ruleset v0.1.0 não foi recalibrado com a mesma coorte.")
+          Nenhuma aprovação técnica manual do proprietário foi usada e o ruleset v0.1.0 não foi recalibrado com a mesma coorte.
+          EOF
 
-          if [[ "$status" != "passed" ]]; then
-            echo "A evidência e os blockers foram versionados na PR ${pr_url}; a Sprint permanece aberta."
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
+          echo "evidence_path=${evidence_path}" >> "$GITHUB_OUTPUT"
+          echo "summary_path=${summary_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish immutable evidence branch
+        if: steps.prepare.outcome == 'success'
+        id: publish
+        shell: bash
+        env:
+          EVIDENCE_BRANCH: ${{ steps.prepare.outputs.branch }}
+          EVIDENCE_STATUS: ${{ steps.prepare.outputs.status }}
+          EVIDENCE_PATH: ${{ steps.prepare.outputs.evidence_path }}
+          SUMMARY_PATH: ${{ steps.prepare.outputs.summary_path }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$EVIDENCE_BRANCH"
+          git add -f "$EVIDENCE_PATH" "$SUMMARY_PATH"
+          if [[ "$EVIDENCE_STATUS" == "passed" ]]; then git add -f DADOS_FII_HANDOFF.md; fi
+          git status --short
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração de evidência foi produzida."
             exit 1
           fi
+          git commit -m "docs: versiona evidência metodológica da Sprint 3.5"
+          git push --force-with-lease origin "HEAD:${EVIDENCE_BRANCH}"
 
-          if ! gh pr merge "$pr_url" --squash --delete-branch; then
-            gh pr merge "$pr_url" --auto --squash --delete-branch
+      - name: Create evidence pull request
+        if: steps.publish.outcome == 'success'
+        id: pull_request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVIDENCE_BRANCH: ${{ steps.prepare.outputs.branch }}
+          EVIDENCE_TITLE: ${{ steps.prepare.outputs.title }}
+        run: |
+          set -euo pipefail
+          pr_url=$(gh pr list --base main --head "$EVIDENCE_BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [[ -z "$pr_url" ]]; then
+            pr_url=$(gh pr create --base main --head "$EVIDENCE_BRANCH" --title "$EVIDENCE_TITLE" --body-file risk-lab-evidence-pr-body.md)
+          fi
+          if [[ -z "$pr_url" ]]; then
+            echo "A branch de evidência foi publicada, mas a PR não foi criada."
+            exit 1
+          fi
+          echo "pr_url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Keep Sprint open when methodological blockers exist
+        if: steps.pull_request.outcome == 'success' && steps.prepare.outputs.status != 'passed'
+        shell: bash
+        run: |
+          echo "A evidência e os blockers foram versionados em ${{ steps.pull_request.outputs.pr_url }}; a Sprint permanece aberta."
+          exit 1
+
+      - name: Merge approved production evidence
+        if: steps.pull_request.outcome == 'success' && steps.prepare.outputs.status == 'passed'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ steps.pull_request.outputs.pr_url }}
+        run: |
+          set -euo pipefail
+          if ! gh pr merge "$PR_URL" --squash --delete-branch; then
+            gh pr merge "$PR_URL" --auto --squash --delete-branch
           fi
