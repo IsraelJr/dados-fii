@@ -1,0 +1,26 @@
+name: Temporary Sprint 3.5 Source Export
+
+on:
+  push:
+    branches:
+      - agent/sprint-3-5-frozen-dividend-notices
+    paths:
+      - ".github/workflows/temporary-export-sprint-3-5-source.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Package source
+        run: tar --exclude=.git -czf dados-fii-source.tgz .
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporary-sprint-3-5-source
+          path: dados-fii-source.tgz
+          retention-days: 1
