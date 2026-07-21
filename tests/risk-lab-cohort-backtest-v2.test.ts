@@ -75,15 +75,16 @@ function observation(ticker: string, year: number, month: number, amount: number
     amountPerShare: amount,
     announcedAt: `${year}-${String(month).padStart(2, "0")}-15T18:00:00-03:00`,
     source: {
-      documentId: `${year}${String(month).padStart(2, "0")}`,
-      sourceUrl: `https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=${year}${month}`,
+      documentId: `inf_mensal_fii_${year}:${competenceMonth}:v1`,
+      sourceUrl: `https://dados.cvm.gov.br/dados/FII/DOC/INF_MENSAL/DADOS/inf_mensal_fii_${year}.zip`,
       sourceType: "primary_regulatory",
       reviewMethod: "automatic_regulatory_validation",
-      reviewedBy: "risk-lab-fnet-automatic-v0.1.0",
+      reviewedBy: "risk-lab-cvm-monthly-bulk-v0.1.0",
       reviewedAt: "2026-07-20T12:00:00-03:00",
       page: 1,
-      excerpt: `Aviso oficial ${competenceMonth}.`,
+      excerpt: `Informe mensal oficial ${competenceMonth}.`,
       sourceHash: HASH,
+      sourceVersion: `inf_mensal_fii_${year}.zip:v1`,
       protocolHash: PROTOCOL_HASH,
       protocolVersion: 1,
     },
@@ -102,7 +103,7 @@ function seriesFor(ticker: string, mode: "healthy" | "stress", year = 2024): Aut
     missingMonths: [],
     conflicts: [],
     longestContiguousSequence: 12,
-    method: "direct_declared_per_share",
+    method: "official_monthly_liability_per_share",
     detectorResult: null,
     detectorExecuted: true,
     classificationFinal: false,
@@ -191,9 +192,18 @@ interface FixtureOptions {
   healthyStressTicker?: string;
 }
 
+interface MonthlyBuildCall {
+  ticker: string;
+  cnpj: string;
+  years: number[];
+  fromDate: string;
+  untilDate: string;
+}
+
 function serviceFor(options: FixtureOptions = {}) {
   const store = new MemoryStore();
   let currentTicker = "";
+  const monthlyBuildCalls: MonthlyBuildCall[] = [];
   const service = new RiskLabCohortBacktestV2Service({
     store,
     now: () => new Date("2026-07-20T12:00:00-03:00"),
@@ -211,7 +221,8 @@ function serviceFor(options: FixtureOptions = {}) {
       }),
     },
     dividendSeries: {
-      build: async (ticker) => {
+      build: async (ticker, cnpj, years, fromDate, untilDate) => {
+        monthlyBuildCalls.push({ ticker, cnpj, years: [...years], fromDate, untilDate });
         const healthyStress = ticker === options.healthyStressTicker;
         const reversible = ticker === "MCCI11" || ticker === "RBRY11";
         const severe = ticker === "DEVA11" || ticker === "VSLH11";
@@ -228,7 +239,7 @@ function serviceFor(options: FixtureOptions = {}) {
       },
     },
   });
-  return { service, store };
+  return { service, store, monthlyBuildCalls };
 }
 
 test("referência primária deriva estresse e recuperação sem chamar o detector sequencial", () => {
@@ -237,8 +248,8 @@ test("referência primária deriva estresse e recuperação sem chamar o detecto
   assert.equal(truth.recoveryAt, "2024-12-15T18:00:00-03:00");
 });
 
-test("v2 verifica a verdade-terreno antes do detector e executa seis casos", async () => {
-  const { service } = serviceFor();
+test("v2 usa lote mensal CVM com CNPJ, anos e janela congelada para os seis casos", async () => {
+  const { service, monthlyBuildCalls } = serviceFor();
   const evidence = await service.run();
 
   assert.equal(evidence.schemaVersion, 2);
@@ -255,6 +266,14 @@ test("v2 verifica a verdade-terreno antes do detector e executa seis casos", asy
   assert.equal(evidence.blockers.length, 0);
   assert.match(evidence.attemptId || "", /^risk-lab-3-5-attempt-/);
   assert.match(evidence.evidenceHash || "", /^[a-f0-9]{64}$/);
+  assert.equal(monthlyBuildCalls.length, 6);
+  assert.equal(monthlyBuildCalls.every((call) => call.cnpj === "12345678000199"), true);
+  assert.equal(monthlyBuildCalls.every((call) => call.years.length > 0), true);
+  assert.equal(monthlyBuildCalls.every((call) => /^20\d{2}-\d{2}-\d{2}$/.test(call.fromDate)), true);
+  assert.equal(monthlyBuildCalls.every((call) => /^20\d{2}-\d{2}-\d{2}$/.test(call.untilDate)), true);
+  assert.equal(evidence.cases.every((item) => item.evidence
+    .filter((entry) => entry.kind === "dividend_notice")
+    .every((entry) => entry.sourceVersion.startsWith("inf_mensal_fii_"))), true);
 });
 
 test("falso negativo grave é medido para a Sprint 3.6 sem maquiar nem bloquear a coleta", async () => {
