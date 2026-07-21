@@ -15,17 +15,12 @@ function errorRecord(error: unknown) {
     name: error instanceof Error ? error.name : null,
     message: error instanceof Error ? error.message : String(error),
     stack: error instanceof Error ? error.stack : null,
-    cause: error instanceof Error && error.cause ? String(error.cause) : null,
   };
 }
 
-async function request(
-  url: URL,
-  accept = "application/json,text/plain;q=0.9,*/*;q=0.1",
-  timeoutMs = 60_000,
-) {
+async function request(url: URL, accept = "application/json,text/plain;q=0.9,*/*;q=0.1") {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), 75_000);
   try {
     const response = await fetch(url, {
       redirect: "follow",
@@ -34,37 +29,35 @@ async function request(
       headers: {
         Accept: accept,
         Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.6)",
+        "User-Agent": "Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/1.7)",
         "X-Requested-With": "XMLHttpRequest",
       },
     });
     const text = await response.text();
     let json: unknown = null;
-    try { json = JSON.parse(text); } catch { /* diagnóstico abaixo */ }
+    try { json = JSON.parse(text); } catch { /* exposto no resultado */ }
     return {
       requestedUrl: url.toString(),
       httpStatus: response.status,
-      finalUrl: response.url,
       contentType: response.headers.get("content-type"),
-      bytes: Buffer.byteLength(text, "utf8"),
       json,
-      textSample: json === null ? text.slice(0, 1800) : null,
+      textSample: json === null ? text.slice(0, 1000) : null,
     };
   } finally {
     clearTimeout(timer);
   }
 }
 
-function payloadRecord(value: unknown) {
+function payload(value: unknown) {
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
 }
 
-function rowsFrom(value: unknown) {
-  const payload = payloadRecord(value);
-  return Array.isArray(payload.data) ? payload.data as Record<string, unknown>[] : [];
+function rows(value: unknown) {
+  const record = payload(value);
+  return Array.isArray(record.data) ? record.data as Record<string, unknown>[] : [];
 }
 
-function documentUrl(parameters: Record<string, string>) {
+function query(parameters: Record<string, string>) {
   const url = new URL("/fnet/publico/pesquisarGerenciadorDocumentosDados", ORIGIN);
   const common = {
     paginaCertificados: "false",
@@ -82,30 +75,17 @@ function documentUrl(parameters: Record<string, string>) {
     idModalidade: "",
     palavraChave: "",
     isSession: "false",
-    d: "0",
+    d: "1",
     s: "0",
-    l: "500",
+    l: "100",
     ...parameters,
   };
   for (const [key, value] of Object.entries(common)) url.searchParams.set(key, value);
   return url;
 }
 
-async function inspectHtml(documentId: string, protocol = false) {
-  const url = new URL(
-    protocol ? "/fnet/publico/visualizarProtocoloDocumentoCVM" : "/fnet/publico/exibirDocumento",
-    ORIGIN,
-  );
-  if (protocol) url.searchParams.set("idDocumento", documentId);
-  else {
-    url.searchParams.set("cvm", "true");
-    url.searchParams.set("id", documentId);
-  }
-  return request(url, "text/html,application/xhtml+xml,*/*;q=0.1", 45_000);
-}
-
-let result: Record<string, unknown> = {
-  schemaVersion: 7,
+const result: Record<string, unknown> = {
+  schemaVersion: 8,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
@@ -113,102 +93,62 @@ let result: Record<string, unknown> = {
 };
 
 try {
-  const specifications = [
-    {
-      name: "legacy_digits_category",
-      params: { cnpjFundo: CNPJ, idCategoriaDocumento: "6", idTipoDocumento: "45" },
-    },
-    {
-      name: "cnpjFundo_digits",
-      params: { cnpjFundo: CNPJ },
-    },
-    {
-      name: "cnpjFundo_formatted",
-      params: { cnpjFundo: CNPJ_FORMATTED },
-    },
-    {
-      name: "both_formatted",
-      params: { cnpj: CNPJ_FORMATTED, cnpjFundo: CNPJ_FORMATTED },
-    },
+  const specs = [
+    { name: "legacy_digits_category", params: { cnpjFundo: CNPJ, idCategoriaDocumento: "6", idTipoDocumento: "45" } },
+    { name: "cnpjFundo_digits", params: { cnpjFundo: CNPJ } },
+    { name: "cnpjFundo_formatted", params: { cnpjFundo: CNPJ_FORMATTED } },
+    { name: "both_formatted", params: { cnpj: CNPJ_FORMATTED, cnpjFundo: CNPJ_FORMATTED } },
   ];
-
-  const probes = await Promise.all(specifications.map(async (specification) => {
+  const probes = await Promise.all(specs.map(async (spec) => {
     try {
-      const response = await request(documentUrl(specification.params));
-      const payload = payloadRecord(response.json);
-      const rows = rowsFrom(response.json);
-      const fundNames = [...new Set(rows.map((row) => String(row.descricaoFundo || "").trim()).filter(Boolean))];
-      const tradeNames = [...new Set(rows.map((row) => String(row.nomePregao || "").trim()).filter(Boolean))];
+      const response = await request(query(spec.params));
+      const record = payload(response.json);
+      const items = rows(response.json);
       return {
-        name: specification.name,
+        name: spec.name,
         response: {
           requestedUrl: response.requestedUrl,
           httpStatus: response.httpStatus,
           contentType: response.contentType,
-          recordsTotal: Number(payload.recordsTotal ?? 0),
-          recordsFiltered: Number(payload.recordsFiltered ?? 0),
-          rowCount: rows.length,
-          fundNames: fundNames.slice(0, 20),
-          tradeNames: tradeNames.slice(0, 20),
+          recordsTotal: Number(record.recordsTotal ?? 0),
+          recordsFiltered: Number(record.recordsFiltered ?? 0),
+          rowCount: items.length,
+          fundNames: [...new Set(items.map((item) => String(item.descricaoFundo || "")).filter(Boolean))].slice(0, 10),
+          tradeNames: [...new Set(items.map((item) => String(item.nomePregao || "")).filter(Boolean))].slice(0, 10),
           textSample: response.textSample,
         },
-        rows,
+        items,
       };
     } catch (error) {
-      return { name: specification.name, error: errorRecord(error), rows: [] as Record<string, unknown>[] };
+      return { name: spec.name, error: errorRecord(error), items: [] as Record<string, unknown>[] };
     }
   }));
 
-  result = {
-    ...result,
-    probes: probes.map((probe) => ({ ...probe, rows: undefined })),
-  };
-
+  result.probes = probes.map((probe) => ({ ...probe, items: undefined }));
   const selected = probes.find((probe) => {
-    const response = "response" in probe ? probe.response : null;
-    if (!response || response.recordsFiltered < 1 || response.recordsFiltered > 5_000) return false;
-    return probe.rows.some((row) => {
-      const searchable = `${row.nomePregao || ""} ${row.informacoesAdicionais || ""} ${row.descricaoFundo || ""}`.toUpperCase();
-      return searchable.includes("KINEA RENDIMENTOS") || searchable.includes("FII KINEA RI");
-    });
+    if (!("response" in probe) || probe.response.recordsFiltered < 1 || probe.response.recordsFiltered > 5_000) return false;
+    return probe.items.every((item) => String(item.descricaoFundo || "").toUpperCase().includes("KINEA RENDIMENTOS"));
   });
-  if (!selected) throw new Error("Nenhuma combinação direta de CNPJ restringiu a consulta ao KNCR11.");
+  if (!selected) throw new Error("Nenhum filtro por CNPJ restringiu a consulta ao KNCR11 com paginação válida.");
 
-  const documents = mapFnetDividendRows(selected.rows, FROM, UNTIL);
-  if (!documents.length) throw new Error(`Filtro ${selected.name} retornou linhas do fundo, mas nenhum aviso estruturado válido.`);
-  const latest = documents.slice(-4);
-  result = {
-    ...result,
-    stage: "series",
-    selectedFilter: selected.name,
-    documentCount: documents.length,
-    latest,
-  };
+  const documents = mapFnetDividendRows(selected.items, FROM, UNTIL);
+  result.selectedFilter = selected.name;
+  result.documentCountOnFirstPage = documents.length;
+  result.latestDocuments = documents.slice(-4);
+  if (!documents.length) throw new Error("O filtro correto não retornou avisos estruturados na primeira página.");
 
-  const series = await new AutomaticDividendSeriesService().build(TICKER, latest);
-  const endpoints = [];
-  for (const document of latest.slice(-2)) {
-    endpoints.push({
-      documentId: document.documentId,
-      notice: await inspectHtml(document.documentId),
-      protocol: await inspectHtml(document.documentId, true),
-    });
-  }
-  result = {
-    ...result,
-    stage: "completed",
-    series: {
-      status: series.status,
-      observationCount: series.observations.length,
-      longestContiguousSequence: series.longestContiguousSequence,
-      conflicts: series.conflicts,
-      sources: series.sources,
-      observations: series.observations,
-    },
-    endpoints,
+  const series = await new AutomaticDividendSeriesService().build(TICKER, documents.slice(-4));
+  result.stage = "completed";
+  result.series = {
+    status: series.status,
+    observationCount: series.observations.length,
+    conflicts: series.conflicts,
+    sources: series.sources,
+    observations: series.observations,
   };
 } catch (error) {
-  result = { ...result, stage: `${String(result.stage)}_failed`, error: errorRecord(error) };
+  result.stage = `${String(result.stage)}_failed`;
+  result.error = errorRecord(error);
 }
 
 await writeFile(OUTPUT, `${JSON.stringify(result, null, 2)}\n`, "utf8");
