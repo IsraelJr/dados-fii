@@ -13,11 +13,11 @@ import type { VerifiedDividendNotice } from "@/types/riskLabDividendStress";
 
 const FNET_ORIGIN = "https://fnet.bmfbovespa.com.br";
 const MAX_HTML_BYTES = 2_000_000;
-const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 25_000;
 const MAX_DOCUMENTS_PER_YEAR = 18;
 const MAX_TOTAL_DOCUMENTS = 108;
-const CONCURRENCY = 4;
-const FETCH_ATTEMPTS = 2;
+const CONCURRENCY = 2;
+const FETCH_ATTEMPTS = 3;
 const PIPELINE = "risk-lab-fnet-automatic-v0.1.0";
 
 interface ValidatedNotice {
@@ -89,7 +89,7 @@ function sha256(value: string) {
 
 function retryable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "");
-  return /AbortError|HTTP (408|425|429|5\d\d)|network|fetch failed|socket/i.test(message)
+  return /AbortError|aborted|HTTP (408|425|429|5\d\d)|network|fetch failed|socket|ECONNRESET|ETIMEDOUT/i.test(message)
     || (error instanceof Error && error.name === "AbortError");
 }
 
@@ -104,7 +104,7 @@ async function fetchHtmlOnce(fetchImpl: typeof fetch, url: string) {
       cache: "no-store",
       headers: {
         Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "DadosFII-RiskLab/0.2 (+automatic-regulatory-validation)",
+        "User-Agent": "DadosFII-RiskLab/0.3 (+automatic-regulatory-validation)",
       },
     });
     if (!response.ok) throw new Error(`FNET respondeu HTTP ${response.status}.`);
@@ -130,7 +130,7 @@ async function fetchHtml(fetchImpl: typeof fetch, url: string) {
     } catch (error) {
       lastError = error;
       if (attempt === FETCH_ATTEMPTS || !retryable(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, attempt * 200));
+      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Falha desconhecida ao consultar o FNET.");
@@ -146,10 +146,8 @@ async function validateDocument(
   if (!/^\d{1,20}$/.test(id)) throw new Error("ID regulatório inválido.");
   const sourceUrl = `${FNET_ORIGIN}/fnet/publico/exibirDocumento?cvm=true&id=${id}`;
   const protocolUrl = `${FNET_ORIGIN}/fnet/publico/visualizarProtocoloDocumentoCVM?idDocumento=${id}`;
-  const [noticeHtml, protocolHtml] = await Promise.all([
-    fetchHtml(fetchImpl, sourceUrl),
-    fetchHtml(fetchImpl, protocolUrl),
-  ]);
+  const noticeHtml = await fetchHtml(fetchImpl, sourceUrl);
+  const protocolHtml = await fetchHtml(fetchImpl, protocolUrl);
   const notice = parseFnetDividendNoticeHtml(noticeHtml);
   const protocol = parseFnetProtocolHtml(protocolHtml);
   if (notice.ticker !== ticker) throw new Error(`Ticker divergente: ${notice.ticker}.`);
@@ -163,7 +161,6 @@ async function validateDocument(
   if (Number.isFinite(receivedDifference) && receivedDifference > 36 * 60 * 60 * 1000) {
     throw new Error("Horário do protocolo diverge do catálogo CVM.");
   }
-
   const sourceHash = sha256(noticeHtml);
   const protocolHash = sha256(protocolHtml);
   const source: VerifiedDividendNotice["source"] = {
@@ -179,15 +176,8 @@ async function validateDocument(
     protocolHash,
     protocolVersion: protocol.version,
   };
-
   return {
-    observation: {
-      ticker,
-      competenceMonth: notice.competenceMonth,
-      amountPerShare: notice.amountPerShare,
-      announcedAt: protocol.deliveredAt,
-      source,
-    },
+    observation: { ticker, competenceMonth: notice.competenceMonth, amountPerShare: notice.amountPerShare, announcedAt: protocol.deliveredAt, source },
     version: protocol.version,
     sourceYear: document.sourceYear,
     sourceHash,
@@ -197,10 +187,7 @@ async function validateDocument(
 
 function deduplicate(validated: ValidatedNotice[]) {
   const grouped = new Map<string, ValidatedNotice[]>();
-  for (const item of validated) {
-    const key = item.observation.competenceMonth;
-    grouped.set(key, [...(grouped.get(key) || []), item]);
-  }
+  for (const item of validated) grouped.set(item.observation.competenceMonth, [...(grouped.get(item.observation.competenceMonth) || []), item]);
   const observations: VerifiedDividendNotice[] = [];
   const conflicts: string[] = [];
   for (const [month, items] of grouped) {
@@ -217,20 +204,15 @@ function deduplicate(validated: ValidatedNotice[]) {
   return { observations, conflicts };
 }
 
-export interface AutomaticDividendSeriesDependencies {
-  fetchImpl?: typeof fetch;
-  now?: () => Date;
-}
+export interface AutomaticDividendSeriesDependencies { fetchImpl?: typeof fetch; now?: () => Date; }
 
 export class AutomaticDividendSeriesService {
   private readonly fetchImpl: typeof fetch;
   private readonly now: () => Date;
-
   constructor(dependencies: AutomaticDividendSeriesDependencies = {}) {
     this.fetchImpl = dependencies.fetchImpl || fetch;
     this.now = dependencies.now || (() => new Date());
   }
-
   async build(ticker: string, documents: AutomaticDocumentEvidence[]): Promise<AutomaticMonthlySeries> {
     const candidates = selectCandidates(documents);
     const reviewedAt = this.now().toISOString();
@@ -244,16 +226,13 @@ export class AutomaticDividendSeriesService {
         else failures.push(`${batch[index].documentId}: ${result.reason instanceof Error ? result.reason.message : "falha desconhecida"}`);
       });
     }
-
     const { observations, conflicts } = deduplicate(validated);
     const { missingMonths, longest } = coverage(observations.map((item) => item.competenceMonth));
     const years = Array.from(new Set(candidates.map((item) => item.sourceYear))).sort((a, b) => b - a);
     const sources: AutomaticMonthlySourceSummary[] = years.map((year) => {
       const inspected = candidates.filter((item) => item.sourceYear === year);
       const accepted = validated.filter((item) => item.sourceYear === year);
-      const combinedHash = accepted.length
-        ? sha256(accepted.map((item) => `${item.sourceHash}:${item.protocolHash}`).sort().join("|"))
-        : null;
+      const combinedHash = accepted.length ? sha256(accepted.map((item) => `${item.sourceHash}:${item.protocolHash}`).sort().join("|")) : null;
       return {
         year,
         sourceUrl: `${FNET_ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM`,
@@ -265,10 +244,8 @@ export class AutomaticDividendSeriesService {
         error: inspected.length > 0 && accepted.length === 0 ? "Nenhum aviso do ano passou na validação automática." : null,
       };
     });
-
     const blocked = conflicts.length > 0 || (candidates.length > 0 && observations.length === 0);
     const ready = !blocked && longest >= 9;
-    const detectorResult = ready ? dividendStressWindowEngine.detect(observations) : null;
     return {
       status: blocked ? "blocked" : ready ? "ready" : "incomplete",
       observations,
@@ -277,12 +254,10 @@ export class AutomaticDividendSeriesService {
       conflicts: [...conflicts, ...failures.slice(0, 40)],
       longestContiguousSequence: longest,
       method: observations.length ? "direct_declared_per_share" : "unavailable",
-      detectorResult,
+      detectorResult: ready ? dividendStressWindowEngine.detect(observations) : null,
       detectorExecuted: ready,
       classificationFinal: false,
-      limitation: ready
-        ? "material_credit_events_not_automatically_validated"
-        : "insufficient_structured_series",
+      limitation: ready ? "material_credit_events_not_automatically_validated" : "insufficient_structured_series",
     };
   }
 }
