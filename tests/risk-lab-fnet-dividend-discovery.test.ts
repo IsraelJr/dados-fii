@@ -6,8 +6,6 @@ import {
   mapFnetDividendRows,
   resolveFnetInternalFundId,
 } from "../src/lib/risk-lab/FnetDividendDocumentDiscovery";
-import { ConcurrentAutomaticDividendSeriesService } from "../src/lib/risk-lab/ConcurrentAutomaticDividendSeriesService";
-import type { AutomaticDocumentEvidence, AutomaticMonthlySeries } from "../src/types/riskLabAutomatic";
 
 function row(overrides: Record<string, unknown> = {}) {
   return {
@@ -21,45 +19,6 @@ function row(overrides: Record<string, unknown> = {}) {
     situacaoDocumento: "A",
     versao: 1,
     ...overrides,
-  };
-}
-
-function eventDocument(year: number): AutomaticDocumentEvidence {
-  return {
-    documentId: `event-${year}`,
-    documentType: "Fato Relevante",
-    fileName: `fato-${year}.pdf`,
-    competenceDate: `${year}-01-01`,
-    receivedAt: `${year}-01-10T12:00:00-03:00`,
-    link: "https://dados.cvm.gov.br/documento.pdf",
-    sourceYear: year,
-    auditResult: "OK",
-    confidence: 99,
-  };
-}
-
-function monthlySeries(year: number): AutomaticMonthlySeries {
-  return {
-    status: "incomplete",
-    observations: [],
-    sources: [{
-      year,
-      sourceUrl: "https://fnet.bmfbovespa.com.br",
-      sourceHash: null,
-      fetched: true,
-      documentsInspected: 1,
-      matchingRows: 1,
-      acceptedMonths: 0,
-      error: null,
-    }],
-    missingMonths: [],
-    conflicts: [],
-    longestContiguousSequence: 0,
-    method: "unavailable",
-    detectorResult: null,
-    detectorExecuted: false,
-    classificationFinal: false,
-    limitation: "insufficient_structured_series",
   };
 }
 
@@ -84,7 +43,7 @@ test("mapeia somente avisos estruturados válidos dentro da janela conhecida", (
   assert.match(documents[1].auditResult || "", /versão 2/);
 });
 
-test("descoberta usa idFundo mais CNPJ, pagina e preserva documentos oficiais", async () => {
+test("descoberta diagnóstica pagina e preserva documentos oficiais", async () => {
   const calls: URL[] = [];
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(String(input));
@@ -116,7 +75,7 @@ test("descoberta usa idFundo mais CNPJ, pagina e preserva documentos oficiais", 
   assert.equal(calls.filter((url) => url.pathname.endsWith("pesquisarGerenciadorDocumentosDados")).length, 2);
 });
 
-test("descoberta bloqueia endpoint que ignorou o filtro do fundo", async () => {
+test("descoberta diagnóstica bloqueia endpoint que ignorou o filtro", async () => {
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(String(input));
     if (url.pathname.endsWith("pesquisarGerenciadorDocumentosCVM")) {
@@ -131,44 +90,13 @@ test("descoberta bloqueia endpoint que ignorou o filtro do fundo", async () => {
   );
 });
 
-test("série concorrente descobre documentos quando o catálogo eventual não contém rendimentos", async () => {
-  let resolvedTicker = "";
-  let discoveryInput: unknown[] = [];
-  let baseDocuments: AutomaticDocumentEvidence[] = [];
-  const service = new ConcurrentAutomaticDividendSeriesService({
-    resolveCnpj: async (ticker) => { resolvedTicker = ticker; return "16706958000132"; },
-    discovery: {
-      async discover(...input) {
-        discoveryInput = input;
-        return {
-          internalFundId: "20031",
-          recordsInspected: 1,
-          sourceUrl: "https://fnet.bmfbovespa.com.br",
-          documents: [mapFnetDividendRows([row()], "2022-01-01", "2023-12-31")[0]],
-        };
-      },
-    },
-    base: {
-      async build(_ticker, documents) {
-        baseDocuments = documents;
-        return monthlySeries(documents[0].sourceYear);
-      },
-    },
-    now: () => new Date("2026-07-21T00:00:00-03:00"),
-  });
-
-  await service.build("KNCR11", [eventDocument(2022), eventDocument(2023)]);
-  assert.equal(resolvedTicker, "KNCR11");
-  assert.deepEqual(discoveryInput, ["16706958000132", "2022-01-01", "2023-12-31"]);
-  assert.equal(baseDocuments[0].documentId, "261398");
-});
-
-test("implementação é generalizada e não contém exceções da coorte", () => {
+test("coletor FNET permanece isolado do caminho crítico e sem exceções por ticker", () => {
   const discovery = readFileSync("src/lib/risk-lab/FnetDividendDocumentDiscovery.ts", "utf8");
-  const concurrent = readFileSync("src/lib/risk-lab/ConcurrentAutomaticDividendSeriesService.ts", "utf8");
+  const critical = readFileSync("src/lib/risk-lab/ConcurrentAutomaticDividendSeriesService.ts", "utf8");
   for (const ticker of ["DEVA11", "VSLH11", "KNCR11", "KNSC11", "MCCI11", "RBRY11"]) {
     assert.doesNotMatch(discovery, new RegExp(ticker));
-    assert.doesNotMatch(concurrent, new RegExp(ticker));
+    assert.doesNotMatch(critical, new RegExp(ticker));
   }
-  assert.doesNotMatch(`${discovery}\n${concurrent}`, /manual_document_review|approve\(|confirm\(/);
+  assert.doesNotMatch(critical, /FnetDividendDocumentDiscovery|fnet\.bmfbovespa|exibirDocumento/);
+  assert.doesNotMatch(`${discovery}\n${critical}`, /manual_document_review|approve\(|confirm\(/);
 });
