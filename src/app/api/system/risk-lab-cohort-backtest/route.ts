@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
+import { riskLabCohortIdentityService } from "@/lib/risk-lab/RiskLabCohortIdentityService";
 import {
   SEGMENTED_COHORT_TICKERS,
   segmentedRiskLabCohortBacktestService,
@@ -56,6 +57,16 @@ export async function GET(request: NextRequest) {
 
     if (execution.authorized) {
       const { action, ticker } = execution.parameters;
+      if (action === "identities") {
+        const identities = await riskLabCohortIdentityService.list();
+        return response({
+          ok: true,
+          sprint: "3.5",
+          status: "ready",
+          releaseCommit: process.env.VERCEL_GIT_COMMIT_SHA,
+          identities,
+        });
+      }
       if (action === "initialize") {
         const evidence = await segmentedRiskLabCohortBacktestService.initialize();
         return response({ ok: true, sprint: "3.5", status: evidence.status, evidence });
