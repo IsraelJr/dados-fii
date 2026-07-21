@@ -12,6 +12,8 @@ interface FnetManagerRow {
   tipoDocumento?: unknown;
   dataReferencia?: unknown;
   dataEntrega?: unknown;
+  descricaoFundo?: unknown;
+  nomePregao?: unknown;
   descricaoStatus?: unknown;
   descricaoModalidade?: unknown;
   situacaoDocumento?: unknown;
@@ -26,7 +28,8 @@ interface FnetManagerPayload {
 }
 
 export interface FnetDividendDocumentDiscoveryResult {
-  internalFundId: string;
+  internalFundId: null;
+  filterMode: "cnpjFundo";
   documents: AutomaticDocumentEvidence[];
   recordsInspected: number;
   sourceUrl: string;
@@ -86,6 +89,10 @@ function attributes(source: string) {
   return result;
 }
 
+/**
+ * Mantido apenas para compatibilidade com fixtures históricas. A descoberta
+ * ativa não depende mais do HTML do gerenciador nem de idFundo.
+ */
 export function resolveFnetInternalFundId(html: string) {
   const candidates = [...html.matchAll(/<input\b([^>]*)>/gi)]
     .map((match) => attributes(match[1]))
@@ -148,6 +155,12 @@ export function mapFnetDividendRows(
   return [...documents.values()].sort((left, right) => Date.parse(left.receivedAt) - Date.parse(right.receivedAt));
 }
 
+function retryable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /AbortError|HTTP (408|425|429|5\d\d)|network|fetch failed|socket/i.test(message)
+    || (error instanceof Error && error.name === "AbortError");
+}
+
 async function fetchText(fetchImpl: typeof fetch, url: URL, accept: string) {
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
@@ -161,8 +174,8 @@ async function fetchText(fetchImpl: typeof fetch, url: URL, accept: string) {
         signal: controller.signal,
         headers: {
           Accept: accept,
-          Referer: `${FNET_ORIGIN}/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-          "User-Agent": "DadosFII-RiskLab/0.3 (+automatic-primary-dividend-discovery)",
+          Referer: `${FNET_ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
+          "User-Agent": "DadosFII-RiskLab/0.4 (+automatic-primary-dividend-discovery)",
           "X-Requested-With": "XMLHttpRequest",
         },
       });
@@ -170,7 +183,8 @@ async function fetchText(fetchImpl: typeof fetch, url: URL, accept: string) {
       return await response.text();
     } catch (error) {
       lastError = error;
-      if (attempt === FETCH_ATTEMPTS) throw error;
+      if (attempt === FETCH_ATTEMPTS || !retryable(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
     } finally {
       clearTimeout(timer);
     }
@@ -189,21 +203,13 @@ export class FnetDividendDocumentDiscovery {
     this.fetchImpl = dependencies.fetchImpl || fetch;
   }
 
-  private async resolveFundId(cnpj: string) {
-    const manager = new URL("/fnet/publico/pesquisarGerenciadorDocumentosCVM", FNET_ORIGIN);
-    manager.searchParams.set("paginaCertificados", "false");
-    manager.searchParams.set("tipoFundo", "1");
-    manager.searchParams.set("cnpjFundo", digits(cnpj));
-    const html = await fetchText(this.fetchImpl, manager, "text/html,application/xhtml+xml");
-    return resolveFnetInternalFundId(html);
-  }
-
   async discover(cnpj: string, fromDate: string, untilDate: string): Promise<FnetDividendDocumentDiscoveryResult> {
+    const normalizedCnpj = digits(cnpj);
     const formattedCnpj = formatCnpj(cnpj);
-    const internalFundId = await this.resolveFundId(cnpj);
     const allRows: FnetManagerRow[] = [];
+    const seenRows = new Set<string>();
     let start = 0;
-    let total = 0;
+    let expectedTotal: number | null = null;
     let draw = 1;
     let sourceUrl = "";
 
@@ -213,24 +219,27 @@ export class FnetDividendDocumentDiscovery {
         paginaCertificados: "false",
         tipoFundo: "1",
         administrador: "",
-        idFundo: internalFundId,
+        idFundo: "",
         idCategoriaDocumento: "0",
         idTipoDocumento: "0",
         idEspecieDocumento: "0",
         situacao: "",
         cnpj: formattedCnpj,
+        cnpjFundo: normalizedCnpj,
         dataReferencia: "",
         ultimaDataReferencia: "false",
         dataInicial: isoToBr(fromDate),
         dataFinal: isoToBr(untilDate),
         idModalidade: "",
         palavraChave: "",
+        isSession: "false",
         d: String(draw),
         s: String(start),
         l: String(PAGE_SIZE),
       };
       for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-      sourceUrl = url.toString();
+      if (!sourceUrl) sourceUrl = url.toString();
+
       const text = await fetchText(this.fetchImpl, url, "application/json,text/plain;q=0.9,*/*;q=0.1");
       let payload: FnetManagerPayload;
       try {
@@ -238,19 +247,47 @@ export class FnetDividendDocumentDiscovery {
       } catch {
         throw new Error("Fundos.NET retornou JSON inválido na descoberta de rendimentos.");
       }
-      const rows = Array.isArray(payload.data) ? payload.data : [];
-      total = Number(payload.recordsFiltered ?? payload.recordsTotal ?? rows.length);
+
+      const pageRows = Array.isArray(payload.data) ? payload.data : [];
+      const total = Number(payload.recordsFiltered ?? payload.recordsTotal ?? pageRows.length);
       if (!Number.isFinite(total) || total < 0 || total > MAX_RECORDS) {
         throw new Error(`Consulta Fundos.NET não ficou restrita ao fundo (${total} registros).`);
       }
-      allRows.push(...rows);
-      start += rows.length;
+      if (expectedTotal === null) expectedTotal = total;
+      else if (total !== expectedTotal) {
+        throw new Error(`Total Fundos.NET mudou durante a paginação (${expectedTotal} para ${total}).`);
+      }
+      if (pageRows.length > PAGE_SIZE) {
+        throw new Error(`Fundos.NET excedeu o limite da página (${pageRows.length}/${PAGE_SIZE}).`);
+      }
+      if (start === 0 && total > 0 && pageRows.length === 0) {
+        throw new Error("Fundos.NET informou documentos, mas retornou a primeira página vazia.");
+      }
+
+      let newRows = 0;
+      for (const row of pageRows) {
+        const key = String(row.id || "").trim();
+        if (!key || seenRows.has(key)) continue;
+        seenRows.add(key);
+        allRows.push(row);
+        newRows += 1;
+      }
+      if (pageRows.length > 0 && newRows === 0 && start < total) {
+        throw new Error("Fundos.NET repetiu uma página sem avançar a paginação.");
+      }
+
+      start += pageRows.length;
       draw += 1;
-      if (!rows.length) break;
-    } while (start < total);
+      if (!pageRows.length) break;
+    } while (start < (expectedTotal || 0));
+
+    if (expectedTotal !== null && allRows.length !== expectedTotal) {
+      throw new Error(`Paginação Fundos.NET incompleta (${allRows.length}/${expectedTotal}).`);
+    }
 
     return {
-      internalFundId,
+      internalFundId: null,
+      filterMode: "cnpjFundo",
       documents: mapFnetDividendRows(allRows, fromDate, untilDate),
       recordsInspected: allRows.length,
       sourceUrl,
