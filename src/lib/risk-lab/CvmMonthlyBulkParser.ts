@@ -141,9 +141,25 @@ function indexed(table: CsvTable, cnpj: string) {
   return result;
 }
 
-function sharedVersion(...tables: Array<Map<number, CsvRow>>) {
-  const versions = [...tables[0].keys()].filter((version) => tables.every((table) => table.has(version)));
-  return versions.length ? Math.max(...versions) : null;
+function commonVersions(...tables: Array<Map<number, CsvRow>>) {
+  return [...tables[0].keys()]
+    .filter((version) => tables.every((table) => table.has(version)))
+    .sort((left, right) => right - left);
+}
+
+function knownVersion(
+  ativo: Map<number, CsvRow>,
+  complemento: Map<number, CsvRow>,
+  geral: Map<number, CsvRow>,
+  untilTimestamp: number,
+) {
+  const versions = commonVersions(ativo, complemento, geral);
+  if (!versions.length) return { version: null, commonVersionExists: false };
+  const version = versions.find((candidate) => {
+    const deliveredAt = knownAt(field(geral.get(candidate)!, DELIVERY));
+    return Boolean(deliveredAt && Date.parse(deliveredAt) <= untilTimestamp);
+  }) || null;
+  return { version, commonVersionExists: true };
 }
 
 export function deriveCvmMonthlyYear(
@@ -156,6 +172,8 @@ export function deriveCvmMonthlyYear(
 ) {
   const cnpj = digits(cnpjValue);
   if (cnpj.length !== 14) throw new Error("CNPJ inválido no informe mensal CVM.");
+  const untilTimestamp = Date.parse(`${untilDate}T23:59:59-03:00`);
+  if (!Number.isFinite(untilTimestamp)) throw new Error("Data final inválida no informe mensal CVM.");
   const ativo = indexed(archive.tables.ativo, cnpj);
   const complemento = indexed(archive.tables.complemento, cnpj);
   const geral = indexed(archive.tables.geral, cnpj);
@@ -172,14 +190,21 @@ export function deriveCvmMonthlyYear(
       conflicts.push(`${reference}: tabelas mensais obrigatórias incompletas.`);
       continue;
     }
-    const version = sharedVersion(a, c, g);
-    if (!version) {
+    const selected = knownVersion(a, c, g, untilTimestamp);
+    if (!selected.commonVersionExists) {
       conflicts.push(`${reference}: nenhuma versão comum entre as tabelas.`);
       continue;
     }
+    if (!selected.version) continue;
+    const version = selected.version;
     const ar = a.get(version)!;
     const cr = c.get(version)!;
     const gr = g.get(version)!;
+    const announcedAt = knownAt(field(gr, DELIVERY));
+    if (!announcedAt) {
+      conflicts.push(`${reference}: Data_Entrega inválida.`);
+      continue;
+    }
     const total = number(field(ar, DISTRIBUTION));
     const complementShares = number(field(cr, SHARES));
     const generalShares = number(field(gr, SHARES));
@@ -192,12 +217,6 @@ export function deriveCvmMonthlyYear(
       conflicts.push(`${reference}: cotas divergentes entre as tabelas.`);
       continue;
     }
-    const announcedAt = knownAt(field(gr, DELIVERY));
-    if (!announcedAt) {
-      conflicts.push(`${reference}: Data_Entrega inválida.`);
-      continue;
-    }
-    if (Date.parse(announcedAt) > Date.parse(`${untilDate}T23:59:59-03:00`)) continue;
     const competenceMonth = reference.slice(0, 7);
     const amount = Math.round(total / shares * 100_000_000) / 100_000_000;
     const rowHash = hash(`${ar.raw}\n${cr.raw}\n${gr.raw}`);
