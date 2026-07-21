@@ -1,56 +1,23 @@
 import { writeFile } from "node:fs/promises";
+import { AutomaticDividendSeriesService } from "../src/lib/risk-lab/AutomaticDividendSeriesService";
+import { mapFnetDividendRows } from "../src/lib/risk-lab/FnetDividendDocumentDiscovery";
 
+const CNPJ = "16706958000132";
+const TICKER = "KNCR11";
 const ORIGIN = "https://fnet.bmfbovespa.com.br";
-const DOCUMENT_ID = "515681";
 const OUTPUT = "risk-lab-fnet-parser-diagnostic.json";
 
-function decodeHtml(value: string) {
-  return value
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
-}
-
-function clean(value: string) {
-  return decodeHtml(value)
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function structure(html: string) {
-  const cells = [...html.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)]
-    .map((match) => clean(match[1]))
-    .filter(Boolean);
-  const inputValues = [...html.matchAll(/<(?:input|textarea|select)\b([^>]*)>/gi)]
-    .map((match) => match[1])
-    .map((attrs) => ({
-      name: attrs.match(/\bname=["']([^"']*)["']/i)?.[1] || null,
-      id: attrs.match(/\bid=["']([^"']*)["']/i)?.[1] || null,
-      value: attrs.match(/\bvalue=["']([^"']*)["']/i)?.[1] || null,
-      placeholder: attrs.match(/\bplaceholder=["']([^"']*)["']/i)?.[1] || null,
-    }))
-    .filter((item) => item.name || item.id || item.value);
+function errorRecord(error: unknown) {
   return {
-    bytes: Buffer.byteLength(html, "utf8"),
-    cells,
-    inputValues: inputValues.slice(0, 250),
-    visibleSample: clean(html).slice(0, 10000),
+    name: error instanceof Error ? error.name : null,
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : null,
   };
 }
 
-async function fetchNotice() {
-  const url = new URL("/fnet/publico/exibirDocumento", ORIGIN);
-  url.searchParams.set("cvm", "true");
-  url.searchParams.set("id", DOCUMENT_ID);
+async function fetchJson(url: URL) {
   let lastError: unknown = null;
-  for (let attempt = 1; attempt <= 4; attempt += 1) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 75_000);
     try {
@@ -59,45 +26,88 @@ async function fetchNotice() {
         cache: "no-store",
         signal: controller.signal,
         headers: {
-          Accept: "text/html,application/xhtml+xml",
-          "User-Agent": `Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/2.1; attempt-${attempt})`,
+          Accept: "application/json,text/plain;q=0.9,*/*;q=0.1",
+          Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
+          "User-Agent": `Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/2.2; attempt-${attempt})`,
+          "X-Requested-With": "XMLHttpRequest",
         },
       });
       if (!response.ok) throw new Error(`Fundos.NET respondeu HTTP ${response.status}.`);
-      const html = await response.text();
-      return {
-        attempt,
-        requestedUrl: url.toString(),
-        finalUrl: response.url,
-        contentType: response.headers.get("content-type"),
-        structure: structure(html),
-      };
+      return JSON.parse(await response.text()) as Record<string, unknown>;
     } catch (error) {
       lastError = error;
-      if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 500));
     } finally {
       clearTimeout(timer);
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Falha desconhecida ao obter aviso.");
+  throw lastError instanceof Error ? lastError : new Error("Falha desconhecida na coleta.");
 }
 
 const result: Record<string, unknown> = {
-  schemaVersion: 12,
+  schemaVersion: 13,
   generatedAt: new Date().toISOString(),
-  documentId: DOCUMENT_ID,
+  ticker: TICKER,
+  cnpj: CNPJ,
+  stage: "collection",
 };
 
 try {
-  result.notice = await fetchNotice();
-  result.status = "completed";
-} catch (error) {
-  result.status = "failed";
-  result.error = {
-    name: error instanceof Error ? error.name : null,
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : null,
+  const url = new URL("/fnet/publico/pesquisarGerenciadorDocumentosDados", ORIGIN);
+  const parameters = {
+    paginaCertificados: "false",
+    tipoFundo: "1",
+    administrador: "",
+    idFundo: "",
+    idCategoriaDocumento: "0",
+    idTipoDocumento: "0",
+    idEspecieDocumento: "0",
+    situacao: "",
+    cnpj: "16.706.958/0001-32",
+    cnpjFundo: CNPJ,
+    dataReferencia: "",
+    ultimaDataReferencia: "false",
+    dataInicial: "01/01/2022",
+    dataFinal: "31/12/2025",
+    idModalidade: "",
+    palavraChave: "",
+    isSession: "false",
+    d: "1",
+    s: "0",
+    l: "100",
   };
+  for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
+  const payload = await fetchJson(url);
+  const rows = Array.isArray(payload.data) ? payload.data as Record<string, unknown>[] : [];
+  const documents = mapFnetDividendRows(rows, "2022-01-01", "2025-12-31");
+  const selected = documents.slice(-4);
+  if (selected.length !== 4) throw new Error(`A página trouxe somente ${selected.length} aviso(s) estruturado(s).`);
+
+  result.stage = "parser";
+  result.collection = {
+    recordsTotal: payload.recordsTotal || null,
+    recordsFiltered: payload.recordsFiltered || null,
+    rowCount: rows.length,
+    structuredDocumentCount: documents.length,
+    selected,
+  };
+
+  const series = await new AutomaticDividendSeriesService().build(TICKER, selected);
+  result.series = {
+    status: series.status,
+    observationCount: series.observations.length,
+    longestContiguousSequence: series.longestContiguousSequence,
+    conflicts: series.conflicts,
+    sources: series.sources,
+    observations: series.observations,
+  };
+  if (series.observations.length !== 4) {
+    throw new Error(`O parser validou ${series.observations.length}/4 avisos reais.`);
+  }
+  result.stage = "completed";
+} catch (error) {
+  result.stage = `${String(result.stage)}_failed`;
+  result.error = errorRecord(error);
 }
 
 await writeFile(OUTPUT, `${JSON.stringify(result, null, 2)}\n`, "utf8");
