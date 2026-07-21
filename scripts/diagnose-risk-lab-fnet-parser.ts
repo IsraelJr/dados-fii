@@ -28,7 +28,7 @@ async function fetchJson(url: URL) {
         headers: {
           Accept: "application/json,text/plain;q=0.9,*/*;q=0.1",
           Referer: `${ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-          "User-Agent": `Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/2.2; attempt-${attempt})`,
+          "User-Agent": `Mozilla/5.0 (compatible; DadosFII-RiskLab-Diagnostic/2.3; attempt-${attempt})`,
           "X-Requested-With": "XMLHttpRequest",
         },
       });
@@ -45,7 +45,7 @@ async function fetchJson(url: URL) {
 }
 
 const result: Record<string, unknown> = {
-  schemaVersion: 13,
+  schemaVersion: 14,
   generatedAt: new Date().toISOString(),
   ticker: TICKER,
   cnpj: CNPJ,
@@ -92,17 +92,33 @@ try {
     selected,
   };
 
-  const series = await new AutomaticDividendSeriesService().build(TICKER, selected);
+  const partials = [];
+  for (const document of selected) {
+    const startedAt = Date.now();
+    const partial = await new AutomaticDividendSeriesService().build(TICKER, [document]);
+    partials.push({
+      documentId: document.documentId,
+      elapsedMs: Date.now() - startedAt,
+      status: partial.status,
+      observations: partial.observations,
+      conflicts: partial.conflicts,
+      sources: partial.sources,
+    });
+  }
+
+  const observations = partials
+    .flatMap((partial) => partial.observations)
+    .sort((left, right) => left.competenceMonth.localeCompare(right.competenceMonth));
+  const conflicts = partials.flatMap((partial) => partial.conflicts);
   result.series = {
-    status: series.status,
-    observationCount: series.observations.length,
-    longestContiguousSequence: series.longestContiguousSequence,
-    conflicts: series.conflicts,
-    sources: series.sources,
-    observations: series.observations,
+    executionMode: "strictly_sequential",
+    partials,
+    observationCount: observations.length,
+    conflicts,
+    observations,
   };
-  if (series.observations.length !== 4) {
-    throw new Error(`O parser validou ${series.observations.length}/4 avisos reais.`);
+  if (observations.length !== 4) {
+    throw new Error(`O parser validou ${observations.length}/4 avisos reais em execução sequencial.`);
   }
   result.stage = "completed";
 } catch (error) {
