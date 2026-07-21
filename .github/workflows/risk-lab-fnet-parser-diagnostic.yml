@@ -1,0 +1,38 @@
+name: Risk Lab FNET Parser Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/risk-lab-fnet-parser-diagnostic.yml"
+      - "scripts/diagnose-risk-lab-fnet-parser.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Diagnose real Fundos.NET parser path
+        run: node --import ./tests/register-ts-loader.mjs --experimental-strip-types scripts/diagnose-risk-lab-fnet-parser.ts
+
+      - name: Upload diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-fnet-parser-diagnostic
+          path: risk-lab-fnet-parser-diagnostic.json
+          if-no-files-found: error
+          retention-days: 7
