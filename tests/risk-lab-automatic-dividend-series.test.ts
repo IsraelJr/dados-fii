@@ -90,6 +90,43 @@ test("automatic series blocks conflicting values in the same latest version", as
   assert.equal(result.conflicts.some((item) => item.includes("Valores conflitantes")), true);
 });
 
+test("retries transient aborts and limits simultaneous Fundos.NET requests", async () => {
+  let active = 0;
+  let maximumActive = 0;
+  let firstNoticeAttempts = 0;
+  const fetchImpl = (async (input: string | URL | Request) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url);
+    const id = Number(url.searchParams.get("id") || url.searchParams.get("idDocumento"));
+    const protocol = url.pathname.includes("visualizarProtocolo");
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      if (!protocol && id === 1) {
+        firstNoticeAttempts += 1;
+        if (firstNoticeAttempts < 3) {
+          const error = new Error("This operation was aborted");
+          error.name = "AbortError";
+          throw error;
+        }
+      }
+      return protocol ? response(protocolHtml(id)) : response(noticeHtml(id, 1));
+    } finally {
+      active -= 1;
+    }
+  }) as typeof fetch;
+  const service = new AutomaticDividendSeriesService({
+    fetchImpl,
+    now: () => new Date("2026-07-18T20:00:00-03:00"),
+  });
+  const result = await service.build("MCCI11", [document(1, 1), document(2, 2), document(3, 3), document(4, 4)]);
+
+  assert.equal(firstNoticeAttempts, 3);
+  assert.ok(maximumActive <= 2);
+  assert.equal(result.observations.length, 4);
+  assert.deepEqual(result.conflicts, []);
+});
+
 test("automatic series ignores documents that are not dividend notices", async () => {
   let calls = 0;
   const service = new AutomaticDividendSeriesService({
