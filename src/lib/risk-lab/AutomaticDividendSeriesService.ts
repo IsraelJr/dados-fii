@@ -13,11 +13,11 @@ import type { VerifiedDividendNotice } from "@/types/riskLabDividendStress";
 
 const FNET_ORIGIN = "https://fnet.bmfbovespa.com.br";
 const MAX_HTML_BYTES = 2_000_000;
-const FETCH_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 25_000;
 const MAX_DOCUMENTS_PER_YEAR = 18;
 const MAX_TOTAL_DOCUMENTS = 108;
-const CONCURRENCY = 4;
-const FETCH_ATTEMPTS = 2;
+const CONCURRENCY = 2;
+const FETCH_ATTEMPTS = 3;
 const PIPELINE = "risk-lab-fnet-automatic-v0.1.0";
 
 interface ValidatedNotice {
@@ -89,7 +89,7 @@ function sha256(value: string) {
 
 function retryable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "");
-  return /AbortError|HTTP (408|425|429|5\d\d)|network|fetch failed|socket/i.test(message)
+  return /AbortError|aborted|HTTP (408|425|429|5\d\d)|network|fetch failed|socket|ECONNRESET|ETIMEDOUT/i.test(message)
     || (error instanceof Error && error.name === "AbortError");
 }
 
@@ -104,7 +104,7 @@ async function fetchHtmlOnce(fetchImpl: typeof fetch, url: string) {
       cache: "no-store",
       headers: {
         Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "DadosFII-RiskLab/0.2 (+automatic-regulatory-validation)",
+        "User-Agent": "DadosFII-RiskLab/0.3 (+automatic-regulatory-validation)",
       },
     });
     if (!response.ok) throw new Error(`FNET respondeu HTTP ${response.status}.`);
@@ -130,7 +130,7 @@ async function fetchHtml(fetchImpl: typeof fetch, url: string) {
     } catch (error) {
       lastError = error;
       if (attempt === FETCH_ATTEMPTS || !retryable(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, attempt * 200));
+      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
     }
   }
   throw lastError instanceof Error ? lastError : new Error("Falha desconhecida ao consultar o FNET.");
@@ -146,10 +146,11 @@ async function validateDocument(
   if (!/^\d{1,20}$/.test(id)) throw new Error("ID regulatório inválido.");
   const sourceUrl = `${FNET_ORIGIN}/fnet/publico/exibirDocumento?cvm=true&id=${id}`;
   const protocolUrl = `${FNET_ORIGIN}/fnet/publico/visualizarProtocoloDocumentoCVM?idDocumento=${id}`;
-  const [noticeHtml, protocolHtml] = await Promise.all([
-    fetchHtml(fetchImpl, sourceUrl),
-    fetchHtml(fetchImpl, protocolUrl),
-  ]);
+
+  // As duas páginas pertencem ao mesmo documento. Buscá-las em sequência reduz
+  // picos de conexão e timeouts do servidor público sem alterar a evidência.
+  const noticeHtml = await fetchHtml(fetchImpl, sourceUrl);
+  const protocolHtml = await fetchHtml(fetchImpl, protocolUrl);
   const notice = parseFnetDividendNoticeHtml(noticeHtml);
   const protocol = parseFnetProtocolHtml(protocolHtml);
   if (notice.ticker !== ticker) throw new Error(`Ticker divergente: ${notice.ticker}.`);
