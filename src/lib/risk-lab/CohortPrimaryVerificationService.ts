@@ -99,6 +99,13 @@ function blocker(
   return { code, stage, message, sourceUrl, year };
 }
 
+function dividendSeriesFailureDetail(monthlySeries: AutomaticMonthlySeries) {
+  const firstConflict = monthlySeries.conflicts
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .find(Boolean);
+  return firstConflict ? ` Causa operacional: ${firstConflict.slice(0, 320)}` : "";
+}
+
 export interface CohortPrimaryVerificationInput {
   item: OutOfSampleValidationCase;
   monthlySeries: AutomaticMonthlySeries;
@@ -155,7 +162,7 @@ export class CohortPrimaryVerificationService {
       blockers.push(blocker(
         "DIVIDEND_SERIES_NOT_READY",
         "dividend-series",
-        `Série primária insuficiente: status ${monthlySeries.status}, sequência contínua ${monthlySeries.longestContiguousSequence}.`,
+        `Série primária insuficiente: status ${monthlySeries.status}, sequência contínua ${monthlySeries.longestContiguousSequence}.${dividendSeriesFailureDetail(monthlySeries)}`,
       ));
     }
     if (screen.status === "inconclusive") {
