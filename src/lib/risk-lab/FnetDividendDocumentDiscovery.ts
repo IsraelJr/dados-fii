@@ -25,9 +25,23 @@ interface FnetManagerPayload {
   recordsTotal?: number;
 }
 
+export interface FnetDividendProtocolMetadata {
+  referenceDate: string;
+  deliveredAt: string;
+  version: number;
+  status: string;
+  modality: string;
+  situation: string;
+  sourceUrl: string;
+}
+
+export interface FnetDividendDocumentEvidence extends AutomaticDocumentEvidence {
+  protocolMetadata: FnetDividendProtocolMetadata;
+}
+
 export interface FnetDividendDocumentDiscoveryResult {
   internalFundId: string;
-  documents: AutomaticDocumentEvidence[];
+  documents: FnetDividendDocumentEvidence[];
   recordsInspected: number;
   sourceUrl: string;
 }
@@ -130,39 +144,58 @@ function acceptedStatus(row: FnetManagerRow) {
   return !status || status === "A" || status === "I";
 }
 
+function protocolMetadata(row: FnetManagerRow, documentId: string): FnetDividendProtocolMetadata {
+  const referenceDate = parseReferenceDate(row.dataReferencia);
+  const deliveredAt = parseDeliveryDate(row.dataEntrega);
+  const version = Number(row.versao);
+  if (!referenceDate || !deliveredAt || !Number.isInteger(version) || version < 1) {
+    throw new Error(`Metadados oficiais de protocolo inválidos no documento ${documentId}.`);
+  }
+  return {
+    referenceDate,
+    deliveredAt,
+    version,
+    status: String(row.descricaoStatus || "").trim(),
+    modality: String(row.descricaoModalidade || "").trim(),
+    situation: normalize(row.situacaoDocumento),
+    sourceUrl: `${FNET_ORIGIN}/fnet/publico/pesquisarGerenciadorDocumentosDados`,
+  };
+}
+
 export function mapFnetDividendRows(
   rows: FnetManagerRow[],
   fromDate: string,
   untilDate: string,
-): AutomaticDocumentEvidence[] {
+): FnetDividendDocumentEvidence[] {
   const from = Date.parse(`${fromDate}T00:00:00-03:00`);
   const until = Date.parse(`${untilDate}T23:59:59-03:00`);
-  const documents = new Map<string, AutomaticDocumentEvidence>();
+  const documents = new Map<string, FnetDividendDocumentEvidence>();
 
   for (const row of rows) {
     if (!isDividendRow(row) || !acceptedStatus(row)) continue;
     const documentId = String(row.id || "").trim();
-    const receivedAt = parseDeliveryDate(row.dataEntrega);
-    if (!/^\d{1,20}$/.test(documentId) || !receivedAt) continue;
-    const receivedTime = Date.parse(receivedAt);
+    if (!/^\d{1,20}$/.test(documentId)) {
+      throw new Error("Aviso estruturado do Fundos.NET sem identificador válido.");
+    }
+    const metadata = protocolMetadata(row, documentId);
+    const receivedTime = Date.parse(metadata.deliveredAt);
     if (!Number.isFinite(receivedTime) || receivedTime < from || receivedTime > until) continue;
-    const competenceDate = parseReferenceDate(row.dataReferencia);
-    const sourceYear = Number((competenceDate || receivedAt).slice(0, 4));
-    const version = Number(row.versao);
+    const sourceYear = Number(metadata.referenceDate.slice(0, 4));
     documents.set(documentId, {
       documentId,
       documentType: "Aviso aos Cotistas - Estruturado - Rendimentos e Amortizações",
       fileName: `fnet-rendimentos-${documentId}.html`,
-      competenceDate,
-      receivedAt,
+      competenceDate: metadata.referenceDate,
+      receivedAt: metadata.deliveredAt,
       link: `${FNET_ORIGIN}/fnet/publico/exibirDocumento?cvm=true&id=${documentId}`,
       sourceYear,
       auditResult: [
-        String(row.descricaoStatus || "").trim(),
-        String(row.descricaoModalidade || "").trim(),
-        Number.isInteger(version) ? `versão ${version}` : "",
-      ].filter(Boolean).join("; ") || null,
-      confidence: normalize(row.situacaoDocumento) === "A" ? 99 : 96,
+        metadata.status,
+        metadata.modality,
+        `versão ${metadata.version}`,
+      ].filter(Boolean).join(";") || null,
+      confidence: metadata.situation === "A" ? 99 : 96,
+      protocolMetadata: metadata,
     });
   }
 
@@ -183,7 +216,7 @@ async function fetchText(fetchImpl: typeof fetch, url: URL, accept: string) {
         headers: {
           Accept: accept,
           Referer: `${FNET_ORIGIN}/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-          "User-Agent": "DadosFII-RiskLab/0.4 (+automatic-primary-dividend-discovery)",
+          "User-Agent": "DadosFII-RiskLab/0.5 (+automatic-primary-dividend-discovery)",
           "X-Requested-With": "XMLHttpRequest",
         },
       });
