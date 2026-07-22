@@ -24,7 +24,7 @@
     "fromDate": "2021-01-01",
     "untilDate": "2026-07-22"
   },
-  "evidenceFile": "docs/production-evidence/risk-lab/deva11-phase-a-evidence.json",
+  "evidenceIndex": "docs/production-evidence/risk-lab/deva11-phase-a/index.json",
   "expected": {
     "documentsDiscovered": 85,
     "documentsProcessed": 85,
@@ -35,6 +35,7 @@
     "inputCheckpointHash": "6b923ceeff2a0a9ddcd27d72b4d8125d3b2cc6aca6109c57531c3efed36d4a89",
     "caseHash": "fca3de0e38755c8213d7e37d5112b51733c794dd29a2f2f7cb5be82980313aa2",
     "auditHash": "157e807f7a61c4d9bb34eedc324e761c8a19c25ac93505023606f6ffcd2159af",
-    "evidenceHash": "2976546b0be83b275e94cf391404dff555ba75dbec123b5c4d305d20c34c2c23"
+    "evidenceHash": "b6f39bea9df860d0ddf12103de9f59abbb65e1370ed2c832cec6f9601c0a1f87",
+    "observationsArtifactGzipSha256": "e3c28ee35d357e74caeded55b6f4de0787489558a3f66f28c32c381bae2a5a43"
   }
 }
