@@ -6,6 +6,7 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "
 
 const publicRoute = read("src/app/api/system/risk-lab-cohort-backtest/route.ts");
 const adminRoute = read("src/app/api/admin/system/risk-lab/cohort-backtest/route.ts");
+const planner = read("src/lib/risk-lab/RiskLabCohortAdvancePlanner.ts");
 const client = read("src/app/admin/risk-lab/cohortBacktestClient.ts");
 const panel = read("src/app/admin/risk-lab/CohortBacktestPanel.tsx");
 const workflow = read(".github/workflows/risk-lab-cohort-backtest.yml");
@@ -24,12 +25,13 @@ test("API pública divide a execução em initialize, case e finalize no release
   assert.doesNotMatch(publicRoute, /segmentedRiskLabCohortBacktestService\.run\(\)/);
 });
 
-test("API Admin mantém autenticação, coorte fechada e avanço automático", () => {
+test("API Admin mantém autenticação, coorte fechada e avanço delegado", () => {
   assert.match(adminRoute, /authorizeAdminRequest/);
   assert.match(adminRoute, /new Set\(\["initialize", "case", "finalize", "advance"\]\)/);
   assert.match(adminRoute, /SEGMENTED_COHORT_TICKERS\.includes\(ticker\)/);
   assert.match(adminRoute, /action === "advance"/);
-  assert.match(adminRoute, /SEGMENTED_COHORT_TICKERS\.find/);
+  assert.match(adminRoute, /planRiskLabCohortAdvance/);
+  assert.match(planner, /tickers\.find/);
   assert.doesNotMatch(adminRoute, /action === "execute"/);
 });
 
