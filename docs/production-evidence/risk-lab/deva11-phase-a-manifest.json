@@ -24,6 +24,7 @@
     "fromDate": "2021-01-01",
     "untilDate": "2026-07-22"
   },
+  "evidenceFile": "docs/production-evidence/risk-lab/deva11-phase-a-evidence.json",
   "expected": {
     "documentsDiscovered": 85,
     "documentsProcessed": 85,
@@ -31,7 +32,9 @@
     "selectedMonthlyObservations": 65,
     "pendingDocuments": 0,
     "conflicts": 0,
+    "inputCheckpointHash": "6b923ceeff2a0a9ddcd27d72b4d8125d3b2cc6aca6109c57531c3efed36d4a89",
     "caseHash": "fca3de0e38755c8213d7e37d5112b51733c794dd29a2f2f7cb5be82980313aa2",
-    "auditHash": "56642c7507a78aa06cc95af77c985509898123a532970630e38507a310c4ad7b"
+    "auditHash": "157e807f7a61c4d9bb34eedc324e761c8a19c25ac93505023606f6ffcd2159af",
+    "evidenceHash": "2976546b0be83b275e94cf391404dff555ba75dbec123b5c4d305d20c34c2c23"
   }
 }
