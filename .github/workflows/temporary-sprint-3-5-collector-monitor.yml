@@ -18,7 +18,7 @@ jobs:
       - name: Inspect collector run and artifacts
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: 2537ac594ae24e5804f25f44cc71c22fb219cdc4
+          TARGET_SHA: b54bc58276f43695c3f48f2aa8c9f47a2cadac2a
         run: |
           set -euo pipefail
           mkdir -p monitor
