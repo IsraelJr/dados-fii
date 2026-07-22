@@ -128,12 +128,15 @@ test("artefatos operacionais possuem retenção curta", () => {
 
 test("orquestração do backtest ocorre no backend por avanço idempotente", () => {
   const route = readFileSync("src/app/api/admin/system/risk-lab/cohort-backtest/route.ts", "utf8");
+  const planner = readFileSync("src/lib/risk-lab/RiskLabCohortAdvancePlanner.ts", "utf8");
   const kickoff = source("risk-lab-cohort-backtest.yml");
-  assert.match(route, /"advance"/);
-  assert.match(route, /getPublicEvidence\(\)/);
-  assert.match(route, /SEGMENTED_COHORT_TICKERS\.find/);
+  assert.match(route, /planRiskLabCohortAdvance/);
+  assert.match(planner, /SEGMENTED|tickers\.find|nextTicker/);
+  assert.match(planner, /action: "initialize"/);
+  assert.match(planner, /action: "finalize"/);
+  assert.match(planner, /action: "noop"/);
   assert.match(route, /nextAction/);
-  assert.doesNotMatch(route, /github-actions|deploy-trigger|git\s+push/i);
+  assert.doesNotMatch(`${route}\n${planner}`, /github-actions|deploy-trigger|git\s+push/i);
   assert.equal((kickoff.match(/curl\b/g) || []).length, 1, "kickoff deve fazer uma única chamada HTTP");
   assert.doesNotMatch(kickoff, /npm\s+(ci|install)|actions\/checkout|sleep|for\s+attempt/i);
 });
