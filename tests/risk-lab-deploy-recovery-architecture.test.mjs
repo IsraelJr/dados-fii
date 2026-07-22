@@ -22,7 +22,7 @@ test("recuperação é espaçada, limitada e não exige ação do proprietário"
   assert.doesNotMatch(executable(workflow), /approval|approve|manual_document_review|ADMIN_EMAILS/);
 });
 
-test("recuperação só aceita evidência final da release atualmente implantável", () => {
+test("recuperação só aceita evidência final do commit atualmente implantável", () => {
   assert.match(workflow, /risk-lab-3-5-20260720-v2/);
   assert.match(workflow, /current_release=\$\(git rev-parse HEAD\)/);
   assert.match(workflow, /run_id.*RUN_ID/);
@@ -33,12 +33,16 @@ test("recuperação só aceita evidência final da release atualmente implantáv
   assert.match(workflow, /completed=true/);
 });
 
-test("orçamento de tentativas reinicia automaticamente quando o SHA alvo muda", () => {
-  assert.match(workflow, /marker_release=.*targetRelease/);
-  assert.match(workflow, /marker_release.*current_release/);
+test("orçamento reinicia em commit funcional novo, mas não em commit-gatilho", () => {
+  assert.match(workflow, /current_subject=\$\(git log -1 --pretty=%s\)/);
+  assert.match(workflow, /current_subject.*ci: reaciona deploy da Sprint 3\.5 para/);
+  assert.match(workflow, /marker_release.*\^\[a-f0-9\]\{40\}\$/);
+  assert.match(workflow, /target_release="\$marker_release"/);
+  assert.match(workflow, /current_attempt=\$\(jq -r '\.attempt \/\/ 0'/);
+  assert.match(workflow, /target_release="\$current_release"/);
   assert.match(workflow, /current_attempt=0/);
   assert.match(workflow, /\.targetRelease = \$targetRelease/);
-  assert.match(workflow, /\.schemaVersion = 3/);
+  assert.match(workflow, /para \$\{target_release\} \(\$\{next_attempt\}\/\$\{maximum_attempts\}\)/);
 });
 
 test("marcador v3 possui release alvo e limite explícito", () => {
