@@ -287,6 +287,15 @@ export class FrozenDividendNoticeCollector {
     if (!(notice.amountPerShare > 0)) {
       throw new Error(`Valor anunciado não positivo no aviso ${document.documentId}.`);
     }
+
+    // A competência econômica define se o documento participa da coorte. Documentos
+    // fora da janela são descartados antes de validar metadados históricos que podem
+    // conter erros oficiais sem qualquer efeito na série congelada analisada.
+    const competence = monthIndex(notice.competenceMonth);
+    const firstMonth = monthIndex(identity.fromDate.slice(0, 7));
+    const lastMonth = monthIndex(identity.untilDate.slice(0, 7));
+    if (competence < firstMonth || competence > lastMonth) return null;
+
     if (!Number.isInteger(protocol.version) || protocol.version < 1) {
       throw new Error(`Versão oficial inválida no documento ${document.documentId}.`);
     }
@@ -306,11 +315,6 @@ export class FrozenDividendNoticeCollector {
     if (!Number.isFinite(catalogDifference) || catalogDifference > 60_000) {
       throw new Error(`Entrega oficial diverge do catálogo (${document.documentId}).`);
     }
-
-    const competence = monthIndex(notice.competenceMonth);
-    const firstMonth = monthIndex(identity.fromDate.slice(0, 7));
-    const lastMonth = monthIndex(identity.untilDate.slice(0, 7));
-    if (competence < firstMonth || competence > lastMonth) return null;
 
     return {
       ticker: identity.ticker,

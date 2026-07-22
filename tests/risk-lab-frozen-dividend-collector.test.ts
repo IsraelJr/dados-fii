@@ -219,3 +219,50 @@ test("ignora classes secundárias da mesma família e escolhe a maior versão do
   assert.equal(result.dataset.cases[0].observations[0].amountPerShare, 1.2);
   assert.equal(result.dataset.cases[0].conflicts.length, 0);
 });
+
+test("ignora anomalia histórica de protocolo quando a competência está fora da coorte", async () => {
+  const targetIdentities = identities();
+  const documentsByCnpj = new Map<string, FnetDividendDocumentEvidence[]>();
+  const htmlById = new Map<string, string>();
+
+  targetIdentities.forEach((identity, index) => {
+    const current = document(String(3000 + index * 10));
+    documentsByCnpj.set(identity.cnpj, [current]);
+    htmlById.set(current.documentId, notice(identity.ticker));
+  });
+
+  const first = targetIdentities[0];
+  const historical = document("3999");
+  historical.protocolMetadata.referenceDate = "2021-01-31";
+  documentsByCnpj.set(first.cnpj, [historical, ...documentsByCnpj.get(first.cnpj)!]);
+  htmlById.set("3999", notice(first.ticker).replace("01-2022", "12-2021"));
+
+  const collector = new FrozenDividendNoticeCollector({
+    attempts: 1,
+    now: () => new Date("2026-07-22T03:00:00-03:00"),
+    discovery: {
+      async discover(cnpj: string) {
+        const documents = documentsByCnpj.get(cnpj);
+        assert.ok(documents);
+        return {
+          internalFundId: cnpj,
+          documents,
+          recordsInspected: documents.length,
+          sourceUrl: "https://fnet.bmfbovespa.com.br/fnet/publico/pesquisarGerenciadorDocumentosDados",
+        };
+      },
+    },
+    fetchImpl: (async (input: string | URL | Request) => {
+      const id = new URL(String(input)).searchParams.get("id") || "";
+      const html = htmlById.get(id);
+      assert.ok(html);
+      return new Response(html, { status: 200, headers: { "content-type": "text/html" } });
+    }) as typeof fetch,
+  });
+
+  const result = await collector.collect(targetIdentities, RELEASE, null, async () => undefined);
+  assert.equal(result.dataset.status, "complete");
+  assert.equal(result.dataset.cases[0].documentsProcessed, 2);
+  assert.equal(result.dataset.cases[0].pendingDocumentIds.length, 0);
+  assert.equal(result.dataset.cases[0].observations.length, 1);
+});

@@ -43,6 +43,7 @@ test("protocolo histórico usa metadados oficiais do gerenciador sem endpoint bl
 test("workflow coleta fora da Vercel com checkpoint, retomada e evidência imutável", () => {
   assert.match(workflow, /actions\/download-artifact@v4/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /timeout-minutes:\s*120/);
   assert.match(workflow, /risk-lab-dividend-notices-checkpoint\.json/);
   assert.match(workflow, /collect-risk-lab-dividend-notices\.ts/);
   assert.match(workflow, /git push --force-with-lease/);
