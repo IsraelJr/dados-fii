@@ -25,20 +25,20 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: risk-lab-frozen-dividend-notices
+  group: risk-lab-frozen-dividend-notices-v2
   cancel-in-progress: false
 
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     env:
-      RUN_ID: risk-lab-3-5-20260720-v2
+      RUN_ID: risk-lab-3-5-20260722-v3
       PRODUCTION_ORIGIN: https://dadosfii.com.br
       OUTPUT_PATH: src/lib/risk-lab/frozen-dividend-notices-v0.1.json
       CHECKPOINT_PATH: .tmp/risk-lab-dividend-notices-checkpoint.json
       SUMMARY_PATH: docs/risk-lab/sprint-3-5-frozen-dividend-notices.md
-      CHECKPOINT_ARTIFACT: risk-lab-frozen-dividend-checkpoint
+      CHECKPOINT_ARTIFACT: risk-lab-frozen-dividend-checkpoint-v2
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -158,6 +158,7 @@ jobs:
             and (.releaseCommit == "${{ github.sha }}")
             and (.cases | length == 6)
             and ([.cases[] | select(.status != "complete" or (.pendingDocumentIds | length) != 0 or (.conflicts | length) != 0)] | length == 0)
+            and ([.cases[].observations[] | select(.protocolEvidenceType != "official_manager_metadata")] | length == 0)
             and (.datasetHash | test("^[a-f0-9]{64}$"))
           ' "$OUTPUT_PATH"
           npm run typecheck
@@ -192,7 +193,7 @@ jobs:
           - Premium integrado: \`false\`
           - notificações enviadas: \`false\`
 
-          A coleta foi sequencial por fundo e documento, com retentativas, backoff, checkpoint reutilizável, validação de aviso/protocolo, exclusão temporal e hashes SHA-256. O ruleset \`v0.1.0\` não foi alterado.
+          A coleta foi sequencial por fundo e documento, com retentativas, backoff, checkpoint reutilizável, validação do aviso e dos metadados oficiais de protocolo, exclusão temporal e hashes SHA-256. O ruleset \`v0.1.0\` não foi alterado.
           BODY
           echo "status=${status}" >> "$GITHUB_OUTPUT"
           echo "branch=${branch}" >> "$GITHUB_OUTPUT"
