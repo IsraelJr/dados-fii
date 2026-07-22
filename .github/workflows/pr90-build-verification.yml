@@ -25,4 +25,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - name: Build with diagnostic capture
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/next-build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr90-next-build-diagnostics
+          path: /tmp/next-build.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Enforce build
+        if: steps.build.outcome != 'success'
+        run: exit 1
