@@ -6,6 +6,10 @@ const route = readFileSync(
   "src/app/api/admin/system/risk-lab/cohort-backtest/route.ts",
   "utf8",
 );
+const planner = readFileSync(
+  "src/lib/risk-lab/RiskLabCohortAdvancePlanner.ts",
+  "utf8",
+);
 const panel = readFileSync(
   "src/app/admin/risk-lab/CohortBacktestPanel.tsx",
   "utf8",
@@ -46,12 +50,15 @@ test("API da coorte reutiliza autenticação Admin e executa etapas segmentadas 
   assert.doesNotMatch(executable(route), /CRON_SECRET|ADMIN_EMAILS|firebaseAdmin|adminDb/);
 });
 
-test("advance escolhe automaticamente inicialização, próximo fundo ou finalização", () => {
+test("advance delega ao planner puro a inicialização, próximo fundo ou finalização", () => {
   assert.match(route, /action === "advance"/);
   assert.match(route, /getPublicEvidence\(\)/);
-  assert.match(route, /current\.releaseCommit !== releaseCommit/);
-  assert.match(route, /SEGMENTED_COHORT_TICKERS\.find/);
-  assert.match(route, /resolvedAction = pendingTicker \? "case" : "finalize"/);
+  assert.match(route, /planRiskLabCohortAdvance/);
+  assert.match(planner, /tickers\.find/);
+  assert.match(planner, /action: "initialize"/);
+  assert.match(planner, /action: "case"/);
+  assert.match(planner, /action: "finalize"/);
+  assert.match(planner, /action: "noop"/);
   assert.match(route, /nextAction/);
   assert.match(route, /nextTicker/);
 });
