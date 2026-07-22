@@ -12,6 +12,7 @@ on:
       - "src/lib/risk-lab/FnetDividendNoticeParser.ts"
       - "src/lib/risk-lab/FrozenDividendDatasetIntegrity.ts"
       - "src/lib/risk-lab/FrozenDividendNoticeCollector.ts"
+      - "src/lib/risk-lab/RiskLabCohortBacktestV2Service.ts"
       - "src/lib/risk-lab/RiskLabCohortIdentityService.ts"
       - "src/types/riskLabFrozenDividendDataset.ts"
       - "tests/risk-lab-frozen-dividend-*.test.ts"
@@ -25,7 +26,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: risk-lab-frozen-dividend-notices-v2
+  group: risk-lab-frozen-dividend-notices-v3
   cancel-in-progress: false
 
 jobs:
@@ -33,12 +34,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      RUN_ID: risk-lab-3-5-20260722-v3
+      RUN_ID: risk-lab-3-5-20260720-v2
       PRODUCTION_ORIGIN: https://dadosfii.com.br
       OUTPUT_PATH: src/lib/risk-lab/frozen-dividend-notices-v0.1.json
       CHECKPOINT_PATH: .tmp/risk-lab-dividend-notices-checkpoint.json
       SUMMARY_PATH: docs/risk-lab/sprint-3-5-frozen-dividend-notices.md
-      CHECKPOINT_ARTIFACT: risk-lab-frozen-dividend-checkpoint-v2
+      CHECKPOINT_ARTIFACT: risk-lab-frozen-dividend-checkpoint-v3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
