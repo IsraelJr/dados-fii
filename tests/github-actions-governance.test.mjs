@@ -29,7 +29,9 @@ test("todos os workflows ativos estão inventariados e possuem política oficial
   const inventory = readFileSync(INVENTORY_PATH, "utf8");
   const files = workflowFiles();
   assert.ok(files.length > 0, "ao menos um workflow deve permanecer ativo");
-  for (const file of files) assert.match(inventory, new RegExp(`\\\`${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\\``));
+  for (const file of files) {
+    assert.equal(inventory.includes(`\`${file}\``), true, `${file} deve constar no inventário`);
+  }
 });
 
 test("workflows legados, recovery por commit e marcador operacional não retornam", () => {
