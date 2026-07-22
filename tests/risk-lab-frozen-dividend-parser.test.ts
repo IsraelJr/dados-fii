@@ -9,6 +9,19 @@ function table(rows: Array<[string, string]>) {
   return `<html><body><table>${rows.map(([label, value]) => `<tr><td>${label}</td><td>${value}</td></tr>`).join("")}</table></body></html>`;
 }
 
+function noticeWithPeriod(period: string, informationDate = "31/01/2022") {
+  return table([
+    ["Nome do Fundo:", "FUNDO DE TESTE"],
+    ["Data da Informação:", informationDate],
+    ["Código de negociação:", "AAAA11"],
+    ["Data-base (último dia de negociação com direito ao provento)", informationDate],
+    ["Valor do provento (R$/unidade)", "1,00"],
+    ["Data do pagamento", "14/02/2022"],
+    ["Período de referência", period],
+    ["Rendimento isento de IR*", "Sim"],
+  ]);
+}
+
 test("decodifica entidades nomeadas, numéricas, acentos e aspas tipográficas reais", () => {
   const notice = table([
     ["Nome do Fundo:", "FUNDO DE RECEB&Iacute;VEIS A&Ccedil;&Atilde;O"],
@@ -36,7 +49,6 @@ test("decodifica entidades nomeadas, numéricas, acentos e aspas tipográficas r
   assert.equal(parsedProtocol.version, 3);
   assert.equal(parsedProtocol.deliveredAt, "2022-01-31T18:02:59-03:00");
 });
-
 
 test("normaliza competência legada curta e virada dezembro/janeiro sem informação futura", () => {
   const legacy = table([
@@ -70,4 +82,11 @@ test("aceita código de outra classe para o coletor decidir o isolamento pelo ti
     ["Rendimento isento de IR*", "Sim"],
   ]);
   assert.equal(parseFnetDividendNoticeHtml(secondary).ticker, "AAAA13");
+});
+
+test("rejeita competência futura fora da correção estrita de virada anual", () => {
+  assert.throws(
+    () => parseFnetDividendNoticeHtml(noticeWithPeriod("02-2022")),
+    /posterior à informação/,
+  );
 });
