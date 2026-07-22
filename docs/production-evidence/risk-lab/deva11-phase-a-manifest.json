@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-A",
+  "sourceArtifact": {
+    "workflowRunId": 29892173774,
+    "artifactId": 8519627249,
+    "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+    "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+    "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+  },
+  "identity": {
+    "ticker": "DEVA11",
+    "cnpj": "37087810000137",
+    "role": "severe_deterioration",
+    "fromDate": "2021-01-01",
+    "untilDate": "2026-07-22"
+  },
+  "pendingDocumentIds": [
+    "137843",
+    "349282"
+  ]
+}
