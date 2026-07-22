@@ -113,30 +113,63 @@ function validMonth(value: string) {
     : null;
 }
 
+function normalizeTemporalCompetence(value: string, informationDate: string, raw: string) {
+  const informationMonth = informationDate.slice(0, 7);
+  if (value <= informationMonth) return value;
+
+  const [year, month] = value.split("-").map(Number);
+  const [informationYear, informationMonthNumber] = informationMonth.split("-").map(Number);
+  if (year === informationYear && month === 12 && informationMonthNumber === 1) {
+    return `${year - 1}-12`;
+  }
+  throw new Error(`Período de referência FNET posterior à informação: ${raw}`);
+}
+
 function parseCompetence(value: string, informationDate: string) {
   const raw = decodeHtml(value).replace(/\s+/g, " ").trim();
   const monthYear = raw.match(/\b(0?[1-9]|1[0-2])\s*[-\/.]\s*(20\d{2})\b/);
-  if (monthYear) return `${monthYear[2]}-${String(Number(monthYear[1])).padStart(2, "0")}`;
+  if (monthYear) {
+    return normalizeTemporalCompetence(
+      `${monthYear[2]}-${String(Number(monthYear[1])).padStart(2, "0")}`,
+      informationDate,
+      raw,
+    );
+  }
 
   const yearMonth = raw.match(/\b(20\d{2})\s*[-\/.]\s*(0?[1-9]|1[0-2])\b/);
-  if (yearMonth) return `${yearMonth[1]}-${String(Number(yearMonth[2])).padStart(2, "0")}`;
+  if (yearMonth) {
+    return normalizeTemporalCompetence(
+      `${yearMonth[1]}-${String(Number(yearMonth[2])).padStart(2, "0")}`,
+      informationDate,
+      raw,
+    );
+  }
 
   const compact = raw.match(/\b(20\d{2})(0[1-9]|1[0-2])\b/);
-  if (compact) return `${compact[1]}-${compact[2]}`;
+  if (compact) return normalizeTemporalCompetence(`${compact[1]}-${compact[2]}`, informationDate, raw);
+
+  const shortMonthYear = raw.match(/\b(0?[1-9]|1[0-2])\s*[-\/.]\s*(\d{2})\b/);
+  if (shortMonthYear) {
+    return normalizeTemporalCompetence(
+      `20${shortMonthYear[2]}-${String(Number(shortMonthYear[1])).padStart(2, "0")}`,
+      informationDate,
+      raw,
+    );
+  }
 
   const cleaned = normalize(raw);
   const monthName = Object.keys(MONTHS).find((month) => cleaned.includes(month));
   if (monthName) {
     const yearMatch = cleaned.match(/\b(20\d{2})\b/);
     const year = yearMatch?.[1] || informationDate.slice(0, 4);
-    return `${year}-${MONTHS[monthName]}`;
+    return normalizeTemporalCompetence(`${year}-${MONTHS[monthName]}`, informationDate, raw);
   }
 
   const tokens = cleaned.split(" ").filter(Boolean);
   if (tokens.length >= 2) {
     const month = validMonth(tokens[0]);
     const year = tokens.find((token) => /^20\d{2}$/.test(token));
-    if (month && year) return `${year}-${month}`;
+    if (month && year) return normalizeTemporalCompetence(`${year}-${month}`, informationDate, raw);
   }
 
   throw new Error(`Período de referência FNET inválido: ${value}`);
@@ -169,7 +202,7 @@ export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
   const exemptRaw = field(allCells, ["Rendimento isento de IR*"]).toLowerCase();
   const ticker = field(allCells, ["Código de negociação:", "Código de negociação da cota:"]).toUpperCase();
 
-  if (!/^[A-Z]{4}11$/.test(ticker)) throw new Error(`Ticker FNET inválido: ${ticker}`);
+  if (!/^[A-Z]{4}\d{2}$/.test(ticker)) throw new Error(`Ticker FNET inválido: ${ticker}`);
 
   return {
     ticker,

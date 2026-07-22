@@ -156,3 +156,66 @@ test("checkpoint retoma somente documento pendente sem duplicar observações an
   assert.equal(firstSuccessfulCalls, 1);
   assert.equal(new Set(second.dataset.cases.flatMap((item) => item.observations.map((entry) => entry.documentId))).size, 6);
 });
+
+
+test("ignora classes secundárias da mesma família e escolhe a maior versão do evento antes da competência", async () => {
+  const targetIdentities = identities();
+  const documentsByCnpj = new Map<string, FnetDividendDocumentEvidence[]>();
+  const htmlById = new Map<string, string>();
+
+  targetIdentities.forEach((identity, index) => {
+    const base = document(String(2000 + index * 10));
+    documentsByCnpj.set(identity.cnpj, [base]);
+    htmlById.set(base.documentId, notice(identity.ticker));
+  });
+
+  const first = targetIdentities[0];
+  const v1 = document("2101");
+  const v2 = document("2102");
+  const secondary = document("2103");
+  v1.protocolMetadata.version = 1;
+  v2.protocolMetadata.version = 2;
+  secondary.protocolMetadata.version = 1;
+  documentsByCnpj.set(first.cnpj, [v1, v2, secondary]);
+  htmlById.set("2101", notice(first.ticker).replace("01-2022", "12-2022"));
+  htmlById.set("2102", notice(first.ticker).replace("1,00", "1,20"));
+  htmlById.set("2103", notice(`${first.ticker.slice(0, 4)}13`, "9,99"));
+
+  const collector = new FrozenDividendNoticeCollector({
+    attempts: 1,
+    now: () => new Date("2026-07-22T02:00:00-03:00"),
+    discovery: {
+      async discover(cnpj: string) {
+        const documents = documentsByCnpj.get(cnpj);
+        assert.ok(documents);
+        return {
+          internalFundId: cnpj,
+          documents,
+          recordsInspected: documents.length,
+          sourceUrl: "https://fnet.bmfbovespa.com.br/fnet/publico/pesquisarGerenciadorDocumentosDados",
+        };
+      },
+    },
+    fetchImpl: (async (input: string | URL | Request) => {
+      const id = new URL(String(input)).searchParams.get("id") || "";
+      const html = htmlById.get(id);
+      assert.ok(html);
+      return new Response(html, { status: 200, headers: { "content-type": "text/html" } });
+    }) as typeof fetch,
+  });
+
+  const result = await collector.collect(
+    targetIdentities,
+    RELEASE,
+    null,
+    async () => undefined,
+  );
+  assert.equal(result.dataset.status, "complete");
+  assert.equal(result.dataset.collectorVersion, "1.2.0");
+  assert.equal(result.dataset.cases[0].pendingDocumentIds.length, 0);
+  assert.equal(result.dataset.cases[0].documentsProcessed, 3);
+  assert.equal(result.dataset.cases[0].observations.length, 1);
+  assert.equal(result.dataset.cases[0].observations[0].documentId, "2102");
+  assert.equal(result.dataset.cases[0].observations[0].amountPerShare, 1.2);
+  assert.equal(result.dataset.cases[0].conflicts.length, 0);
+});
