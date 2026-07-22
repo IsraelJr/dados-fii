@@ -48,8 +48,8 @@ test("workflow coleta fora da Vercel com checkpoint, retomada e evidência imut�
   assert.match(workflow, /collect-risk-lab-dividend-notices\.ts/);
   assert.match(workflow, /git push --force-with-lease/);
   assert.match(workflow, /gh pr create/);
-  assert.match(workflow, /Premium integrado: \`false\`/);
-  assert.match(workflow, /notificações enviadas: \`false\`/);
+  assert.match(workflow, /Premium integrado: \\`false\\`/);
+  assert.match(workflow, /notificações enviadas: \\`false\\`/);
 });
 
 test("workflow e endpoint compartilham exatamente o mesmo identificador protegido", () => {
