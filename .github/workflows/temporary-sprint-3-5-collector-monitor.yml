@@ -47,19 +47,65 @@ jobs:
           fi
           cat monitor/target-run.json
 
-      - name: Capture real Fundos.NET fund resolver contract
+      - name: Capture real Fundos.NET contracts
         shell: bash
         run: |
           set -euo pipefail
           origin="https://fnet.bmfbovespa.com.br"
-          path="/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1&cnpjFundo=16706958000132"
+          manager_path="/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1&cnpjFundo=16706958000132"
+          user_agent='DadosFII-RiskLab-Diagnostic/1.0'
+
           curl --silent --show-error --location --max-time 90 \
             -H 'Accept: text/html,application/xhtml+xml' \
-            -H 'User-Agent: DadosFII-RiskLab-Diagnostic/1.0' \
+            -H "User-Agent: ${user_agent}" \
+            -c monitor/fnet.cookies \
             -D monitor/fnet-manager.headers \
-            "$origin$path" > monitor/fnet-manager.html
+            "$origin$manager_path" > monitor/fnet-manager.html
+
+          curl --silent --show-error --location --max-time 90 \
+            -H 'Accept: application/javascript,text/javascript,*/*;q=0.1' \
+            -H "User-Agent: ${user_agent}" \
+            "$origin/fnet/resources/js/paginas/publico/gerenciador-documentos-cvm.js" \
+            > monitor/gerenciador-documentos-cvm.js
+
+          query_data() {
+            local suffix="$1"
+            shift
+            curl --silent --show-error --location --max-time 90 --get \
+              -H 'Accept: application/json,text/plain;q=0.9,*/*;q=0.1' \
+              -H 'X-Requested-With: XMLHttpRequest' \
+              -H "Referer: ${origin}${manager_path}" \
+              -H "User-Agent: ${user_agent}" \
+              "$@" \
+              -D "monitor/fnet-data-${suffix}.headers" \
+              --data-urlencode 'paginaCertificados=false' \
+              --data-urlencode 'tipoFundo=1' \
+              --data-urlencode 'administrador=' \
+              --data-urlencode 'idFundo=20031' \
+              --data-urlencode 'idCategoriaDocumento=0' \
+              --data-urlencode 'idTipoDocumento=0' \
+              --data-urlencode 'idEspecieDocumento=0' \
+              --data-urlencode 'situacao=' \
+              --data-urlencode 'cnpj=16.706.958/0001-32' \
+              --data-urlencode 'dataReferencia=' \
+              --data-urlencode 'ultimaDataReferencia=false' \
+              --data-urlencode 'dataInicial=01/01/2022' \
+              --data-urlencode 'dataFinal=31/12/2025' \
+              --data-urlencode 'idModalidade=' \
+              --data-urlencode 'palavraChave=' \
+              --data-urlencode 'd=1' \
+              --data-urlencode 's=0' \
+              --data-urlencode 'l=100' \
+              "$origin/fnet/publico/pesquisarGerenciadorDocumentosDados" \
+              > "monitor/fnet-data-${suffix}.body"
+          }
+
+          query_data no-cookie
+          query_data with-cookie -b monitor/fnet.cookies
+
           python - <<'PY'
           import json
+          import re
           from html.parser import HTMLParser
           from pathlib import Path
 
@@ -85,10 +131,33 @@ jobs:
               'scripts': parser.scripts,
               'idFundoOccurrences': body.count('idFundo'),
               'cnpjFundoOccurrences': body.count('cnpjFundo'),
-              'searchEndpoints': sorted(set(__import__('re').findall(r'[/A-Za-z0-9_-]*pesquisar[A-Za-z0-9_/?=&.-]*', body))),
+              'searchEndpoints': sorted(set(re.findall(r'[/A-Za-z0-9_-]*pesquisar[A-Za-z0-9_/?=&.-]*', body))),
           }
           Path('monitor/fnet-manager-contract.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), 'utf-8')
-          print(json.dumps(result, ensure_ascii=False, indent=2))
+
+          summaries = {}
+          for suffix in ('no-cookie', 'with-cookie'):
+              raw = Path(f'monitor/fnet-data-{suffix}.body').read_text('utf-8', errors='replace')
+              try:
+                  payload = json.loads(raw)
+                  rows = payload.get('data') if isinstance(payload, dict) else None
+                  summaries[suffix] = {
+                      'json': True,
+                      'bytes': len(raw.encode('utf-8')),
+                      'recordsFiltered': payload.get('recordsFiltered'),
+                      'recordsTotal': payload.get('recordsTotal'),
+                      'rowCount': len(rows) if isinstance(rows, list) else None,
+                      'firstRow': rows[0] if isinstance(rows, list) and rows else None,
+                  }
+              except Exception as error:
+                  summaries[suffix] = {
+                      'json': False,
+                      'bytes': len(raw.encode('utf-8')),
+                      'error': str(error),
+                      'prefix': raw[:500],
+                  }
+          Path('monitor/fnet-data-contract.json').write_text(json.dumps(summaries, ensure_ascii=False, indent=2), 'utf-8')
+          print(json.dumps({'manager': result, 'data': summaries}, ensure_ascii=False, indent=2))
           PY
 
       - name: Upload monitor evidence
