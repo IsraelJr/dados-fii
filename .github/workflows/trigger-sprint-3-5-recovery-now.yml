@@ -1,0 +1,21 @@
+name: Trigger Sprint 3.5 Recovery Now
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/trigger-sprint-3-5-recovery-now.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch versioned recovery workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run risk-lab-cohort-deploy-recovery.yml --repo IsraelJr/dados-fii --ref main
