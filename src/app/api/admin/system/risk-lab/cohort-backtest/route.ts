@@ -29,12 +29,22 @@ export async function GET(request: NextRequest) {
   try {
     const releaseCommit = activeProductionRelease();
     const evidence = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
+    const completedTickers = new Set(evidence?.cases.map((item) => item.ticker) || []);
+    const nextTicker = SEGMENTED_COHORT_TICKERS.find((ticker) => !completedTickers.has(ticker)) || null;
     return adminJson({
       ok: true,
       enabled: Boolean(releaseCommit),
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       releaseCommit,
       tickers: SEGMENTED_COHORT_TICKERS,
+      nextAction: evidence?.releaseCommit !== releaseCommit
+        ? "initialize"
+        : evidence?.status !== "running"
+          ? null
+          : nextTicker
+            ? "advance"
+            : "finalize",
+      nextTicker,
       evidence,
     });
   } catch (error) {
@@ -68,34 +78,76 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const action = String(body?.action || "").trim().toLowerCase();
   const ticker = String(body?.ticker || "").trim().toUpperCase();
-  if (!new Set(["initialize", "case", "finalize"]).has(action)) {
-    return adminJson({ ok: false, error: "Ação inválida. Use initialize, case ou finalize." }, 400);
+  if (!new Set(["initialize", "case", "finalize", "advance"]).has(action)) {
+    return adminJson({ ok: false, error: "Ação inválida. Use initialize, advance, case ou finalize." }, 400);
   }
   if (action === "case" && !SEGMENTED_COHORT_TICKERS.includes(ticker)) {
     return adminJson({ ok: false, error: "Ticker fora da coorte pré-registrada." }, 400);
   }
 
   try {
+    let resolvedAction = action;
+    let resolvedTicker = ticker || null;
+
+    if (action === "advance") {
+      const current = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
+      if (!current || current.releaseCommit !== releaseCommit) {
+        resolvedAction = "initialize";
+        resolvedTicker = null;
+      } else if (current.status !== "running") {
+        return adminJson({
+          ok: true,
+          enabled: true,
+          runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
+          releaseCommit,
+          action: "noop",
+          ticker: null,
+          persistedCases: current.cases.length,
+          nextAction: null,
+          nextTicker: null,
+          evidence: current,
+        });
+      } else {
+        const completedTickers = new Set(current.cases.map((item) => item.ticker));
+        const pendingTicker = SEGMENTED_COHORT_TICKERS.find((item) => !completedTickers.has(item)) || null;
+        resolvedAction = pendingTicker ? "case" : "finalize";
+        resolvedTicker = pendingTicker;
+      }
+    }
+
     console.info("Risk Lab segmented admin execution requested", {
       actor: authorization.identity.email,
       releaseCommit,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
-      action,
-      ticker: ticker || null,
+      requestedAction: action,
+      resolvedAction,
+      ticker: resolvedTicker,
     });
-    const evidence = action === "initialize"
+
+    const evidence = resolvedAction === "initialize"
       ? await segmentedRiskLabCohortBacktestService.initialize()
-      : action === "case"
-        ? await segmentedRiskLabCohortBacktestService.runTicker(ticker)
+      : resolvedAction === "case" && resolvedTicker
+        ? await segmentedRiskLabCohortBacktestService.runTicker(resolvedTicker)
         : await segmentedRiskLabCohortBacktestService.finalize();
+
+    const completedTickers = new Set(evidence.cases.map((item) => item.ticker));
+    const nextTicker = SEGMENTED_COHORT_TICKERS.find((item) => !completedTickers.has(item)) || null;
+    const nextAction = evidence.status !== "running"
+      ? null
+      : nextTicker
+        ? "advance"
+        : "finalize";
+
     return adminJson({
-      ok: action === "finalize" ? evidence.status === "passed" : true,
+      ok: resolvedAction === "finalize" ? evidence.status === "passed" : true,
       enabled: true,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       releaseCommit,
-      action,
-      ticker: ticker || null,
+      action: resolvedAction,
+      ticker: resolvedTicker,
       persistedCases: evidence.cases.length,
+      nextAction,
+      nextTicker,
       evidence,
     }, evidence.status === "running" ? 202 : 200);
   } catch (error) {
