@@ -6,6 +6,7 @@ const service = readFileSync("src/lib/risk-lab/RiskLabCohortBacktestV2Service.ts
 const verifier = readFileSync("src/lib/risk-lab/CohortPrimaryVerificationService.ts", "utf8");
 const store = readFileSync("src/lib/risk-lab/RiskLabCohortBacktestStore.ts", "utf8");
 const route = readFileSync("src/app/api/system/risk-lab-cohort-backtest/route.ts", "utf8");
+const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/cohort-backtest/route.ts", "utf8");
 const workflow = readFileSync(".github/workflows/risk-lab-cohort-backtest.yml", "utf8");
 const series = readFileSync("src/lib/risk-lab/AutomaticDividendSeriesService.ts", "utf8");
 const cohort = JSON.parse(readFileSync("src/lib/risk-lab/out-of-sample-cohort-v0.1.json", "utf8"));
@@ -13,7 +14,7 @@ const cohort = JSON.parse(readFileSync("src/lib/risk-lab/out-of-sample-cohort-v0
 function executable(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+    .replace(/^\s*(?:\/\/|#).*$/gm, "");
 }
 
 test("matriz externa permanece exatamente pré-registrada", () => {
@@ -98,15 +99,23 @@ test("persistência possui tentativa imutável, lock, auditoria, hash e isolamen
   assert.doesNotMatch(executable(service), /getPremiumReport|AIInsights|sendEmail|sendNotification|createAlert/);
 });
 
-test("rota só executa no deployment exato e workflow versiona resultado automaticamente", () => {
-  assert.match(route, /source === "github-actions"/);
-  assert.match(route, /release === deployedRelease/);
+test("rota protege o release e o GitHub somente inicia uma tentativa persistida", () => {
+  assert.match(route, /parameters\.source === "github-actions"/);
+  assert.match(route, /parameters\.release === deployedRelease/);
   assert.match(route, /VERCEL_ENV === "production"/);
-  assert.match(route, /RiskLabCohortBacktestV2Service/);
   assert.match(workflow, /risk-lab-3-5-20260720-v2/);
-  assert.match(workflow, /github\.sha/);
-  assert.match(workflow, /evidence\.releaseCommit/);
-  assert.match(workflow, /docs\/production-evidence\/risk-lab/);
-  assert.match(workflow, /gh pr create/);
-  assert.match(workflow, /Nenhuma aprovação técnica manual/);
+  assert.match(workflow, /inputs\.release_sha/);
+  assert.match(workflow, /evidence\.releaseCommit == \$release/);
+  assert.match(workflow, /action=initialize/);
+  assert.equal((workflow.match(/curl\b/g) || []).length, 1);
+  assert.doesNotMatch(executable(workflow), /action=case|action=finalize|git\s+push|gh\s+pr|sleep|npm run test/);
+});
+
+test("continuação automática de baixo nível pertence ao backend administrativo", () => {
+  assert.match(adminRoute, /"advance"/);
+  assert.match(adminRoute, /getPublicEvidence\(\)/);
+  assert.match(adminRoute, /SEGMENTED_COHORT_TICKERS\.find/);
+  assert.match(adminRoute, /nextAction/);
+  assert.match(adminRoute, /nextTicker/);
+  assert.doesNotMatch(executable(adminRoute), /git\s+push|github-actions|deploy-trigger|sendEmail|sendNotification/);
 });
