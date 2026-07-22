@@ -113,25 +113,25 @@ function validMonth(value: string) {
     : null;
 }
 
-function normalizeTemporalCompetence(value: string, informationDate: string, raw: string) {
-  const informationMonth = informationDate.slice(0, 7);
-  if (value <= informationMonth) return value;
+function normalizeTemporalCompetence(value: string, temporalAnchorDate: string, raw: string) {
+  const temporalAnchorMonth = temporalAnchorDate.slice(0, 7);
+  if (value <= temporalAnchorMonth) return value;
 
   const [year, month] = value.split("-").map(Number);
-  const [informationYear, informationMonthNumber] = informationMonth.split("-").map(Number);
-  if (year === informationYear && month === 12 && informationMonthNumber === 1) {
+  const [anchorYear, anchorMonthNumber] = temporalAnchorMonth.split("-").map(Number);
+  if (year === anchorYear && month === 12 && anchorMonthNumber === 1) {
     return `${year - 1}-12`;
   }
-  throw new Error(`Período de referência FNET posterior à informação: ${raw}`);
+  throw new Error(`Período de referência FNET posterior às datas do aviso: ${raw}`);
 }
 
-function parseCompetence(value: string, informationDate: string) {
+function parseCompetence(value: string, temporalAnchorDate: string) {
   const raw = decodeHtml(value).replace(/\s+/g, " ").trim();
   const monthYear = raw.match(/\b(0?[1-9]|1[0-2])\s*[-\/.]\s*(20\d{2})\b/);
   if (monthYear) {
     return normalizeTemporalCompetence(
       `${monthYear[2]}-${String(Number(monthYear[1])).padStart(2, "0")}`,
-      informationDate,
+      temporalAnchorDate,
       raw,
     );
   }
@@ -140,19 +140,19 @@ function parseCompetence(value: string, informationDate: string) {
   if (yearMonth) {
     return normalizeTemporalCompetence(
       `${yearMonth[1]}-${String(Number(yearMonth[2])).padStart(2, "0")}`,
-      informationDate,
+      temporalAnchorDate,
       raw,
     );
   }
 
   const compact = raw.match(/\b(20\d{2})(0[1-9]|1[0-2])\b/);
-  if (compact) return normalizeTemporalCompetence(`${compact[1]}-${compact[2]}`, informationDate, raw);
+  if (compact) return normalizeTemporalCompetence(`${compact[1]}-${compact[2]}`, temporalAnchorDate, raw);
 
   const shortMonthYear = raw.match(/\b(0?[1-9]|1[0-2])\s*[-\/.]\s*(\d{2})\b/);
   if (shortMonthYear) {
     return normalizeTemporalCompetence(
       `20${shortMonthYear[2]}-${String(Number(shortMonthYear[1])).padStart(2, "0")}`,
-      informationDate,
+      temporalAnchorDate,
       raw,
     );
   }
@@ -161,15 +161,15 @@ function parseCompetence(value: string, informationDate: string) {
   const monthName = Object.keys(MONTHS).find((month) => cleaned.includes(month));
   if (monthName) {
     const yearMatch = cleaned.match(/\b(20\d{2})\b/);
-    const year = yearMatch?.[1] || informationDate.slice(0, 4);
-    return normalizeTemporalCompetence(`${year}-${MONTHS[monthName]}`, informationDate, raw);
+    const year = yearMatch?.[1] || temporalAnchorDate.slice(0, 4);
+    return normalizeTemporalCompetence(`${year}-${MONTHS[monthName]}`, temporalAnchorDate, raw);
   }
 
   const tokens = cleaned.split(" ").filter(Boolean);
   if (tokens.length >= 2) {
     const month = validMonth(tokens[0]);
     const year = tokens.find((token) => /^20\d{2}$/.test(token));
-    if (month && year) return normalizeTemporalCompetence(`${year}-${month}`, informationDate, raw);
+    if (month && year) return normalizeTemporalCompetence(`${year}-${month}`, temporalAnchorDate, raw);
   }
 
   throw new Error(`Período de referência FNET inválido: ${value}`);
@@ -198,6 +198,8 @@ export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
   if (!html || html.length < 100) throw new Error("HTML do aviso FNET vazio ou incompleto.");
   const allCells = cells(html);
   const informationDate = parseBrazilianDate(field(allCells, ["Data da Informação:", "Data da informação"]));
+  const baseDate = parseBrazilianDate(field(allCells, ["Data-base (último dia de negociação “com” direito ao provento)", "Data-base (último dia de negociação com direito ao provento)"]));
+  const temporalAnchorDate = baseDate > informationDate ? baseDate : informationDate;
   const periodReferenceRaw = field(allCells, ["Período de referência"]);
   const exemptRaw = field(allCells, ["Rendimento isento de IR*"]).toLowerCase();
   const ticker = field(allCells, ["Código de negociação:", "Código de negociação da cota:"]).toUpperCase();
@@ -208,9 +210,9 @@ export function parseFnetDividendNoticeHtml(html: string): ParsedFnetNotice {
     ticker,
     fundName: field(allCells, ["Nome do Fundo:"]),
     informationDate,
-    baseDate: parseBrazilianDate(field(allCells, ["Data-base (último dia de negociação “com” direito ao provento)", "Data-base (último dia de negociação com direito ao provento)"])),
+    baseDate,
     paymentDate: parseBrazilianDate(field(allCells, ["Data do pagamento"])),
-    competenceMonth: parseCompetence(periodReferenceRaw, informationDate),
+    competenceMonth: parseCompetence(periodReferenceRaw, temporalAnchorDate),
     periodReferenceRaw,
     amountPerShare: parseAmount(field(allCells, ["Valor do provento (R$/unidade)", "Valor do provento por cota (R$)"])),
     incomeTaxExempt: exemptRaw.startsWith("sim") ? true : exemptRaw.startsWith("não") || exemptRaw.startsWith("nao") ? false : null,
