@@ -86,13 +86,34 @@ function attributes(source: string) {
   return result;
 }
 
+function classes(value: string | undefined) {
+  return new Set(String(value || "").split(/\s+/).filter(Boolean));
+}
+
 export function resolveFnetInternalFundId(html: string) {
-  const candidates = [...html.matchAll(/<input\b([^>]*)>/gi)]
-    .map((match) => attributes(match[1]))
+  const inputs = [...html.matchAll(/<input\b([^>]*)>/gi)]
+    .map((match) => attributes(match[1]));
+
+  // Contrato real do Fundos.NET: o select2 recebe a seleção inicial por
+  // <input type="hidden" class="fundoItemInicial" data-id="...">.
+  const preselected = inputs
     .filter((item) => normalize(item.get("type")) === "HIDDEN")
-    .map((item) => String(item.get("id") || ""))
-    .filter((id) => /^\d{2,12}$/.test(id));
-  const unique = [...new Set(candidates)];
+    .filter((item) => classes(item.get("class")).has("fundoItemInicial"))
+    .map((item) => String(item.get("data-id") || ""));
+
+  // Compatibilidade defensiva para versões que preencham diretamente o
+  // input idFundo e para o contrato legado observado em fixtures antigas.
+  const direct = inputs
+    .filter((item) => normalize(item.get("type")) === "HIDDEN")
+    .filter((item) => normalize(item.get("id")) === "IDFUNDO" || normalize(item.get("name")) === "IDFUNDO")
+    .flatMap((item) => String(item.get("value") || "").split(","));
+  const legacy = inputs
+    .filter((item) => normalize(item.get("type")) === "HIDDEN")
+    .map((item) => String(item.get("id") || ""));
+
+  const unique = [...new Set([...preselected, ...direct, ...legacy]
+    .map((item) => item.trim())
+    .filter((id) => /^\d{2,12}$/.test(id)))];
   if (unique.length !== 1) {
     throw new Error(`Fundos.NET não resolveu um idFundo único para o CNPJ consultado (${unique.length} candidato(s)).`);
   }
@@ -162,7 +183,7 @@ async function fetchText(fetchImpl: typeof fetch, url: URL, accept: string) {
         headers: {
           Accept: accept,
           Referer: `${FNET_ORIGIN}/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1`,
-          "User-Agent": "DadosFII-RiskLab/0.3 (+automatic-primary-dividend-discovery)",
+          "User-Agent": "DadosFII-RiskLab/0.4 (+automatic-primary-dividend-discovery)",
           "X-Requested-With": "XMLHttpRequest",
         },
       });
@@ -219,12 +240,14 @@ export class FnetDividendDocumentDiscovery {
         idEspecieDocumento: "0",
         situacao: "",
         cnpj: formattedCnpj,
+        cnpjFundo: formattedCnpj,
         dataReferencia: "",
         ultimaDataReferencia: "false",
         dataInicial: isoToBr(fromDate),
         dataFinal: isoToBr(untilDate),
         idModalidade: "",
         palavraChave: "",
+        isSession: "false",
         d: String(draw),
         s: String(start),
         l: String(PAGE_SIZE),
