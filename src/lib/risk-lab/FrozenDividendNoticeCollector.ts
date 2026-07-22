@@ -22,7 +22,7 @@ const FNET_ORIGIN = "https://fnet.bmfbovespa.com.br";
 const MAX_HTML_BYTES = 2_000_000;
 const DEFAULT_ATTEMPTS = 4;
 const DEFAULT_TIMEOUT_MS = 45_000;
-const COLLECTOR_VERSION = "1.1.0";
+const COLLECTOR_VERSION = "1.2.0";
 
 export interface FrozenDividendCohortIdentity {
   ticker: string;
@@ -100,7 +100,7 @@ function protocolMetadataPayload(document: FnetDividendDocumentEvidence) {
 
 function retryable(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "");
-  return /AbortError|HTTP (408|425|429|5\d\d)|network|fetch failed|socket|timed out/i.test(message)
+  return /AbortError|operation was aborted|HTTP (408|425|429|5\d\d)|network|fetch failed|socket|timed out/i.test(message)
     || (error instanceof Error && error.name === "AbortError");
 }
 
@@ -139,14 +139,49 @@ function validateIdentity(identity: FrozenDividendCohortIdentity) {
   }
 }
 
+function noticeEventKey(observation: FrozenDividendNoticeObservation) {
+  return [
+    observation.ticker,
+    observation.informationDate,
+    observation.baseDate,
+    observation.paymentDate,
+  ].join("|");
+}
+
 function selectKnownVersions(
   observations: FrozenDividendNoticeObservation[],
   untilDate: string,
 ) {
   const until = Date.parse(`${untilDate}T23:59:59-03:00`);
-  const grouped = new Map<string, FrozenDividendNoticeObservation[]>();
+  const events = new Map<string, FrozenDividendNoticeObservation[]>();
   for (const observation of observations) {
     if (Date.parse(observation.announcedAt) > until) continue;
+    const key = noticeEventKey(observation);
+    events.set(key, [...(events.get(key) || []), observation]);
+  }
+
+  const conflicts: string[] = [];
+  const currentEvents: FrozenDividendNoticeObservation[] = [];
+  for (const [eventKey, items] of events) {
+    items.sort((left, right) =>
+      right.protocolVersion - left.protocolVersion
+      || Date.parse(right.announcedAt) - Date.parse(left.announcedAt)
+      || right.documentId.localeCompare(left.documentId));
+    const highestVersion = items[0].protocolVersion;
+    const candidates = items.filter((item) => item.protocolVersion === highestVersion);
+    const signatures = new Set(candidates.map((item) => [
+      item.competenceMonth,
+      item.amountPerShare.toFixed(8),
+    ].join("|")));
+    if (signatures.size > 1) {
+      conflicts.push(`Reapresentações conflitantes no evento ${eventKey}, versão ${highestVersion}.`);
+      continue;
+    }
+    currentEvents.push(candidates[0]);
+  }
+
+  const grouped = new Map<string, FrozenDividendNoticeObservation[]>();
+  for (const observation of currentEvents) {
     grouped.set(observation.competenceMonth, [
       ...(grouped.get(observation.competenceMonth) || []),
       observation,
@@ -154,7 +189,6 @@ function selectKnownVersions(
   }
 
   const selected: FrozenDividendNoticeObservation[] = [];
-  const conflicts: string[] = [];
   for (const [competenceMonth, items] of grouped) {
     items.sort((left, right) =>
       right.protocolVersion - left.protocolVersion
@@ -217,7 +251,7 @@ export class FrozenDividendNoticeCollector {
           headers: {
             Accept: "text/html,application/xhtml+xml",
             Referer: `${FNET_ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM`,
-            "User-Agent": "DadosFII-RiskLab/1.1 (+frozen-primary-dividend-collector)",
+            "User-Agent": "DadosFII-RiskLab/1.2 (+frozen-primary-dividend-collector)",
           },
         });
         if (!response.ok) throw new Error(`Fundos.NET respondeu HTTP ${response.status}.`);
@@ -247,6 +281,7 @@ export class FrozenDividendNoticeCollector {
     const protocol = document.protocolMetadata;
 
     if (notice.ticker !== identity.ticker) {
+      if (notice.ticker.slice(0, 4) === identity.ticker.slice(0, 4)) return null;
       throw new Error(`Ticker divergente no aviso ${document.documentId}: ${notice.ticker}.`);
     }
     if (!(notice.amountPerShare > 0)) {
