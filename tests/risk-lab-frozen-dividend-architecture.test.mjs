@@ -6,12 +6,17 @@ const collector = readFileSync("src/lib/risk-lab/FrozenDividendNoticeCollector.t
 const discovery = readFileSync("src/lib/risk-lab/FnetDividendDocumentDiscovery.ts", "utf8");
 const series = readFileSync("src/lib/risk-lab/FrozenDividendNoticeSeriesService.ts", "utf8");
 const concurrent = readFileSync("src/lib/risk-lab/ConcurrentAutomaticDividendSeriesService.ts", "utf8");
+const backtestService = readFileSync("src/lib/risk-lab/RiskLabCohortBacktestV2Service.ts", "utf8");
 const script = readFileSync("scripts/collect-risk-lab-dividend-notices.ts", "utf8");
 const workflow = readFileSync(".github/workflows/risk-lab-frozen-dividend-notices.yml", "utf8");
 const route = readFileSync("src/app/api/system/risk-lab-cohort-backtest/route.ts", "utf8");
 const dataset = JSON.parse(readFileSync("src/lib/risk-lab/frozen-dividend-notices-v0.1.json", "utf8"));
 
 const COHORT = ["DEVA11", "VSLH11", "KNCR11", "KNSC11", "MCCI11", "RBRY11"];
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 test("coletor é geral, sequencial e não contém exceções por ticker", () => {
   for (const ticker of COHORT) {
@@ -44,6 +49,14 @@ test("workflow coleta fora da Vercel com checkpoint, retomada e evidência imut�
   assert.match(workflow, /gh pr create/);
   assert.match(workflow, /Premium integrado: \\`false\\`/);
   assert.match(workflow, /notificações enviadas: \\`false\\`/);
+});
+
+test("workflow e endpoint compartilham exatamente o mesmo identificador protegido", () => {
+  const match = backtestService.match(/export const RISK_LAB_COHORT_BACKTEST_RUN_ID = "([^"]+)"/);
+  assert.ok(match, "Constante protegida do backtest não encontrada.");
+  assert.match(workflow, new RegExp(`RUN_ID:\\s*${escapeRegex(match[1])}`));
+  assert.match(workflow, /src\/lib\/risk-lab\/RiskLabCohortBacktestV2Service\.ts/);
+  assert.match(route, /parameters\.runId === RISK_LAB_COHORT_BACKTEST_RUN_ID/);
 });
 
 test("endpoint de identidades continua protegido pelo SHA exato de Produção", () => {
