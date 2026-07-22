@@ -65,3 +65,5 @@ jobs:
           path: audit
           if-no-files-found: error
           retention-days: 7
+
+# Releitura após o dispatch do coletor congelado.
