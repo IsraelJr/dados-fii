@@ -47,6 +47,29 @@ jobs:
           fi
           cat monitor/target-run.json
 
+      - name: Probe one real notice and protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="https://fnet.bmfbovespa.com.br"
+          user_agent='DadosFII-RiskLab-Diagnostic/1.0'
+          probe() {
+            local name="$1"
+            local url="$2"
+            curl --silent --show-error --location --max-time 60 \
+              -H 'Accept: text/html,application/xhtml+xml' \
+              -H 'Referer: https://fnet.bmfbovespa.com.br/fnet/publico/abrirGerenciadorDocumentosCVM' \
+              -H "User-Agent: ${user_agent}" \
+              -D "monitor/${name}.headers" \
+              -o "monitor/${name}.html" \
+              -w '{"httpCode":%{http_code},"seconds":%{time_total},"bytes":%{size_download},"contentType":"%{content_type}","redirects":%{num_redirects}}\n' \
+              "$url" > "monitor/${name}.metrics.json"
+          }
+          probe notice "$origin/fnet/publico/exibirDocumento?id=261398&cvm=true"
+          probe protocol "$origin/fnet/publico/visualizarProtocoloDocumentoCVM?idDocumento=261398"
+          cat monitor/notice.metrics.json
+          cat monitor/protocol.metrics.json
+
       - name: Upload monitor evidence
         if: always()
         uses: actions/upload-artifact@v4
