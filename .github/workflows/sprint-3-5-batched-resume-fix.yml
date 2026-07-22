@@ -1,0 +1,523 @@
+name: Sprint 3.5 Batched Resume Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/sprint-3-5-batched-resume-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply bounded collection and date precision corrections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          discovery_path = Path("src/lib/risk-lab/FnetDividendDocumentDiscovery.ts")
+          discovery = discovery_path.read_text()
+          discovery = replace_once(
+              discovery,
+              '''export interface FnetDividendProtocolMetadata {
+            referenceDate: string;
+            deliveredAt: string;''',
+              '''export interface FnetDividendProtocolMetadata {
+            referenceDate: string;
+            referencePrecision?: "day" | "month";
+            deliveredAt: string;''',
+              "protocol precision interface",
+          )
+          discovery = replace_once(
+              discovery,
+              '''function parseReferenceDate(value: unknown): string | null {
+            const text = String(value || "").trim();
+            const full = text.match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})(?:\\s+\\d{2}:\\d{2})?$/);
+            if (full) return `${full[3]}-${full[2]}-${full[1]}`;
+            const month = text.match(/^(\\d{2})\\/(\\d{4})$/);
+            if (month) return `${month[2]}-${month[1]}-01`;
+            return null;
+          }''',
+              '''function parseReferenceDate(value: unknown): { date: string; precision: "day" | "month" } | null {
+            const text = String(value || "").trim();
+            const full = text.match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})(?:\\s+\\d{2}:\\d{2})?$/);
+            if (full) return { date: `${full[3]}-${full[2]}-${full[1]}`, precision: "day" };
+            const month = text.match(/^(\\d{2})\\/(\\d{4})$/);
+            if (month) return { date: `${month[2]}-${month[1]}-01`, precision: "month" };
+            return null;
+          }''',
+              "reference date parser",
+          )
+          discovery = replace_once(
+              discovery,
+              '''  const referenceDate = parseReferenceDate(row.dataReferencia);
+            const deliveredAt = parseDeliveryDate(row.dataEntrega);
+            const version = Number(row.versao);
+            if (!referenceDate || !deliveredAt || !Number.isInteger(version) || version < 1) {
+              throw new Error(`Metadados oficiais de protocolo inválidos no documento ${documentId}.`);
+            }
+            return {
+              referenceDate,
+              deliveredAt,''',
+              '''  const reference = parseReferenceDate(row.dataReferencia);
+            const deliveredAt = parseDeliveryDate(row.dataEntrega);
+            const version = Number(row.versao);
+            if (!reference || !deliveredAt || !Number.isInteger(version) || version < 1) {
+              throw new Error(`Metadados oficiais de protocolo inválidos no documento ${documentId}.`);
+            }
+            return {
+              referenceDate: reference.date,
+              referencePrecision: reference.precision,
+              deliveredAt,''',
+              "protocol metadata mapping",
+          )
+          discovery_path.write_text(discovery)
+
+          parser_path = Path("src/lib/risk-lab/FnetDividendNoticeParser.ts")
+          parser = parser_path.read_text()
+          parser = replace_once(
+              parser,
+              '''function normalizeTemporalCompetence(value: string, informationDate: string, raw: string) {
+            const informationMonth = informationDate.slice(0, 7);
+            if (value <= informationMonth) return value;
+
+            const [year, month] = value.split("-").map(Number);
+            const [informationYear, informationMonthNumber] = informationMonth.split("-").map(Number);
+            if (year === informationYear && month === 12 && informationMonthNumber === 1) {
+              return `${year - 1}-12`;
+            }
+            throw new Error(`Período de referência FNET posterior à informação: ${raw}`);
+          }''',
+              '''function normalizeTemporalCompetence(value: string, informationDate: string, raw: string) {
+            const informationMonth = informationDate.slice(0, 7);
+            if (value <= informationMonth) return value;
+
+            const [year, month] = value.split("-").map(Number);
+            const [informationYear, informationMonthNumber] = informationMonth.split("-").map(Number);
+            if (year === informationYear && month === 12 && informationMonthNumber === 1) {
+              return `${year - 1}-12`;
+            }
+
+            const distance = year * 12 + month - (informationYear * 12 + informationMonthNumber);
+            if (distance === 1) return value;
+            throw new Error(`Período de referência FNET posterior à informação: ${raw}`);
+          }''',
+              "temporal competence policy",
+          )
+          parser_path.write_text(parser)
+
+          collector_path = Path("src/lib/risk-lab/FrozenDividendNoticeCollector.ts")
+          collector = collector_path.read_text()
+          collector = replace_once(collector, 'const COLLECTOR_VERSION = "1.2.0";', 'const COLLECTOR_VERSION = "1.3.0";', "collector version")
+          collector = replace_once(
+              collector,
+              '''  attempts?: number;
+            timeoutMs?: number;
+          }''',
+              '''  attempts?: number;
+            timeoutMs?: number;
+            maxDocumentsPerRun?: number;
+          }''',
+              "collector dependency budget",
+          )
+          collector = replace_once(
+              collector,
+              '''    referenceDate: protocol.referenceDate,
+                deliveredAt: protocol.deliveredAt,''',
+              '''    referenceDate: protocol.referenceDate,
+                referencePrecision: protocol.referencePrecision || "day",
+                deliveredAt: protocol.deliveredAt,''',
+              "protocol hash precision",
+          )
+          collector = replace_once(
+              collector,
+              '''  private readonly attempts: number;
+            private readonly timeoutMs: number;
+
+            constructor(dependencies: FrozenDividendNoticeCollectorDependencies = {}) {''',
+              '''  private readonly attempts: number;
+            private readonly timeoutMs: number;
+            private readonly maxDocumentsPerRun: number;
+
+            constructor(dependencies: FrozenDividendNoticeCollectorDependencies = {}) {''',
+              "collector budget field",
+          )
+          collector = replace_once(
+              collector,
+              '''    this.attempts = Math.max(1, Math.min(8, dependencies.attempts || DEFAULT_ATTEMPTS));
+                this.timeoutMs = Math.max(1_000, dependencies.timeoutMs || DEFAULT_TIMEOUT_MS);
+              }''',
+              '''    this.attempts = Math.max(1, Math.min(8, dependencies.attempts || DEFAULT_ATTEMPTS));
+                this.timeoutMs = Math.max(1_000, dependencies.timeoutMs || DEFAULT_TIMEOUT_MS);
+                this.maxDocumentsPerRun = dependencies.maxDocumentsPerRun === undefined
+                  ? Number.MAX_SAFE_INTEGER
+                  : Math.max(1, Math.min(10_000, Math.floor(dependencies.maxDocumentsPerRun)));
+              }''',
+              "collector budget initialization",
+          )
+          collector = replace_once(
+              collector,
+              '''            "User-Agent": "DadosFII-RiskLab/1.2 (+frozen-primary-dividend-collector)",''',
+              '''            "User-Agent": "DadosFII-RiskLab/1.3 (+frozen-primary-dividend-collector)",''',
+              "collector user agent",
+          )
+          collector = replace_once(
+              collector,
+              '''    if (protocol.referenceDate !== notice.informationDate && protocol.referenceDate !== notice.baseDate) {
+                  throw new Error(`Aviso e metadados oficiais divergem na data de referência (${document.documentId}).`);
+                }''',
+              '''    const referenceMatches = protocol.referencePrecision === "month"
+                  ? [notice.informationDate, notice.baseDate]
+                    .some((date) => date.slice(0, 7) === protocol.referenceDate.slice(0, 7))
+                  : protocol.referenceDate === notice.informationDate || protocol.referenceDate === notice.baseDate;
+                if (!referenceMatches) {
+                  throw new Error(`Aviso e metadados oficiais divergem na data de referência (${document.documentId}).`);
+                }''',
+              "reference precision validation",
+          )
+          collector = replace_once(
+              collector,
+              '''    for (const identity of identities) {
+                  const caseCheckpoint = checkpointFor(identity, checkpoint.cases[identity.ticker], this.now().toISOString());
+                  checkpoint.cases[identity.ticker] = caseCheckpoint;
+                  let discovery: FnetDividendDocumentDiscoveryResult;''',
+              '''    for (const identity of identities) {
+                  checkpoint.cases[identity.ticker] = checkpointFor(
+                    identity,
+                    checkpoint.cases[identity.ticker],
+                    this.now().toISOString(),
+                  );
+                }
+
+                let attemptedDocuments = 0;
+                collection:
+                for (const identity of identities) {
+                  const caseCheckpoint = checkpoint.cases[identity.ticker];
+                  let discovery: FnetDividendDocumentDiscoveryResult;''',
+              "checkpoint initialization and collection label",
+          )
+          collector = replace_once(
+              collector,
+              '''      for (const document of documents) {
+                    if (completed.has(document.documentId)) continue;
+                    try {''',
+              '''      for (const document of documents) {
+                    if (completed.has(document.documentId)) continue;
+                    if (attemptedDocuments >= this.maxDocumentsPerRun) break collection;
+                    attemptedDocuments += 1;
+                    try {''',
+              "document budget guard",
+          )
+          collector_path.write_text(collector)
+
+          script_path = Path("scripts/collect-risk-lab-dividend-notices.ts")
+          script = script_path.read_text()
+          script = replace_once(
+              script,
+              '''function required(name: string, environmentName: string) {
+            const value = argument(name) || process.env[environmentName] || "";
+            if (!value.trim()) throw new Error(`${environmentName} é obrigatório.`);
+            return value.trim();
+          }''',
+              '''function required(name: string, environmentName: string) {
+            const value = argument(name) || process.env[environmentName] || "";
+            if (!value.trim()) throw new Error(`${environmentName} é obrigatório.`);
+            return value.trim();
+          }
+
+          function optionalPositiveInteger(name: string, environmentName: string) {
+            const raw = argument(name) || process.env[environmentName] || "";
+            if (!raw.trim()) return undefined;
+            const value = Number(raw);
+            if (!Number.isInteger(value) || value < 1) throw new Error(`${environmentName} deve ser inteiro positivo.`);
+            return value;
+          }''',
+              "optional batch argument",
+          )
+          script = replace_once(
+              script,
+              '''  const summaryPath = resolve(argument("summary") || process.env.SUMMARY_PATH || "docs/risk-lab/sprint-3-5-frozen-dividend-notices.md");
+
+            const identities = await fetchIdentities(endpoint, releaseCommit);
+            const existing = await loadCheckpoint(checkpointPath);
+            const collector = new FrozenDividendNoticeCollector();''',
+              '''  const summaryPath = resolve(argument("summary") || process.env.SUMMARY_PATH || "docs/risk-lab/sprint-3-5-frozen-dividend-notices.md");
+            const maxDocumentsPerRun = optionalPositiveInteger("max-documents-per-run", "MAX_DOCUMENTS_PER_RUN");
+
+            const identities = await fetchIdentities(endpoint, releaseCommit);
+            const existing = await loadCheckpoint(checkpointPath);
+            const collector = new FrozenDividendNoticeCollector({ maxDocumentsPerRun });''',
+              "script collector budget",
+          )
+          script = replace_once(
+              script,
+              '''    pending: dataset.cases.reduce((sum, item) => sum + item.pendingDocumentIds.length, 0),
+                datasetHash: dataset.datasetHash,
+              }));
+              if (dataset.status !== "complete") process.exitCode = 2;''',
+              '''    pending: dataset.cases.reduce((sum, item) => sum + item.pendingDocumentIds.length, 0),
+                continuationRequired: dataset.status !== "complete" && maxDocumentsPerRun !== undefined,
+                datasetHash: dataset.datasetHash,
+              }));
+              if (dataset.status !== "complete" && maxDocumentsPerRun === undefined) process.exitCode = 2;''',
+              "script continuation result",
+          )
+          script_path.write_text(script)
+
+          workflow_path = Path(".github/workflows/risk-lab-frozen-dividend-notices.yml")
+          workflow = workflow_path.read_text()
+          workflow = replace_once(
+              workflow,
+              '''  workflow_dispatch:
+
+          permissions:
+            actions: read''',
+              '''  workflow_dispatch:
+              inputs:
+                continuation_depth:
+                  description: "Profundidade automática de retomada"
+                  required: false
+                  default: "0"
+
+          permissions:
+            actions: write''',
+              "workflow continuation input",
+          )
+          workflow = replace_once(
+              workflow,
+              '''      CHECKPOINT_ARTIFACT: risk-lab-frozen-dividend-checkpoint-v3''',
+              '''      CHECKPOINT_ARTIFACT: risk-lab-frozen-dividend-checkpoint-v3
+                MAX_DOCUMENTS_PER_RUN: "12"''',
+              "workflow batch size",
+          )
+          workflow = replace_once(
+              workflow,
+              '''          retention-days: 30
+
+              - name: Validate complete dataset''',
+              '''          retention-days: 30
+
+              - name: Inspect bounded batch state
+                if: always() && hashFiles('src/lib/risk-lab/frozen-dividend-notices-v0.1.json') != ''
+                id: batch
+                shell: bash
+                run: |
+                  set -euo pipefail
+                  status=$(jq -r '.status // "blocked"' "$OUTPUT_PATH")
+                  depth="${{ github.event.inputs.continuation_depth || '0' }}"
+                  if ! [[ "$depth" =~ ^[0-9]+$ ]]; then depth=0; fi
+                  complete=false
+                  can_continue=false
+                  if [[ "$status" == "complete" ]]; then
+                    complete=true
+                  elif (( depth < 12 )); then
+                    can_continue=true
+                  fi
+                  echo "status=${status}" >> "$GITHUB_OUTPUT"
+                  echo "complete=${complete}" >> "$GITHUB_OUTPUT"
+                  echo "can_continue=${can_continue}" >> "$GITHUB_OUTPUT"
+                  echo "next_depth=$((depth + 1))" >> "$GITHUB_OUTPUT"
+
+              - name: Continue incomplete batch automatically
+                if: steps.batch.outputs.complete != 'true' && steps.batch.outputs.can_continue == 'true'
+                shell: bash
+                env:
+                  GH_TOKEN: ${{ github.token }}
+                run: |
+                  gh workflow run risk-lab-frozen-dividend-notices.yml \
+                    --ref main \
+                    -f continuation_depth="${{ steps.batch.outputs.next_depth }}"
+
+              - name: Validate complete dataset''',
+              "workflow bounded continuation",
+          )
+          workflow = replace_once(
+              workflow,
+              '''        if: steps.collection.outcome == 'success' ''',
+              '''        if: steps.batch.outputs.complete == 'true' && steps.collection.outcome == 'success' ''',
+              "validation complete condition",
+          )
+          workflow = replace_once(
+              workflow,
+              '''        if: always() && hashFiles('src/lib/risk-lab/frozen-dividend-notices-v0.1.json') != ''
+                id: prepare''',
+              '''        if: steps.batch.outputs.complete == 'true' && steps.validation.outcome == 'success'
+                id: prepare''',
+              "publish only complete dataset",
+          )
+          workflow = replace_once(
+              workflow,
+              '''      - name: Enforce complete collection
+                if: steps.collection.outcome != 'success' || steps.validation.outcome != 'success'
+                run: exit 1''',
+              '''      - name: Enforce valid terminal state
+                if: >-
+                  steps.collection.outcome != 'success'
+                  || (steps.batch.outputs.complete == 'true' && steps.validation.outcome != 'success')
+                  || (steps.batch.outputs.complete != 'true' && steps.batch.outputs.can_continue != 'true')
+                run: exit 1''',
+              "terminal state enforcement",
+          )
+          workflow_path.write_text(workflow)
+
+          discovery_test_path = Path("tests/risk-lab-fnet-dividend-discovery.test.ts")
+          discovery_test = discovery_test_path.read_text()
+          discovery_test = replace_once(
+              discovery_test,
+              '''    referenceDate: "2022-01-31",
+                deliveredAt: "2022-01-31T18:02:00-03:00",''',
+              '''    referenceDate: "2022-01-31",
+                referencePrecision: "day",
+                deliveredAt: "2022-01-31T18:02:00-03:00",''',
+              "discovery day precision expectation",
+          )
+          discovery_test = replace_once(
+              discovery_test,
+              '''  assert.equal(documents[1].competenceDate, "2022-02-01");
+            assert.equal(documents[1].protocolMetadata.version, 2);''',
+              '''  assert.equal(documents[1].competenceDate, "2022-02-01");
+            assert.equal(documents[1].protocolMetadata.referencePrecision, "month");
+            assert.equal(documents[1].protocolMetadata.version, 2);''',
+              "discovery month precision expectation",
+          )
+          discovery_test_path.write_text(discovery_test)
+
+          parser_test_path = Path("tests/risk-lab-frozen-dividend-parser.test.ts")
+          parser_test = parser_test_path.read_text()
+          parser_test = replace_once(
+              parser_test,
+              '''test("rejeita competência futura fora da correção estrita de virada anual", () => {
+            assert.throws(
+              () => parseFnetDividendNoticeHtml(noticeWithPeriod("02-2022")),
+              /posterior à informação/,
+            );
+          });''',
+              '''test("aceita somente o mês oficial imediatamente seguinte e rejeita saltos futuros", () => {
+            assert.equal(
+              parseFnetDividendNoticeHtml(noticeWithPeriod("02-2022")).competenceMonth,
+              "2022-02",
+            );
+            assert.throws(
+              () => parseFnetDividendNoticeHtml(noticeWithPeriod("03-2022")),
+              /posterior à informação/,
+            );
+          });''',
+              "parser next month regression",
+          )
+          parser_test_path.write_text(parser_test)
+
+          collector_test_path = Path("tests/risk-lab-frozen-dividend-collector.test.ts")
+          collector_test = collector_test_path.read_text()
+          collector_test = replace_once(
+              collector_test,
+              '''  assert.equal(result.dataset.collectorVersion, "1.2.0");''',
+              '''  assert.equal(result.dataset.collectorVersion, "1.3.0");''',
+              "collector test version",
+          )
+          collector_test += r'''
+
+          test("aceita referência mensal oficial quando o aviso pertence ao mesmo mês", async () => {
+            const source = fixture(null);
+            const firstIdentity = identities()[0];
+            const firstDocument = document("1001");
+            firstDocument.protocolMetadata.referenceDate = "2022-01-01";
+            firstDocument.protocolMetadata.referencePrecision = "month";
+            const collector = new FrozenDividendNoticeCollector({
+              discovery: source.discovery,
+              fetchImpl: source.fetchImpl,
+              attempts: 1,
+              now: () => new Date("2026-07-22T02:00:00-03:00"),
+            });
+            const result = await collector.collect(identities(), RELEASE, null, async () => undefined);
+            assert.equal(result.dataset.status, "complete");
+            assert.equal(result.dataset.cases.find((item) => item.ticker === firstIdentity.ticker)?.observations.length, 1);
+          });
+
+          test("limita documentos por execução e retoma por checkpoint sem duplicação", async () => {
+            const source = fixture(null);
+            const collector = new FrozenDividendNoticeCollector({
+              discovery: source.discovery,
+              fetchImpl: source.fetchImpl,
+              attempts: 1,
+              maxDocumentsPerRun: 2,
+              now: () => new Date("2026-07-22T02:00:00-03:00"),
+            });
+            let checkpoint: FrozenDividendCollectionCheckpoint | null = null;
+            const statuses: string[] = [];
+            for (let run = 0; run < 3; run += 1) {
+              const result = await collector.collect(
+                identities(),
+                RELEASE,
+                checkpoint,
+                async (value) => { checkpoint = structuredClone(value); },
+              );
+              checkpoint = result.checkpoint;
+              statuses.push(result.dataset.status);
+            }
+            assert.deepEqual(statuses, ["pending", "pending", "complete"]);
+            assert.equal([...source.calls.values()].reduce((sum, value) => sum + value, 0), 6);
+            assert.equal(new Set(Object.values(checkpoint!.cases)
+              .flatMap((item) => item.completedDocumentIds)).size, 6);
+          });
+          '''
+          collector_test_path.write_text(collector_test)
+
+          architecture_path = Path("tests/risk-lab-frozen-dividend-architecture.test.mjs")
+          architecture = architecture_path.read_text()
+          architecture += r'''
+
+          test("coleta longa usa lotes sequenciais e retomada automática limitada", () => {
+            assert.match(collector, /maxDocumentsPerRun/);
+            assert.match(script, /MAX_DOCUMENTS_PER_RUN/);
+            assert.match(workflow, /MAX_DOCUMENTS_PER_RUN:\s*"12"/);
+            assert.match(workflow, /continuation_depth/);
+            assert.match(workflow, /Continue incomplete batch automatically/);
+            assert.match(workflow, /depth < 12/);
+            assert.match(workflow, /actions:\s*write/);
+            assert.doesNotMatch(collector, /Promise\.all/);
+          });
+
+          test("protocolo mensal preserva precisão sem afrouxar referência diária", () => {
+            assert.match(discovery, /referencePrecision/);
+            assert.match(collector, /protocol\.referencePrecision === "month"/);
+            assert.match(collector, /date\.slice\(0, 7\)/);
+          });
+          '''
+          architecture_path.write_text(architecture)
+          PY
+
+      - run: npm run typecheck
+      - run: npm run test:sprint3.5
+      - run: npm run test:sprint2
+
+      - name: Commit tested implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/sprint-3-5-batched-resume-fix.yml
+          git add -A
+          git commit -m "fix: retoma coleta congelada em lotes automáticos"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
