@@ -1,0 +1,91 @@
+name: Sprint 3.5 Next Steps Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/sprint-3-5-next-steps-audit.yml
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRODUCTION_ORIGIN: https://dadosfii.com.br
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect production and workflow evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+
+          gh api "repos/${GITHUB_REPOSITORY}/commits/main" > audit/main-commit.json
+
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/risk-lab-frozen-dividend-notices.yml/runs?branch=main&per_page=10" \
+            > audit/frozen-runs.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/risk-lab-cohort-backtest.yml/runs?branch=main&per_page=10" \
+            > audit/backtest-runs.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/risk-lab-cohort-deploy-recovery.yml/runs?branch=main&per_page=10" \
+            > audit/recovery-runs.json
+
+          curl --silent --show-error --location --max-time 45 \
+            --dump-header audit/production-headers.txt \
+            --output audit/production-response.json \
+            --write-out '%{http_code}' \
+            "${PRODUCTION_ORIGIN}/api/system/risk-lab-cohort-backtest" \
+            > audit/production-http-code.txt || true
+
+          gh api -X GET search/issues \
+            -f q="repo:${GITHUB_REPOSITORY} is:pr is:open" \
+            -f per_page=100 > audit/open-prs.json
+
+          jq '{
+            auditedAt: now | todate,
+            main: {
+              sha: input.sha,
+              message: input.commit.message
+            }
+          }' audit/main-commit.json audit/main-commit.json > audit/main-summary.json
+
+          jq '{runs: [.workflow_runs[] | {
+            id, name, status, conclusion, event, head_sha, head_branch,
+            run_number, run_attempt, created_at, updated_at, html_url
+          }]}' audit/frozen-runs.json > audit/frozen-summary.json
+
+          jq '{runs: [.workflow_runs[] | {
+            id, name, status, conclusion, event, head_sha, head_branch,
+            run_number, run_attempt, created_at, updated_at, html_url
+          }]}' audit/backtest-runs.json > audit/backtest-summary.json
+
+          jq '{runs: [.workflow_runs[] | {
+            id, name, status, conclusion, event, head_sha, head_branch,
+            run_number, run_attempt, created_at, updated_at, html_url
+          }]}' audit/recovery-runs.json > audit/recovery-summary.json
+
+          jq '{pullRequests: [.items[] | {
+            number, title, state, draft: .draft, html_url,
+            created_at, updated_at, labels: [.labels[].name]
+          }]}' audit/open-prs.json > audit/open-prs-summary.json
+
+          jq -n \
+            --arg httpCode "$(cat audit/production-http-code.txt)" \
+            --slurpfile response audit/production-response.json \
+            '{httpCode: $httpCode, response: ($response[0] // null)}' \
+            > audit/production-summary.json
+
+      - name: Upload audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint-3-5-next-steps-audit
+          path: audit
+          if-no-files-found: error
+          retention-days: 7
