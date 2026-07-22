@@ -1,0 +1,186 @@
+name: Sprint 3.5 Batched Resume Fix V2
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/sprint-3-5-batched-resume-fix-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-and-commit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Execute reviewed patch and harden checkpoint migration
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          patch_workflow = Path('.github/workflows/sprint-3-5-batched-resume-fix.yml')
+          source = patch_workflow.read_text()
+
+          # Corrige duas âncoras com espaço final que impediriam o patch de localizar
+          # as condições reais do workflow canônico.
+          source = source.replace(
+              "'''        if: steps.collection.outcome == 'success' '''",
+              "'''        if: steps.collection.outcome == 'success'''",
+          )
+          source = source.replace(
+              "'''        if: steps.batch.outputs.complete == 'true' && steps.collection.outcome == 'success' '''",
+              "'''        if: steps.batch.outputs.complete == 'true' && steps.collection.outcome == 'success'''",
+          )
+
+          marker = "          python - <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY", start)
+          script = source[start:end]
+          script = "\n".join(line[10:] if line.startswith("          ") else line for line in script.splitlines())
+          exec(compile(script, 'sprint-3-5-batched-resume-fix', 'exec'))
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          collector_path = Path('src/lib/risk-lab/FrozenDividendNoticeCollector.ts')
+          collector = collector_path.read_text()
+
+          # Observações oficiais já congeladas continuam válidas quando somente o
+          # código de coleta muda. Falhas pendentes são reprocessadas pelo coletor novo.
+          collector = replace_once(
+              collector,
+              '''    const checkpoint: FrozenDividendCollectionCheckpoint = existingCheckpoint?.releaseCommit === releaseCommit
+                ? existingCheckpoint
+                : {
+                  schemaVersion: 1,
+                  datasetId: "risk-lab-fnet-dividend-notices-v0.1",
+                  releaseCommit,
+                  cases: {},
+                  updatedAt: startedAt,
+                };''',
+              '''    const checkpoint: FrozenDividendCollectionCheckpoint = existingCheckpoint?.datasetId === "risk-lab-fnet-dividend-notices-v0.1"
+                ? { ...existingCheckpoint, releaseCommit }
+                : {
+                  schemaVersion: 1,
+                  datasetId: "risk-lab-fnet-dividend-notices-v0.1",
+                  releaseCommit,
+                  cases: {},
+                  updatedAt: startedAt,
+                };''',
+              'cross-release checkpoint migration',
+          )
+
+          # Mantém o contrato de hash dos metadados compatível com observações já
+          # coletadas. A precisão é regra de validação, não parte do payload histórico.
+          collector = replace_once(
+              collector,
+              '''    referenceDate: protocol.referenceDate,
+                referencePrecision: protocol.referencePrecision || "day",
+                deliveredAt: protocol.deliveredAt,''',
+              '''    referenceDate: protocol.referenceDate,
+                deliveredAt: protocol.deliveredAt,''',
+              'protocol hash backwards compatibility',
+          )
+          collector_path.write_text(collector)
+
+          collector_test_path = Path('tests/risk-lab-frozen-dividend-collector.test.ts')
+          collector_test = collector_test_path.read_text()
+          collector_test = replace_once(
+              collector_test,
+              '''  return { fetchImpl, discovery, calls, paths, maximumActive: () => maximumActive };''',
+              '''  return { fetchImpl, discovery, documentByCnpj, calls, paths, maximumActive: () => maximumActive };''',
+              'expose fixture documents',
+          )
+          collector_test = replace_once(
+              collector_test,
+              '''  const firstDocument = document("1001");
+            firstDocument.protocolMetadata.referenceDate = "2022-01-01";
+            firstDocument.protocolMetadata.referencePrecision = "month";''',
+              '''  const firstDocument = source.documentByCnpj.get(firstIdentity.cnpj);
+            assert.ok(firstDocument);
+            firstDocument.protocolMetadata.referenceDate = "2022-01-01";
+            firstDocument.protocolMetadata.referencePrecision = "month";''',
+              'monthly precision fixture',
+          )
+          collector_test = replace_once(
+              collector_test,
+              '''              const result = await collector.collect(
+                    identities(),
+                    RELEASE,
+                    checkpoint,
+                    async (value) => { checkpoint = structuredClone(value); },
+                  );''',
+              '''              const result = await collector.collect(
+                    identities(),
+                    run === 0 ? RELEASE : "b".repeat(40),
+                    checkpoint,
+                    async (value) => { checkpoint = structuredClone(value); },
+                  );''',
+              'cross-release resume regression',
+          )
+          collector_test += r'''
+
+          test("migra checkpoint para nova release preservando somente evidências concluídas", async () => {
+            const source = fixture(null);
+            const collector = new FrozenDividendNoticeCollector({
+              discovery: source.discovery,
+              fetchImpl: source.fetchImpl,
+              attempts: 1,
+              maxDocumentsPerRun: 1,
+              now: () => new Date("2026-07-22T02:00:00-03:00"),
+            });
+            const first = await collector.collect(identities(), RELEASE, null, async () => undefined);
+            const secondRelease = "c".repeat(40);
+            const second = await collector.collect(identities(), secondRelease, first.checkpoint, async () => undefined);
+            assert.equal(second.checkpoint.releaseCommit, secondRelease);
+            assert.equal(second.dataset.cases[0].documentsProcessed, 1);
+            assert.equal(source.calls.get("1001"), 1);
+          });
+          '''
+          collector_test_path.write_text(collector_test)
+
+          architecture_path = Path('tests/risk-lab-frozen-dividend-architecture.test.mjs')
+          architecture = architecture_path.read_text()
+          architecture += r'''
+
+          test("checkpoint oficial sobrevive a releases de código sem reiniciar evidências válidas", () => {
+            assert.match(collector, /existingCheckpoint\?\.datasetId/);
+            assert.match(collector, /\{ \.\.\.existingCheckpoint, releaseCommit \}/);
+            assert.doesNotMatch(collector, /existingCheckpoint\?\.releaseCommit === releaseCommit/);
+          });
+          '''
+          architecture_path.write_text(architecture)
+
+          # Remove os dois workflows de aplicação temporária antes do commit final.
+          patch_workflow.unlink()
+          Path('.github/workflows/sprint-3-5-batched-resume-fix-v2.yml').unlink()
+          PY
+
+      - run: npm run typecheck
+      - run: npm run test:sprint3.5
+      - run: npm run test:sprint2
+
+      - name: Commit only after all gates pass
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: retoma coleta congelada em lotes automáticos"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
