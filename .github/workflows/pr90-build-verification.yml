@@ -1,0 +1,28 @@
+name: PR 90 Build Verification
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/pr90-build-verification.yml
+      - src/lib/risk-lab/FnetDividendNoticeParser.ts
+      - src/lib/risk-lab/FrozenDividendNoticeCollector.ts
+      - tests/risk-lab-frozen-dividend-parser.test.ts
+      - tests/risk-lab-frozen-dividend-collector.test.ts
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
