@@ -1,0 +1,76 @@
+name: Diagnose FNET Edge Documents
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/diagnose-fnet-edge-docs.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Fetch and inspect official documents
+        run: |
+          mkdir -p diagnostic
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from "node:fs";
+          import { FnetDividendDocumentDiscovery } from "./src/lib/risk-lab/FnetDividendDocumentDiscovery.ts";
+          import { parseFnetDividendNoticeHtml } from "./src/lib/risk-lab/FnetDividendNoticeParser.ts";
+
+          mkdirSync("diagnostic", { recursive: true });
+          const targets = [
+            { ticker: "DEVA11", cnpj: "37087810000137", fromDate: "2021-01-01", untilDate: "2026-07-22", documentId: "137843" },
+            { ticker: "KNCR11", cnpj: "16706958000132", fromDate: "2022-01-01", untilDate: "2025-12-31", documentId: "453528" },
+          ];
+          const discovery = new FnetDividendDocumentDiscovery();
+          const results = [];
+          for (const target of targets) {
+            const discovered = await discovery.discover(target.cnpj, target.fromDate, target.untilDate);
+            const document = discovered.documents.find((item) => item.documentId === target.documentId) || null;
+            const url = `https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=${target.documentId}&cvm=true`;
+            const response = await fetch(url, {
+              headers: {
+                Accept: "text/html,application/xhtml+xml",
+                Referer: "https://fnet.bmfbovespa.com.br/fnet/publico/abrirGerenciadorDocumentosCVM",
+                "User-Agent": "DadosFII-RiskLab-Diagnostic/1.0",
+              },
+            });
+            const html = await response.text();
+            writeFileSync(`diagnostic/${target.ticker}-${target.documentId}.html`, html);
+            let parsed = null;
+            let parserError = null;
+            try {
+              parsed = parseFnetDividendNoticeHtml(html);
+            } catch (error) {
+              parserError = error instanceof Error ? error.message : String(error);
+            }
+            results.push({
+              target,
+              httpStatus: response.status,
+              contentType: response.headers.get("content-type"),
+              document,
+              parsed,
+              parserError,
+            });
+          }
+          writeFileSync("diagnostic/results.json", JSON.stringify(results, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fnet-edge-documents-diagnostic
+          path: diagnostic
+          if-no-files-found: error
+          retention-days: 7
