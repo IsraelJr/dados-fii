@@ -1,0 +1,75 @@
+name: Sprint 3.5-A DEVA11
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/lib/risk-lab/SingleFrozenDividendCaseFinalizer.ts"
+      - "scripts/finalize-frozen-dividend-case.ts"
+      - "tests/risk-lab-deva11-phase-a.test.ts"
+      - "docs/production-evidence/risk-lab/deva11-phase-a-manifest.json"
+      - ".github/workflows/risk-lab-deva11-phase-a.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  finalize-deva11:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run isolated phase tests
+        run: node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/risk-lab-deva11-phase-a.test.ts tests/risk-lab-fnet-notice-parser.test.ts tests/risk-lab-frozen-dividend-collector.test.ts
+      - name: Restore immutable source checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/source
+          artifact_id=$(jq -r '.sourceArtifact.artifactId' docs/production-evidence/risk-lab/deva11-phase-a-manifest.json)
+          expected_digest=$(jq -r '.sourceArtifact.artifactDigest' docs/production-evidence/risk-lab/deva11-phase-a-manifest.json)
+          api_digest=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" --jq '.digest')
+          test "$api_digest" = "$expected_digest"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > .tmp/source.zip
+          unzip -q .tmp/source.zip -d .tmp/source
+          test -f .tmp/source/.tmp/risk-lab-dividend-notices-checkpoint.json
+      - name: Prepare DEVA11-only input
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('docs/production-evidence/risk-lab/deva11-phase-a-manifest.json'));
+          const source = JSON.parse(fs.readFileSync('.tmp/source/.tmp/risk-lab-dividend-notices-checkpoint.json'));
+          if (source.releaseCommit !== manifest.sourceArtifact.releaseCommit) throw new Error('Release do checkpoint diverge do manifesto.');
+          const checkpoint = source.cases[manifest.identity.ticker];
+          if (!checkpoint) throw new Error('Caso DEVA11 ausente no checkpoint.');
+          const input = { ...manifest, checkpoint };
+          fs.writeFileSync('.tmp/deva11-input.json', JSON.stringify(input, null, 2) + '\n');
+          NODE
+      - name: Finalize DEVA11 twice from the same checkpoint
+        run: |
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types scripts/finalize-frozen-dividend-case.ts .tmp/deva11-input.json .tmp/deva11-run-1
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types scripts/finalize-frozen-dividend-case.ts .tmp/deva11-input.json .tmp/deva11-run-2
+          node - <<'NODE'
+          const fs = require('fs');
+          const a = JSON.parse(fs.readFileSync('.tmp/deva11-run-1/audit.json'));
+          const b = JSON.parse(fs.readFileSync('.tmp/deva11-run-2/audit.json'));
+          if (a.finalCaseHash !== b.finalCaseHash || a.auditHash !== b.auditHash) throw new Error('Hashes não reproduzíveis.');
+          if (a.pendingDocuments !== 0 || a.exclusions.length !== 2) throw new Error('Caso DEVA11 permanece incompleto.');
+          console.log({ caseHash: a.finalCaseHash, auditHash: a.auditHash });
+          NODE
+      - name: Upload deterministic DEVA11 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-deva11-phase-a-final
+          path: .tmp/deva11-run-1/
+          if-no-files-found: error
+          retention-days: 30

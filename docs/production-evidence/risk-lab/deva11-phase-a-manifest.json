@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-A",
+  "sourceArtifacts": {
+    "baseline": {
+      "workflowRunId": 29892173774,
+      "artifactId": 8519627249,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+      "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+    },
+    "diagnostic": {
+      "workflowRunId": 29881954620,
+      "artifactId": 8515476365,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+      "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+    }
+  },
+  "identity": {
+    "ticker": "DEVA11",
+    "cnpj": "37087810000137",
+    "role": "severe_deterioration",
+    "fromDate": "2021-01-01",
+    "untilDate": "2026-07-22"
+  },
+  "expected": {
+    "documentsDiscovered": 85,
+    "documentsProcessed": 85,
+    "rawObservationsInCheckpoint": 67,
+    "selectedMonthlyObservations": 65,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "caseHash": "fca3de0e38755c8213d7e37d5112b51733c794dd29a2f2f7cb5be82980313aa2",
+    "auditHash": "56642c7507a78aa06cc95af77c985509898123a532970630e38507a310c4ad7b"
+  }
+}
