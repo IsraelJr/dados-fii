@@ -1,8 +1,9 @@
 name: Sprint 3.5 Deployment Recovery
 
+# A recuperação periódica foi pausada quando a Sprint 3.5 deixou de ser tratada
+# como uma entrega monolítica. O workflow permanece disponível apenas para
+# execução manual futura, depois que as fases de coleta e validação forem concluídas.
 on:
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
