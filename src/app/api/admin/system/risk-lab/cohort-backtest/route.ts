@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
 import {
+  planRiskLabCohortAdvance,
+  type RiskLabCohortAdvanceAction,
+} from "@/lib/risk-lab/RiskLabCohortAdvancePlanner";
+import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
 import {
@@ -18,6 +22,12 @@ function activeProductionRelease() {
   return /^[a-f0-9]{40}$/.test(release) ? release : null;
 }
 
+function clientNextAction(action: RiskLabCohortAdvanceAction) {
+  if (action === "case") return "advance";
+  if (action === "noop") return null;
+  return action;
+}
+
 export async function GET(request: NextRequest) {
   const authorization = await authorizeAdminRequest(
     request,
@@ -29,22 +39,17 @@ export async function GET(request: NextRequest) {
   try {
     const releaseCommit = activeProductionRelease();
     const evidence = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
-    const completedTickers = new Set(evidence?.cases.map((item) => item.ticker) || []);
-    const nextTicker = SEGMENTED_COHORT_TICKERS.find((ticker) => !completedTickers.has(ticker)) || null;
+    const plan = releaseCommit
+      ? planRiskLabCohortAdvance(releaseCommit, SEGMENTED_COHORT_TICKERS, evidence)
+      : { action: "noop" as const, ticker: null };
     return adminJson({
       ok: true,
       enabled: Boolean(releaseCommit),
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       releaseCommit,
       tickers: SEGMENTED_COHORT_TICKERS,
-      nextAction: evidence?.releaseCommit !== releaseCommit
-        ? "initialize"
-        : evidence?.status !== "running"
-          ? null
-          : nextTicker
-            ? "advance"
-            : "finalize",
-      nextTicker,
+      nextAction: clientNextAction(plan.action),
+      nextTicker: plan.ticker,
       evidence,
     });
   } catch (error) {
@@ -86,15 +91,17 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    let resolvedAction = action;
+    let resolvedAction: RiskLabCohortAdvanceAction = action === "advance"
+      ? "noop"
+      : action as Exclude<RiskLabCohortAdvanceAction, "noop">;
     let resolvedTicker = ticker || null;
 
     if (action === "advance") {
       const current = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
-      if (!current || current.releaseCommit !== releaseCommit) {
-        resolvedAction = "initialize";
-        resolvedTicker = null;
-      } else if (current.status !== "running") {
+      const plan = planRiskLabCohortAdvance(releaseCommit, SEGMENTED_COHORT_TICKERS, current);
+      resolvedAction = plan.action;
+      resolvedTicker = plan.ticker;
+      if (resolvedAction === "noop") {
         return adminJson({
           ok: true,
           enabled: true,
@@ -102,16 +109,11 @@ export async function POST(request: NextRequest) {
           releaseCommit,
           action: "noop",
           ticker: null,
-          persistedCases: current.cases.length,
+          persistedCases: current?.cases.length || 0,
           nextAction: null,
           nextTicker: null,
           evidence: current,
         });
-      } else {
-        const completedTickers = new Set(current.cases.map((item) => item.ticker));
-        const pendingTicker = SEGMENTED_COHORT_TICKERS.find((item) => !completedTickers.has(item)) || null;
-        resolvedAction = pendingTicker ? "case" : "finalize";
-        resolvedTicker = pendingTicker;
       }
     }
 
@@ -130,14 +132,7 @@ export async function POST(request: NextRequest) {
         ? await segmentedRiskLabCohortBacktestService.runTicker(resolvedTicker)
         : await segmentedRiskLabCohortBacktestService.finalize();
 
-    const completedTickers = new Set(evidence.cases.map((item) => item.ticker));
-    const nextTicker = SEGMENTED_COHORT_TICKERS.find((item) => !completedTickers.has(item)) || null;
-    const nextAction = evidence.status !== "running"
-      ? null
-      : nextTicker
-        ? "advance"
-        : "finalize";
-
+    const nextPlan = planRiskLabCohortAdvance(releaseCommit, SEGMENTED_COHORT_TICKERS, evidence);
     return adminJson({
       ok: resolvedAction === "finalize" ? evidence.status === "passed" : true,
       enabled: true,
@@ -146,8 +141,8 @@ export async function POST(request: NextRequest) {
       action: resolvedAction,
       ticker: resolvedTicker,
       persistedCases: evidence.cases.length,
-      nextAction,
-      nextTicker,
+      nextAction: clientNextAction(nextPlan.action),
+      nextTicker: nextPlan.ticker,
       evidence,
     }, evidence.status === "running" ? 202 : 200);
   } catch (error) {
