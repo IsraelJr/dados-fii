@@ -22,10 +22,41 @@ function row(overrides: Record<string, unknown> = {}) {
   };
 }
 
-test("resolve idFundo interno sem depender de ticker", () => {
-  const html = `<input name="paginaCertificados" value="false" type="hidden"><input id="20031" type="hidden"><input id="cnpj" name="cnpj" type="text">`;
-  assert.equal(resolveFnetInternalFundId(html), "20031");
-  assert.throws(() => resolveFnetInternalFundId("<input id='1' type='hidden'><input id='2' type='hidden'>"), /idFundo único/);
+function realFundResolverHtml(id = "20031") {
+  return `
+    <html>
+      <body>
+        <input type="hidden" id="idFundo" name="idFundo" multiple="multiple" value="">
+        <input
+          type="hidden"
+          disabled="disabled"
+          class="fundoItemInicial"
+          data-id="${id}"
+          data-text="FII KINEA RI - KINEA RENDIMENTOS IMOBILIÁRIOS FII"
+        >
+      </body>
+    </html>
+  `;
+}
+
+test("resolve idFundo pelo data-id real do item inicial do Fundos.NET", () => {
+  assert.equal(resolveFnetInternalFundId(realFundResolverHtml()), "20031");
+});
+
+test("mantém compatibilidade com valor direto e contrato legado", () => {
+  assert.equal(
+    resolveFnetInternalFundId('<input type="hidden" id="idFundo" name="idFundo" value="20031">'),
+    "20031",
+  );
+  assert.equal(resolveFnetInternalFundId('<input id="20031" type="hidden">'), "20031");
+});
+
+test("falha fechada quando o resolvedor retorna zero ou múltiplos fundos", () => {
+  assert.throws(() => resolveFnetInternalFundId('<input id="idFundo" type="hidden" value="">'), /0 candidato/);
+  assert.throws(
+    () => resolveFnetInternalFundId(`${realFundResolverHtml("20031")}${realFundResolverHtml("20032")}`),
+    /2 candidato/,
+  );
 });
 
 test("mapeia somente avisos estruturados válidos dentro da janela conhecida", () => {
@@ -43,23 +74,31 @@ test("mapeia somente avisos estruturados válidos dentro da janela conhecida", (
   assert.match(documents[1].auditResult || "", /versão 2/);
 });
 
-test("descoberta diagnóstica pagina e preserva documentos oficiais", async () => {
+test("descoberta pagina pelo contrato real e preserva documentos oficiais", async () => {
   const calls: URL[] = [];
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(String(input));
     calls.push(url);
     if (url.pathname.endsWith("pesquisarGerenciadorDocumentosCVM")) {
-      return new Response(`<html><input id="20031" type="hidden"></html>`, {
+      assert.equal(url.searchParams.get("cnpjFundo"), "16706958000132");
+      return new Response(realFundResolverHtml(), {
         status: 200,
         headers: { "content-type": "text/html" },
       });
     }
+
     assert.equal(url.searchParams.get("idFundo"), "20031");
     assert.equal(url.searchParams.get("cnpj"), "16.706.958/0001-32");
+    assert.equal(url.searchParams.get("cnpjFundo"), "16.706.958/0001-32");
+    assert.equal(url.searchParams.get("isSession"), "false");
     assert.equal(url.searchParams.get("dataInicial"), "01/01/2022");
     assert.equal(url.searchParams.get("dataFinal"), "31/12/2025");
+    assert.equal(url.searchParams.get("l"), "100");
+
     const start = Number(url.searchParams.get("s"));
-    const data = start === 0 ? [row()] : [row({ id: 261399, dataReferencia: "28/02/2022", dataEntrega: "28/02/2022 18:00" })];
+    const data = start === 0
+      ? [row()]
+      : [row({ id: 261399, dataReferencia: "28/02/2022", dataEntrega: "28/02/2022 18:00" })];
     return Response.json({ data, draw: start === 0 ? 1 : 2, recordsFiltered: 2, recordsTotal: 2 });
   }) as typeof fetch;
 
@@ -75,11 +114,11 @@ test("descoberta diagnóstica pagina e preserva documentos oficiais", async () =
   assert.equal(calls.filter((url) => url.pathname.endsWith("pesquisarGerenciadorDocumentosDados")).length, 2);
 });
 
-test("descoberta diagnóstica bloqueia endpoint que ignorou o filtro", async () => {
+test("descoberta bloqueia endpoint que ignorou o filtro", async () => {
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(String(input));
     if (url.pathname.endsWith("pesquisarGerenciadorDocumentosCVM")) {
-      return new Response(`<input id="20031" type="hidden">`, { status: 200 });
+      return new Response(realFundResolverHtml(), { status: 200 });
     }
     return Response.json({ data: [row()], draw: 1, recordsFiltered: 164880, recordsTotal: 164880 });
   }) as typeof fetch;
