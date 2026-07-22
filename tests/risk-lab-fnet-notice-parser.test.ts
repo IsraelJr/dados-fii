@@ -112,3 +112,25 @@ test("rejeita valor de provento inválido", () => {
 test("rejeita HTML incompleto", () => {
   assert.throws(() => parseFnetDividendNoticeHtml("<html></html>"), /vazio ou incompleto/);
 });
+
+test("usa a data-base como limite temporal quando a data da informação está defasada", () => {
+  const notice = table([
+    ["Nome do Fundo:", "FUNDO DE INVESTIMENTO IMOBILIÁRIO KINEA RENDIMENTOS"],
+    ["Data da Informação:", "31/03/2023"],
+    ["Código de negociação:", "KNCR11"],
+    ["Data-base (último dia de negociação “com” direito ao provento)", "28/04/2023"],
+    ["Valor do provento (R$/unidade)", "1,00"],
+    ["Data do pagamento", "12/05/2023"],
+    ["Período de referência", "Abril 2023"],
+    ["Rendimento isento de IR*", "Sim"],
+  ]);
+  const parsed = parseFnetDividendNoticeHtml(notice);
+  assert.equal(parsed.informationDate, "2023-03-31");
+  assert.equal(parsed.baseDate, "2023-04-28");
+  assert.equal(parsed.competenceMonth, "2023-04");
+});
+
+test("continua rejeitando competência posterior tanto à informação quanto à data-base", () => {
+  const invalid = currentNotice.replace("Junho-2026", "Agosto-2026");
+  assert.throws(() => parseFnetDividendNoticeHtml(invalid), /posterior às datas do aviso/);
+});
