@@ -1,9 +1,10 @@
-import { parseFnetDividendNoticeHtml } from "@/lib/risk-lab/FnetDividendNoticeParser";
 import { hashFrozenDividendCase, sha256Text } from "@/lib/risk-lab/FrozenDividendDatasetIntegrity";
-import type { FrozenDividendCaseCheckpoint, FrozenDividendNoticeCase, FrozenDividendNoticeFailure, FrozenDividendNoticeObservation } from "@/types/riskLabFrozenDividendDataset";
-
-const FNET_ORIGIN = "https://fnet.bmfbovespa.com.br";
-const MAX_HTML_BYTES = 2_000_000;
+import type {
+  FrozenDividendCaseCheckpoint,
+  FrozenDividendNoticeCase,
+  FrozenDividendNoticeFailure,
+  FrozenDividendNoticeObservation,
+} from "@/types/riskLabFrozenDividendDataset";
 
 export interface SingleFrozenDividendIdentity {
   ticker: string;
@@ -13,28 +14,38 @@ export interface SingleFrozenDividendIdentity {
   untilDate: string;
 }
 
+export interface FrozenDividendDiagnosticEvidence {
+  artifactId: number;
+  artifactDigest: string;
+  documentId: string;
+  failure: FrozenDividendNoticeFailure;
+}
+
 export interface SingleFrozenDividendInput {
   schemaVersion: 1;
   phase: string;
-  sourceArtifact: Record<string, unknown>;
+  sourceArtifacts: Record<string, unknown>;
   identity: SingleFrozenDividendIdentity;
   checkpoint: FrozenDividendCaseCheckpoint;
-  pendingDocumentIds: string[];
+  diagnosticEvidence: FrozenDividendDiagnosticEvidence[];
 }
 
 export interface SingleFrozenDividendExclusion {
   documentId: string;
   classification: "outside_cohort_window" | "secondary_share_class";
-  parsedTicker: string;
-  competenceMonth: string;
+  parsedTicker: string | null;
+  competenceMonth: string | null;
   sourceUrl: string;
-  sourceHash: string;
+  evidenceArtifactId: number;
+  evidenceArtifactDigest: string;
+  evidenceMessage: string;
+  evidenceHash: string;
 }
 
 export interface SingleFrozenDividendAudit {
   schemaVersion: 1;
   phase: string;
-  sourceArtifact: Record<string, unknown>;
+  sourceArtifacts: Record<string, unknown>;
   identity: SingleFrozenDividendIdentity;
   inputCheckpointHash: string;
   exclusions: SingleFrozenDividendExclusion[];
@@ -43,23 +54,18 @@ export interface SingleFrozenDividendAudit {
   documentsProcessed: number;
   observations: number;
   pendingDocuments: number;
+  conflicts: number;
   auditHash: string;
-}
-
-export interface SingleFrozenDividendFinalizerDependencies {
-  fetchImpl?: typeof fetch;
-  now?: () => Date;
-  attempts?: number;
-  timeoutMs?: number;
-  sleep?: (milliseconds: number) => Promise<void>;
 }
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
   if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, item]) => [key, stableValue(item)]));
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => [key, stableValue(item)]),
+  );
 }
 
 function stableHash(value: unknown) {
@@ -98,7 +104,12 @@ function seriesCoverage(months: string[]) {
 }
 
 function noticeEventKey(observation: FrozenDividendNoticeObservation) {
-  return [observation.ticker, observation.informationDate, observation.baseDate, observation.paymentDate].join("|");
+  return [
+    observation.ticker,
+    observation.informationDate,
+    observation.baseDate,
+    observation.paymentDate,
+  ].join("|");
 }
 
 function selectKnownVersions(observations: FrozenDividendNoticeObservation[], untilDate: string) {
@@ -109,26 +120,39 @@ function selectKnownVersions(observations: FrozenDividendNoticeObservation[], un
     const key = noticeEventKey(observation);
     events.set(key, [...(events.get(key) || []), observation]);
   }
+
   const conflicts: string[] = [];
   const currentEvents: FrozenDividendNoticeObservation[] = [];
   for (const [eventKey, items] of events) {
-    items.sort((left, right) => right.protocolVersion - left.protocolVersion
+    items.sort((left, right) =>
+      right.protocolVersion - left.protocolVersion
       || Date.parse(right.announcedAt) - Date.parse(left.announcedAt)
       || right.documentId.localeCompare(left.documentId));
     const highestVersion = items[0].protocolVersion;
     const candidates = items.filter((item) => item.protocolVersion === highestVersion);
-    const signatures = new Set(candidates.map((item) => `${item.competenceMonth}|${item.amountPerShare.toFixed(8)}`));
+    const signatures = new Set(candidates.map((item) => [
+      item.competenceMonth,
+      item.amountPerShare.toFixed(8),
+    ].join("|")));
     if (signatures.size > 1) {
       conflicts.push(`Reapresentações conflitantes no evento ${eventKey}, versão ${highestVersion}.`);
       continue;
     }
     currentEvents.push(candidates[0]);
   }
+
   const grouped = new Map<string, FrozenDividendNoticeObservation[]>();
-  for (const observation of currentEvents) grouped.set(observation.competenceMonth, [...(grouped.get(observation.competenceMonth) || []), observation]);
+  for (const observation of currentEvents) {
+    grouped.set(observation.competenceMonth, [
+      ...(grouped.get(observation.competenceMonth) || []),
+      observation,
+    ]);
+  }
+
   const selected: FrozenDividendNoticeObservation[] = [];
   for (const [competenceMonth, items] of grouped) {
-    items.sort((left, right) => right.protocolVersion - left.protocolVersion
+    items.sort((left, right) =>
+      right.protocolVersion - left.protocolVersion
       || Date.parse(right.announcedAt) - Date.parse(left.announcedAt)
       || right.documentId.localeCompare(left.documentId));
     const highestVersion = items[0].protocolVersion;
@@ -144,13 +168,25 @@ function selectKnownVersions(observations: FrozenDividendNoticeObservation[], un
   return { selected, conflicts };
 }
 
-function buildCase(identity: SingleFrozenDividendIdentity, checkpoint: FrozenDividendCaseCheckpoint): FrozenDividendNoticeCase {
+function buildCase(
+  identity: SingleFrozenDividendIdentity,
+  checkpoint: FrozenDividendCaseCheckpoint,
+): FrozenDividendNoticeCase {
   const completed = new Set(checkpoint.completedDocumentIds);
   const pendingDocumentIds = checkpoint.discoveredDocumentIds.filter((id) => !completed.has(id));
-  const { selected, conflicts } = selectKnownVersions(Object.values(checkpoint.observationsByDocumentId), identity.untilDate);
+  const { selected, conflicts } = selectKnownVersions(
+    Object.values(checkpoint.observationsByDocumentId),
+    identity.untilDate,
+  );
   const coverage = seriesCoverage(selected.map((item) => item.competenceMonth));
-  const status = conflicts.length ? "blocked" : pendingDocumentIds.length || !selected.length ? "incomplete" : "complete";
-  const failures = pendingDocumentIds.map((id) => checkpoint.failuresByDocumentId[id]).filter((item): item is FrozenDividendNoticeFailure => Boolean(item));
+  const status = conflicts.length > 0
+    ? "blocked"
+    : pendingDocumentIds.length > 0 || selected.length === 0
+      ? "incomplete"
+      : "complete";
+  const failures = pendingDocumentIds
+    .map((id) => checkpoint.failuresByDocumentId[id])
+    .filter((item): item is FrozenDividendNoticeFailure => Boolean(item));
   const withoutHash: Omit<FrozenDividendNoticeCase, "caseHash"> = {
     ticker: identity.ticker,
     cnpj: identity.cnpj,
@@ -171,113 +207,109 @@ function buildCase(identity: SingleFrozenDividendIdentity, checkpoint: FrozenDiv
 }
 
 function sourceUrl(documentId: string) {
-  const url = new URL("/fnet/publico/exibirDocumento", FNET_ORIGIN);
-  url.searchParams.set("id", documentId);
-  url.searchParams.set("cvm", "true");
-  return url.toString();
+  return `https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=${documentId}`;
 }
 
-function retryable(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || "");
-  return /AbortError|operation was aborted|HTTP (408|425|429|5\d\d)|network|fetch failed|socket|timed out/i.test(message)
-    || (error instanceof Error && error.name === "AbortError");
+function classifyEvidence(identity: SingleFrozenDividendIdentity, evidence: FrozenDividendDiagnosticEvidence) {
+  const message = evidence.failure.message;
+  const tickerMatch = message.match(/Ticker FNET inválido:\s*([A-Z]{4}\d{2})/i);
+  if (tickerMatch) {
+    const parsedTicker = tickerMatch[1].toUpperCase();
+    if (parsedTicker !== identity.ticker && parsedTicker.slice(0, 4) === identity.ticker.slice(0, 4)) {
+      return {
+        classification: "secondary_share_class" as const,
+        parsedTicker,
+        competenceMonth: null,
+      };
+    }
+    throw new Error(`Evidência de ticker não justifica exclusão de ${evidence.documentId}: ${parsedTicker}.`);
+  }
+
+  const periodMatch = message.match(/Período de referência FNET inválido:\s*(0?[1-9]|1[0-2])\s*[-\/.]\s*(\d{2})/i);
+  if (periodMatch) {
+    const competenceMonth = `20${periodMatch[2]}-${String(Number(periodMatch[1])).padStart(2, "0")}`;
+    const competence = monthIndex(competenceMonth);
+    const firstMonth = monthIndex(identity.fromDate.slice(0, 7));
+    const lastMonth = monthIndex(identity.untilDate.slice(0, 7));
+    if (competence < firstMonth || competence > lastMonth) {
+      return {
+        classification: "outside_cohort_window" as const,
+        parsedTicker: identity.ticker,
+        competenceMonth,
+      };
+    }
+    throw new Error(`Período histórico ${competenceMonth} pertence à janela da coorte.`);
+  }
+
+  throw new Error(`Evidência insuficiente para classificar ${evidence.documentId}: ${message}`);
 }
 
 export class SingleFrozenDividendCaseFinalizer {
-  private readonly fetchImpl: typeof fetch;
-  private readonly now: () => Date;
-  private readonly attempts: number;
-  private readonly timeoutMs: number;
-  private readonly sleep: (milliseconds: number) => Promise<void>;
-
-  constructor(dependencies: SingleFrozenDividendFinalizerDependencies = {}) {
-    this.fetchImpl = dependencies.fetchImpl || fetch;
-    this.now = dependencies.now || (() => new Date());
-    this.attempts = Math.max(1, Math.min(8, dependencies.attempts || 4));
-    this.timeoutMs = Math.max(1_000, dependencies.timeoutMs || 45_000);
-    this.sleep = dependencies.sleep || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
-  }
-
-  private async fetchHtml(url: string) {
-    let lastError: unknown = null;
-    for (let attempt = 1; attempt <= this.attempts; attempt += 1) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-      try {
-        const response = await this.fetchImpl(url, {
-          method: "GET",
-          redirect: "follow",
-          cache: "no-store",
-          signal: controller.signal,
-          headers: {
-            Accept: "text/html,application/xhtml+xml",
-            Referer: `${FNET_ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM`,
-            "User-Agent": "DadosFII-RiskLab/1.0 (+single-frozen-case-finalizer)",
-          },
-        });
-        if (!response.ok) throw new Error(`Fundos.NET respondeu HTTP ${response.status}.`);
-        const html = await response.text();
-        if (Buffer.byteLength(html, "utf8") > MAX_HTML_BYTES) throw new Error("Documento Fundos.NET excede o limite seguro de 2 MB.");
-        return html;
-      } catch (error) {
-        lastError = error;
-        if (attempt === this.attempts || !retryable(error)) throw error;
-        await this.sleep(Math.min(30_000, 500 * 2 ** (attempt - 1)));
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-    throw lastError instanceof Error ? lastError : new Error("Falha desconhecida após retentativas.");
-  }
-
-  async finalize(input: SingleFrozenDividendInput) {
+  finalize(input: SingleFrozenDividendInput) {
     if (input.schemaVersion !== 1) throw new Error("Entrada da fase com schema incompatível.");
     const { identity } = input;
-    if (!/^[A-Z]{4}11$/.test(identity.ticker) || !/^\d{14}$/.test(identity.cnpj)) throw new Error("Identidade inválida.");
+    if (!/^[A-Z]{4}11$/.test(identity.ticker) || !/^\d{14}$/.test(identity.cnpj)) {
+      throw new Error("Identidade inválida.");
+    }
     const checkpoint = structuredClone(input.checkpoint);
-    if (checkpoint.ticker !== identity.ticker || checkpoint.cnpj !== identity.cnpj
-      || checkpoint.fromDate !== identity.fromDate || checkpoint.untilDate !== identity.untilDate) {
+    if (
+      checkpoint.ticker !== identity.ticker
+      || checkpoint.cnpj !== identity.cnpj
+      || checkpoint.fromDate !== identity.fromDate
+      || checkpoint.untilDate !== identity.untilDate
+    ) {
       throw new Error("Checkpoint não pertence à identidade informada.");
     }
+
     const completed = new Set(checkpoint.completedDocumentIds);
-    const actualPending = checkpoint.discoveredDocumentIds.filter((id) => !completed.has(id)).sort();
-    const requestedPending = [...new Set(input.pendingDocumentIds)].sort();
-    if (JSON.stringify(actualPending) !== JSON.stringify(requestedPending)) {
-      throw new Error(`Pendências da entrada divergem do checkpoint: ${actualPending.join(", ")}.`);
+    const actualPending = checkpoint.discoveredDocumentIds
+      .filter((id) => !completed.has(id))
+      .sort();
+    const evidenceById = new Map(input.diagnosticEvidence.map((item) => [item.documentId, item]));
+    const evidenceIds = [...evidenceById.keys()].sort();
+    if (JSON.stringify(actualPending) !== JSON.stringify(evidenceIds)) {
+      throw new Error(`Evidências divergem das pendências do checkpoint: ${actualPending.join(", ")}.`);
     }
 
     const exclusions: SingleFrozenDividendExclusion[] = [];
-    for (const documentId of requestedPending) {
-      const url = sourceUrl(documentId);
-      const html = await this.fetchHtml(url);
-      const notice = parseFnetDividendNoticeHtml(html);
-      let classification: SingleFrozenDividendExclusion["classification"] | null = null;
-      if (notice.ticker !== identity.ticker) {
-        if (notice.ticker.slice(0, 4) === identity.ticker.slice(0, 4)) classification = "secondary_share_class";
-        else throw new Error(`Ticker divergente no aviso ${documentId}: ${notice.ticker}.`);
+    for (const documentId of actualPending) {
+      const evidence = evidenceById.get(documentId);
+      if (!evidence) throw new Error(`Evidência ausente para ${documentId}.`);
+      if (evidence.failure.documentId !== documentId) {
+        throw new Error(`Evidência associada ao documento incorreto: ${documentId}.`);
       }
-      if (!(notice.amountPerShare > 0)) throw new Error(`Valor anunciado não positivo no aviso ${documentId}.`);
-      const competence = monthIndex(notice.competenceMonth);
-      const firstMonth = monthIndex(identity.fromDate.slice(0, 7));
-      const lastMonth = monthIndex(identity.untilDate.slice(0, 7));
-      if (!classification && (competence < firstMonth || competence > lastMonth)) classification = "outside_cohort_window";
-      if (!classification) {
-        throw new Error(`Documento primário ${documentId} pertence à janela e exige coleta completa com metadados de protocolo.`);
+      if (!/^sha256:[a-f0-9]{64}$/.test(evidence.artifactDigest)) {
+        throw new Error(`Digest do artefato diagnóstico inválido para ${documentId}.`);
       }
-      exclusions.push({ documentId, classification, parsedTicker: notice.ticker, competenceMonth: notice.competenceMonth, sourceUrl: url, sourceHash: sha256Text(html) });
+      const classification = classifyEvidence(identity, evidence);
+      exclusions.push({
+        documentId,
+        ...classification,
+        sourceUrl: sourceUrl(documentId),
+        evidenceArtifactId: evidence.artifactId,
+        evidenceArtifactDigest: evidence.artifactDigest,
+        evidenceMessage: evidence.failure.message,
+        evidenceHash: stableHash(evidence),
+      });
       completed.add(documentId);
       delete checkpoint.failuresByDocumentId[documentId];
     }
+
     checkpoint.completedDocumentIds = [...completed].sort((left, right) => left.localeCompare(right));
-    checkpoint.updatedAt = this.now().toISOString();
+    checkpoint.updatedAt = input.checkpoint.updatedAt;
     const finalCase = buildCase(identity, checkpoint);
-    if (finalCase.status !== "complete" || finalCase.pendingDocumentIds.length || finalCase.conflicts.length) {
+    if (
+      finalCase.status !== "complete"
+      || finalCase.pendingDocumentIds.length > 0
+      || finalCase.conflicts.length > 0
+    ) {
       throw new Error(`Caso ${identity.ticker} não ficou completo após a finalização.`);
     }
+
     const auditWithoutHash: Omit<SingleFrozenDividendAudit, "auditHash"> = {
       schemaVersion: 1,
       phase: input.phase,
-      sourceArtifact: input.sourceArtifact,
+      sourceArtifacts: input.sourceArtifacts,
       identity,
       inputCheckpointHash: stableHash(input.checkpoint),
       exclusions: exclusions.sort((left, right) => left.documentId.localeCompare(right.documentId)),
@@ -286,8 +318,12 @@ export class SingleFrozenDividendCaseFinalizer {
       documentsProcessed: finalCase.documentsProcessed,
       observations: finalCase.observations.length,
       pendingDocuments: finalCase.pendingDocumentIds.length,
+      conflicts: finalCase.conflicts.length,
     };
-    const audit: SingleFrozenDividendAudit = { ...auditWithoutHash, auditHash: stableHash(auditWithoutHash) };
+    const audit: SingleFrozenDividendAudit = {
+      ...auditWithoutHash,
+      auditHash: stableHash(auditWithoutHash),
+    };
     return { case: finalCase, checkpoint, audit };
   }
 }
