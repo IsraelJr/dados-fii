@@ -124,3 +124,21 @@ test("falha fechada para ticker de outra família", () => {
     /não justifica exclusão/,
   );
 });
+
+test("falha fechada quando a evidência não justifica uma classificação geral", () => {
+  const value = input();
+  value.diagnosticEvidence[1].failure.message = "Operação abortada durante a leitura do documento";
+  assert.throws(
+    () => new SingleFrozenDividendCaseFinalizer().finalize(value),
+    /Evidência insuficiente para classificar secondary/,
+  );
+});
+
+test("exige evidência exata para todas as pendências do checkpoint", () => {
+  const value = input();
+  value.diagnosticEvidence = value.diagnosticEvidence.filter((item) => item.documentId !== "secondary");
+  assert.throws(
+    () => new SingleFrozenDividendCaseFinalizer().finalize(value),
+    /Evidências divergem das pendências do checkpoint/,
+  );
+});
