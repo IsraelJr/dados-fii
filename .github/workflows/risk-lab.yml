@@ -13,6 +13,8 @@ on:
       - "src/types/riskLab*.ts"
       - "tests/risk-lab-*.test.ts"
       - "tests/risk-lab-*.test.mjs"
+      - "docs/production-evidence/risk-lab/**"
+      - "docs/risk-lab/**"
       - "package.json"
       - "package-lock.json"
   workflow_dispatch:
@@ -45,3 +47,9 @@ jobs:
       # Esta verificação executa somente a suíte especializada do domínio.
       - name: Run Risk Lab tests
         run: npm run test:risk-lab
+
+      - name: Validate deterministic DEVA11 phase
+        run: >-
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test
+          tests/risk-lab-deva11-phase-a.test.ts
+          tests/risk-lab-deva11-evidence.test.mjs
