@@ -5,6 +5,9 @@ export type FrozenDividendCaseRole =
 
 export type FrozenDividendDatasetStatus = "pending" | "complete" | "blocked";
 export type FrozenDividendCaseStatus = "complete" | "incomplete" | "blocked";
+export type FrozenDividendProtocolEvidenceType =
+  | "protocol_html"
+  | "official_manager_metadata";
 
 export interface FrozenDividendNoticeObservation {
   ticker: string;
@@ -23,6 +26,7 @@ export interface FrozenDividendNoticeObservation {
   sourceHash: string;
   protocolHash: string;
   protocolVersion: number;
+  protocolEvidenceType?: FrozenDividendProtocolEvidenceType;
   sourceVersion: string;
 }
 
