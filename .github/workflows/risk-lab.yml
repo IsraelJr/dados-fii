@@ -2,59 +2,32 @@ name: Risk Lab CI
 
 on:
   pull_request:
+    branches: [main]
     paths:
       - ".github/workflows/risk-lab.yml"
-      - ".github/workflows/risk-lab-closure.yml"
-      - ".github/scripts/close-risk-lab-3-4.py"
-      - "docs/risk-lab/**"
-      - "docs/production-evidence/risk-lab/**"
       - "src/app/admin/risk-lab/**"
       - "src/app/api/admin/system/risk-lab/**"
+      - "src/app/api/system/risk-lab-*/**"
       - "src/lib/risk-lab/**"
       - "src/lib/featureFlags.ts"
-      - "src/types/riskLab.ts"
-      - "src/types/riskLabProduction.ts"
-      - "src/types/riskLabDividendStress.ts"
-      - "src/types/riskLabDividendStressRun.ts"
-      - "src/types/riskLabSeriesReadiness.ts"
+      - "src/types/riskLab*.ts"
       - "tests/risk-lab-*.test.ts"
       - "tests/risk-lab-*.test.mjs"
       - "package.json"
       - "package-lock.json"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/risk-lab.yml"
-      - ".github/workflows/risk-lab-closure.yml"
-      - ".github/scripts/close-risk-lab-3-4.py"
-      - "docs/risk-lab/**"
-      - "docs/production-evidence/risk-lab/**"
-      - "src/app/admin/risk-lab/**"
-      - "src/app/api/admin/system/risk-lab/**"
-      - "src/lib/risk-lab/**"
-      - "src/lib/featureFlags.ts"
-      - "src/types/riskLab.ts"
-      - "src/types/riskLabProduction.ts"
-      - "src/types/riskLabDividendStress.ts"
-      - "src/types/riskLabDividendStressRun.ts"
-      - "src/types/riskLabSeriesReadiness.ts"
-      - "tests/risk-lab-*.test.ts"
-      - "tests/risk-lab-*.test.mjs"
-      - "package.json"
-      - "package-lock.json"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: risk-lab-${{ github.workflow }}-${{ github.ref }}
+  group: risk-lab-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,49 +38,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm install --silent
+      - name: Install frozen dependencies
+        run: npm ci --silent
 
-      - name: Validate closure script
-        id: closure_script
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          if [[ -f .github/scripts/close-risk-lab-3-4.py ]]; then
-            python3 -m py_compile .github/scripts/close-risk-lab-3-4.py 2>&1 | tee risk-lab-closure-script.log
-          else
-            echo "No temporary closure script present." | tee risk-lab-closure-script.log
-          fi
-
-      - name: Typecheck
-        id: typecheck
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run typecheck 2>&1 | tee risk-lab-typecheck.log
-
+      # O typecheck e a governança dos workflows pertencem à CI central.
+      # Esta verificação executa somente a suíte especializada do domínio.
       - name: Run Risk Lab tests
-        id: risk_tests
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run test:risk-lab 2>&1 | tee risk-lab-test.log
-
-      - name: Upload Risk Lab validation reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: risk-lab-validation-report
-          path: |
-            risk-lab-closure-script.log
-            risk-lab-typecheck.log
-            risk-lab-test.log
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Enforce Risk Lab validation result
-        if: steps.closure_script.outcome != 'success' || steps.typecheck.outcome != 'success' || steps.risk_tests.outcome != 'success'
-        run: exit 1
+        run: npm run test:risk-lab
