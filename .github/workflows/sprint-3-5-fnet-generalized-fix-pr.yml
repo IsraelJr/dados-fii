@@ -27,7 +27,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Execute tested patch embedded in the temporary workflow
+      - name: Execute and verify the generalized correction
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -43,6 +43,30 @@ jobs:
           script = source[start:end]
           script = "\n".join(line[10:] if line.startswith("          ") else line for line in script.splitlines())
           exec(compile(script, 'sprint-3-5-fnet-generalized-fix', 'exec'))
+
+          collector_path = Path('src/lib/risk-lab/FrozenDividendNoticeCollector.ts')
+          collector = collector_path.read_text()
+          old = '''    if (notice.ticker !== identity.ticker) {
+                throw new Error(`Ticker divergente no aviso ${document.documentId}: ${notice.ticker}.`);
+              }'''
+          new = '''    if (notice.ticker !== identity.ticker) {
+                if (notice.ticker.slice(0, 4) === identity.ticker.slice(0, 4)) return null;
+                throw new Error(`Ticker divergente no aviso ${document.documentId}: ${notice.ticker}.`);
+              }'''
+          if old in collector:
+              collector = collector.replace(old, new)
+          if new not in collector:
+              raise SystemExit('Isolamento por classe não foi aplicado ao coletor.')
+          for required in ['noticeEventKey', 'const COLLECTOR_VERSION = "1.2.0"', 'operation was aborted']:
+              if required not in collector:
+                  raise SystemExit(f'Correção obrigatória ausente no coletor: {required}')
+          collector_path.write_text(collector)
+
+          parser = Path('src/lib/risk-lab/FnetDividendNoticeParser.ts').read_text()
+          for required in ['shortMonthYear', 'normalizeTemporalCompetence', '^[A-Z]{4}\\d{2}$']:
+              if required not in parser:
+                  raise SystemExit(f'Correção obrigatória ausente no parser: {required}')
+
           Path('.github/workflows/sprint-3-5-fnet-generalized-fix-pr.yml').unlink()
           PY
 
