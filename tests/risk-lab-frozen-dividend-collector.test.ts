@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { FrozenDividendNoticeCollector } from "../src/lib/risk-lab/FrozenDividendNoticeCollector";
 import type { FrozenDividendCohortIdentity } from "../src/lib/risk-lab/FrozenDividendNoticeCollector";
-import type { AutomaticDocumentEvidence } from "../src/types/riskLabAutomatic";
+import type { FnetDividendDocumentEvidence } from "../src/lib/risk-lab/FnetDividendDocumentDiscovery";
 import type { FrozenDividendCollectionCheckpoint } from "../src/types/riskLabFrozenDividendDataset";
 
 const TICKERS = ["AAAA11", "BBBB11", "CCCC11", "DDDD11", "EEEE11", "FFFF11"];
@@ -34,32 +34,32 @@ function notice(ticker: string, amount = "1,00") {
   ]);
 }
 
-function protocol(version = 1) {
-  return table([
-    ["Identificação do Documento", "Aviso aos Cotistas - Estruturado - Rendimentos e Amortizações"],
-    ["Versão", String(version)],
-    ["Data de Referência", "31/01/2022"],
-    ["Data de Entrega", "31/01/2022 18:02:03"],
-  ]);
-}
-
-function document(id: string): AutomaticDocumentEvidence {
+function document(id: string): FnetDividendDocumentEvidence {
   return {
     documentId: id,
     documentType: "Aviso aos Cotistas - Estruturado - Rendimentos e Amortizações",
     fileName: `fnet-rendimentos-${id}.html`,
     competenceDate: "2022-01-31",
-    receivedAt: "2022-01-31T18:02:03-03:00",
+    receivedAt: "2022-01-31T18:02:00-03:00",
     link: `https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=${id}&cvm=true`,
     sourceYear: 2022,
-    auditResult: "versão 1",
+    auditResult: "Ativo com visualização; Apresentação; versão 1",
     confidence: 99,
+    protocolMetadata: {
+      referenceDate: "2022-01-31",
+      deliveredAt: "2022-01-31T18:02:00-03:00",
+      version: 1,
+      status: "Ativo com visualização",
+      modality: "Apresentação",
+      situation: "A",
+      sourceUrl: "https://fnet.bmfbovespa.com.br/fnet/publico/pesquisarGerenciadorDocumentosDados",
+    },
   };
 }
 
 function fixture(failingDocumentId: string | null = null) {
   const tickerByDocument = new Map<string, string>();
-  const documentByCnpj = new Map<string, AutomaticDocumentEvidence>();
+  const documentByCnpj = new Map<string, FnetDividendDocumentEvidence>();
   identities().forEach((identity, index) => {
     const id = String(1001 + index);
     tickerByDocument.set(id, identity.ticker);
@@ -68,9 +68,11 @@ function fixture(failingDocumentId: string | null = null) {
   let active = 0;
   let maximumActive = 0;
   const calls = new Map<string, number>();
+  const paths: string[] = [];
   const fetchImpl = (async (input: string | URL | Request) => {
     const url = new URL(String(input));
-    const id = url.searchParams.get("idDocumento") || url.searchParams.get("id") || "";
+    const id = url.searchParams.get("id") || "";
+    paths.push(url.pathname);
     calls.set(id, (calls.get(id) || 0) + 1);
     active += 1;
     maximumActive = Math.max(maximumActive, active);
@@ -79,7 +81,7 @@ function fixture(failingDocumentId: string | null = null) {
     if (id === failingDocumentId) throw new TypeError("fetch failed");
     const ticker = tickerByDocument.get(id);
     assert.ok(ticker);
-    return new Response(url.pathname.includes("visualizarProtocolo") ? protocol() : notice(ticker), {
+    return new Response(notice(ticker), {
       status: 200,
       headers: { "content-type": "text/html" },
     });
@@ -96,7 +98,7 @@ function fixture(failingDocumentId: string | null = null) {
       };
     },
   };
-  return { fetchImpl, discovery, calls, maximumActive: () => maximumActive };
+  return { fetchImpl, discovery, calls, paths, maximumActive: () => maximumActive };
 }
 
 const RELEASE = "a".repeat(40);
@@ -129,11 +131,14 @@ test("coleta os seis fundos e todos os documentos de forma estritamente sequenci
   assert.equal(result.dataset.cases.length, 6);
   assert.equal(result.dataset.cases.every((item) => item.observations.length === 1), true);
   assert.equal(result.source.maximumActive(), 1);
+  assert.equal(result.source.paths.every((path) => path.endsWith("/exibirDocumento")), true);
   assert.match(result.dataset.datasetHash || "", /^[a-f0-9]{64}$/);
   for (const item of result.dataset.cases) {
     assert.match(item.caseHash, /^[a-f0-9]{64}$/);
     assert.match(item.observations[0].sourceHash, /^[a-f0-9]{64}$/);
     assert.match(item.observations[0].protocolHash, /^[a-f0-9]{64}$/);
+    assert.equal(item.observations[0].protocolEvidenceType, "official_manager_metadata");
+    assert.match(item.observations[0].sourceVersion, /manager-metadata/);
   }
 });
 
@@ -148,6 +153,6 @@ test("checkpoint retoma somente documento pendente sem duplicar observações an
   assert.equal(second.dataset.status, "complete");
   assert.equal(second.dataset.cases.every((item) => item.observations.length === 1), true);
   assert.equal(second.source.calls.get("1001") || 0, 0);
-  assert.equal(firstSuccessfulCalls, 2);
+  assert.equal(firstSuccessfulCalls, 1);
   assert.equal(new Set(second.dataset.cases.flatMap((item) => item.observations.map((entry) => entry.documentId))).size, 6);
 });

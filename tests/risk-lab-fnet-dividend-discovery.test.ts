@@ -59,7 +59,7 @@ test("falha fechada quando o resolvedor retorna zero ou múltiplos fundos", () =
   );
 });
 
-test("mapeia somente avisos estruturados válidos dentro da janela conhecida", () => {
+test("mapeia avisos e preserva metadados oficiais equivalentes ao protocolo", () => {
   const documents = mapFnetDividendRows([
     row(),
     row({ id: 2, tipoDocumento: "Relatório Gerencial" }),
@@ -70,8 +70,25 @@ test("mapeia somente avisos estruturados válidos dentro da janela conhecida", (
 
   assert.deepEqual(documents.map((item) => item.documentId), ["261398", "5"]);
   assert.equal(documents[0].receivedAt, "2022-01-31T18:02:00-03:00");
+  assert.deepEqual(documents[0].protocolMetadata, {
+    referenceDate: "2022-01-31",
+    deliveredAt: "2022-01-31T18:02:00-03:00",
+    version: 1,
+    status: "Ativo com visualização",
+    modality: "Apresentação",
+    situation: "A",
+    sourceUrl: "https://fnet.bmfbovespa.com.br/fnet/publico/pesquisarGerenciadorDocumentosDados",
+  });
   assert.equal(documents[1].competenceDate, "2022-02-01");
+  assert.equal(documents[1].protocolMetadata.version, 2);
   assert.match(documents[1].auditResult || "", /versão 2/);
+});
+
+test("falha fechada quando um aviso aceito não possui protocolo oficial íntegro", () => {
+  assert.throws(
+    () => mapFnetDividendRows([row({ dataEntrega: "", versao: 0 })], "2022-01-01", "2025-12-31"),
+    /Metadados oficiais de protocolo inválidos/,
+  );
 });
 
 test("descoberta pagina pelo contrato real e preserva documentos oficiais", async () => {
@@ -111,6 +128,7 @@ test("descoberta pagina pelo contrato real e preserva documentos oficiais", asyn
   assert.equal(result.internalFundId, "20031");
   assert.equal(result.recordsInspected, 2);
   assert.deepEqual(result.documents.map((item) => item.documentId), ["261398", "261399"]);
+  assert.equal(result.documents.every((item) => item.protocolMetadata.version === 1), true);
   assert.equal(calls.filter((url) => url.pathname.endsWith("pesquisarGerenciadorDocumentosDados")).length, 2);
 });
 

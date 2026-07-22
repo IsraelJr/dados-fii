@@ -1,17 +1,14 @@
 import {
   FnetDividendDocumentDiscovery,
   type FnetDividendDocumentDiscoveryResult,
+  type FnetDividendDocumentEvidence,
 } from "@/lib/risk-lab/FnetDividendDocumentDiscovery";
-import {
-  parseFnetDividendNoticeHtml,
-  parseFnetProtocolHtml,
-} from "@/lib/risk-lab/FnetDividendNoticeParser";
+import { parseFnetDividendNoticeHtml } from "@/lib/risk-lab/FnetDividendNoticeParser";
 import {
   hashFrozenDividendCase,
   hashFrozenDividendDataset,
   sha256Text,
 } from "@/lib/risk-lab/FrozenDividendDatasetIntegrity";
-import type { AutomaticDocumentEvidence } from "@/types/riskLabAutomatic";
 import type {
   FrozenDividendCaseCheckpoint,
   FrozenDividendCollectionCheckpoint,
@@ -25,7 +22,7 @@ const FNET_ORIGIN = "https://fnet.bmfbovespa.com.br";
 const MAX_HTML_BYTES = 2_000_000;
 const DEFAULT_ATTEMPTS = 4;
 const DEFAULT_TIMEOUT_MS = 45_000;
-const COLLECTOR_VERSION = "1.0.0";
+const COLLECTOR_VERSION = "1.1.0";
 
 export interface FrozenDividendCohortIdentity {
   ticker: string;
@@ -84,6 +81,21 @@ function canonicalUrl(path: string, id: string) {
   url.searchParams.set(path.includes("Protocolo") ? "idDocumento" : "id", id);
   if (path.includes("exibirDocumento")) url.searchParams.set("cvm", "true");
   return url.toString();
+}
+
+function protocolMetadataPayload(document: FnetDividendDocumentEvidence) {
+  const protocol = document.protocolMetadata;
+  return JSON.stringify({
+    documentId: document.documentId,
+    documentType: document.documentType,
+    referenceDate: protocol.referenceDate,
+    deliveredAt: protocol.deliveredAt,
+    version: protocol.version,
+    status: protocol.status,
+    modality: protocol.modality,
+    situation: protocol.situation,
+    sourceUrl: protocol.sourceUrl,
+  });
 }
 
 function retryable(error: unknown) {
@@ -205,7 +217,7 @@ export class FrozenDividendNoticeCollector {
           headers: {
             Accept: "text/html,application/xhtml+xml",
             Referer: `${FNET_ORIGIN}/fnet/publico/abrirGerenciadorDocumentosCVM`,
-            "User-Agent": "DadosFII-RiskLab/1.0 (+frozen-primary-dividend-collector)",
+            "User-Agent": "DadosFII-RiskLab/1.1 (+frozen-primary-dividend-collector)",
           },
         });
         if (!response.ok) throw new Error(`Fundos.NET respondeu HTTP ${response.status}.`);
@@ -226,16 +238,13 @@ export class FrozenDividendNoticeCollector {
 
   private async collectDocument(
     identity: FrozenDividendCohortIdentity,
-    document: AutomaticDocumentEvidence,
+    document: FnetDividendDocumentEvidence,
   ): Promise<FrozenDividendNoticeObservation | null> {
     const sourceUrl = canonicalUrl("/fnet/publico/exibirDocumento", document.documentId);
     const protocolUrl = canonicalUrl("/fnet/publico/visualizarProtocoloDocumentoCVM", document.documentId);
-
-    // A coleta é deliberadamente sequencial: aviso primeiro, protocolo depois.
     const noticeHtml = await this.fetchHtml(sourceUrl);
-    const protocolHtml = await this.fetchHtml(protocolUrl);
     const notice = parseFnetDividendNoticeHtml(noticeHtml);
-    const protocol = parseFnetProtocolHtml(protocolHtml);
+    const protocol = document.protocolMetadata;
 
     if (notice.ticker !== identity.ticker) {
       throw new Error(`Ticker divergente no aviso ${document.documentId}: ${notice.ticker}.`);
@@ -243,8 +252,11 @@ export class FrozenDividendNoticeCollector {
     if (!(notice.amountPerShare > 0)) {
       throw new Error(`Valor anunciado não positivo no aviso ${document.documentId}.`);
     }
+    if (!Number.isInteger(protocol.version) || protocol.version < 1) {
+      throw new Error(`Versão oficial inválida no documento ${document.documentId}.`);
+    }
     if (protocol.referenceDate !== notice.informationDate && protocol.referenceDate !== notice.baseDate) {
-      throw new Error(`Aviso e protocolo divergem na data de referência (${document.documentId}).`);
+      throw new Error(`Aviso e metadados oficiais divergem na data de referência (${document.documentId}).`);
     }
     const announcedAt = Date.parse(protocol.deliveredAt);
     const lowerBound = Date.parse(`${identity.fromDate}T00:00:00-03:00`);
@@ -253,11 +265,11 @@ export class FrozenDividendNoticeCollector {
       throw new Error(`Documento ${document.documentId} fora da janela conhecida.`);
     }
     if (announcedAt < Date.parse(`${notice.informationDate}T00:00:00-03:00`)) {
-      throw new Error(`Protocolo anterior à informação do aviso ${document.documentId}.`);
+      throw new Error(`Entrega oficial anterior à informação do aviso ${document.documentId}.`);
     }
     const catalogDifference = Math.abs(announcedAt - Date.parse(document.receivedAt));
-    if (!Number.isFinite(catalogDifference) || catalogDifference > 36 * 60 * 60 * 1000) {
-      throw new Error(`Entrega do protocolo diverge do catálogo (${document.documentId}).`);
+    if (!Number.isFinite(catalogDifference) || catalogDifference > 60_000) {
+      throw new Error(`Entrega oficial diverge do catálogo (${document.documentId}).`);
     }
 
     const competence = monthIndex(notice.competenceMonth);
@@ -278,11 +290,12 @@ export class FrozenDividendNoticeCollector {
       sourceUrl,
       protocolUrl,
       page: 1,
-      excerpt: `Aviso estruturado validado; competência ${notice.competenceMonth}; valor R$ ${notice.amountPerShare}; entrega ${protocol.deliveredAt}; versão ${protocol.version}.`,
+      excerpt: `Aviso estruturado validado; competência ${notice.competenceMonth}; valor R$ ${notice.amountPerShare}; entrega ${protocol.deliveredAt}; versão ${protocol.version}; protocolo confirmado pelos metadados oficiais do gerenciador.`,
       sourceHash: sha256Text(noticeHtml),
-      protocolHash: sha256Text(protocolHtml),
+      protocolHash: sha256Text(protocolMetadataPayload(document)),
       protocolVersion: protocol.version,
-      sourceVersion: `fnet-notice-protocol-v${protocol.version}`,
+      protocolEvidenceType: "official_manager_metadata",
+      sourceVersion: `fnet-notice-manager-metadata-v${protocol.version}`,
     };
   }
 
