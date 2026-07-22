@@ -1,0 +1,56 @@
+name: Temporary Sprint 3.5 Collector Monitor
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temporary-sprint-3-5-collector-monitor.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect collector runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: 9c96b701e311de68e56357c5fc46000a3a304014
+        run: |
+          set -euo pipefail
+          mkdir -p monitor
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/risk-lab-frozen-dividend-notices.yml/runs?per_page=20" > monitor/workflow-runs.json
+          jq --arg sha "$TARGET_SHA" '{
+            targetSha: $sha,
+            runs: [.workflow_runs[] | select(.head_sha == $sha) | {
+              id,
+              name,
+              event,
+              status,
+              conclusion,
+              run_number,
+              run_attempt,
+              created_at,
+              updated_at,
+              html_url,
+              jobs_url,
+              artifacts_url
+            }]
+          }' monitor/workflow-runs.json > monitor/target-run.json
+          run_id=$(jq -r '.runs[0].id // empty' monitor/target-run.json)
+          if [[ -n "$run_id" ]]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" > monitor/jobs.json
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" > monitor/artifacts.json
+          fi
+          cat monitor/target-run.json
+
+      - name: Upload monitor evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporary-sprint-3-5-collector-monitor
+          path: monitor
+          retention-days: 1
