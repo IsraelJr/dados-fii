@@ -32,7 +32,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       RUN_ID: risk-lab-3-5-20260720-v2
       PRODUCTION_ORIGIN: https://dadosfii.com.br
