@@ -22,19 +22,30 @@ test("recuperação é espaçada, limitada e não exige ação do proprietário"
   assert.doesNotMatch(executable(workflow), /approval|approve|manual_document_review|ADMIN_EMAILS/);
 });
 
-test("recuperação v2 para ao encontrar evidência final versionada", () => {
+test("recuperação só aceita evidência final da release atualmente implantável", () => {
   assert.match(workflow, /risk-lab-3-5-20260720-v2/);
+  assert.match(workflow, /current_release=\$\(git rev-parse HEAD\)/);
   assert.match(workflow, /run_id.*RUN_ID/);
+  assert.match(workflow, /release.*current_release/);
   assert.match(workflow, /status.*passed/);
   assert.match(workflow, /status.*failed/);
   assert.match(workflow, /evidence_hash/);
   assert.match(workflow, /completed=true/);
 });
 
-test("marcador v2 possui limite explícito e representa o estado real", () => {
-  assert.equal(marker.schemaVersion, 2);
+test("orçamento de tentativas reinicia automaticamente quando o SHA alvo muda", () => {
+  assert.match(workflow, /marker_release=.*targetRelease/);
+  assert.match(workflow, /marker_release.*current_release/);
+  assert.match(workflow, /current_attempt=0/);
+  assert.match(workflow, /\.targetRelease = \$targetRelease/);
+  assert.match(workflow, /\.schemaVersion = 3/);
+});
+
+test("marcador v3 possui release alvo e limite explícito", () => {
+  assert.equal(marker.schemaVersion, 3);
   assert.equal(marker.sprint, "3.5");
   assert.equal(marker.runId, "risk-lab-3-5-20260720-v2");
+  assert.match(marker.targetRelease, /^[a-f0-9]{40}$/);
   assert.ok(Number.isInteger(marker.attempt));
   assert.ok(marker.attempt >= 0);
   assert.ok(marker.attempt <= marker.maximumAttempts);
