@@ -47,6 +47,50 @@ jobs:
           fi
           cat monitor/target-run.json
 
+      - name: Capture real Fundos.NET fund resolver contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="https://fnet.bmfbovespa.com.br"
+          path="/fnet/publico/pesquisarGerenciadorDocumentosCVM?paginaCertificados=false&tipoFundo=1&cnpjFundo=16706958000132"
+          curl --silent --show-error --location --max-time 90 \
+            -H 'Accept: text/html,application/xhtml+xml' \
+            -H 'User-Agent: DadosFII-RiskLab-Diagnostic/1.0' \
+            -D monitor/fnet-manager.headers \
+            "$origin$path" > monitor/fnet-manager.html
+          python - <<'PY'
+          import json
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          class Parser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.inputs = []
+                  self.scripts = []
+                  self.forms = []
+              def handle_starttag(self, tag, attrs):
+                  values = dict(attrs)
+                  if tag == 'input': self.inputs.append(values)
+                  if tag == 'script' and values.get('src'): self.scripts.append(values['src'])
+                  if tag == 'form': self.forms.append(values)
+
+          body = Path('monitor/fnet-manager.html').read_text('utf-8', errors='replace')
+          parser = Parser()
+          parser.feed(body)
+          result = {
+              'bytes': len(body.encode('utf-8')),
+              'inputs': parser.inputs,
+              'forms': parser.forms,
+              'scripts': parser.scripts,
+              'idFundoOccurrences': body.count('idFundo'),
+              'cnpjFundoOccurrences': body.count('cnpjFundo'),
+              'searchEndpoints': sorted(set(__import__('re').findall(r'[/A-Za-z0-9_-]*pesquisar[A-Za-z0-9_/?=&.-]*', body))),
+          }
+          Path('monitor/fnet-manager-contract.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), 'utf-8')
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          PY
+
       - name: Upload monitor evidence
         if: always()
         uses: actions/upload-artifact@v4
