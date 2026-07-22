@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const collector = readFileSync("src/lib/risk-lab/FrozenDividendNoticeCollector.ts", "utf8");
+const discovery = readFileSync("src/lib/risk-lab/FnetDividendDocumentDiscovery.ts", "utf8");
 const series = readFileSync("src/lib/risk-lab/FrozenDividendNoticeSeriesService.ts", "utf8");
 const concurrent = readFileSync("src/lib/risk-lab/ConcurrentAutomaticDividendSeriesService.ts", "utf8");
 const script = readFileSync("scripts/collect-risk-lab-dividend-notices.ts", "utf8");
@@ -23,6 +24,15 @@ test("coletor é geral, sequencial e não contém exceções por ticker", () => 
   assert.match(collector, /for \(const identity of identities\)/);
   assert.match(collector, /for \(const document of documents\)/);
   assert.doesNotMatch(`${collector}\n${series}\n${script}`, /manual_document_review|requiresHuman|approve\(|confirm\(/i);
+});
+
+test("protocolo histórico usa metadados oficiais do gerenciador sem endpoint bloqueante", () => {
+  assert.match(discovery, /protocolMetadata/);
+  assert.match(collector, /official_manager_metadata/);
+  assert.match(collector, /protocolMetadataPayload/);
+  assert.doesNotMatch(collector, /parseFnetProtocolHtml/);
+  assert.doesNotMatch(collector, /fetchHtml\(protocolUrl\)/);
+  assert.match(collector, /sha256Text\(protocolMetadataPayload\(document\)\)/);
 });
 
 test("workflow coleta fora da Vercel com checkpoint, retomada e evidência imutável", () => {
