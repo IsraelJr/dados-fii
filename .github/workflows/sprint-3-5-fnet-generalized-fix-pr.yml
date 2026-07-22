@@ -33,6 +33,10 @@ jobs:
           from pathlib import Path
 
           source = Path('.github/workflows/sprint-3-5-fnet-generalized-fix.yml').read_text()
+          source = source.replace(
+              'notice(first.ticker).replace("01-2022", "02-2022")',
+              'notice(first.ticker).replace("01-2022", "12-2022")',
+          )
           marker = "          python - <<'PY'\n"
           start = source.index(marker) + len(marker)
           end = source.index("\n          PY", start)
