@@ -47,7 +47,26 @@ jobs:
           PY
 
       - run: npm run typecheck
-      - run: npm run test:sprint3.5
+
+      - name: Run Sprint 3.5 regressions with diagnostic capture
+        id: sprint35
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test:sprint3.5 2>&1 | tee /tmp/sprint-3-5-tests.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sprint-3-5-generalized-fix-diagnostics
+          path: /tmp/sprint-3-5-tests.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce Sprint 3.5 regressions
+        if: steps.sprint35.outcome != 'success'
+        run: exit 1
+
       - run: npm run test:sprint2
 
       - name: Commit tested corrections
