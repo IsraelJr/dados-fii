@@ -2,41 +2,41 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 6.2.0  
-**Data:** 20/07/2026  
+**Versão:** 6.3.0  
+**Data:** 22/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**Commit auditado em Produção:** `e9a5d6ec263c0aa87961133a361891f60175dba4`  
-**Branch desta atualização:** `automation/risk-lab-3-4-release-0072ecf340e6`  
-**PR desta atualização:** #59 — `chore: formaliza conclusão da Sprint 3.4`
+**Último commit auditado em Produção:** `e9a5d6ec263c0aa87961133a361891f60175dba4`  
+**Branch desta atualização:** `agent/github-actions-cost-architecture`  
+**PR desta atualização:** a abrir após os testes controlados  
+**Sprint corrente:** 3.5 — Coorte externa e backtest sem informação futura
 
-## Como interpretar os status deste documento
+## Como interpretar os status
 
 - **Implementada:** existe código versionado no Git.
-- **Testada em repositório:** existem testes automatizados versionados que cobrem o comportamento.
+- **Testada em repositório:** existem testes automatizados versionados.
 - **Implantada:** o commit exato possui deployment identificado e saudável.
-- **Validada funcionalmente:** houve validação do proprietário ou smoke test documentado.
-- **Formalmente concluída:** todas as condições anteriores foram atendidas sobre o universo aplicável, com evidências persistidas no Git e sem depender apenas de fundos sentinela.
+- **Validada funcionalmente:** houve smoke test documentado ou validação operacional.
+- **Formalmente concluída:** código, CI, deployment, cobertura do universo, segurança, custo e evidências foram auditados.
 
-Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integral de uma fase.
+Uma validação pontual ou manual não conclui, sozinha, uma fase.
 
 ## Decisões vigentes que substituem decisões anteriores
 
 | Decisão vigente | Decisão substituída | Motivo |
 |---|---|---|
-| As Fases 1 e 2 estão formalmente concluídas em Produção sob a evidência schema v2 do run `catalog-20260719204643291-c845f739`. | “Fase 2 apenas validada funcionalmente, com encerramento condicionado à Sprint 2.12.” | A carga, o double check global, 25 checks e a homologação de cinco casos foram executados em Produção e persistidos no Git. |
-| Nenhuma fase será declarada 100% concluída sem código, CI, deployment do commit exato, smoke test, cobertura do universo e evidências no Git. | Conclusão baseada em testes de poucos tickers ou confirmação verbal. | Correções de cálculo, cadastro, IA e relatórios precisam ser generalizadas para todos os fundos aplicáveis. |
-| Sprint corrente canônica: **3.5 — Coorte externa e backtest sem informação futura**. | Sprint 3.4 como sprint corrente. | A Sprint 3.4 foi homologada em Produção com evidência auditável, mantendo o Risk Lab isolado do Premium e das notificações. |
-| Fase 3 = **Risk Lab**; Fase 4 = **Radar/Acompanhar fundo fora da carteira**. | Radar como Fase 3. | O Risk Lab já possui implementação substancial e precisa ser homologado antes de alimentar decisões e alertas. |
-| Fluxo principal do Risk Lab = **ticker-only**; seleção de documento, fila de IDs e execução manual são ferramentas de diagnóstico. | Fluxos manuais como experiência principal. | O proprietário não deve resolver IDs nem validar documentos técnicos para usar o produto. |
-| O Relatório Premium usa cálculo determinístico e dados estruturados antes da IA; a IA explica, compara e contextualiza, mas não inventa nem decide regras. | IA produzindo análise diretamente de dados incompletos ou chamando OpenAI por endpoint. | Evita alucinação, inconsistência e custo repetido. |
-| Telegram fica **adiado e fora do roadmap ativo**. WhatsApp permanece decisão aberta. | Telegram como canal obrigatório do monitor. | Decisão mais recente do proprietário: não priorizar Telegram agora. |
-| IFIX é sincronizado no primeiro ciclo de janeiro, maio e setembro, com execução manual no Admin. | Sincronização diária da composição do IFIX. | A composição não exige consulta diária; reduz custo sem perder utilidade operacional. |
-| Notificação de carteira só nasce quando dividendos pagos/anunciados mudam; sem mudança, exige variação patrimonial absoluta mínima de 3% no Grátis. Usuários pagos poderão parametrizar o limiar. | Notificação diária mesmo sem mudança material. | Reduz ruído e fadiga. |
-| E-mails correlatos devem ser consolidados em um digest, com deduplicação e cooldown. | Um e-mail por evento de concentração/resumo. | Evita mensagens contraditórias e múltiplos e-mails no mesmo ciclo. |
-| Planos visíveis ao usuário serão `Grátis`, `Premium` e, se aprovado comercialmente, `Super Premium`; `ADMIN` é permissão, não plano. | Exibir `ADMIN` no campo de plano. | Separa autorização administrativa de produto e cobrança. |
-| Correções de P/VP, ágio/desconto, liquidez, dividendos anuais e qualidade cadastral devem ser regras globais com regressão, nunca patches por ticker. | Correções pontuais apenas para MXRF11, VGIA11 ou outro fundo observado. | O problema identificado em um fundo pode afetar todo o universo. |
-| O texto vigente da leitura rápida é **“Dividendos consolidados pelo histórico mensal da carteira.”** | Texto que limitava explicitamente a meses encerrados. | A PR #39 restaurou a cópia após a PR #32 ter sido revertida pela PR #33. |
+| Fases 1 e 2 estão formalmente concluídas em Produção sob a evidência schema v2. | Fase 2 apenas validada funcionalmente. | Carga, double check, checks globais e casos estratificados foram persistidos. |
+| Sprint corrente canônica: 3.5. | Sprint 3.4 corrente. | Sprint 3.4 foi homologada em Produção; a coorte externa segue pendente. |
+| GitHub Actions é usado apenas no ciclo de engenharia ligado ao código/SHA. | Actions como cron, fila, polling, storage e recovery. | Reduz custo e elimina cascatas sem remover testes. |
+| Backtest da Sprint 3.5 possui kickoff manual curto; casos, locks e auditoria ficam no backend/Firestore. | Workflow de 90 minutos processando seis fundos e esperando locks. | O estado operacional já pertence ao backend. |
+| Recovery por commit, push em `main` e arquivo marcador são proibidos. | Commits `ci: reaciona deploy...` e marcador de tentativas. | Git não é banco operacional nem mecanismo de retry. |
+| Coleta FNET pesada fica manual e limitada até migrar para fila/worker. | Gatilho automático por push com timeout de 120 minutos. | Evita consumo automático; migração definitiva depende da infraestrutura adequada. |
+| Correções de dados/cálculos são globais e testadas, nunca patches por ticker. | Correções pontuais para fundos sentinela. | O mesmo problema pode afetar todo o universo. |
+| Relatório Premium usa cálculo determinístico e dados estruturados antes da IA. | IA decidindo regras ou preenchendo lacunas. | Segurança, consistência e redução de custo. |
+| Telegram permanece adiado; WhatsApp continua decisão aberta. | Telegram obrigatório. | Prioridade vigente do produto. |
+| IFIX é sincronizado no ciclo oficial de janeiro, maio e setembro, com execução manual no Admin. | Sincronização diária. | Menor custo sem perda funcional. |
+| Notificações exigem mudança material e e-mails correlatos viram digest. | Notificação diária e múltiplos e-mails por ciclo. | Redução de ruído. |
+| `ADMIN` é autorização, não plano comercial. | Exibir ADMIN como plano. | Separa segurança de monetização. |
 
 ---
 
@@ -44,31 +44,54 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 ### Resumo executivo
 
-- A fundação regulatória, a camada de serviços, scores, APIs administrativas, Dashboard, Timeline, relatórios, IA, observabilidade, monitor e notificações estão implementados.
-- As Fases 1 e 2 estão **formalmente concluídas em Produção** pela Sprint 2.12.
-- O run `catalog-20260719204643291-c845f739` confirmou 100% de conciliação B3/CVM, 504/504 ativos com cadastro básico, 97,81% de cobertura essencial aplicável, zero CNPJ duplicado e diretório materializado com 504 ativos.
-- O smoke schema v2 aprovou 25/25 checks, Health 98 e Validation 100 com 384 fundos processados.
-- Relatório Gratuito, AI Insights e Premium foram aprovados em cinco casos: `MXRF11` (FII), `VGIA11` (FIAGRO), `BODB11` (FI-Infra), `RJDA11` (incompleto) e `HGPO11` (excepcional/inativo).
-- A evidência canônica está em `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json`, hash `2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5`.
-- A Sprint 3.4 do Risk Lab foi concluída em Produção com 11/11 checks, 6/6 casos obrigatórios e zero blockers; evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f`. O Risk Lab continua isolado do Premium e das notificações; a coorte externa permanece bloqueada até verificação primária.
-- O Plano SEO de 90 dias segue como trilha paralela, sem autorizar publicação massiva de páginas rasas ou dados não homologados.
+- Fundação regulatória, RegulatoryDataService, scores, validação, Dashboard, Timeline, relatórios, IA, observabilidade, monitor e notificações estão implementados.
+- Fases 1 e 2 estão formalmente concluídas em Produção.
+- Catálogo auditado: 504/504 ativos com cadastro básico; 97,81% de cobertura essencial aplicável; zero CNPJ duplicado no run canônico.
+- Sprint 3.4 do Risk Lab foi concluída em Produção com 11/11 checks, 6/6 casos e zero blockers.
+- Sprint 3.5 permanece aberta até a coorte completa possuir evidência primária, dataset congelado e backtest conclusivo sem look-ahead.
+- A otimização do GitHub Actions está implementada nesta branch, mas não é considerada concluída antes de CI, auditoria do diff e merge.
+- O fluxo anterior de recovery foi pausado e não deve ser reativado.
+
+### Estado da automação de engenharia
+
+Baseline de `main` antes desta branch:
+
+- 7 workflows ativos;
+- 2 workflows pesados automáticos;
+- timeout de até 90 e 120 minutos;
+- polling, sleeps e recovery por commits;
+- instalação e suítes repetidas;
+- artefatos de 14/30 dias.
+
+Estado proposto nesta branch:
+
+- 5 workflows ativos;
+- 2 removidos;
+- nenhum workflow escreve no repositório;
+- nenhum workflow pesado dispara por push;
+- nenhum sleep/polling;
+- timeouts máximos de 20 minutos, com uma exceção manual documentada de 30;
+- `npm ci` e cache em todos os jobs Node;
+- redução mensal projetada de 2.140 para 529 minutos no cenário documentado (75,3%).
 
 ### Auditoria de conclusão
 
-| Área | Código | Testes no Git | Deployment identificado | Evidência operacional | Status canônico |
+| Área | Código | Testes | Produção | Evidência | Status |
 |---|---:|---:|---:|---:|---|
-| Fase 1 — Engine regulatória | Sim | Sim | Sim | Schema v2, publicação/backup/auditoria e smoke | Formalmente concluída |
-| Fase 2 — Serviços e inteligência | Sim | Sim | Sim (`f4602e`, Vercel verde) | 25/25 checks, universo global e cinco casos | Formalmente concluída |
-| Fase 3 — Risk Lab | Sim, até 3.4 | Sim | Sim (`e9a5d6e`, Vercel verde) | Smoke 3.4: 11/11 checks e 6/6 casos; coorte externa pendente | Em andamento |
-| SEO 90 dias | Plano pronto | Não se aplica ao plano | Não iniciado como trilha auditada | Search Console/KPIs não registrados | Pendente |
+| Fase 1 — Regulatory Engine | Sim | Sim | Sim | Schema v2 e trilhas de publicação | Concluída |
+| Fase 2 — Core Intelligence | Sim | Sim | Sim | 25/25 checks e universo global | Concluída |
+| Fase 3 — Risk Lab até 3.4 | Sim | Sim | Sim | 11/11 checks e 6/6 casos | Concluída até 3.4 |
+| Sprint 3.5 | Parcial | Sim | Parcial | Dataset/coorte final pendentes | Em andamento |
+| Otimização GitHub Actions | Sim, na branch | Testes adicionados | Não se aplica antes do merge | Inventário e política | Em validação |
+| SEO 90 dias | Plano pronto | n/a | Não iniciado | Baseline pendente | Pendente |
 
-### Pendências de dados já conhecidas
+### Pendências de dados conhecidas
 
-- Abertura PF/PJ não publicada nas fontes estruturadas usadas: `BFCC11`, `BRHT11`, `BTML11`, `FINF11`, `IDUA11`, `MTOF11`, `PBLV11`, `REME11`, `RRES11` e `SPAF11`.
-- `RJDA11`: também sem cotas emitidas, patrimônio líquido e total de cotistas nos layouts usados.
+- PF/PJ não publicado nas fontes estruturadas para `BFCC11`, `BRHT11`, `BTML11`, `FINF11`, `IDUA11`, `MTOF11`, `PBLV11`, `REME11`, `RRES11` e `SPAF11`.
+- `RJDA11` também sem cotas emitidas, patrimônio líquido e total de cotistas nos layouts usados.
 - Divergências históricas de ISIN em revisão: `KISU11`, `SPTW11` e `TRXF11`.
-- `HGPO11` foi inativado com evidência oficial de liquidação/ausência na B3 e histórico preservado.
-- Lacuna externa deve ser `null`, com fonte, data e aviso; nunca zero ou informação inventada.
+- `HGPO11` inativado com evidência oficial e histórico preservado.
+- Lacuna externa permanece `null`, com fonte/data/aviso; nunca zero inventado.
 
 ---
 
@@ -76,21 +99,17 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 ### Fase 1 — Regulatory Engine
 
-**Escopo de engenharia concluído:** parser CVM v2, suporte FII/FIAGRO, reconciliação, QA, staging/produção, aprovação humana, backup imutável, hash, publicação protegida, rollback e CI.
-
-**Evidências existentes:** código e testes versionados; homologações históricas em `TGAR11`, `VGIA11`, `MXRF11` e `KNCA11`; trilhas de backup/publicação/rollback.
-
-**Status rigoroso:** formalmente concluída em Produção. A Sprint 2.12 revalidou publicação, backup, auditoria, catálogo global e smoke, com evidência schema v2 persistida no Git.
+Concluída: parser CVM v2, FII/FIAGRO, reconciliação, QA, staging/produção, backup, hash, publicação protegida, rollback e CI.
 
 ### Fase 2 — Core Intelligence & Product Foundation
 
-**Escopo implementado:** RegulatoryDataService, Repository, Normalizer, Validator, Cache e Types; ScoreEngine; Health; Validation e histórico; Dashboard Admin; Timeline; Relatório Gratuito; AI Insights; Relatório Premium; observabilidade; monitor; catálogo e qualidade; notificações e jobs.
-
-**Status rigoroso:** formalmente concluída em Produção. A carga oficial, o double check, os 25 checks e a homologação estratificada de cinco casos estão versionados na evidência da Sprint 2.12.
+Concluída: RegulatoryDataService/Repository/Normalizer/Validator/Cache/Types; ScoreEngine; Health; Validation; Admin; Timeline; relatórios; AI Insights; observabilidade; monitor; catálogo; notificações e jobs.
 
 ### Fase 3 — Risk Lab
 
-**Em andamento.** As Sprints 3.0 a 3.4 possuem código, testes e homologação de Produção. A Sprint 3.5 continua bloqueada até a verificação primária da coorte externa.
+- Sprints 3.0 a 3.4 concluídas.
+- Sprint 3.5 aberta.
+- Risk Lab continua isolado do Premium e das notificações enquanto não houver gate formal.
 
 ---
 
@@ -98,519 +117,322 @@ Uma validação manual bem-sucedida não equivale, sozinha, à conclusão integr
 
 ### Sprint 3.5 — Coorte externa e backtest sem informação futura
 
-**Objetivo:** verificar a coorte pré-registrada em fontes primárias e executar o backtest sem informação futura, preservando integralmente o ruleset `v0.1.0`.
+**Objetivo:** verificar a coorte pré-registrada em fontes primárias, congelar o dataset e executar backtest sem look-ahead, preservando o ruleset `v0.1.0`.
+
+**Coorte:** `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11`, `RBRY11`.
 
 **Trabalho obrigatório:**
 
-1. confirmar `knownAt`, URL, trecho, página, hash e versão por observação;
-2. executar `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11` e `RBRY11` sem look-ahead;
-3. medir antecedência, falsos positivos, falsos negativos, inconclusão e cobertura;
-4. manter `executionAllowed=false` enquanto faltar verificação primária;
-5. versionar a evidência e preservar o ruleset congelado.
+1. confirmar `knownAt`, URL, trecho, página, hash e versão;
+2. concluir a coleta dos seis fundos sem exceção por ticker;
+3. congelar dataset com hash reproduzível;
+4. executar coorte completa e medir falsos positivos, falsos negativos, inconclusão, cobertura e antecedência;
+5. manter `executionAllowed=false` quando faltar evidência primária;
+6. persistir locks, tentativas, casos e auditoria no Firestore;
+7. publicar somente a evidência final relevante.
 
-**Critério de aceite:** nenhuma conclusão final sustentada apenas por fonte secundária; controles saudáveis sem vermelho injustificado; ambiguidades como inconclusivas; métricas e evidências persistidas no Git.
-## 4. Ordem oficial das próximas sprints
+**Critério de aceite:** seis casos completos; zero pendências/conflitos não explicados; nenhum controle saudável com vermelho injustificado; ambiguidades inconclusivas; zero look-ahead; hashes válidos; auditoria e CI verdes.
 
-### Trilha principal de produto
+### Arquitetura operacional vigente da Sprint 3.5
 
-1. **Sprint 3.5 — Coorte externa e backtest sem informação futura.**
-2. **Sprint 3.6 — Métricas, calibração e gate formal.**
-3. **Sprint 3.7 — Risk Lab read-only no Relatório Premium e Prompt Premium v3.**
-4. **Sprint 3.8 — Impacto na carteira e alertas opt-in.**
-5. **Sprint 4.1 — Radar: acompanhar fundo fora da carteira.**
-6. **Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.**
-7. **Sprint 4.3 — Planos, preferências, canais e monetização.**
-8. **Sprint 5.1 — Carteira histórica verdadeira e ledger de eventos.**
-9. **Sprint 5.2 — Motor de risco, exposição e atribuição acionável.**
-10. **Sprint 5.3 — Inteligência sobre comunicados oficiais.**
-11. **Sprint 5.4 — Screener quantitativo, pares e fair value por tipo de FII.**
-12. **Sprint 5.5 — Benchmark, retorno total, calendário, centro fiscal e simuladores.**
-### Trilha SEO de 90 dias, em paralelo e sem furar gates de dados
-
-1. **Sprint SEO 1 — Dias 1–15: fundação técnica e indexação.**
-2. **Sprint SEO 2 — Dias 16–45: vinte páginas prioritárias de fundos.**
-3. **Sprint SEO 3 — Dias 46–70: long tails, comparações e páginas diferenciadas.**
-4. **Sprint SEO 4 — Dias 71–90: autoridade, estudos originais e melhoria contínua.**
-
-Incidentes de segurança, integridade de dados e regressões de Produção sempre interrompem a ordem normal.
+- GitHub workflow inicia uma tentativa por `workflow_dispatch` e SHA explícito.
+- O kickoff faz uma chamada única e termina em até 5 minutos.
+- O Admin protegido oferece `advance`, que decide automaticamente inicialização, próximo fundo ou finalização.
+- Estado fica nas coleções `RiskLabCohortBacktestRuns`, `Attempts`, `Audit` e `Locks`.
+- Não existem commits de retry, marcador ou polling no runner.
+- Coleta FNET completa ainda é exceção manual de até 30 minutos, com artefato de 3 dias; migração para fila/worker permanece dívida técnica.
 
 ---
 
-## 5. Escopo e critérios de aceite de cada sprint
+## 4. Ordem oficial das próximas sprints
 
-### Sprint 2.12 — Encerramento auditável (concluída)
+### Trilha principal
 
-**Escopo executado:** carga controlada, double check, reconciliação de ciclo de vida, homologação estratificada e dossiê de Produção.
+1. Sprint 3.5 — Coorte externa e backtest sem informação futura.
+2. Sprint 3.6 — Métricas, calibração e gate formal.
+3. Sprint 3.7 — Risk Lab read-only no Premium e Prompt Premium v3.
+4. Sprint 3.8 — Impacto na carteira e alertas opt-in.
+5. Sprint 4.1 — Radar: acompanhar fundo fora da carteira.
+6. Sprint 4.2 — Radar: eventos, tese e relatório pré-compra.
+7. Sprint 4.3 — Planos, preferências, canais e monetização.
+8. Sprint 5.1 — Carteira histórica e ledger de eventos.
+9. Sprint 5.2 — Motor de risco/exposição/atribuição.
+10. Sprint 5.3 — Inteligência sobre comunicados oficiais.
+11. Sprint 5.4 — Screener quantitativo, pares e fair value.
+12. Sprint 5.5 — Benchmark, retorno total, calendário, fiscal e simuladores.
 
-**Aceite obtido:** 100% B3/CVM conciliado; 100% cadastro básico; 97,81% essencial; zero CNPJ duplicado; 25/25 checks; cinco casos homologados; evidência schema v2 no Git; crons e token temporários removidos.
+### SEO em paralelo
 
-### Sprint 3.4 — Risk Lab em Produção (concluída)
+1. Dias 1–15: fundação técnica/indexação.
+2. Dias 16–45: vinte páginas prioritárias.
+3. Dias 46–70: long tails/comparações.
+4. Dias 71–90: autoridade e estudos originais.
 
-**Escopo:** homologar o fluxo `ticker → identidade/CNPJ → fontes oficiais → validação → série mensal → detector → triagem de crédito → validated/inconclusive/blocked`.
+Incidente de segurança, dados ou Produção interrompe a ordem normal.
 
-**Aceite obtido:** deployment exato `e9a5d6ec263c0aa87961133a361891f60175dba4` em Produção; 11/11 checks; 6/6 casos; zero blockers; persistência, auditoria, locks, hashes e rate limit conferidos; zero efeito no Premium e nas notificações; evidência `deb0f79597c2fbfb87214c6d05df37cbe782e084e4a7289a487042c3582a567f` salva no Git. Os casos reais ficaram inconclusivos com segurança por insuficiência de evidência estruturada, sem falsa classificação final.
+---
 
-### Sprint 3.5 — Coorte externa
+## 5. Escopo e critérios de aceite das sprints
 
-**Escopo:** verificar em fonte primária e executar, sem alterar o ruleset `v0.1.0`, `DEVA11`, `VSLH11`, `KNCR11`, `KNSC11`, `MCCI11` e `RBRY11`.
+### Sprint 3.5
 
-**Aceite:** `knownAt`, URL, trecho, página, hash e versão por observação; nenhum look-ahead; métricas de primeiro amarelo/laranja/vermelho, antecedência, falso positivo, falso negativo, inconclusão e cobertura; controles saudáveis sem vermelho injustificado. O teste atual mantém `executionAllowed=false` até a verificação primária.
+Aceite definido na seção 3. Não concluir com amostra parcial, artefato pendente ou workflow verde sem evidência de domínio.
 
-### Sprint 3.6 — Métricas, calibração e gate
+### Sprint 3.6
 
-**Escopo:** avaliar desempenho e decidir aprovar, reprovar ou criar ruleset novo.
+Métricas por papel, antecedência, falsos positivos/negativos, cobertura, calibração fora da coorte e gate de produto.
 
-**Aceite:** zero vermelho falso positivo nos controles; nenhuma conclusão final sustentada só por fonte secundária; ambiguidades resultam em inconclusivo; qualquer alteração cria versão/hash novos e repete a coorte integral; decisão formal versionada.
+### Sprint 3.7
 
-### Sprint 3.7 — Premium read-only e Prompt Premium v3
+Integração read-only no Premium; IA apenas explica dados determinísticos; fallback explícito; cache e auditoria.
 
-**Escopo:** integrar resultados aprovados do Risk Lab como evidência explicável; refinar o prompt com metodologia própria para FIIs, impacto na carteira e linguagem leiga.
+### Sprint 3.8
 
-**Aceite:** feature flag e rollback; fontes e datas; separação entre fato, cálculo, estimativa e inferência; falha isolada; ausência de recomendação automática; nenhum jargão sem explicação; relatório parcial quando a confiança for insuficiente; testes por tipo de fundo e perfil de carteira.
+Impacto por posição/carteira e alertas opt-in, com cooldown, digest e thresholds configuráveis.
 
-### Sprint 3.8 — Impacto e alertas opt-in
+### Sprints 4.x
 
-**Escopo:** converter risco do fundo em impacto estimado sobre patrimônio e renda da carteira; oferecer painel antes de canais interruptivos.
+Radar fora da carteira, tese/eventos/relatório pré-compra e monetização/entitlements.
 
-**Aceite:** consentimento, relevância por posição, deduplicação, cooldown, digest, histórico e cancelamento; nenhuma notificação por simples ausência de dado; nenhum alerta público sem gate aprovado; testes de ruído e reversão.
+### Sprints 5.x
 
-### Sprint 4.1 — Radar/Acompanhar fundo
-
-**Escopo:** permitir acompanhar fundos que não fazem parte da carteira para decidir se vale comprar.
-
-**Aceite:** limite aplicado no servidor de **1 fundo ativo no Grátis** e **10 no Premium**, até nova decisão; autenticação; idempotência; fontes oficiais; adicionar/remover; histórico; nenhum acesso direto da API ao Firestore; custo medido; sem duplicar fundo já coberto pela carteira.
-
-### Sprint 4.2 — Eventos e tese pré-compra
-
-**Escopo:** dividendos anunciados, fatos relevantes, relatórios gerenciais, assembleias, emissões, mudança de gestão, tese, riscos, catalisadores e alteração material desde a última leitura.
-
-**Aceite:** timeline deduplicada; fonte/data; “o que mudou”, “por que importa” e “impacto provável”; estado `inconclusive` quando faltarem dados; relatório pré-compra reaproveitando AI Insights e Risk Lab, sem chamadas de IA isoladas por endpoint.
-
-### Sprint 4.3 — Planos e monetização
-
-**Escopo:** entitlements para Grátis/Premium/Super Premium, cobrança, trials, preferências de alerta e canais.
-
-**Aceite:** autorização no servidor; `ADMIN` nunca exibido como plano; tabela de limites versionada; downgrade seguro; cobrança, cancelamento e estorno definidos; consentimento por canal; custos unitários medidos; LGPD e termos revisados.
-
-### Sprint 5.1 — Carteira histórica verdadeira
-
-**Escopo:** ledger imutável de transações, lotes, dividendos, subscrições, amortizações, desdobramentos, incorporações e snapshots.
-
-**Aceite:** reprocessamento determinístico; correções por evento, não por sobrescrita; patrimônio e renda históricos reproduzíveis; custo de aquisição e retorno total; conciliação com posições; exportação e trilha de auditoria.
-
-### Sprint 5.2 — Risco, exposição e atribuição
-
-**Escopo:** concentração por fundo, gestor, segmento, indexador, devedor, inquilino, geografia e tipo de receita; correlação, liquidez, sensibilidade a juros, stress e atribuição de retorno/renda.
-
-**Aceite:** contribuição de cada posição para risco e resultado; impacto na carteira; metodologia pública; cenários explicados; testes com carteiras sintéticas; sem falsa precisão.
-
-### Sprint 5.3 — Inteligência sobre comunicados oficiais
-
-**Escopo:** detectar mudanças materiais entre competências e documentos oficiais, com fatos, números, riscos, oportunidades e perguntas à gestão.
-
-**Aceite:** diff verificável; citação de fonte; nenhuma afirmação não sustentada; relevância para fundo e carteira; cache/reuso de insight; custo e taxa de inconclusão monitorados.
-
-### Sprint 5.4 — Screener, pares e fair value
-
-**Escopo:** filtros salvos, scores/fatores, comparação com pares do mesmo mandato, qualidade da renda, desconto ajustado ao risco e valuation específico por tipo de FII.
-
-**Aceite:** universo e critérios reproduzíveis; pares explicáveis; exportação; backtest sem look-ahead; FII de tijolo, papel, FoF, desenvolvimento, FIAGRO e FI-Infra com metodologias próprias; nenhuma aplicação genérica de DCF de ações.
-
-### Sprint 5.5 — Ferramentas complementares
-
-**Escopo:** IFIX e outros benchmarks, decomposição preço+renda, calendário anúncio/data-com/pagamento, centro fiscal/documental, projeção de renda, aportes e reinvestimento.
-
-**Aceite:** dados e datas reconciliados; retorno total correto; documentos auditáveis; simulações com premissas editáveis; linguagem educativa; exportação e limites fiscais explícitos.
-
-### Sprint SEO 1 — Fundação técnica
-
-**Escopo:** Search Console, sitemap, robots, canonical, redirects, SSR/conteúdo rastreável, links internos, `noindex` para Admin/privado, dados estruturados e Core Web Vitals.
-
-**Aceite:** propriedade verificada; sitemap aceito; ausência de páginas administrativas no índice; páginas públicas renderizadas sem depender de interação; baseline de indexação, CWV e erros salvo no Git.
-
-### Sprint SEO 2 — Vinte páginas prioritárias
-
-**Escopo:** melhorar páginas de fundos de maior demanda com identidade, indicadores confiáveis, histórico, eventos, metodologia, fontes, atualização e glossário contextual.
-
-**Aceite:** vinte URLs únicas, úteis e indexáveis; sem conteúdo fino/duplicado; schema válido; links internos; métricas de impressão, posição, CTR e cobertura acompanhadas.
-
-### Sprint SEO 3 — Long tails e diferenciação
-
-**Escopo:** comparações por pares, páginas de eventos, dividendos, mudanças, risco e perguntas long tail baseadas em dados próprios.
-
-**Aceite:** intenção de busca explícita; evidência e data; canonical correto; páginas programáticas somente quando possuírem informação material exclusiva; revisão de qualidade antes da publicação.
-
-### Sprint SEO 4 — Autoridade
-
-**Escopo:** estudos originais, cases, metodologia, outreach e backlinks legítimos.
-
-**Aceite:** estudos reproduzíveis; fontes primárias; divulgação sem compra de links; dashboard de autoridade e conversão; revisão dos primeiros 90 dias e backlog do próximo ciclo.
+Ledger histórico, risco/atribuição, comunicados, screener/fair value e ferramentas avançadas.
 
 ---
 
 ## 6. Regras arquiteturais obrigatórias
 
-1. **Nenhuma API nova acessa Firestore diretamente.** Fluxo regulatório: `API → RegulatoryDataService → RegulatoryRepository → Firestore`.
-2. Toda leitura regulatória passa pelo Repository; exceção existente exige justificativa, teste, auditoria e plano de migração.
-3. Identidade, snapshots, eventos, fatores e ledger do usuário são domínios separados; campos derivados não são gravados manualmente.
-4. O documento canônico por fundo deve atender a consulta principal em uma leitura; diretórios materializados e cache evitam fan-out e reduzem custo.
-5. Não duplicar CNPJ, nome legal, prestadores ou classificações em coleções concorrentes. Snapshot preserva competência e proveniência.
-6. Toda publicação sensível exige fonte, data, hash, identidade, idempotência, aprovação, backup, versão, auditoria e rollback.
-7. Campos legados protegidos nunca são sobrescritos automaticamente.
-8. Todo score passa pelo `ScoreEngine`; toda IA textual passa pelo `AIInsightsEngine`; nenhuma API chama OpenAI diretamente.
-9. IA recebe dados estruturados e cálculos prontos; não inventa valores, não transforma ausência em fraqueza/força e não confunde identificação de gestor com qualidade de governança.
-10. Relatórios separam fato, cálculo, estimativa, inferência e indisponibilidade; sempre informam fonte, data de referência, confiança e impacto para a carteira.
-11. P/VP = preço por cota ÷ valor patrimonial por cota. Ágio/desconto = `(P/VP − 1) × 100`; verde representa desconto e vermelho representa ágio. Exibir duas casas decimais em todo o produto.
-12. Liquidez precisa ter unidade e período explícitos; valores implausíveis bloqueiam a conclusão e entram no reprocessamento, nunca são explicados pela IA como fato.
-13. Correção observada num fundo deve gerar auditoria global, teste de regressão e amostra estratificada antes de ser considerada resolvida.
-14. Risk Lab usa `knownAt`; look-ahead é proibido. Fonte oficial prevalece; fonte secundária só localiza ou contextualiza.
-15. Falta, conflito ou ambiguidade produzem `inconclusive`/`blocked`; “nenhum evento encontrado” não certifica segurança.
-16. Ruleset congelado exige versão e hash; ferramentas manuais do Risk Lab são diagnóstico, não experiência principal.
-17. Risk Lab não alimenta Premium antes do gate 3.6 nem dispara alertas antes da 3.8.
-18. Planos e limites são resolvidos no servidor; cliente não concede Premium nem Admin.
-19. Notificações são orientadas a mudança material, deduplicadas e consolidadas; sem mudança de dividendos, o Grátis exige variação patrimonial absoluta de pelo menos 3%.
-20. SEO nunca autoriza conteúdo raso, páginas duplicadas ou dados não homologados. Páginas públicas devem expor método, data e limitações.
+### Dados e APIs
+
+1. APIs novas não acessam Firestore diretamente quando existe serviço/repositório de domínio.
+2. RegulatoryDataService centraliza cache, regras, métricas e auditoria regulatória.
+3. Dado oficial ausente não é inventado.
+4. Toda correção é generalizada e coberta por regressão.
+5. IA não decide regra, score, alerta ou verdade-terreno.
+
+### GitHub Actions
+
+1. Usar apenas para ciclo de código, status check, schema, build/auditoria ligada a SHA ou kickoff curto.
+2. Proibido cron de negócio, fila, polling, sleep, storage operacional e monitor contínuo.
+3. Proibido commit/push/PR/merge/retry artificial dentro de workflow operacional.
+4. CI em PR; push somente `main` para pós-merge curto.
+5. Todo workflow possui `concurrency` e `cancel-in-progress: true`.
+6. `npm ci`, lockfile e cache obrigatórios.
+7. Timeout comum até 20 min; exceção manual documentada até 30 min.
+8. Artefato operacional até 7 dias; padrão atual 3 dias.
+9. Workflow pesado somente manual/condicional.
+10. `tests/github-actions-governance.test.mjs` bloqueia regressões.
+
+Documentos normativos:
+
+- `docs/engineering/github-actions-policy.md`
+- `docs/engineering/github-actions-inventory.md`
+
+### Vercel e operação
+
+- Fluxo: PR → CI rápida → merge → deploy único → validação curta → negócio no backend → evidência final.
+- Cron de negócio pertence ao `vercel.json`/backend.
+- Nenhum cron novo agressivo será criado sem confirmar limite/custo do plano.
 
 ---
 
-## 7. Arquivos, branches, commits e PRs existentes
+## 7. Arquivos, branches, commits e PRs relevantes
 
-### Repositório e deployment
+### Branches/PRs
 
-- Repositório privado: `IsraelJr/dados-fii`.
-- Branch canônica: `main`.
-- Commit executado na homologação final: `f4602e223e04c2d917b22a19391dbbd9e6f6286b`.
-- Vercel do commit: `success`.
-- Run de catálogo: `catalog-20260719204643291-c845f739`.
-- Evidência pública: `https://www.dadosfii.com.br/api/system/phase-2-closure`.
-- Evidência persistida: `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json`.
-- Hash final: `2a3a3750eaeb55d4bae7c1240d3f29797d752a8382639edce60af02f869867c5`.
+- `main`: baseline `fb926f241a57a3d1c0f1a701f82701f302fece1a` antes desta otimização.
+- `agent/github-actions-cost-architecture`: implementação atual.
+- PR #96: retomadas em lotes; deve permanecer fechada/não mesclada.
+- PR #100: DEVA11 isolado; workflow temporário deve ser removido antes de eventual merge.
 
-### Arquivos canônicos e evidências centrais
+### Arquivos principais desta otimização
 
-| Arquivo | Função |
-|---|---|
-| `DADOS_FII_HANDOFF.md` | Estado e roadmap canônicos. |
-| `docs/data-quality-hardening.md` | Contrato do catálogo, auditoria global e gate permanente de conclusão. |
-| `docs/phase-2-closure.md` | Dossiê da Sprint 2.12 e resultado final. |
-| `docs/production-evidence/phase-2/phase-2-closure-catalog-20260719204643291-c845f739-v2.json` | Evidência sanitizada e imutável do fechamento. |
-| `docs/risk-lab/README.md` | Princípios, escopo e isolamento do Risk Lab. |
-| `src/lib/featureFlags.ts` | Flags centrais das Fases 2/3. |
-| `vercel.json` | Jobs agendados e cadência operacional. |
-| `package.json` | Comandos de validação `typecheck`, `test:sprint2`, `test:risk-lab` e `build`. |
-| `tests/phase-2-completion.test.ts` | Regressões de relatório, cálculos, observabilidade e monitor. |
-| `tests/risk-lab-production.test.ts` | Gates de dataset e execução administrativa. |
-| `tests/risk-lab-ruleset-freeze.test.mjs` | Congelamento e hash das regras. |
-| `tests/risk-lab-cohort-registry.test.ts` | Bloqueio da coorte até fonte primária. |
-| `.github/workflows/risk-lab.yml` | CI específico do Risk Lab. |
-| `.github/workflows/portfolio-notifications-ci.yml` | CI das notificações. |
+- `.github/workflows/phase-2-closure.yml`
+- `.github/workflows/portfolio-notifications-ci.yml`
+- `.github/workflows/risk-lab.yml`
+- `.github/workflows/risk-lab-cohort-backtest.yml`
+- `.github/workflows/risk-lab-frozen-dividend-notices.yml`
+- `src/app/api/admin/system/risk-lab/cohort-backtest/route.ts`
+- `tests/github-actions-governance.test.mjs`
+- `docs/engineering/github-actions-policy.md`
+- `docs/engineering/github-actions-inventory.md`
 
-### Commits e PRs-chave já mesclados
+### Removidos
 
-- PR #6: base da Fase 2.
-- PRs #7–#21: histórico, Admin, validação, carteira, ágio/desconto, qualidade e catálogo.
-- PRs #22–#23: piloto e freeze do Risk Lab.
-- PRs #24–#29: coorte, eventos, motor e cobertura.
-- PR #30: política de notificações orientada a eventos.
-- PR #33: rollback da PR #32.
-- PR #39: restauração do texto vigente da leitura rápida.
-- PRs #38, #40 e #41: fluxo ticker-only, série mensal/detector e eventos automáticos de crédito; substituem os fluxos manuais como principal.
-- PR #42: handoff v5; seu conteúdo é substituído integralmente por esta versão.
-- PR #43: handoff v6 e adoção da Sprint 2.12 como gate formal.
-- PRs #47 e #48: schema v2, casos incompleto/excepcional e janela de execução de Produção.
-- Commits `752bbfc`, `7af6781`, `3d7ae1b` e `f4602e2`: disparo protegido de revalidação e rotação do token temporário; o mecanismo é removido no fechamento.
+- `.github/workflows/patch-portfolio-notification-types.yml`
+- `.github/workflows/risk-lab-cohort-deploy-recovery.yml`
+- `docs/production-evidence/risk-lab/sprint-3-5-deploy-trigger.json`
 
-### PRs abertas na data da auditoria
+### Commits desta branch até esta atualização
 
-- **#5 — “Adicionar ingestão operacional controlada de FIIs e presentes VIP”**: draft antigo e divergente do fluxo canônico atual; deve ser reconciliado com `main` e então fechado ou redefinido. É a única PR aberta localizada antes da abertura do PR desta atualização.
-- PR #49 foi fechada sem merge porque foi substituída pelo disparo temporário incorporado diretamente em `main`.
-- **#50 — encerramento formal da Fase 2:** PR atual; persiste a evidência schema v2, remove mecanismos temporários e promove o handoff para v6.1.0.
-
-### Branches remotas
-
-Foram localizadas 54 branches, incluindo `main` e a branch atual `agent/phase-2-formal-closure`. Permanecem famílias históricas `agent/*`, `feat/*`, `feature/*`, `fix/*`, `docs/*` e `vercel/*`.
-
-- Fase 2 e correções: `agent/sprint-2-*`, `agent/data-quality-hardening`, `agent/phase-2-*`, `agent/fix-*`, `feature/portfolio-notifications` e `feature/free-friday-observability`;
-- Risk Lab: `feat/risk-lab-*` e `fix/risk-lab-*`;
-- documentação/rollback: `docs/canonical-handoff-v5`, `agent/canonical-handoff-v6`, `agent/rollback-pr-32` e `agent/rollback-quick-numbers`;
-- segurança automática: `vercel/react-server-components-cve-*`.
-
-Não apagar branches em lote sem reconciliar PR, merge e necessidade de recuperação. Criar uma tarefa de higienização após a Sprint 2.12.
+- remoção do patch legado;
+- remoção do recovery/marcador;
+- otimização das três CIs;
+- redução dos fluxos pesados a manual/limitado;
+- endpoint `advance` idempotente;
+- testes de governança e atualização dos testes arquiteturais;
+- política, inventário e orçamento.
 
 ---
 
 ## 8. Funcionalidades concluídas, parciais e pendentes
 
-### Implementadas e com testes no repositório
+### Concluídas
 
-- Engine regulatória, parser v2, FII/FIAGRO, reconciliação, QA, staging, publicação protegida, aprovação, backup, hash e rollback.
-- RegulatoryDataService, Repository, Normalizer, Validator, Cache e Types.
-- ScoreEngine e subscores de risco, dividendos, governança, crescimento, liquidez, qualidade e Premium.
-- Health, Validation, histórico, parser health, Dashboard Admin e rate limiting.
-- Timeline regulatória, Relatório Gratuito, AI Insights, Relatório Premium, observabilidade e monitor.
-- Carteira, snapshots, histórico, sincronização e notificações orientadas a eventos.
-- Cálculo global de P/VP e ágio/desconto, padronização visual e glossário.
-- Job IFIX na primeira semana de janeiro/maio/setembro e acionamento manual no Admin.
-- Catálogo normalizado, ciclo de vida, proveniência, materialização e double check em código e Produção.
-- Sprint 2.12: carga protegida, 25 checks, homologação de cinco casos e evidência schema v2 persistida.
-- Risk Lab até descoberta por ticker, série mensal automática, detector, triagem de crédito, regras congeladas, autenticação e isolamento.
+- Fases 1 e 2;
+- Risk Lab 3.0–3.4;
+- infraestrutura de relatórios/IA/observabilidade;
+- política e implementação de redução de Actions na branch.
 
-### Parciais ou pendentes de evidência operacional
+### Parciais
 
-- Cobertura essencial permanece em 97,81% por lacunas legítimas das fontes; não é falha de cadastro básico nem bloqueador retroativo da Fase 2.
-- Política antirruído das notificações: implementada; eficácia, abertura, opt-out e falsos alertas devem continuar monitorados em Produção.
-- Risk Lab: código avançado, mas sem smoke autenticado e sem gate externo.
-- Coorte: pré-registrada, com execução explicitamente bloqueada até fonte primária.
-- Persistência/auditoria do fluxo automático do Risk Lab: precisa do dossiê da Sprint 3.4.
-- SEO: plano pronto, execução não auditada.
+- Sprint 3.5: DEVA11 em trabalho isolado; demais fundos/dataset/backtest pendentes.
+- Coleta FNET: coletor/testes/checkpoint existem; worker persistente fora do Actions pendente.
+- Acompanhar fundo: regra planejada de 1 no Grátis e 10 no Premium; produto pendente.
+- Prompt Premium v3: contrato pronto, implementação pendente.
 
-### Pendentes — prioridade de valor competitivo
+### Pendentes
 
-| Ordem | Funcionalidade | Valor estratégico | Sprint |
-|---:|---|---:|---|
-| 1 | Motor de risco, exposição e atribuição acionável | 10,0 | 5.2 |
-| 2 | Inteligência sobre comunicados oficiais | 9,5 | 5.3 |
-| 3 | Carteira histórica verdadeira com lotes, dividendos e snapshots | 9,2 | 5.1 |
-| 4 | Alertas multigatilho e digests relevantes | 8,9 | 3.8/4.2 |
-| 5 | Screener quantitativo, filtros salvos e scores | 8,5 | 5.4 |
-| 6 | Fair value e sustentabilidade de dividendos | 8,2 | 5.4 |
-| 7 | Benchmark e decomposição do retorno total versus renda | 7,8 | 5.5 |
-| 8 | Calendário anúncio → data-com → pagamento | 7,2 | 5.5 |
-| 9 | Comparação de pares e exportação | 6,9 | 5.4 |
-| 10 | Centro fiscal e documental | 6,5 | 5.5 |
-| 11 | Gráficos avançados de preço, volume e indicadores | 6,2 | backlog posterior à 5.5 |
-| 12 | Simuladores de renda, aporte e reinvestimento | 5,8 | 5.5 |
-
-### Funcionalidade explícita de Radar
-
-“Acompanhar um fundo” significa seguir um FII/FIAGRO/FI-Infra que **não está na carteira**, receber mudanças materiais e construir uma tese antes da compra. Limite vigente para planejamento: **1 no Grátis e 10 no Premium**, aplicados no servidor. Alertas não podem se limitar a preço; devem considerar rendimentos, documentos, eventos, risco, tese e relevância.
+- Radar 4.x;
+- ledger histórico 5.1;
+- motor avançado de risco 5.2;
+- comunicados/screener/fair value/fiscal/simuladores 5.3–5.5.
 
 ---
 
 ## 9. Decisões de segurança
 
-1. APIs administrativas exigem Firebase Authentication, e-mail verificado, e-mail presente em `ADMIN_EMAILS` e autorização Admin no servidor.
-2. Admin não é plano comercial. Sessão administrativa usa cookie assinado `HttpOnly`, `SameSite=Lax`, `Secure` em Produção e prazo limitado.
-3. Nenhuma API administrativa é pública; conferir mesma origem, método, autenticação, autorização e rate limit.
-4. Segredos só existem no ambiente do servidor; nunca em logs, resposta de API, bundle cliente, prompt ou documento.
-5. `NEXT_PUBLIC_*` contém apenas configuração pública do cliente Firebase; credencial de serviço nunca usa prefixo público.
-6. Jobs cron exigem `CRON_SECRET` ou mecanismo equivalente da plataforma.
-7. Publicação, rollback, validação, aprovação, catálogo, Risk Lab e alterações de plano produzem logs de auditoria.
-8. Antes de publicação: backup, hash, aprovação e capacidade de rollback são obrigatórios.
-9. Fontes externas usam allowlist; sem URL livre, bypass de captcha ou promoção automática de fonte secundária.
-10. PII de carteira, e-mail e preferências não é enviada à IA quando não for necessária; logs devem ser minimizados e sanitizados.
-11. Alertas por e-mail/WhatsApp exigem opt-in, cancelamento, deduplicação, cooldown e política de retenção.
-12. WhatsApp depende de avaliação de custo, template, consentimento e LGPD. Telegram está adiado.
-13. As PRs de segurança #1/#2 devem ser comparadas com dependências atuais e encerradas ou substituídas com justificativa versionada.
+- Admin exige sessão protegida, e-mail verificado e autorização.
+- Endpoints operacionais usam mesma origem, rate limit e auditoria.
+- Segredos não aparecem em logs/query/artifacts.
+- Risk Lab permanece isolado de Premium/notificações até gate.
+- Proibido auto-merge de evidência metodológica.
+- GitHub workflows usam permissões somente leitura nesta arquitetura.
+- Dado técnico não é aprovado manualmente fundo a fundo pelo proprietário.
 
 ---
 
 ## 10. Variáveis de ambiente
 
-Nenhum valor secreto deve ser salvo neste documento ou no Git.
+Conhecidas/relevantes:
 
-### Confirmadas pelo proprietário
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `FIREBASE_SERVICE_ACCOUNT_KEY`
+- `ADMIN_EMAILS`
+- `ENABLE_AUTOMATIC_MONITOR`
+- `CRON_SECRET`
+- `VERCEL_ENV`
+- `VERCEL_GIT_COMMIT_SHA`
+- `VERCEL_PROJECT_PRODUCTION_URL`
+- variáveis de OpenAI/IA conforme ambiente
 
-- `ADMIN_EMAILS` criada.
-- `NEXT_PUBLIC_FIREBASE_API_KEY` existente na Vercel.
-- `ENABLE_AUTOMATIC_MONITOR=true` em Preview e Produção.
-- Créditos de IA adquiridos; isso não substitui limites de custo e cache.
+Regras:
 
-### Firebase e serviços-base
-
-```text
-NEXT_PUBLIC_FIREBASE_API_KEY
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-NEXT_PUBLIC_FIREBASE_PROJECT_ID
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-NEXT_PUBLIC_FIREBASE_APP_ID
-FIREBASE_SERVICE_ACCOUNT_KEY
-ADMIN_EMAILS
-OPENAI_API_KEY
-CRON_SECRET
-```
-
-`NEXT_PUBLIC_FIREBASE_PROJECT_ID` deve apontar para o mesmo projeto Firebase usado pelo site e pelo backend. Fazer inventário de Preview/Produção antes da Sprint 2.12; não copiar valores de outro projeto apenas porque pertencem a um app iOS.
-
-### Feature flags centrais verificadas no código
-
-```text
-ENABLE_SYSTEM_VALIDATION
-ENABLE_HEALTH_MONITOR
-ENABLE_AI_INSIGHTS
-ENABLE_REPORT_PREMIUM
-ENABLE_AUTOMATIC_MONITOR
-ENABLE_SCORE_ENGINE
-ENABLE_RISK_LAB_ADMIN
-```
-
-### Flags e configuração operacional documentadas
-
-```text
-ENABLE_PORTFOLIO_REGULATORY_INTELLIGENCE
-PREMIUM_PREVIEW_EMAILS
-MONITOR_ALERT_COOLDOWN_MS
-MONITOR_ALERT_EMAILS
-SMTP_HOST
-SMTP_PORT
-SMTP_SECURE
-SMTP_USER
-SMTP_PASS
-SMTP_FROM
-TELEGRAM_BOT_TOKEN
-TELEGRAM_CHAT_ID
-```
-
-Telegram é legado/opcional e fica desativado por decisão atual.
-
-### Risk Lab
-
-```text
-ENABLE_RISK_LAB_ADMIN
-ENABLE_RISK_LAB_AUTOMATIC_DISCOVERY
-ENABLE_RISK_LAB_FNET_IMPORT
-ENABLE_RISK_LAB_STRESS_RUN
-```
-
-`ENABLE_RISK_LAB_AUTOMATIC_DISCOVERY` controla o fluxo principal. FNET manual e stress run são diagnóstico. Todas as flags de Produção devem ter valor explícito e constar no dossiê sem revelar o valor de segredos.
-
-### WhatsApp
-
-Não criar nem exigir variáveis Twilio/WhatsApp antes da decisão da Sprint 4.3. A presença da dependência `twilio` no `package.json` não significa funcionalidade aprovada.
+- variáveis públicas apenas quando realmente públicas;
+- segredo nunca versionado;
+- Preview e Produção auditados separadamente;
+- job não deve falhar por variável alheia ao seu escopo sem diagnóstico explícito.
 
 ---
 
 ## 11. Testes obrigatórios
 
-### Gate mínimo por release
+### Gerais
 
-```bash
-npm run typecheck
-npm run test:sprint2
-npm run test:risk-lab
-npm run build
-```
+- `npm run typecheck`
+- `npm run test:sprint2`
+- `npm run test:risk-lab`
+- build de verificação quando aplicável
 
-O fechamento foi executado no commit `f4602e223e04c2d917b22a19391dbbd9e6f6286b`, com Vercel verde. A evidência schema v2 e o teste que a valida são obrigatórios no PR final de limpeza.
+### Governança de automações
 
-### Cobertura executada na Sprint 2.12
+- `npm run test:workflow-governance`
 
-- parser v2 com ao menos um FII e um FIAGRO;
-- QA, reconciliação, publicação, backup, aprovação, hash e rollback;
-- RegulatoryDataService sem acesso novo direto ao Firestore;
-- Health, Validation, histórico, Admin e rate limit;
-- P/VP, ágio/desconto, valor patrimonial por cota, liquidez e yield;
-- dividendos mês a mês, total anual, maior mês e meses futuros/parciais;
-- patrimônio da carteira com cota e quantidade corretas;
-- notificação: mudança de rendimento, limiar de 3%, deduplicação e digest;
-- Relatório Gratuito, Premium e AI Insights com FII, FIAGRO, FI-Infra, fundo incompleto e exceção;
-- catálogo: universo B3/CVM, CNPJ único, ciclo de vida, sucessor, `null` externo e double check;
-- jobs cron, IFIX e execução manual no Admin;
-- smoke autenticado de Produção no commit exato.
+Esse teste exige:
 
-### Cobertura obrigatória do Risk Lab
+- inventário de todos os workflows;
+- ausência dos arquivos legados;
+- zero commit/push/PR/merge/`gh workflow run`;
+- zero sleep/polling/retry ilimitado;
+- timeout e concurrency em todos os jobs;
+- `npm ci`/cache;
+- zero cron e permissões de escrita;
+- workflows pesados somente manuais;
+- artefatos com retenção curta;
+- kickoff com uma única chamada;
+- orquestração `advance` no backend.
 
-- hash/freeze; `knownAt`; bloqueio de look-ahead;
-- identidade ticker/CNPJ e fontes permitidas;
-- lacuna, duplicidade, reapresentação, conflito e ambiguidade;
-- thresholds e unidade; data do anúncio; evento de crédito;
-- dataset candidato/gold e aprovação restrita;
-- coorte bloqueada até fonte primária;
-- autenticação, rate limit, timeout e auditoria;
-- isolamento de Premium, IA e notificações.
+### Sprint 3.5
 
-### Evidência persistida
-
-Cada homologação deve gerar um arquivo em `docs/production-evidence/YYYY-MM-DD-<escopo>.md` contendo:
-
-- commit SHA e branch;
-- URL/ID do deployment e horário;
-- ambiente e flags não secretas;
-- comandos e resultado;
-- fundos/amostra e motivo da seleção;
-- passos de smoke e resultado esperado/obtido;
-- exceções e limitações;
-- evidência de generalização;
-- decisão aprovar, bloquear ou reabrir.
-
-Sem esse arquivo, o resultado pode ser considerado útil, mas não encerra formalmente uma fase.
-
-### SEO
-
-- sitemap, robots, canonical, redirects e dados estruturados;
-- SSR e conteúdo rastreável;
-- `noindex` para Admin/privado;
-- Lighthouse/Core Web Vitals;
-- ausência de páginas finas/duplicadas;
-- métricas Search Console registradas antes/depois.
+- parser FNET e anomalias temporais;
+- coletor geral, sem exceção por ticker;
+- checkpoint/retomada sem duplicação;
+- hashes/dataset imutável;
+- seleção de versões/no-look-ahead;
+- locks/attempts/audit;
+- controles saudáveis sem falso positivo;
+- fechamento só com evidência primária completa.
 
 ---
 
-## 12. Pendências e decisões ainda abertas
+## 12. Pendências e decisões abertas
 
 ### Bloqueadores imediatos
 
-1. Verificar fontes primárias da coorte e só então remover o bloqueio de execução.
+1. Executar CI controlada da branch de otimização.
+2. Auditar os cinco workflows finais e o diff completo.
+3. Abrir/validar/mesclar a PR sem regressões.
+4. Fechar a PR #96 e neutralizar o workflow temporário da PR #100.
+5. Concluir dataset primário e backtest da Sprint 3.5.
 
-### Produto e monetização
+### Dívida técnica de infraestrutura
 
-1. Definir preços, periodicidade, trial, cobrança, cancelamento, reembolso e impostos.
-2. Confirmar existência e proposta do `Super Premium`; até lá, apenas Grátis e Premium possuem planejamento concreto.
-3. Definir matriz final de entitlements, inclusive Radar, relatórios, limites de IA e limiar patrimonial.
-4. Confirmar se 1/10 significa fundos simultaneamente acompanhados — interpretação vigente — ou limite por período.
-5. Definir o limite entre informação personalizada e recomendação regulada.
-6. Definir cache distribuído, quotas de IA, TTL, reuso de insights e orçamento mensal.
+6. Migrar a coleta FNET para fila persistida e worker/backend.
+7. Confirmar limites/custo do plano Vercel antes de definir frequência do scheduler.
+8. Medir uso real de Actions por 30 dias e recalibrar orçamento.
+9. Avaliar renomear `Phase 2 Closure CI` após confirmar regras de branch protection.
 
-### Canais e notificações
+### Produto/monetização
 
-7. WhatsApp: decidir planos, provedor, custo, opt-in e templates.
-8. Telegram: adiado; não implementar agora.
-9. Medir redução de ruído, abertura, opt-out, falsos alertas e consolidação de e-mail.
+10. Definir preços, trial, cobrança, cancelamento, reembolso e impostos.
+11. Confirmar Super Premium e matriz final de entitlements.
+12. Definir cache/quota/TTL/orçamento de IA.
+13. Definir limite entre informação personalizada e recomendação regulada.
 
-### Dados e fornecedores
+### Canais
 
-10. Resolver ou documentar permanentemente as 11 lacunas externas de indicadores essenciais.
-11. Continuar monitorando identidade, ciclo de vida e sucessores; qualquer mudança exige evidência oficial.
-12. Avaliar licenciamento e SLA de cotações, volume e liquidez.
-13. Definir extração determinística de PDFs/FNET; documento não legível continua inconclusivo.
-14. Definir monitoramento em tempo real apenas quando o valor justificar custo; jobs atuais permanecem periódicos.
+14. WhatsApp: provedor, custo, opt-in e templates.
+15. Telegram: adiado.
+16. Medir abertura, opt-out, falsos alertas e digest.
 
-### Engenharia e operação
+### Dados/fornecedores
 
-15. Reconciliar e encerrar/redefinir a PR aberta #5.
-16. Higienizar branches remotas após reconciliação, preservando recuperação.
-17. Decidir se regras futuras exigem `v0.2.0`; qualquer mudança repete toda a coorte.
-18. Mover ferramentas manuais antigas do Risk Lab para `/debug` ou removê-las após o fluxo automático ser homologado.
+17. Resolver/documentar lacunas externas.
+18. Avaliar licenciamento/SLA de cotações, volume e liquidez.
+19. Manter documento não legível como inconclusivo.
 
-### SEO e crescimento
+### SEO
 
-20. Iniciar Sprint SEO 1 após inventário técnico e baseline.
-21. Definir 20 fundos prioritários por demanda, qualidade e oportunidade.
-22. Medir conversão orgânica para carteira, Radar e Premium, além de posição média.
-23. Não comprar backlinks nem gerar páginas programáticas sem informação material própria.
-
-### Prompt Premium v3
-
-24. Implementar o contrato detalhado em `Referencias Relatorio Premium/REFERENCIAS_PROMPT_PREMIUM_FII.md`.
-25. Validar por tipo de fundo, qualidade de dados, perfil de usuário e impacto na carteira.
-26. Manter análise técnica, stop-loss e sinais `buy/sell` fora do núcleo até existir série confiável, metodologia validada e decisão jurídica/produto.
+20. Registrar baseline técnico/Search Console.
+21. Definir 20 fundos prioritários.
+22. Não comprar backlinks nem publicar páginas rasas.
 
 ---
 
-## Critérios para declarar as fases concluídas daqui em diante
+## Critérios para declarar fases concluídas
 
-Uma fase só pode ser declarada integralmente concluída quando:
+Uma fase só é concluída quando:
 
-1. código estiver integrado à `main`;
-2. CI obrigatório estiver verde no commit de release;
-3. deployment de Produção do commit exato estiver identificado e saudável;
-4. smoke test estiver documentado;
-5. cobertura tiver sido avaliada sobre todo o universo aplicável;
-6. correções tiverem testes globais e amostra estratificada;
-7. dados ausentes, conflitos e exceções estiverem explícitos;
-8. double check e auditoria estiverem persistidos;
-9. segurança, custo, rollback e observabilidade estiverem validados;
-10. a evidência estiver salva no Git.
+1. código está integrado à `main`;
+2. CI obrigatória está verde no SHA;
+3. deployment exato está saudável;
+4. smoke está documentado;
+5. universo aplicável foi coberto;
+6. correções são globais e testadas;
+7. ausências/conflitos/exceções estão explícitos;
+8. double check/auditoria estão persistidos;
+9. segurança, custo, rollback e observabilidade foram validados;
+10. evidência final está no Git.
 
-Formulação vigente: **Fases 1 e 2 formalmente concluídas em Produção sob a evidência schema v2; Fase 3 em andamento, com Sprint 3.4 concluída e Sprint atual 3.5.**
+**Formulação vigente:** Fases 1 e 2 concluídas; Fase 3 em andamento; Sprint 3.4 concluída; Sprint 3.5 aberta; otimização de GitHub Actions implementada em branch e aguardando validação/merge.
