@@ -1,0 +1,358 @@
+name: Sprint 3.5 Generalized FNET Fix
+
+on:
+  push:
+    branches:
+      - agent/sprint-3-5-fnet-generalized-regressions
+    paths:
+      - .github/workflows/sprint-3-5-fnet-generalized-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply generalized parser and collector corrections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          parser_path = Path("src/lib/risk-lab/FnetDividendNoticeParser.ts")
+          parser = parser_path.read_text()
+          parser = parser.replace(
+          '''function validMonth(value: string) {
+            const month = Number(value);
+            return Number.isInteger(month) && month >= 1 && month <= 12
+              ? String(month).padStart(2, "0")
+              : null;
+          }
+
+          function parseCompetence(value: string, informationDate: string) {''',
+          '''function validMonth(value: string) {
+            const month = Number(value);
+            return Number.isInteger(month) && month >= 1 && month <= 12
+              ? String(month).padStart(2, "0")
+              : null;
+          }
+
+          function normalizeTemporalCompetence(value: string, informationDate: string, raw: string) {
+            const informationMonth = informationDate.slice(0, 7);
+            if (value <= informationMonth) return value;
+
+            const [year, month] = value.split("-").map(Number);
+            const [informationYear, informationMonthNumber] = informationMonth.split("-").map(Number);
+            if (year === informationYear && month === 12 && informationMonthNumber === 1) {
+              return `${year - 1}-12`;
+            }
+            throw new Error(`Período de referência FNET posterior à informação: ${raw}`);
+          }
+
+          function parseCompetence(value: string, informationDate: string) {''')
+          parser = parser.replace(
+          '''  const monthYear = raw.match(/\\b(0?[1-9]|1[0-2])\\s*[-\\/.]\\s*(20\\d{2})\\b/);
+            if (monthYear) return `${monthYear[2]}-${String(Number(monthYear[1])).padStart(2, "0")}`;
+
+            const yearMonth = raw.match(/\\b(20\\d{2})\\s*[-\\/.]\\s*(0?[1-9]|1[0-2])\\b/);
+            if (yearMonth) return `${yearMonth[1]}-${String(Number(yearMonth[2])).padStart(2, "0")}`;
+
+            const compact = raw.match(/\\b(20\\d{2})(0[1-9]|1[0-2])\\b/);
+            if (compact) return `${compact[1]}-${compact[2]}`;''',
+          '''  const monthYear = raw.match(/\\b(0?[1-9]|1[0-2])\\s*[-\\/.]\\s*(20\\d{2})\\b/);
+            if (monthYear) {
+              return normalizeTemporalCompetence(
+                `${monthYear[2]}-${String(Number(monthYear[1])).padStart(2, "0")}`,
+                informationDate,
+                raw,
+              );
+            }
+
+            const yearMonth = raw.match(/\\b(20\\d{2})\\s*[-\\/.]\\s*(0?[1-9]|1[0-2])\\b/);
+            if (yearMonth) {
+              return normalizeTemporalCompetence(
+                `${yearMonth[1]}-${String(Number(yearMonth[2])).padStart(2, "0")}`,
+                informationDate,
+                raw,
+              );
+            }
+
+            const compact = raw.match(/\\b(20\\d{2})(0[1-9]|1[0-2])\\b/);
+            if (compact) return normalizeTemporalCompetence(`${compact[1]}-${compact[2]}`, informationDate, raw);
+
+            const shortMonthYear = raw.match(/\\b(0?[1-9]|1[0-2])\\s*[-\\/.]\\s*(\\d{2})\\b/);
+            if (shortMonthYear) {
+              return normalizeTemporalCompetence(
+                `20${shortMonthYear[2]}-${String(Number(shortMonthYear[1])).padStart(2, "0")}`,
+                informationDate,
+                raw,
+              );
+            }''')
+          parser = parser.replace(
+          '''    return `${year}-${MONTHS[monthName]}`;''',
+          '''    return normalizeTemporalCompetence(`${year}-${MONTHS[monthName]}`, informationDate, raw);''')
+          parser = parser.replace(
+          '''    if (month && year) return `${year}-${month}`;''',
+          '''    if (month && year) return normalizeTemporalCompetence(`${year}-${month}`, informationDate, raw);''')
+          parser = parser.replace(
+          '''  if (!/^[A-Z]{4}11$/.test(ticker)) throw new Error(`Ticker FNET inválido: ${ticker}`);''',
+          '''  if (!/^[A-Z]{4}\\d{2}$/.test(ticker)) throw new Error(`Ticker FNET inválido: ${ticker}`);''')
+          parser_path.write_text(parser)
+
+          collector_path = Path("src/lib/risk-lab/FrozenDividendNoticeCollector.ts")
+          collector = collector_path.read_text()
+          collector = collector.replace('const COLLECTOR_VERSION = "1.1.0";', 'const COLLECTOR_VERSION = "1.2.0";')
+          collector = collector.replace(
+          '''  return /AbortError|HTTP (408|425|429|5\\d\\d)|network|fetch failed|socket|timed out/i.test(message)''',
+          '''  return /AbortError|operation was aborted|HTTP (408|425|429|5\\d\\d)|network|fetch failed|socket|timed out/i.test(message)''')
+          old_selection = '''function selectKnownVersions(
+            observations: FrozenDividendNoticeObservation[],
+            untilDate: string,
+          ) {
+            const until = Date.parse(`${untilDate}T23:59:59-03:00`);
+            const grouped = new Map<string, FrozenDividendNoticeObservation[]>();
+            for (const observation of observations) {
+              if (Date.parse(observation.announcedAt) > until) continue;
+              grouped.set(observation.competenceMonth, [
+                ...(grouped.get(observation.competenceMonth) || []),
+                observation,
+              ]);
+            }
+
+            const selected: FrozenDividendNoticeObservation[] = [];
+            const conflicts: string[] = [];
+            for (const [competenceMonth, items] of grouped) {
+              items.sort((left, right) =>
+                right.protocolVersion - left.protocolVersion
+                || Date.parse(right.announcedAt) - Date.parse(left.announcedAt)
+                || right.documentId.localeCompare(left.documentId));
+              const highestVersion = items[0].protocolVersion;
+              const candidates = items.filter((item) => item.protocolVersion === highestVersion);
+              const amounts = new Set(candidates.map((item) => item.amountPerShare.toFixed(8)));
+              if (amounts.size > 1) {
+                conflicts.push(`Valores conflitantes em ${competenceMonth}, versão ${highestVersion}.`);
+                continue;
+              }
+              selected.push(candidates[0]);
+            }
+            selected.sort((left, right) => monthIndex(left.competenceMonth) - monthIndex(right.competenceMonth));
+            return { selected, conflicts };
+          }'''
+          new_selection = '''function noticeEventKey(observation: FrozenDividendNoticeObservation) {
+            return [
+              observation.ticker,
+              observation.informationDate,
+              observation.baseDate,
+              observation.paymentDate,
+            ].join("|");
+          }
+
+          function selectKnownVersions(
+            observations: FrozenDividendNoticeObservation[],
+            untilDate: string,
+          ) {
+            const until = Date.parse(`${untilDate}T23:59:59-03:00`);
+            const events = new Map<string, FrozenDividendNoticeObservation[]>();
+            for (const observation of observations) {
+              if (Date.parse(observation.announcedAt) > until) continue;
+              const key = noticeEventKey(observation);
+              events.set(key, [...(events.get(key) || []), observation]);
+            }
+
+            const conflicts: string[] = [];
+            const currentEvents: FrozenDividendNoticeObservation[] = [];
+            for (const [eventKey, items] of events) {
+              items.sort((left, right) =>
+                right.protocolVersion - left.protocolVersion
+                || Date.parse(right.announcedAt) - Date.parse(left.announcedAt)
+                || right.documentId.localeCompare(left.documentId));
+              const highestVersion = items[0].protocolVersion;
+              const candidates = items.filter((item) => item.protocolVersion === highestVersion);
+              const signatures = new Set(candidates.map((item) => [
+                item.competenceMonth,
+                item.amountPerShare.toFixed(8),
+              ].join("|")));
+              if (signatures.size > 1) {
+                conflicts.push(`Reapresentações conflitantes no evento ${eventKey}, versão ${highestVersion}.`);
+                continue;
+              }
+              currentEvents.push(candidates[0]);
+            }
+
+            const grouped = new Map<string, FrozenDividendNoticeObservation[]>();
+            for (const observation of currentEvents) {
+              grouped.set(observation.competenceMonth, [
+                ...(grouped.get(observation.competenceMonth) || []),
+                observation,
+              ]);
+            }
+
+            const selected: FrozenDividendNoticeObservation[] = [];
+            for (const [competenceMonth, items] of grouped) {
+              items.sort((left, right) =>
+                right.protocolVersion - left.protocolVersion
+                || Date.parse(right.announcedAt) - Date.parse(left.announcedAt)
+                || right.documentId.localeCompare(left.documentId));
+              const highestVersion = items[0].protocolVersion;
+              const candidates = items.filter((item) => item.protocolVersion === highestVersion);
+              const amounts = new Set(candidates.map((item) => item.amountPerShare.toFixed(8)));
+              if (amounts.size > 1) {
+                conflicts.push(`Valores conflitantes em ${competenceMonth}, versão ${highestVersion}.`);
+                continue;
+              }
+              selected.push(candidates[0]);
+            }
+            selected.sort((left, right) => monthIndex(left.competenceMonth) - monthIndex(right.competenceMonth));
+            return { selected, conflicts };
+          }'''
+          if old_selection not in collector:
+              raise SystemExit("selectKnownVersions block not found")
+          collector = collector.replace(old_selection, new_selection)
+          collector = collector.replace(
+          '''    if (notice.ticker !== identity.ticker) {
+              throw new Error(`Ticker divergente no aviso ${document.documentId}: ${notice.ticker}.`);
+            }''',
+          '''    if (notice.ticker !== identity.ticker) {
+              if (notice.ticker.slice(0, 4) === identity.ticker.slice(0, 4)) return null;
+              throw new Error(`Ticker divergente no aviso ${document.documentId}: ${notice.ticker}.`);
+            }''')
+          collector = collector.replace(
+          '"User-Agent": "DadosFII-RiskLab/1.1 (+frozen-primary-dividend-collector)",',
+          '"User-Agent": "DadosFII-RiskLab/1.2 (+frozen-primary-dividend-collector)",')
+          collector_path.write_text(collector)
+
+          parser_test = Path("tests/risk-lab-frozen-dividend-parser.test.ts")
+          parser_tests = parser_test.read_text()
+          parser_tests += r'''
+
+          test("normaliza competência legada curta e virada dezembro/janeiro sem informação futura", () => {
+            const legacy = table([
+              ["Nome do Fundo:", "FUNDO LEGADO"],
+              ["Data da Informação:", "07/01/2021"],
+              ["Código de negociação:", "AAAA11"],
+              ["Data-base (último dia de negociação com direito ao provento)", "07/01/2021"],
+              ["Valor do provento (R$/unidade)", "1,00"],
+              ["Data do pagamento", "14/01/2021"],
+              ["Período de referência", "12-20"],
+              ["Rendimento isento de IR*", "Sim"],
+            ]);
+            assert.equal(parseFnetDividendNoticeHtml(legacy).competenceMonth, "2020-12");
+
+            const rollover = legacy
+              .replaceAll("07/01/2021", "12/01/2022")
+              .replace("14/01/2021", "19/01/2022")
+              .replace("12-20", "12-2022");
+            assert.equal(parseFnetDividendNoticeHtml(rollover).competenceMonth, "2021-12");
+          });
+
+          test("aceita código de outra classe para o coletor decidir o isolamento pelo ticker-alvo", () => {
+            const secondary = table([
+              ["Nome do Fundo:", "FUNDO MULTICLASSE"],
+              ["Data da Informação:", "31/01/2022"],
+              ["Código de negociação:", "AAAA13"],
+              ["Data-base (último dia de negociação com direito ao provento)", "31/01/2022"],
+              ["Valor do provento (R$/unidade)", "1,00"],
+              ["Data do pagamento", "14/02/2022"],
+              ["Período de referência", "01-2022"],
+              ["Rendimento isento de IR*", "Sim"],
+            ]);
+            assert.equal(parseFnetDividendNoticeHtml(secondary).ticker, "AAAA13");
+          });
+          '''
+          parser_test.write_text(parser_tests)
+
+          collector_test = Path("tests/risk-lab-frozen-dividend-collector.test.ts")
+          collector_tests = collector_test.read_text()
+          collector_tests += r'''
+
+          test("ignora classes secundárias da mesma família e escolhe a maior versão do evento antes da competência", async () => {
+            const targetIdentities = identities();
+            const documentsByCnpj = new Map<string, FnetDividendDocumentEvidence[]>();
+            const htmlById = new Map<string, string>();
+
+            targetIdentities.forEach((identity, index) => {
+              const base = document(String(2000 + index * 10));
+              documentsByCnpj.set(identity.cnpj, [base]);
+              htmlById.set(base.documentId, notice(identity.ticker));
+            });
+
+            const first = targetIdentities[0];
+            const v1 = document("2101");
+            const v2 = document("2102");
+            const secondary = document("2103");
+            v1.protocolMetadata.version = 1;
+            v2.protocolMetadata.version = 2;
+            secondary.protocolMetadata.version = 1;
+            documentsByCnpj.set(first.cnpj, [v1, v2, secondary]);
+            htmlById.set("2101", notice(first.ticker).replace("01-2022", "02-2022"));
+            htmlById.set("2102", notice(first.ticker).replace("1,00", "1,20"));
+            htmlById.set("2103", notice(`${first.ticker.slice(0, 4)}13`, "9,99"));
+
+            const collector = new FrozenDividendNoticeCollector({
+              attempts: 1,
+              now: () => new Date("2026-07-22T02:00:00-03:00"),
+              discovery: {
+                async discover(cnpj: string) {
+                  const documents = documentsByCnpj.get(cnpj);
+                  assert.ok(documents);
+                  return {
+                    internalFundId: cnpj,
+                    documents,
+                    recordsInspected: documents.length,
+                    sourceUrl: "https://fnet.bmfbovespa.com.br/fnet/publico/pesquisarGerenciadorDocumentosDados",
+                  };
+                },
+              },
+              fetchImpl: (async (input: string | URL | Request) => {
+                const id = new URL(String(input)).searchParams.get("id") || "";
+                const html = htmlById.get(id);
+                assert.ok(html);
+                return new Response(html, { status: 200, headers: { "content-type": "text/html" } });
+              }) as typeof fetch,
+            });
+
+            const result = await collector.collect(
+              targetIdentities,
+              RELEASE,
+              null,
+              async () => undefined,
+            );
+            assert.equal(result.dataset.status, "complete");
+            assert.equal(result.dataset.collectorVersion, "1.2.0");
+            assert.equal(result.dataset.cases[0].pendingDocumentIds.length, 0);
+            assert.equal(result.dataset.cases[0].documentsProcessed, 3);
+            assert.equal(result.dataset.cases[0].observations.length, 1);
+            assert.equal(result.dataset.cases[0].observations[0].documentId, "2102");
+            assert.equal(result.dataset.cases[0].observations[0].amountPerShare, 1.2);
+            assert.equal(result.dataset.cases[0].conflicts.length, 0);
+          });
+          '''
+          collector_test.write_text(collector_tests)
+
+          Path(".github/workflows/sprint-3-5-fnet-generalized-fix.yml").unlink()
+          PY
+
+      - run: npm run typecheck
+      - run: npm run test:sprint3.5
+      - run: npm run test:sprint2
+
+      - name: Commit tested corrections
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: normaliza avisos multiclasse e reapresentações FNET"
+          git push origin HEAD:${GITHUB_REF_NAME}
