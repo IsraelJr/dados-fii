@@ -30,44 +30,6 @@
     "diagnosticZipSha256": "8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
     "artifactsRedownloadedAndMatched": true
   },
-  "observationFiles": [
-    {
-      "file": "docs/production-evidence/risk-lab/deva11-phase-a/observations-2021.json",
-      "year": "2021",
-      "count": 12,
-      "observationsHash": "91da52359484b55cedfd0aedc630b8789c8cce6cc5fe3dd0c454bcc737ecc4df"
-    },
-    {
-      "file": "docs/production-evidence/risk-lab/deva11-phase-a/observations-2022.json",
-      "year": "2022",
-      "count": 12,
-      "observationsHash": "bbb49921d98d3d2faa3b9a6164f01269a9abca1b0f9fb5c02c8b927b7bd9c5d8"
-    },
-    {
-      "file": "docs/production-evidence/risk-lab/deva11-phase-a/observations-2023.json",
-      "year": "2023",
-      "count": 12,
-      "observationsHash": "ccdfd951b9593c30afaab088ad6094a0c1f32ae3b4e6135a6a27512effeac92a"
-    },
-    {
-      "file": "docs/production-evidence/risk-lab/deva11-phase-a/observations-2024.json",
-      "year": "2024",
-      "count": 11,
-      "observationsHash": "5af18a8b9168fb1ea5f4e4ca85cc8dcb3f99f84348eff127a9c809940243884a"
-    },
-    {
-      "file": "docs/production-evidence/risk-lab/deva11-phase-a/observations-2025.json",
-      "year": "2025",
-      "count": 12,
-      "observationsHash": "946551470ff05684278ae71d98fb3a3fdf79c286e49fb619e8c68977774c058b"
-    },
-    {
-      "file": "docs/production-evidence/risk-lab/deva11-phase-a/observations-2026.json",
-      "year": "2026",
-      "count": 6,
-      "observationsHash": "8b20850697370266edb3ba2177d00f3935484d43441547c4ceda556e28944a3d"
-    }
-  ],
   "execution": {
     "mode": "offline_deterministic_from_immutable_github_artifacts",
     "runs": 2,
@@ -217,5 +179,40 @@
     "conflicts": 0,
     "auditHash": "157e807f7a61c4d9bb34eedc324e761c8a19c25ac93505023606f6ffcd2159af"
   },
-  "evidenceHash": "1273ed48a0044df5b4dee5559c0a2c24603244f929c40f8385398349ff23cc83"
+  "observationsArtifact": {
+    "file": "docs/production-evidence/risk-lab/deva11-phase-a/observations.json.gz.base64",
+    "encoding": "base64",
+    "compression": "gzip",
+    "format": "application/json",
+    "uncompressedStructure": "FrozenDividendNoticeObservation[]",
+    "count": 65,
+    "gzipSha256": "e3c28ee35d357e74caeded55b6f4de0787489558a3f66f28c32c381bae2a5a43",
+    "years": {
+      "2021": {
+        "count": 12,
+        "observationsHash": "91da52359484b55cedfd0aedc630b8789c8cce6cc5fe3dd0c454bcc737ecc4df"
+      },
+      "2022": {
+        "count": 12,
+        "observationsHash": "bbb49921d98d3d2faa3b9a6164f01269a9abca1b0f9fb5c02c8b927b7bd9c5d8"
+      },
+      "2023": {
+        "count": 12,
+        "observationsHash": "ccdfd951b9593c30afaab088ad6094a0c1f32ae3b4e6135a6a27512effeac92a"
+      },
+      "2024": {
+        "count": 11,
+        "observationsHash": "5af18a8b9168fb1ea5f4e4ca85cc8dcb3f99f84348eff127a9c809940243884a"
+      },
+      "2025": {
+        "count": 12,
+        "observationsHash": "946551470ff05684278ae71d98fb3a3fdf79c286e49fb619e8c68977774c058b"
+      },
+      "2026": {
+        "count": 6,
+        "observationsHash": "8b20850697370266edb3ba2177d00f3935484d43441547c4ceda556e28944a3d"
+      }
+    }
+  },
+  "evidenceHash": "b6f39bea9df860d0ddf12103de9f59abbb65e1370ed2c832cec6f9601c0a1f87"
 }
