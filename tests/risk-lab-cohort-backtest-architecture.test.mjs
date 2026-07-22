@@ -7,6 +7,7 @@ const verifier = readFileSync("src/lib/risk-lab/CohortPrimaryVerificationService
 const store = readFileSync("src/lib/risk-lab/RiskLabCohortBacktestStore.ts", "utf8");
 const route = readFileSync("src/app/api/system/risk-lab-cohort-backtest/route.ts", "utf8");
 const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/cohort-backtest/route.ts", "utf8");
+const planner = readFileSync("src/lib/risk-lab/RiskLabCohortAdvancePlanner.ts", "utf8");
 const workflow = readFileSync(".github/workflows/risk-lab-cohort-backtest.yml", "utf8");
 const series = readFileSync("src/lib/risk-lab/AutomaticDividendSeriesService.ts", "utf8");
 const cohort = JSON.parse(readFileSync("src/lib/risk-lab/out-of-sample-cohort-v0.1.json", "utf8"));
@@ -111,11 +112,13 @@ test("rota protege o release e o GitHub somente inicia uma tentativa persistida"
   assert.doesNotMatch(executable(workflow), /action=case|action=finalize|git\s+push|gh\s+pr|sleep|npm run test/);
 });
 
-test("continuação automática de baixo nível pertence ao backend administrativo", () => {
-  assert.match(adminRoute, /"advance"/);
-  assert.match(adminRoute, /getPublicEvidence\(\)/);
-  assert.match(adminRoute, /SEGMENTED_COHORT_TICKERS\.find/);
+test("continuação automática de baixo nível pertence ao backend e ao planner puro", () => {
+  assert.match(adminRoute, /planRiskLabCohortAdvance/);
+  assert.match(planner, /tickers\.find/);
+  assert.match(planner, /action: "initialize"/);
+  assert.match(planner, /action: "case"/);
+  assert.match(planner, /action: "finalize"/);
+  assert.match(planner, /action: "noop"/);
   assert.match(adminRoute, /nextAction/);
-  assert.match(adminRoute, /nextTicker/);
-  assert.doesNotMatch(executable(adminRoute), /git\s+push|github-actions|deploy-trigger|sendEmail|sendNotification/);
+  assert.doesNotMatch(executable(`${adminRoute}\n${planner}`), /git\s+push|github-actions|deploy-trigger|sendEmail|sendNotification/);
 });
