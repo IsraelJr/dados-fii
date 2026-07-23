@@ -54,16 +54,21 @@ jobs:
           npm run test:risk-lab 2>&1 | tee .tmp/risk-lab-ci.log
 
       - name: Validate deterministic DEVA11 phase
-        run: >-
-          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test
-          tests/risk-lab-deva11-phase-a.test.ts
-          tests/risk-lab-deva11-evidence.test.mjs
+        id: deva11_tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \
+            tests/risk-lab-deva11-phase-a.test.ts \
+            tests/risk-lab-deva11-evidence.test.mjs 2>&1 | tee .tmp/deva11-ci.log
 
       - name: Upload failure diagnostics
-        if: failure() && steps.risk_lab_tests.outcome == 'failure'
+        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: risk-lab-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .tmp/risk-lab-ci.log
+          path: |
+            .tmp/risk-lab-ci.log
+            .tmp/deva11-ci.log
           if-no-files-found: error
           retention-days: 3
