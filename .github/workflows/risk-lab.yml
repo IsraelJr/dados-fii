@@ -44,4 +44,18 @@ jobs:
       # O typecheck e a governança dos workflows pertencem à CI central.
       # Esta verificação executa somente a suíte especializada do domínio.
       - name: Run Risk Lab tests
-        run: npm run test:risk-lab
+        id: risk_lab_tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          npm run test:risk-lab 2>&1 | tee .tmp/risk-lab-ci.log
+
+      - name: Upload failure diagnostics
+        if: failure() && steps.risk_lab_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .tmp/risk-lab-ci.log
+          if-no-files-found: error
+          retention-days: 3
