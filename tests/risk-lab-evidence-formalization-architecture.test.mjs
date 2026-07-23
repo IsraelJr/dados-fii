@@ -1,49 +1,44 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const workflow = readFileSync(".github/workflows/risk-lab-cohort-backtest.yml", "utf8");
+const policy = readFileSync("docs/engineering/github-actions-policy.md", "utf8");
 
 function executable(source) {
   return source.replace(/^\s*#.*$/gm, "");
 }
 
-test("formalização publica a branch antes de tentar criar a PR", () => {
-  const publish = workflow.indexOf("name: Publish immutable evidence branch");
-  const createPr = workflow.indexOf("name: Create evidence pull request");
-  assert.ok(publish >= 0);
-  assert.ok(createPr > publish);
-  assert.match(workflow, /git push --force-with-lease origin "HEAD:\$\{EVIDENCE_BRANCH\}"/);
-  assert.match(workflow, /gh pr create --base main --head "\$EVIDENCE_BRANCH"/);
+test("kickoff não cria branch, commit, PR ou merge de evidência", () => {
+  const source = executable(workflow);
+  assert.doesNotMatch(source, /git\s+(checkout|add|commit|push)/i);
+  assert.doesNotMatch(source, /gh\s+pr\s+(create|merge)/i);
+  assert.doesNotMatch(source, /contents:\s*write|pull-requests:\s*write/i);
 });
 
-test("branch de evidência é única por execução e tentativa", () => {
-  assert.match(workflow, /GITHUB_RUN_ID.*GITHUB_RUN_ATTEMPT/);
-  assert.match(workflow, /git checkout -B "\$EVIDENCE_BRANCH"/);
-  assert.match(workflow, /git add -f "\$EVIDENCE_PATH" "\$SUMMARY_PATH"/);
+test("tentativa intermediária usa summary e artefato curto", () => {
+  assert.match(workflow, /GITHUB_STEP_SUMMARY/);
+  assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /retention-days:\s*3/);
+  assert.doesNotMatch(workflow, /docs\/production-evidence\/risk-lab/);
 });
 
-test("blockers mantêm a Sprint aberta somente depois da PR existir", () => {
-  const createPr = workflow.indexOf("name: Create evidence pull request");
-  const failClosed = workflow.indexOf("name: Keep Sprint open when methodological blockers exist");
-  assert.ok(failClosed > createPr);
-  assert.match(workflow, /steps\.pull_request\.outcome == 'success'/);
-  assert.match(workflow, /steps\.prepare\.outputs\.status != 'passed'/);
-  assert.match(workflow, /exit 1/);
+test("workflow não repete gates já aprovados antes do deploy", () => {
+  assert.doesNotMatch(workflow, /npm run typecheck/);
+  assert.doesNotMatch(workflow, /npm run test:risk-lab/);
+  assert.doesNotMatch(workflow, /npm run test:sprint2/);
+  assert.doesNotMatch(workflow, /finalize-risk-lab-sprint-3-5\.mjs/);
 });
 
-test("evidência aprovada executa gates locais e merge automático", () => {
-  assert.match(workflow, /npm run typecheck/);
-  assert.match(workflow, /npm run test:risk-lab/);
-  assert.match(workflow, /npm run test:sprint2/);
-  assert.match(workflow, /finalize-risk-lab-sprint-3-5\.mjs/);
-  assert.match(workflow, /gh pr merge "\$PR_URL" --squash --delete-branch/);
-  assert.match(workflow, /gh pr merge "\$PR_URL" --auto --squash --delete-branch/);
+test("formalizador final continua versionado, mas fora do runner operacional", () => {
+  assert.equal(existsSync("scripts/finalize-risk-lab-sprint-3-5.mjs"), true);
+  assert.match(policy, /Branch\/PR só é criada para evidência final estável e relevante/);
+  assert.match(policy, /Evidência final/);
 });
 
-test("formalização continua sem aprovação manual ou efeitos externos", () => {
+test("fluxo permanece sem aprovação técnica manual ou efeitos externos", () => {
   const source = executable(workflow);
   assert.doesNotMatch(source, /manual_document_review|approve fund|aprovar fundo|sendEmail|sendNotification/);
-  assert.match(workflow, /premiumIntegrated == false/);
-  assert.match(workflow, /notificationsSent == false/);
+  assert.match(workflow, /runId/);
+  assert.match(workflow, /releaseCommit/);
 });

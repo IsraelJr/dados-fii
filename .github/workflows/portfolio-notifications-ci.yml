@@ -3,20 +3,44 @@ name: Portfolio Notifications CI
 on:
   pull_request:
     branches: [main]
+    paths:
+      - ".github/workflows/portfolio-notifications-ci.yml"
+      - "src/lib/portfolioNotification*.ts"
+      - "src/app/api/admin/process-portfolio-notifications/**"
+      - "src/app/api/wallet/notification-preferences/**"
+      - "src/app/components/PortfolioNotificationPreferences.tsx"
+      - "tests/portfolio-notification-*.test.ts"
+      - "tests/portfolio-notification-*.test.mjs"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: portfolio-notifications-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  typecheck:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 8
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm install --silent
-      - run: npx tsc --noEmit
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Run notification policy regressions
+        run: >-
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test
+          tests/portfolio-notification-regression.test.mjs
+          tests/portfolio-notification-policy.test.ts

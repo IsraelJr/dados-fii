@@ -6,6 +6,10 @@ const route = readFileSync(
   "src/app/api/admin/system/risk-lab/cohort-backtest/route.ts",
   "utf8",
 );
+const planner = readFileSync(
+  "src/lib/risk-lab/RiskLabCohortAdvancePlanner.ts",
+  "utf8",
+);
 const panel = readFileSync(
   "src/app/admin/risk-lab/CohortBacktestPanel.tsx",
   "utf8",
@@ -30,7 +34,7 @@ const workflow = readFileSync(
 function executable(source) {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+    .replace(/^\s*(?:\/\/|#).*$/gm, "");
 }
 
 test("API da coorte reutiliza autenticação Admin e executa etapas segmentadas só em Produção", () => {
@@ -39,11 +43,24 @@ test("API da coorte reutiliza autenticação Admin e executa etapas segmentadas 
   assert.match(route, /VERCEL_ENV !== "production"/);
   assert.match(route, /VERCEL_GIT_COMMIT_SHA/);
   assert.match(route, /segmentedRiskLabCohortBacktestService\.initialize\(\)/);
-  assert.match(route, /segmentedRiskLabCohortBacktestService\.runTicker\(ticker\)/);
+  assert.match(route, /segmentedRiskLabCohortBacktestService\.runTicker\(resolvedTicker\)/);
   assert.match(route, /segmentedRiskLabCohortBacktestService\.finalize\(\)/);
-  assert.match(route, /new Set\(\["initialize", "case", "finalize"\]\)/);
+  assert.match(route, /new Set\(\["initialize", "case", "finalize", "advance"\]\)/);
   assert.match(route, /SEGMENTED_COHORT_TICKERS\.includes\(ticker\)/);
   assert.doesNotMatch(executable(route), /CRON_SECRET|ADMIN_EMAILS|firebaseAdmin|adminDb/);
+});
+
+test("advance delega ao planner puro a inicialização, próximo fundo ou finalização", () => {
+  assert.match(route, /action === "advance"/);
+  assert.match(route, /getPublicEvidence\(\)/);
+  assert.match(route, /planRiskLabCohortAdvance/);
+  assert.match(planner, /tickers\.find/);
+  assert.match(planner, /action: "initialize"/);
+  assert.match(planner, /action: "case"/);
+  assert.match(planner, /action: "finalize"/);
+  assert.match(planner, /action: "noop"/);
+  assert.match(route, /nextAction/);
+  assert.match(route, /nextTicker/);
 });
 
 test("botão executa com um clique sem aprovação técnica manual", () => {
@@ -74,16 +91,10 @@ test("navegação do Admin torna o acionamento encontrável", () => {
   assert.match(layout, /Pendências Sprint 3\.5/);
 });
 
-test("push do marcador dispara o workflow segmentado no release exato", () => {
-  assert.match(
-    workflow,
-    /docs\/production-evidence\/risk-lab\/sprint-3-5-deploy-trigger\.json/,
-  );
+test("workflow somente registra a release e deixa os casos para o backend", () => {
+  assert.match(workflow, /^\s{2}workflow_dispatch:/m);
   assert.match(workflow, /risk-lab-3-5-20260720-v2/);
-  assert.match(workflow, /src\/app\/api\/admin\/system\/risk-lab\/cohort-backtest\/\*\*/);
-  assert.match(workflow, /RELEASE_COMMIT:\s*\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /RELEASE_COMMIT:\s*\$\{\{ inputs\.release_sha \}\}/);
   assert.match(workflow, /action=initialize/);
-  assert.match(workflow, /action=case&ticker=\$\{ticker\}/);
-  assert.match(workflow, /action=finalize/);
-  assert.match(workflow, /release.*RELEASE_COMMIT/);
+  assert.doesNotMatch(executable(workflow), /action=case|action=finalize|git\s+push|sleep|for\s+attempt/);
 });

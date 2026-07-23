@@ -1,6 +1,10 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
 import {
+  planRiskLabCohortAdvance,
+  type RiskLabCohortAdvanceAction,
+} from "@/lib/risk-lab/RiskLabCohortAdvancePlanner";
+import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
 import {
@@ -18,6 +22,12 @@ function activeProductionRelease() {
   return /^[a-f0-9]{40}$/.test(release) ? release : null;
 }
 
+function clientNextAction(action: RiskLabCohortAdvanceAction) {
+  if (action === "case") return "advance";
+  if (action === "noop") return null;
+  return action;
+}
+
 export async function GET(request: NextRequest) {
   const authorization = await authorizeAdminRequest(
     request,
@@ -29,12 +39,17 @@ export async function GET(request: NextRequest) {
   try {
     const releaseCommit = activeProductionRelease();
     const evidence = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
+    const plan = releaseCommit
+      ? planRiskLabCohortAdvance(releaseCommit, SEGMENTED_COHORT_TICKERS, evidence)
+      : { action: "noop" as const, ticker: null };
     return adminJson({
       ok: true,
       enabled: Boolean(releaseCommit),
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       releaseCommit,
       tickers: SEGMENTED_COHORT_TICKERS,
+      nextAction: clientNextAction(plan.action),
+      nextTicker: plan.ticker,
       evidence,
     });
   } catch (error) {
@@ -68,34 +83,66 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const action = String(body?.action || "").trim().toLowerCase();
   const ticker = String(body?.ticker || "").trim().toUpperCase();
-  if (!new Set(["initialize", "case", "finalize"]).has(action)) {
-    return adminJson({ ok: false, error: "Ação inválida. Use initialize, case ou finalize." }, 400);
+  if (!new Set(["initialize", "case", "finalize", "advance"]).has(action)) {
+    return adminJson({ ok: false, error: "Ação inválida. Use initialize, advance, case ou finalize." }, 400);
   }
   if (action === "case" && !SEGMENTED_COHORT_TICKERS.includes(ticker)) {
     return adminJson({ ok: false, error: "Ticker fora da coorte pré-registrada." }, 400);
   }
 
   try {
+    let resolvedAction: RiskLabCohortAdvanceAction = action === "advance"
+      ? "noop"
+      : action as Exclude<RiskLabCohortAdvanceAction, "noop">;
+    let resolvedTicker = ticker || null;
+
+    if (action === "advance") {
+      const current = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
+      const plan = planRiskLabCohortAdvance(releaseCommit, SEGMENTED_COHORT_TICKERS, current);
+      resolvedAction = plan.action;
+      resolvedTicker = plan.ticker;
+      if (resolvedAction === "noop") {
+        return adminJson({
+          ok: true,
+          enabled: true,
+          runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
+          releaseCommit,
+          action: "noop",
+          ticker: null,
+          persistedCases: current?.cases.length || 0,
+          nextAction: null,
+          nextTicker: null,
+          evidence: current,
+        });
+      }
+    }
+
     console.info("Risk Lab segmented admin execution requested", {
       actor: authorization.identity.email,
       releaseCommit,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
-      action,
-      ticker: ticker || null,
+      requestedAction: action,
+      resolvedAction,
+      ticker: resolvedTicker,
     });
-    const evidence = action === "initialize"
+
+    const evidence = resolvedAction === "initialize"
       ? await segmentedRiskLabCohortBacktestService.initialize()
-      : action === "case"
-        ? await segmentedRiskLabCohortBacktestService.runTicker(ticker)
+      : resolvedAction === "case" && resolvedTicker
+        ? await segmentedRiskLabCohortBacktestService.runTicker(resolvedTicker)
         : await segmentedRiskLabCohortBacktestService.finalize();
+
+    const nextPlan = planRiskLabCohortAdvance(releaseCommit, SEGMENTED_COHORT_TICKERS, evidence);
     return adminJson({
-      ok: action === "finalize" ? evidence.status === "passed" : true,
+      ok: resolvedAction === "finalize" ? evidence.status === "passed" : true,
       enabled: true,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       releaseCommit,
-      action,
-      ticker: ticker || null,
+      action: resolvedAction,
+      ticker: resolvedTicker,
       persistedCases: evidence.cases.length,
+      nextAction: clientNextAction(nextPlan.action),
+      nextTicker: nextPlan.ticker,
       evidence,
     }, evidence.status === "running" ? 202 : 200);
   } catch (error) {

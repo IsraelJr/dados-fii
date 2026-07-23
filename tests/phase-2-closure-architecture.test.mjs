@@ -55,16 +55,18 @@ test("public closure evidence is read-only and does not expose credentials or ap
   assert.doesNotMatch(route, /approvalHash/);
 });
 
-test("production schedule has no temporary Phase 2 closure cron and Sprint CI includes the gates", () => {
+test("production schedule has no temporary Phase 2 closure cron and CI responsibilities are separated", () => {
   const vercel = read("vercel.json");
   const packageJson = read("package.json");
-  const workflow = read(".github/workflows/phase-2-closure.yml");
+  const coreWorkflow = read(".github/workflows/phase-2-closure.yml");
+  const riskLabWorkflow = read(".github/workflows/risk-lab.yml");
   assert.equal((vercel.match(/\/api\/cron\/phase-2-closure/g) || []).length, 0);
   assert.match(packageJson, /phase-2-closure\.test\.ts/);
   assert.match(packageJson, /phase-2-closure-architecture\.test\.mjs/);
-  assert.match(workflow, /npm run typecheck/);
-  assert.match(workflow, /npm run test:sprint2/);
-  assert.match(workflow, /npm run test:risk-lab/);
+  assert.match(coreWorkflow, /npm run typecheck/);
+  assert.match(coreWorkflow, /npm run test:sprint2/);
+  assert.doesNotMatch(coreWorkflow, /npm run test:risk-lab/);
+  assert.match(riskLabWorkflow, /npm run test:risk-lab/);
 });
 
 test("persisted Phase 2 evidence is schema v2, passed and covers standard plus edge cases", () => {

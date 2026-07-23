@@ -18,6 +18,10 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function executable(source) {
+  return source.replace(/^\s*#.*$/gm, "");
+}
+
 test("coletor é geral, sequencial e não contém exceções por ticker", () => {
   for (const ticker of COHORT) {
     assert.doesNotMatch(collector, new RegExp(ticker));
@@ -40,23 +44,31 @@ test("protocolo histórico usa metadados oficiais do gerenciador sem endpoint bl
   assert.match(collector, /sha256Text\(protocolMetadataPayload\(document\)\)/);
 });
 
-test("workflow coleta fora da Vercel com checkpoint, retomada e evidência imutável", () => {
+test("workflow temporário é manual, limitado e sem espera por deploy", () => {
+  assert.match(workflow, /^\s{2}workflow_dispatch:/m);
+  assert.doesNotMatch(workflow, /^\s{2}(push|pull_request|schedule):/m);
+  assert.match(workflow, /timeout-minutes:\s*30/);
+  assert.match(workflow, /governance-exception/);
+  assert.match(workflow, /release_sha/);
+  assert.equal((workflow.match(/curl\b/g) || []).length, 1);
+  assert.doesNotMatch(executable(workflow), /\bsleep\b|for\s+attempt|seq\s+1/i);
+});
+
+test("workflow preserva checkpoint curto sem escrever no Git", () => {
   assert.match(workflow, /actions\/download-artifact@v4/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
-  assert.match(workflow, /timeout-minutes:\s*120/);
   assert.match(workflow, /risk-lab-dividend-notices-checkpoint\.json/);
   assert.match(workflow, /collect-risk-lab-dividend-notices\.ts/);
-  assert.match(workflow, /git push --force-with-lease/);
-  assert.match(workflow, /gh pr create/);
-  assert.match(workflow, /Premium integrado: \\`false\\`/);
-  assert.match(workflow, /notificações enviadas: \\`false\\`/);
+  assert.match(workflow, /retention-days:\s*3/);
+  assert.match(workflow, /npm ci --silent/);
+  assert.doesNotMatch(executable(workflow), /git\s+(commit|push|checkout -B)|gh\s+pr|contents:\s*write|pull-requests:\s*write/i);
+  assert.doesNotMatch(workflow, /npm run test:risk-lab|npm run test:sprint2|npm run typecheck/);
 });
 
 test("workflow e endpoint compartilham exatamente o mesmo identificador protegido", () => {
   const match = backtestService.match(/export const RISK_LAB_COHORT_BACKTEST_RUN_ID = "([^"]+)"/);
   assert.ok(match, "Constante protegida do backtest não encontrada.");
   assert.match(workflow, new RegExp(`RUN_ID:\\s*${escapeRegex(match[1])}`));
-  assert.match(workflow, /src\/lib\/risk-lab\/RiskLabCohortBacktestV2Service\.ts/);
   assert.match(route, /parameters\.runId === RISK_LAB_COHORT_BACKTEST_RUN_ID/);
 });
 

@@ -87,6 +87,6 @@ test("aceita código de outra classe para o coletor decidir o isolamento pelo ti
 test("rejeita competência futura fora da correção estrita de virada anual", () => {
   assert.throws(
     () => parseFnetDividendNoticeHtml(noticeWithPeriod("02-2022")),
-    /posterior à informação/,
+    /posterior às datas do aviso/,
   );
 });
