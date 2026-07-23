@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { gunzipSync } from "node:zlib";
 import test from "node:test";
 
 const MANIFEST_PATH = "docs/production-evidence/risk-lab/deva11-phase-a-manifest.json";
@@ -25,24 +24,29 @@ function hashValue(value) {
 function loadEvidence() {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
   const index = JSON.parse(readFileSync(INDEX_PATH, "utf8"));
-  const encoded = readFileSync(index.observationsArtifact.file, "utf8").trim();
-  const gzipBytes = Buffer.from(encoded, "base64");
-  const observations = JSON.parse(gunzipSync(gzipBytes).toString("utf8"));
-  return { manifest, index, gzipBytes, observations };
+  const observations = [];
+  for (const descriptor of index.observationFiles) {
+    const payload = JSON.parse(readFileSync(descriptor.file, "utf8"));
+    assert.equal(payload.schemaVersion, 1);
+    assert.equal(payload.phase, "3.5-A");
+    assert.equal(payload.ticker, "DEVA11");
+    assert.equal(payload.year, descriptor.year);
+    assert.equal(payload.observations.length, descriptor.count);
+    assert.equal(hashValue(payload.observations), descriptor.observationsHash);
+    observations.push(...payload.observations);
+  }
+  return { manifest, index, observations };
 }
 
-test("artefato compactado recompõe as 65 observações mensais do DEVA11", () => {
-  const { manifest, index, gzipBytes, observations } = loadEvidence();
+test("arquivos anuais recompõem as 65 observações mensais do DEVA11", () => {
+  const { manifest, index, observations } = loadEvidence();
   assert.equal(index.status, "complete");
   assert.equal(index.identity.ticker, "DEVA11");
   assert.equal(index.identity.cnpj, "37087810000137");
+  assert.equal(index.observationFiles.length, 6);
   assert.equal(observations.length, 65);
-  assert.equal(index.observationsArtifact.count, observations.length);
-  assert.equal(
-    createHash("sha256").update(gzipBytes).digest("hex"),
-    index.observationsArtifact.gzipSha256,
-  );
-  assert.equal(index.observationsArtifact.gzipSha256, manifest.expected.observationsArtifactGzipSha256);
+  assert.equal(hashValue(observations), index.combinedObservationsHash);
+  assert.equal(index.combinedObservationsHash, manifest.expected.combinedObservationsHash);
 
   const months = observations.map((item) => item.competenceMonth);
   assert.deepEqual(months, [...months].sort());
@@ -66,14 +70,8 @@ test("artefato compactado recompõe as 65 observações mensais do DEVA11", () =
   }
 });
 
-test("hashes por ano e hash final do caso são reproduzíveis", () => {
+test("hash final do caso, auditoria e índice são reproduzíveis", () => {
   const { manifest, index, observations } = loadEvidence();
-  const grouped = Object.groupBy(observations, (item) => item.competenceMonth.slice(0, 4));
-  for (const [year, expected] of Object.entries(index.observationsArtifact.years)) {
-    assert.equal(grouped[year]?.length, expected.count, `contagem divergente em ${year}`);
-    assert.equal(hashValue(grouped[year]), expected.observationsHash, `hash divergente em ${year}`);
-  }
-
   const reconstructedCase = { ...index.caseWithoutObservations, observations };
   assert.equal(hashValue(reconstructedCase), index.caseHash);
   assert.equal(index.caseHash, manifest.expected.caseHash);

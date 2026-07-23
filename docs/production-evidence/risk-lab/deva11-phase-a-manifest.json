@@ -35,7 +35,7 @@
     "inputCheckpointHash": "6b923ceeff2a0a9ddcd27d72b4d8125d3b2cc6aca6109c57531c3efed36d4a89",
     "caseHash": "fca3de0e38755c8213d7e37d5112b51733c794dd29a2f2f7cb5be82980313aa2",
     "auditHash": "157e807f7a61c4d9bb34eedc324e761c8a19c25ac93505023606f6ffcd2159af",
-    "evidenceHash": "85cdc0aff739205fb9869a96ff7512afb525192a6d4e08374a0fdd30c05eeaa2",
-    "observationsArtifactGzipSha256": "f82681c586a6f1dd82a78f576cea21da2fca89ebf8f50f44ea6c376d8bdb5287"
+    "evidenceHash": "62a19d9b20b57b49489d7ab51ed85d72505625ca68f47762a5045fc3c650993b",
+    "combinedObservationsHash": "6788292746eeb5321d36cd198c75b5810c3797cead357341cc04df9254fee20c"
   }
 }
