@@ -2,13 +2,12 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 6.4.0  
+**Versão:** 6.4.1  
 **Data:** 23/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
 **Último commit auditado no repositório e com deployment saudável:** `498654f03ce66bd54598d5a4677c18bbe5bbdc86`  
-**Branch desta atualização:** `docs/handoff-sprint-3-5-a-complete`  
-**PR desta atualização:** a abrir após a validação do documento  
+**Evidência de conclusão da Fase 3.5-A:** PR #105, merge `498654f03ce66bd54598d5a4677c18bbe5bbdc86`  
 **Sprint corrente:** 3.5 — Coorte externa e backtest sem informação futura  
 **Fase ativa seguinte:** 3.5-B1 — VSLH11, ainda não iniciada
 
