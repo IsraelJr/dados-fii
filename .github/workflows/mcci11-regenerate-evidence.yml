@@ -1,0 +1,98 @@
+name: Regenerate MCCI11 evidence
+
+on:
+  push:
+    branches: [agent/sprint-3-5-b4-mcci11]
+    paths:
+      - ".github/workflows/mcci11-regenerate-evidence.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/sprint-3-5-b4-mcci11
+          fetch-depth: 0
+
+      - name: Download immutable diagnostic artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${GITHUB_REPOSITORY}/actions/artifacts/8515476365/zip > /tmp/mcci-source.zip
+          echo "8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e  /tmp/mcci-source.zip" | sha256sum -c -
+          mkdir -p /tmp/mcci-source
+          unzip -q /tmp/mcci-source.zip -d /tmp/mcci-source
+
+      - name: Regenerate annual evidence and verify hashes
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+
+          const checkpointDataset = JSON.parse(readFileSync(
+            "/tmp/mcci-source/.tmp/risk-lab-dividend-notices-checkpoint.json",
+            "utf8",
+          ));
+          const checkpoint = checkpointDataset.cases.MCCI11;
+          if (!checkpoint || checkpoint.cnpj !== "23648935000184") {
+            throw new Error("Checkpoint MCCI11 ausente ou com identidade divergente.");
+          }
+
+          function stableValue(value) {
+            if (Array.isArray(value)) return value.map(stableValue);
+            if (!value || typeof value !== "object") return value;
+            return Object.fromEntries(
+              Object.entries(value)
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, item]) => [key, stableValue(item)]),
+            );
+          }
+          function hashValue(value) {
+            return createHash("sha256")
+              .update(JSON.stringify(stableValue(value)), "utf8")
+              .digest("hex");
+          }
+
+          const observations = Object.values(checkpoint.observationsByDocumentId)
+            .filter((item) => item.documentId !== "255155")
+            .sort((left, right) => left.competenceMonth.localeCompare(right.competenceMonth));
+          if (observations.length !== 46) throw new Error(`Observações inesperadas: ${observations.length}.`);
+
+          const expected = {
+            "2022": "b7b781bd2fdf55a7c9a4c05fdd17ea165de70e31ee56c9cc621dcfb7b743239f",
+            "2023": "012a5d7171e6127e465b900f3e8d6ae9473979edbce6e95658c1869cd295562c",
+            "2024": "f49347ffd83159e0b21f66c653d5bda5d8d7d5b3ccec62d2555f3cefa0f6114b",
+            "2025": "537d30c2bbac1eb441b37d795b6bdd80682fbb50991f646e3a10ce98996e44a7",
+          };
+          const expectedCombined = "75d66bf48e8d838529dd847385aadf073a8cf51aac53cbb8130bda125e42709e";
+          if (hashValue(observations) !== expectedCombined) {
+            throw new Error("Hash combinado das observações divergiu do caso congelado.");
+          }
+
+          const output = "docs/production-evidence/risk-lab/mcci11-phase-b4";
+          mkdirSync(output, { recursive: true });
+          for (const year of Object.keys(expected)) {
+            const annual = observations.filter((item) => item.competenceMonth.startsWith(`${year}-`));
+            const actual = hashValue(annual);
+            if (actual !== expected[year]) {
+              throw new Error(`Hash anual ${year} divergente: ${actual}.`);
+            }
+            const payload = { schemaVersion: 1, phase: "3.5-B4", ticker: "MCCI11", year, observations: annual };
+            writeFileSync(`${output}/observations-${year}.json`, `${JSON.stringify(payload)}\n`, "utf8");
+          }
+          NODE
+
+      - name: Commit regenerated evidence and remove bootstrap
+        run: |
+          rm .github/workflows/mcci11-regenerate-evidence.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/production-evidence/risk-lab/mcci11-phase-b4/observations-*.json .github/workflows/mcci11-regenerate-evidence.yml
+          git commit -m "data: regenera evidência anual MCCI11 do artefato"
+          git push origin HEAD:agent/sprint-3-5-b4-mcci11
