@@ -110,7 +110,7 @@ test("fontes estratégicas de SEO e Prompt Premium estão versionadas", () => {
   }
 
   const visualReadme = readFileSync(sourceFiles[2], "utf8");
-  assert.match(visualReadme, /binários.*não estavam acessíveis/i);
+  assert.match(visualReadme, /não estavam acessíveis como binários/i);
   assert.match(visualReadme, /nenhum hash foi inventado/i);
 });
 
