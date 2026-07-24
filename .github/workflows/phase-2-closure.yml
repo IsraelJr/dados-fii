@@ -13,6 +13,9 @@ on:
       - "package-lock.json"
       - "vercel.json"
       - ".github/workflows/**"
+      - "DADOS_FII_HANDOFF.md"
+      - "docs/strategy/**"
+      - "docs/sources/**"
       - "docs/engineering/github-actions-*.md"
   push:
     branches: [main]
@@ -21,7 +24,11 @@ on:
       - "package.json"
       - "package-lock.json"
       - "vercel.json"
+      - "DADOS_FII_HANDOFF.md"
+      - "docs/strategy/**"
+      - "docs/sources/**"
       - "tests/github-actions-governance.test.mjs"
+      - "tests/canonical-handoff.test.mjs"
       - "docs/engineering/github-actions-*.md"
 
 permissions:
@@ -50,6 +57,9 @@ jobs:
 
       - name: Validate GitHub Actions governance
         run: npm run test:workflow-governance
+
+      - name: Validate canonical Handoff
+        run: npm run test:handoff
 
       - name: Typecheck
         if: github.event_name == 'pull_request'
