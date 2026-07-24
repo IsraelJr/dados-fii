@@ -47,7 +47,7 @@ jobs:
         run: npm ci --silent
 
       # O typecheck e a governança dos workflows pertencem à CI central.
-      # Esta verificação executa somente a suíte especializada do domínio.
+      # Esta verificação executa a suíte especializada e mantém diagnóstico local do build.
       - name: Run Risk Lab tests
         id: risk_lab_tests
         shell: bash
@@ -100,6 +100,13 @@ jobs:
           node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \
             tests/firebase-admin-config.test.ts 2>&1 | tee .tmp/firebase-admin-config.log
 
+      - name: Validate TypeScript diagnostics
+        id: typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee .tmp/typecheck.log
+
       # Fallback automatizado para indisponibilidade externa do Preview Vercel.
       # Mantém o gate de build sem depender de cota, ação manual ou plano pago.
       - name: Validate production build
@@ -120,7 +127,7 @@ jobs:
           npm run build 2>&1 | tee .tmp/production-build.log
 
       - name: Upload failure diagnostics
-        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.firebase_admin_config_tests.outcome == 'failure' || steps.production_build.outcome == 'failure')
+        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.firebase_admin_config_tests.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.production_build.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: risk-lab-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -131,6 +138,7 @@ jobs:
             .tmp/kncr11-ci.log
             .tmp/knsc11-ci.log
             .tmp/firebase-admin-config.log
+            .tmp/typecheck.log
             .tmp/production-build.log
           if-no-files-found: error
           retention-days: 3
