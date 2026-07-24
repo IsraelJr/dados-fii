@@ -11,6 +11,10 @@ interface FrozenDividendArtifactReference {
   artifactDigest: string;
 }
 
+export type FrozenDividendRecoveryClassification =
+  | "recovered_transient_failure"
+  | "recovered_reference_period_metadata_drift";
+
 export interface FrozenDividendRecoveryEvidence extends FrozenDividendArtifactReference {
   documentId: string;
   failure: FrozenDividendNoticeFailure;
@@ -31,7 +35,7 @@ export interface FrozenDividendCheckpointReconciliationInput {
 
 export interface FrozenDividendRecoveryAudit {
   documentId: string;
-  classification: "recovered_transient_failure";
+  classification: FrozenDividendRecoveryClassification;
   competenceMonth: string;
   amountPerShare: number;
   sourceUrl: string;
@@ -156,6 +160,55 @@ function isTransientFailure(message: string) {
   return /(aborted|abortad[ao]|timeout|timed out|tempo limite)/i.test(message);
 }
 
+const PORTUGUESE_MONTHS = new Map([
+  ["janeiro", 1], ["fevereiro", 2], ["marco", 3], ["abril", 4],
+  ["maio", 5], ["junho", 6], ["julho", 7], ["agosto", 8],
+  ["setembro", 9], ["outubro", 10], ["novembro", 11], ["dezembro", 12],
+]);
+
+function normalizeWord(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function referencePeriodFromFailure(message: string) {
+  const match = message.match(
+    /Período de referência FNET posterior à informação:\s*([A-Za-zÀ-ÿ]+)\s+(\d{4})/i,
+  );
+  if (!match) return null;
+  const month = PORTUGUESE_MONTHS.get(normalizeWord(match[1]));
+  if (!month) return null;
+  return `${match[2]}-${String(month).padStart(2, "0")}`;
+}
+
+function previousMonthLastDay(competenceMonth: string) {
+  const match = competenceMonth.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  return new Date(Date.UTC(year, month - 1, 0)).toISOString().slice(0, 10);
+}
+
+function recoveryClassification(
+  failure: FrozenDividendNoticeFailure,
+  observation: FrozenDividendNoticeObservation,
+): FrozenDividendRecoveryClassification | null {
+  if (failure.retryable && isTransientFailure(failure.message)) {
+    return "recovered_transient_failure";
+  }
+
+  const failedReferencePeriod = referencePeriodFromFailure(failure.message);
+  if (
+    !failure.retryable
+    && failedReferencePeriod === observation.competenceMonth
+    && observation.informationDate === previousMonthLastDay(observation.competenceMonth)
+  ) {
+    return "recovered_reference_period_metadata_drift";
+  }
+
+  return null;
+}
+
 function sourceUrl(documentId: string) {
   return `https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=${documentId}`;
 }
@@ -195,7 +248,8 @@ export class FrozenDividendCheckpointReconciler {
       if (!failure || stableHash(failure) !== stableHash(evidence.failure)) {
         throw new Error(`Falha original divergente para ${documentId}.`);
       }
-      if (!failure.retryable || !isTransientFailure(failure.message)) {
+      const classification = recoveryClassification(failure, evidence.observation);
+      if (!classification) {
         throw new Error(`Falha não transitória não pode ser recuperada para ${documentId}.`);
       }
       assertObservation(identity, documentId, evidence.observation);
@@ -210,7 +264,7 @@ export class FrozenDividendCheckpointReconciler {
       const observationHash = stableHash(evidence.observation);
       const withoutEvidenceHash = {
         documentId,
-        classification: "recovered_transient_failure" as const,
+        classification,
         competenceMonth: evidence.observation.competenceMonth,
         amountPerShare: evidence.observation.amountPerShare,
         sourceUrl: sourceUrl(documentId),

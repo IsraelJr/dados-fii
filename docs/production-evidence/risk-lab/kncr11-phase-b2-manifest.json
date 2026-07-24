@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-B2",
+  "sourceArtifacts": {
+    "baseline": {
+      "workflowRunId": 29892173774,
+      "artifactId": 8519627249,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+      "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+    },
+    "diagnostic": {
+      "workflowRunId": 29881954620,
+      "artifactId": 8515476365,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+      "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+    }
+  },
+  "identity": {
+    "ticker": "KNCR11",
+    "cnpj": "16706958000132",
+    "role": "healthy_control",
+    "fromDate": "2022-01-01",
+    "untilDate": "2025-12-31"
+  },
+  "evidenceIndex": "docs/production-evidence/risk-lab/kncr11-phase-b2/index.json",
+  "expected": {
+    "documentsDiscovered": 52,
+    "documentsProcessed": 52,
+    "rawObservationsInCheckpoint": 48,
+    "selectedMonthlyObservations": 48,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "baselineCheckpointHash": "3138b67b82e4aaf7248401c208bf97a916b39fe6c7bbe7c52503664b63b182fb",
+    "reconciledCheckpointHash": "c6d8b22e9bec7171bcff54ffdb0413c95cdd4ea6d2f20077962c8e1e02e2b025",
+    "reconciliationHash": "49aec230744c4045c573a0242431da4034691af8b862617f3e0ab9e5b55abe6c",
+    "caseHash": "d9245d60378c0eebc53a541368b01a64cd7d242761f7d0e6b01f52d344130987",
+    "auditHash": "f804361e9bccd57cdca06113672c3a8e4f288c3f4d40d1da8eb237422ff31031",
+    "evidenceHash": "c11de46d43de21e98a3eb6986a8fb5c0692465672c412b3329f20d86a9bfd1bb",
+    "combinedObservationsHash": "fd7e47d03fbea224b1a0e4d0dff0629c20d59fa6fced2c8348c2aacbf417d09f"
+  }
+}
