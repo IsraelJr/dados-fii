@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-B1",
+  "sourceArtifacts": {
+    "baseline": {
+      "workflowRunId": 29892173774,
+      "artifactId": 8519627249,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+      "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+    },
+    "diagnostic": {
+      "workflowRunId": 29881954620,
+      "artifactId": 8515476365,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+      "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+    }
+  },
+  "identity": {
+    "ticker": "VSLH11",
+    "cnpj": "36244015000142",
+    "role": "severe_deterioration",
+    "fromDate": "2021-01-01",
+    "untilDate": "2026-07-22"
+  },
+  "evidenceIndex": "docs/production-evidence/risk-lab/vslh11-phase-b1/index.json",
+  "expected": {
+    "documentsDiscovered": 79,
+    "documentsProcessed": 79,
+    "rawObservationsInCheckpoint": 66,
+    "selectedMonthlyObservations": 64,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "baselineCheckpointHash": "2de8f866fd4b4400b309090830a282f2bb1ccc97689ce1745a6c0faca251d755",
+    "reconciledCheckpointHash": "29c18ce11077894d024738513882ca8e7cfe7a09c7e5eeb7659f4552e8c1277f",
+    "reconciliationHash": "b6d944ea86854254cba6bfd22a1a15f388574bb83a4e1b0a546f71718a76eb25",
+    "caseHash": "a24d0185599fa80c2606dfc8a462dfe77bc4fad76a4a86e82dc8dc127768299d",
+    "auditHash": "ece06fcc7b4ac7317d80e00747f3be458ec3ff322c5284020ebaead73e23365f",
+    "evidenceHash": "952c88ec36f930ce83d153bedb07344226cf8d9029d14ada1576514214269092",
+    "combinedObservationsHash": "2551679cf4a16ecb389c474f26c541670db69c7c39f34484a28cc6a61cae85ea"
+  }
+}
