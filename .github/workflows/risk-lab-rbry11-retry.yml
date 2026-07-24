@@ -27,6 +27,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "a68cef8147eae4165fdd55e4c4a3b0ad63855364d281d2c8ccf30879239708cd  .tmp/rbry-bundle-00" | sha256sum -c -
+          echo "57add64f381c1e1889c8f70ec7d87b467deedba4b3f3081db934054d32f2406a  .tmp/rbry-bundle-01" | sha256sum -c -
+          echo "accdc2075db47b2e4c4132a269b168e517a86b729f8e4ec427d9f2ed7a48dce2  .tmp/rbry-bundle-02" | sha256sum -c -
+          echo "a36b53a3d0bd7f2d3a77a7813c53578c741f23c5aaea123b9667de0b774264e6  .tmp/rbry-bundle-03" | sha256sum -c -
+          echo "dab1bfa6ec0570c6239483524c7a7c76ff35c1a34c9ceeb9dc5c6d0f071c9268  .tmp/rbry-bundle-04" | sha256sum -c -
           cat .tmp/rbry-bundle-00 .tmp/rbry-bundle-01 .tmp/rbry-bundle-02 .tmp/rbry-bundle-03 .tmp/rbry-bundle-04 > .tmp/rbry-final.tar.gz.b64
           echo "2c107e1988d9b3615c8698f0592e3a13313ab2b7589d6c63efb68616f59646f7  .tmp/rbry-final.tar.gz.b64" | sha256sum -c -
           base64 --decode .tmp/rbry-final.tar.gz.b64 > .tmp/rbry-final.tar.gz
