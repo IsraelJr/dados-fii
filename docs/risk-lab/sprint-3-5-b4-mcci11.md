@@ -74,18 +74,16 @@ O documento `301632` foi classificado como `secondary_share_class` pela regra ge
 
 A ausência de `2025-02` permanece uma lacuna auditável. Ela não foi transformada em zero, estimada nem preenchida por fonte secundária.
 
-## Evidência compactada
+## Evidência anual
 
-As 46 observações completas foram persistidas em um bundle determinístico `base64 + gzip + canonical JSON`:
+As 46 observações completas foram divididas em quatro arquivos JSON auditáveis:
 
-- arquivo: `docs/production-evidence/risk-lab/mcci11-phase-b4/observations.json.gz.b64`;
-- bytes JSON: `43044`;
-- bytes gzip: `6656`;
-- hash das observações: `75d66bf48e8d838529dd847385aadf073a8cf51aac53cbb8130bda125e42709e`;
-- hash do gzip: `8ffe0371deb5675f414666f80e71fd57c761dbb53ec3121c4a22aa2cfbbf2570`;
-- hash textual normalizado do base64: `88100eef5b2fb48911fb7b8990ac3e9f3903cbf11da040b512d8d14b88ab4e6c`.
+- `observations-2022.json`: 12 competências; hash `b7b781bd2fdf55a7c9a4c05fdd17ea165de70e31ee56c9cc621dcfb7b743239f`;
+- `observations-2023.json`: 12 competências; hash `012a5d7171e6127e465b900f3e8d6ae9473979edbce6e95658c1869cd295562c`;
+- `observations-2024.json`: 12 competências; hash `f49347ffd83159e0b21f66c653d5bda5d8d7d5b3ccec62d2555f3cefa0f6114b`;
+- `observations-2025.json`: 10 competências; hash `537d30c2bbac1eb441b37d795b6bdd80682fbb50991f646e3a10ce98996e44a7`.
 
-O teste integral recompõe o bundle e verifica todos esses valores antes de validar as observações.
+O teste integral recompõe os quatro arquivos, verifica o hash de cada ano e confirma o hash conjunto das 46 observações.
 
 ## Hashes determinísticos
 
@@ -95,7 +93,8 @@ O teste integral recompõe o bundle e verifica todos esses valores antes de vali
 - sanitização: `749145f0102edbbe922733c1b24e1836d4cb770d01c21deb3d3d55c168fe764c`;
 - caso: `16535e26bd75da0b67cc5be1ba3990a6a2b69d369179ea929cd54cb6138eeb06`;
 - auditoria: `3a681c30244c05a1bf54ab40f65a1b34044c4bfbd656d06b56137cdf50560318`;
-- índice de evidência: `1e9e4552acf93deb278cb82ff973c8b6e8dc661681e33b1a2f54fb08a3968a14`.
+- observações combinadas: `75d66bf48e8d838529dd847385aadf073a8cf51aac53cbb8130bda125e42709e`;
+- índice de evidência: `14c6ad2e55053d020688c0c99252e35a45c91a748cd946fd403b9acd0d99a817`.
 
 Duas execuções independentes produziram os mesmos hashes.
 
@@ -103,7 +102,7 @@ Duas execuções independentes produziram os mesmos hashes.
 
 - testes sintéticos do sanitizador temporal geral;
 - falha fechada para cobertura incompleta, observação divergente, competência corrigida dentro da coorte, padrão normal e digest/identidade inválidos;
-- teste integral do bundle e das 46 observações reais;
+- teste integral dos quatro arquivos anuais e das 46 observações reais;
 - verificação do documento temporal e da classe `MCCI13`;
 - verificação de ausência de hardcode, workflow exclusivo e efeitos de produto;
 - preservação dos gates DEVA11, VSLH11, KNCR11 e KNSC11.
