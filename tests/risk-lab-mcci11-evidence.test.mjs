@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
-import { gunzipSync } from "node:zlib";
 
 const MANIFEST_PATH = "docs/production-evidence/risk-lab/mcci11-phase-b4-manifest.json";
 const INDEX_PATH = "docs/production-evidence/risk-lab/mcci11-phase-b4/index.json";
@@ -18,40 +17,35 @@ function stableValue(value) {
   );
 }
 
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 function hashValue(value) {
-  return sha256(JSON.stringify(stableValue(value)));
+  return createHash("sha256").update(JSON.stringify(stableValue(value)), "utf8").digest("hex");
 }
 
 function loadEvidence() {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
   const index = JSON.parse(readFileSync(INDEX_PATH, "utf8"));
-  const descriptor = index.observationBundle;
-  assert.equal(descriptor.encoding, "base64+gzip+canonical-json");
-  assert.equal(descriptor.count, 46);
-
-  const encoded = readFileSync(descriptor.file, "utf8").trim();
-  assert.equal(sha256(encoded), descriptor.base64Hash);
-  const compressed = Buffer.from(encoded, "base64");
-  assert.equal(compressed.byteLength, descriptor.compressedBytes);
-  assert.equal(sha256(compressed), descriptor.gzipHash);
-  const uncompressed = gunzipSync(compressed);
-  assert.equal(uncompressed.byteLength, descriptor.uncompressedBytes);
-  const observations = JSON.parse(uncompressed.toString("utf8"));
-  assert.equal(observations.length, descriptor.count);
-  assert.equal(hashValue(observations), descriptor.observationsHash);
+  const observations = [];
+  for (const descriptor of index.observationFiles) {
+    const payload = JSON.parse(readFileSync(descriptor.file, "utf8"));
+    assert.equal(payload.schemaVersion, 1);
+    assert.equal(payload.phase, "3.5-B4");
+    assert.equal(payload.ticker, "MCCI11");
+    assert.equal(payload.year, descriptor.year);
+    assert.equal(payload.observations.length, descriptor.count);
+    assert.equal(hashValue(payload.observations), descriptor.observationsHash);
+    observations.push(...payload.observations);
+  }
   return { manifest, index, observations };
 }
 
-test("bundle imutável recompõe as 46 competências selecionadas do MCCI11", () => {
+test("quatro arquivos anuais recompõem as 46 competências selecionadas do MCCI11", () => {
   const { manifest, index, observations } = loadEvidence();
   assert.equal(index.status, "complete");
   assert.equal(index.identity.ticker, "MCCI11");
   assert.equal(index.identity.cnpj, "23648935000184");
   assert.equal(index.identity.role, "reversible_stress");
+  assert.equal(index.observationFiles.length, 4);
+  assert.deepEqual(index.observationFiles.map((item) => item.count), [12, 12, 12, 10]);
   assert.equal(observations.length, 46);
   assert.equal(hashValue(observations), index.combinedObservationsHash);
   assert.equal(index.combinedObservationsHash, manifest.deterministicHashes.combinedObservationsHash);
