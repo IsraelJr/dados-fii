@@ -83,7 +83,7 @@ As 46 observações completas foram persistidas em um bundle determinístico `ba
 - bytes gzip: `6656`;
 - hash das observações: `75d66bf48e8d838529dd847385aadf073a8cf51aac53cbb8130bda125e42709e`;
 - hash do gzip: `8ffe0371deb5675f414666f80e71fd57c761dbb53ec3121c4a22aa2cfbbf2570`;
-- hash do base64: `be388944eeb3a15b34d70dd88e3d5900fef5c9104e44e2b43652ed744e1005f2`.
+- hash textual normalizado do base64: `88100eef5b2fb48911fb7b8990ac3e9f3903cbf11da040b512d8d14b88ab4e6c`.
 
 O teste integral recompõe o bundle e verifica todos esses valores antes de validar as observações.
 
@@ -95,7 +95,7 @@ O teste integral recompõe o bundle e verifica todos esses valores antes de vali
 - sanitização: `749145f0102edbbe922733c1b24e1836d4cb770d01c21deb3d3d55c168fe764c`;
 - caso: `16535e26bd75da0b67cc5be1ba3990a6a2b69d369179ea929cd54cb6138eeb06`;
 - auditoria: `3a681c30244c05a1bf54ab40f65a1b34044c4bfbd656d06b56137cdf50560318`;
-- índice de evidência: `5e5c604379856fbb9b748c4cfac114ae75d88ed14c6df9a2604b111b68db73bd`.
+- índice de evidência: `1e9e4552acf93deb278cb82ff973c8b6e8dc661681e33b1a2f54fb08a3968a14`.
 
 Duas execuções independentes produziram os mesmos hashes.
 
