@@ -85,6 +85,8 @@ As 46 observações completas foram divididas em quatro arquivos JSON auditávei
 
 O teste integral recompõe os quatro arquivos, verifica o hash de cada ano e confirma o hash conjunto das 46 observações.
 
+Os quatro arquivos foram regenerados diretamente do artefato imutável no GitHub Actions, com conferência prévia do SHA-256 do ZIP; o bootstrap temporário foi removido no mesmo commit e não integra o diff final.
+
 ## Hashes determinísticos
 
 - checkpoint de entrada: `b4e52447d2495f5c482732e794ea02b19579a0267f76ecf726a53f102a53f520`;
