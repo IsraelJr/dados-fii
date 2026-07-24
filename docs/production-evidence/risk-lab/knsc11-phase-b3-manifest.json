@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-B3",
+  "ticker": "KNSC11",
+  "status": "complete",
+  "identity": {
+    "ticker": "KNSC11",
+    "cnpj": "35864448000138",
+    "role": "healthy_control",
+    "fromDate": "2022-01-01",
+    "untilDate": "2025-12-31"
+  },
+  "sourceArtifacts": {
+    "diagnostic": {
+      "workflowRunId": 29881954620,
+      "artifactId": 8515476365,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+      "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+    }
+  },
+  "sourceVerification": {
+    "diagnosticZipSha256": "8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+    "artifactRedownloadedAndMatched": true
+  },
+  "result": {
+    "documentsDiscovered": 52,
+    "documentsClassified": 52,
+    "rawObservationsInCheckpoint": 49,
+    "selectedMonthlyObservations": 48,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "missingMonths": [],
+    "longestContiguousSequence": 48
+  },
+  "deterministicHashes": {
+    "inputCheckpointHash": "740df8717b831fa892e3a32d35e4cff636381118146676b6191f044a2b006edf",
+    "finalizedCheckpointHash": "1aaccf1822f73a50689899d0f8d7c644da6e9fbb421e16a3ea8ec684e8816216",
+    "caseHash": "4eddc7ed639e97d3828bce8a54d905105d4f60031a1ed8f332695ea97f31b4c2",
+    "auditHash": "ec34755f95f6bd25f1af7421b66fc6874d9c73eeb2ab3b924471f765be04a22a",
+    "combinedObservationsHash": "00ddf8ec44c0f02757b766f3b98781d80649bc1fca973c4b46cf05a866014045",
+    "evidenceHash": "149ababbbd26ac4cf21b5462022e0c921cff3ff10a1797f0d4047fda2d3bdb65"
+  },
+  "safety": {
+    "tickerHardcodeInSharedFinalizer": false,
+    "productIntegration": false,
+    "premiumIntegration": false,
+    "notificationIntegration": false,
+    "backtestExecuted": false
+  },
+  "files": [
+    "index.json",
+    "observations-2022.json",
+    "observations-2023.json",
+    "observations-2024.json",
+    "observations-2025.json"
+  ]
+}
