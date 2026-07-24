@@ -108,7 +108,13 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           ALLOW_FIREBASE_ADMIN_BUILD_WITHOUT_CREDENTIALS: "true"
+          NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dados-fii-build.firebaseapp.com"
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dados-fii-build"
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "dados-fii-build.appspot.com"
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
+          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-0000000000"
         run: |
           set -o pipefail
           npm run build 2>&1 | tee .tmp/production-build.log
