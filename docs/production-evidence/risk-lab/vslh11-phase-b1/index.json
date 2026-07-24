@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-B1",
+  "status": "complete",
+  "identity": {
+    "ticker": "VSLH11",
+    "cnpj": "36244015000142",
+    "role": "severe_deterioration",
+    "fromDate": "2021-01-01",
+    "untilDate": "2026-07-22"
+  },
+  "sourceArtifacts": {
+    "baseline": {
+      "workflowRunId": 29892173774,
+      "artifactId": 8519627249,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+      "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+    },
+    "diagnostic": {
+      "workflowRunId": 29881954620,
+      "artifactId": 8515476365,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+      "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+    }
+  },
+  "sourceVerification": {
+    "baselineZipSha256": "13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+    "diagnosticZipSha256": "8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+    "artifactsRedownloadedAndMatched": true
+  },
+  "execution": {
+    "mode": "offline_deterministic_reconciliation_from_immutable_github_artifacts",
+    "runs": 2,
+    "run1": {
+      "baselineCheckpointHash": "2de8f866fd4b4400b309090830a282f2bb1ccc97689ce1745a6c0faca251d755",
+      "reconciledCheckpointHash": "29c18ce11077894d024738513882ca8e7cfe7a09c7e5eeb7659f4552e8c1277f",
+      "reconciliationHash": "b6d944ea86854254cba6bfd22a1a15f388574bb83a4e1b0a546f71718a76eb25",
+      "caseHash": "a24d0185599fa80c2606dfc8a462dfe77bc4fad76a4a86e82dc8dc127768299d",
+      "auditHash": "ece06fcc7b4ac7317d80e00747f3be458ec3ff322c5284020ebaead73e23365f"
+    },
+    "run2": {
+      "baselineCheckpointHash": "2de8f866fd4b4400b309090830a282f2bb1ccc97689ce1745a6c0faca251d755",
+      "reconciledCheckpointHash": "29c18ce11077894d024738513882ca8e7cfe7a09c7e5eeb7659f4552e8c1277f",
+      "reconciliationHash": "b6d944ea86854254cba6bfd22a1a15f388574bb83a4e1b0a546f71718a76eb25",
+      "caseHash": "a24d0185599fa80c2606dfc8a462dfe77bc4fad76a4a86e82dc8dc127768299d",
+      "auditHash": "ece06fcc7b4ac7317d80e00747f3be458ec3ff322c5284020ebaead73e23365f"
+    },
+    "hashesMatch": true
+  },
+  "result": {
+    "documentsDiscovered": 79,
+    "documentsClassified": 79,
+    "rawObservationsInCheckpoint": 66,
+    "selectedMonthlyObservations": 64,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "missingMonths": [
+      "2023-12"
+    ],
+    "longestContiguousSequence": 34
+  },
+  "reconciliation": {
+    "baselineCheckpointHash": "2de8f866fd4b4400b309090830a282f2bb1ccc97689ce1745a6c0faca251d755",
+    "reconciledCheckpointHash": "29c18ce11077894d024738513882ca8e7cfe7a09c7e5eeb7659f4552e8c1277f",
+    "reconciliationHash": "b6d944ea86854254cba6bfd22a1a15f388574bb83a4e1b0a546f71718a76eb25",
+    "recoveries": [
+      {
+        "documentId": "1055396",
+        "classification": "recovered_transient_failure",
+        "competenceMonth": "2025-11",
+        "amountPerShare": 0.029,
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=1055396",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "priorFailure": {
+          "documentId": "1055396",
+          "message": "This operation was aborted",
+          "attempts": 1,
+          "retryable": true,
+          "lastAttemptAt": "2026-07-22T05:29:17.821Z"
+        },
+        "observationHash": "40701022f8ea70b6c7064cf57fe21f3e0e124961e17c0b4d9e4148129456a82e",
+        "evidenceHash": "a23d6bdb07198658d1a8dd5e22aee2061cf39cd5edaf66beaf09992d5be001cc"
+      },
+      {
+        "documentId": "312220",
+        "classification": "recovered_transient_failure",
+        "competenceMonth": "2022-05",
+        "amountPerShare": 0.12,
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=312220",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "priorFailure": {
+          "documentId": "312220",
+          "message": "This operation was aborted",
+          "attempts": 1,
+          "retryable": true,
+          "lastAttemptAt": "2026-07-22T05:16:40.350Z"
+        },
+        "observationHash": "ef940eeec4e03eb86c9bacfdd114a0cb9420f5a2baa66d94dd625166beecdac4",
+        "evidenceHash": "207364f375d04fdb0bb1c97ec2bda89669fdee75aa5c02dd6e08d76df6bd2dc7"
+      }
+    ],
+    "secondaryShareClasses": [
+      {
+        "documentId": "152889",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH13",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=152889",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH13",
+        "evidenceHash": "d934f38e83ff10473335142dc3c9a4ccdc119c9b684f2cd010410996d39196ea"
+      },
+      {
+        "documentId": "152890",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH13",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=152890",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH13",
+        "evidenceHash": "284f6afb9f5bfa82210a59f4be050be4bb582a20c7e56e7329813ad64445ecac"
+      },
+      {
+        "documentId": "152893",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH15",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=152893",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH15",
+        "evidenceHash": "a124be3d7b7ac63d68aa0e8a67fc68bf2dbb5f93baa50d3a9f2b68602d9d6221"
+      },
+      {
+        "documentId": "152900",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=152900",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH14",
+        "evidenceHash": "1105f282d65c84468e5a811f2f91edc270168b6b2f58a40817a0e5e5b45823a8"
+      },
+      {
+        "documentId": "182993",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH13",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=182993",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH13",
+        "evidenceHash": "341175439ce91b232952a06f928343e92adccc832395f9cd2c415cbbe1c08b39"
+      },
+      {
+        "documentId": "191954",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH13",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=191954",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH13",
+        "evidenceHash": "b2c3278bf2d6e8f566aa683d471aa50cc9e3845db51a041ed8e66edcf341a8ab"
+      },
+      {
+        "documentId": "191955",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=191955",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH14",
+        "evidenceHash": "917a23e348824e399aec7739eea0baf7d9248a1e1c3417f256730e1a3e949d83"
+      },
+      {
+        "documentId": "192027",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH13",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=192027",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH13",
+        "evidenceHash": "9266b5924c2c8cbecdbfa7e2f48f830a3d6060fe3fe1fd2d043626e10b5f5768"
+      },
+      {
+        "documentId": "192028",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=192028",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH14",
+        "evidenceHash": "39c18b53af5590bb4de23ac630f7586d74d58bcdf1205583b6f0c5aecb7ae9ef"
+      },
+      {
+        "documentId": "232142",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=232142",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH14",
+        "evidenceHash": "5c2e31249edc6be8d67f9a2a2ac894e5eda0d480a26fb4e0fad56e5568fdf6cd"
+      },
+      {
+        "documentId": "232145",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH13",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=232145",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH13",
+        "evidenceHash": "9afe5ddd03de0e84b96f0d158f3d61afe6a56a50e5298ede1444f2e54795b553"
+      },
+      {
+        "documentId": "253930",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH13",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=253930",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH13",
+        "evidenceHash": "7514ee61d3b9a100fb8ab2549646c712fa3fc6a18bf038d9bdb3899d47dc119b"
+      },
+      {
+        "documentId": "253933",
+        "classification": "secondary_share_class",
+        "parsedTicker": "VSLH14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=253933",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: VSLH14",
+        "evidenceHash": "781686ca39df98710d9bcd8ccd13ea2cf9bd96830865f78451f6ef56df3d3312"
+      }
+    ]
+  },
+  "selectionDecisions": [
+    {
+      "excludedDocumentId": "152886",
+      "selectedDocumentId": "153493",
+      "originalCompetenceMonth": "2021-02",
+      "selectedCompetenceMonth": "2021-02",
+      "reason": "superseded_protocol_version_for_same_official_event",
+      "amountPerShare": 0.123,
+      "excludedProtocolVersion": 1,
+      "selectedProtocolVersion": 2
+    },
+    {
+      "excludedDocumentId": "191952",
+      "selectedDocumentId": "192026",
+      "competenceMonth": "2021-06",
+      "reason": "same_competence_higher_protocol_version",
+      "amountPerShare": 0.094,
+      "excludedProtocolVersion": 1,
+      "selectedProtocolVersion": 2
+    }
+  ],
+  "caseWithoutObservations": {
+    "ticker": "VSLH11",
+    "cnpj": "36244015000142",
+    "role": "severe_deterioration",
+    "fromDate": "2021-01-01",
+    "untilDate": "2026-07-22",
+    "status": "complete",
+    "documentsDiscovered": 79,
+    "documentsProcessed": 79,
+    "pendingDocumentIds": [],
+    "failures": [],
+    "conflicts": [],
+    "missingMonths": [
+      "2023-12"
+    ],
+    "longestContiguousSequence": 34
+  },
+  "caseHash": "a24d0185599fa80c2606dfc8a462dfe77bc4fad76a4a86e82dc8dc127768299d",
+  "audit": {
+    "schemaVersion": 1,
+    "phase": "3.5-B1",
+    "sourceArtifacts": {
+      "baseline": {
+        "workflowRunId": 29892173774,
+        "artifactId": 8519627249,
+        "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+        "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+        "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+      },
+      "diagnostic": {
+        "workflowRunId": 29881954620,
+        "artifactId": 8515476365,
+        "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+      }
+    },
+    "identity": {
+      "ticker": "VSLH11",
+      "cnpj": "36244015000142",
+      "role": "severe_deterioration",
+      "fromDate": "2021-01-01",
+      "untilDate": "2026-07-22"
+    },
+    "inputCheckpointHash": "29c18ce11077894d024738513882ca8e7cfe7a09c7e5eeb7659f4552e8c1277f",
+    "exclusions": [],
+    "finalCaseHash": "a24d0185599fa80c2606dfc8a462dfe77bc4fad76a4a86e82dc8dc127768299d",
+    "documentsDiscovered": 79,
+    "documentsProcessed": 79,
+    "observations": 64,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "auditHash": "ece06fcc7b4ac7317d80e00747f3be458ec3ff322c5284020ebaead73e23365f"
+  },
+  "observationFiles": [
+    {
+      "file": "docs/production-evidence/risk-lab/vslh11-phase-b1/observations-2021.json",
+      "year": "2021",
+      "count": 11,
+      "observationsHash": "88d1b57e0a70020d51593f572a980c96c29a07f75cc63359f12f7ddff9efd39d"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/vslh11-phase-b1/observations-2022.json",
+      "year": "2022",
+      "count": 12,
+      "observationsHash": "e47e01e4b6cdf680490b23858424038bd7bbc9ddeadd6407e209ec862605965d"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/vslh11-phase-b1/observations-2023.json",
+      "year": "2023",
+      "count": 11,
+      "observationsHash": "ba532b47e0ce24cc5264f7dd17510085f442c1cb70ca90fd0826216ab85e05a1"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/vslh11-phase-b1/observations-2024.json",
+      "year": "2024",
+      "count": 12,
+      "observationsHash": "5ff936a060450a0ad5a4bcabdfee9806ecf7ec91f78f7982014154c334f5bcfa"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/vslh11-phase-b1/observations-2025.json",
+      "year": "2025",
+      "count": 12,
+      "observationsHash": "3b3d9e54cc3412929211d30f21b2cdf91eb1fdd9057c0fdf2a03de7319bd2e16"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/vslh11-phase-b1/observations-2026.json",
+      "year": "2026",
+      "count": 6,
+      "observationsHash": "ddbc973f1d1a5dff67611f9762d411e9dfd0391c8430b4e661bb02f37c3e393a"
+    }
+  ],
+  "combinedObservationsHash": "2551679cf4a16ecb389c474f26c541670db69c7c39f34484a28cc6a61cae85ea",
+  "evidenceHash": "952c88ec36f930ce83d153bedb07344226cf8d9029d14ada1576514214269092"
+}
