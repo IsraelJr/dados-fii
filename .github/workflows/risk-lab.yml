@@ -10,7 +10,10 @@ on:
       - "src/app/api/system/risk-lab-*/**"
       - "src/lib/risk-lab/**"
       - "src/lib/featureFlags.ts"
+      - "src/lib/firebaseAdmin.ts"
+      - "src/lib/firebaseAdminConfig.ts"
       - "src/types/riskLab*.ts"
+      - "tests/firebase-admin-config.test.ts"
       - "tests/risk-lab-*.test.ts"
       - "tests/risk-lab-*.test.mjs"
       - "docs/production-evidence/risk-lab/**"
@@ -89,6 +92,14 @@ jobs:
             tests/risk-lab-deva11-phase-a.test.ts \
             tests/risk-lab-knsc11-evidence.test.mjs 2>&1 | tee .tmp/knsc11-ci.log
 
+      - name: Validate credential-safe build bootstrap
+        id: firebase_admin_config_tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \
+            tests/firebase-admin-config.test.ts 2>&1 | tee .tmp/firebase-admin-config.log
+
       # Fallback automatizado para indisponibilidade externa do Preview Vercel.
       # Mantém o gate de build sem depender de cota, ação manual ou plano pago.
       - name: Validate production build
@@ -96,12 +107,14 @@ jobs:
         shell: bash
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+          ALLOW_FIREBASE_ADMIN_BUILD_WITHOUT_CREDENTIALS: "true"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dados-fii-build"
         run: |
           set -o pipefail
           npm run build 2>&1 | tee .tmp/production-build.log
 
       - name: Upload failure diagnostics
-        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.production_build.outcome == 'failure')
+        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.firebase_admin_config_tests.outcome == 'failure' || steps.production_build.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: risk-lab-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -111,6 +124,7 @@ jobs:
             .tmp/vslh11-ci.log
             .tmp/kncr11-ci.log
             .tmp/knsc11-ci.log
+            .tmp/firebase-admin-config.log
             .tmp/production-build.log
           if-no-files-found: error
           retention-days: 3
