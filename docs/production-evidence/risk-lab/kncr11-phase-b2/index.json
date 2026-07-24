@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-B2",
+  "status": "complete",
+  "identity": {
+    "ticker": "KNCR11",
+    "cnpj": "16706958000132",
+    "role": "healthy_control",
+    "fromDate": "2022-01-01",
+    "untilDate": "2025-12-31"
+  },
+  "sourceArtifacts": {
+    "baseline": {
+      "workflowRunId": 29892173774,
+      "artifactId": 8519627249,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+      "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+    },
+    "diagnostic": {
+      "workflowRunId": 29881954620,
+      "artifactId": 8515476365,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+      "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+    }
+  },
+  "sourceVerification": {
+    "baselineZipSha256": "13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+    "diagnosticZipSha256": "8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+    "artifactsRedownloadedAndMatched": true
+  },
+  "execution": {
+    "mode": "offline_deterministic_reconciliation_from_immutable_github_artifacts",
+    "runs": 2,
+    "run1": {
+      "baselineCheckpointHash": "3138b67b82e4aaf7248401c208bf97a916b39fe6c7bbe7c52503664b63b182fb",
+      "reconciledCheckpointHash": "c6d8b22e9bec7171bcff54ffdb0413c95cdd4ea6d2f20077962c8e1e02e2b025",
+      "reconciliationHash": "49aec230744c4045c573a0242431da4034691af8b862617f3e0ab9e5b55abe6c",
+      "caseHash": "d9245d60378c0eebc53a541368b01a64cd7d242761f7d0e6b01f52d344130987",
+      "auditHash": "f804361e9bccd57cdca06113672c3a8e4f288c3f4d40d1da8eb237422ff31031"
+    },
+    "run2": {
+      "baselineCheckpointHash": "3138b67b82e4aaf7248401c208bf97a916b39fe6c7bbe7c52503664b63b182fb",
+      "reconciledCheckpointHash": "c6d8b22e9bec7171bcff54ffdb0413c95cdd4ea6d2f20077962c8e1e02e2b025",
+      "reconciliationHash": "49aec230744c4045c573a0242431da4034691af8b862617f3e0ab9e5b55abe6c",
+      "caseHash": "d9245d60378c0eebc53a541368b01a64cd7d242761f7d0e6b01f52d344130987",
+      "auditHash": "f804361e9bccd57cdca06113672c3a8e4f288c3f4d40d1da8eb237422ff31031"
+    },
+    "hashesMatch": true
+  },
+  "result": {
+    "documentsDiscovered": 52,
+    "documentsClassified": 52,
+    "rawObservationsInCheckpoint": 48,
+    "selectedMonthlyObservations": 48,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "missingMonths": [],
+    "longestContiguousSequence": 48
+  },
+  "reconciliation": {
+    "baselineCheckpointHash": "3138b67b82e4aaf7248401c208bf97a916b39fe6c7bbe7c52503664b63b182fb",
+    "reconciledCheckpointHash": "c6d8b22e9bec7171bcff54ffdb0413c95cdd4ea6d2f20077962c8e1e02e2b025",
+    "recoveries": [
+      {
+        "documentId": "453528",
+        "classification": "recovered_reference_period_metadata_drift",
+        "competenceMonth": "2023-04",
+        "amountPerShare": 1,
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=453528",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "priorFailure": {
+          "documentId": "453528",
+          "message": "Período de referência FNET posterior à informação: Abril 2023",
+          "attempts": 1,
+          "retryable": false,
+          "lastAttemptAt": "2026-07-22T05:44:04.680Z"
+        },
+        "observationHash": "f1f6263f81004beeac0f4c606260d509806808c8f54579579181f9d4011f6942",
+        "evidenceHash": "6445a71eb1dd8fe35759d417c8a8ce1c4b15eb52d58231cf4e0bc338202fa1cc"
+      }
+    ],
+    "secondaryShareClasses": [
+      {
+        "documentId": "310584",
+        "classification": "secondary_share_class",
+        "parsedTicker": "KNCR14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=310584",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: KNCR14",
+        "evidenceHash": "f675a6ecc986f7c68086c952921c14bb4674b895d020af47e49993354561c48f"
+      },
+      {
+        "documentId": "321258",
+        "classification": "secondary_share_class",
+        "parsedTicker": "KNCR14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=321258",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: KNCR14",
+        "evidenceHash": "047fd21a152e89d3f9c8ece27b298ff7f3886e42a6131319497f19029492ecbc"
+      },
+      {
+        "documentId": "332122",
+        "classification": "secondary_share_class",
+        "parsedTicker": "KNCR14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=332122",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: KNCR14",
+        "evidenceHash": "278d083fccd707e42680e7220e1666e43cad93dc8276e4ff05c232fb4c0f01fd"
+      },
+      {
+        "documentId": "346629",
+        "classification": "secondary_share_class",
+        "parsedTicker": "KNCR14",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?cvm=true&id=346629",
+        "artifactId": 8515476365,
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "evidenceMessage": "Ticker FNET inválido: KNCR14",
+        "evidenceHash": "7d52544a726e7c9f9a79a029dbdea18d974ea4f02517ee264ed77be4fc2a5bab"
+      }
+    ],
+    "reconciliationHash": "49aec230744c4045c573a0242431da4034691af8b862617f3e0ab9e5b55abe6c"
+  },
+  "selectionDecisions": [],
+  "caseWithoutObservations": {
+    "ticker": "KNCR11",
+    "cnpj": "16706958000132",
+    "role": "healthy_control",
+    "fromDate": "2022-01-01",
+    "untilDate": "2025-12-31",
+    "status": "complete",
+    "documentsDiscovered": 52,
+    "documentsProcessed": 52,
+    "pendingDocumentIds": [],
+    "failures": [],
+    "conflicts": [],
+    "missingMonths": [],
+    "longestContiguousSequence": 48
+  },
+  "caseHash": "d9245d60378c0eebc53a541368b01a64cd7d242761f7d0e6b01f52d344130987",
+  "audit": {
+    "schemaVersion": 1,
+    "phase": "3.5-B2",
+    "sourceArtifacts": {
+      "baseline": {
+        "workflowRunId": 29892173774,
+        "artifactId": 8519627249,
+        "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+        "artifactDigest": "sha256:13925125a3e69f8dddae8416ae653105c0d9ee897765267c66586f2084e00a00",
+        "releaseCommit": "d072821a35d35489f360ca9203275fc71d247a34"
+      },
+      "diagnostic": {
+        "workflowRunId": 29881954620,
+        "artifactId": 8515476365,
+        "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+        "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+        "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+      }
+    },
+    "identity": {
+      "ticker": "KNCR11",
+      "cnpj": "16706958000132",
+      "role": "healthy_control",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31"
+    },
+    "inputCheckpointHash": "c6d8b22e9bec7171bcff54ffdb0413c95cdd4ea6d2f20077962c8e1e02e2b025",
+    "exclusions": [],
+    "finalCaseHash": "d9245d60378c0eebc53a541368b01a64cd7d242761f7d0e6b01f52d344130987",
+    "documentsDiscovered": 52,
+    "documentsProcessed": 52,
+    "observations": 48,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "auditHash": "f804361e9bccd57cdca06113672c3a8e4f288c3f4d40d1da8eb237422ff31031"
+  },
+  "observationFiles": [
+    {
+      "file": "docs/production-evidence/risk-lab/kncr11-phase-b2/observations-2022.json",
+      "year": "2022",
+      "count": 12,
+      "observationsHash": "055512e9f67f56ce059afb8df3088687da92443f5a60dc6fa647909eb684f6d9"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/kncr11-phase-b2/observations-2023.json",
+      "year": "2023",
+      "count": 12,
+      "observationsHash": "19eb32261422a78ff7ad778230acadaca7c3092b8347ff95c0cdfaeab7d68576"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/kncr11-phase-b2/observations-2024.json",
+      "year": "2024",
+      "count": 12,
+      "observationsHash": "9c62c2d0f703cbd259697eb47491f19b14c1d2c6bee7db52563735bbabffa606"
+    },
+    {
+      "file": "docs/production-evidence/risk-lab/kncr11-phase-b2/observations-2025.json",
+      "year": "2025",
+      "count": 12,
+      "observationsHash": "ce0e2a274b41f3a040677fc510bf2f00319d023525ad34feaca5f83291d731d4"
+    }
+  ],
+  "combinedObservationsHash": "fd7e47d03fbea224b1a0e4d0dff0629c20d59fa6fced2c8348c2aacbf417d09f",
+  "evidenceHash": "c11de46d43de21e98a3eb6986a8fb5c0692465672c412b3329f20d86a9bfd1bb"
+}
