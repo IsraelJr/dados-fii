@@ -39,7 +39,7 @@ test("Handoff possui precedência, versão e data vigentes", () => {
   const body = readFileSync(HANDOFF, "utf8");
 
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 6\.5\.0/);
+  assert.match(body, /\*\*Versão:\*\* 6\.6\.0/);
   assert.match(body, /\*\*Data:\*\* 24\/07\/2026/);
   assert.match(body, /existe apenas um Handoff canônico versionado no repositório/i);
 });
@@ -69,40 +69,46 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("estado canônico mantém DEVA11 concluído e VSLH11 como próxima fase", () => {
+test("estado canônico mantém DEVA11 e VSLH11 concluídos e KNCR11 como próxima fase", () => {
   const body = readFileSync(HANDOFF, "utf8");
 
   assert.match(body, /Fase 3\.5-A — DEVA11 está formalmente concluída/);
-  assert.match(body, /Próxima unidade de trabalho:\*\* 3\.5-B1 — VSLH11/);
+  assert.match(body, /Fase 3\.5-B1 — VSLH11 está formalmente concluída/);
+  assert.match(body, /Próxima unidade de trabalho:\*\* 3\.5-B2 — KNCR11/);
   assert.match(body, /documentos descobertos\/classificados: `85\/85`/);
-  assert.match(body, /pendências: `0`/);
-  assert.match(body, /conflitos: `0`/);
-  assert.match(body, /498654f03ce66bd54598d5a4677c18bbe5bbdc86/);
+  assert.match(body, /documentos descobertos\/classificados: `79\/79`/);
+  assert.match(body, /merge funcional: `1c4c96e571b7daa80a56d9a5be35e2af050e6469`/);
+  assert.match(body, /índice de evidência: `952c88ec36f930ce83d153bedb07344226cf8d9029d14ada1576514214269092`/);
+  assert.match(body, /3\.5-B2 — KNCR11: próxima, não iniciada/);
 });
 
 test("roadmap inclui SEO, Premium v3, Radar e limites de acompanhamento", () => {
   const body = readFileSync(HANDOFF, "utf8");
 
   for (const required of [
-    "SEO-S1 — Dias 1–15",
+    "SEO-S1, dias 1–15",
     "3.7 — Risk Lab read-only no Premium + Prompt Premium v3",
     "4.1 — Radar: acompanhar fundo fora da carteira",
-    "Grátis: até 1 fundo",
-    "Premium: até 10 fundos",
-    "Inteligência sobre documentos e “o que mudou”",
+    "Grátis até 1",
+    "Premium até 10",
+    "Inteligência documental",
     "Carteira histórica verdadeira",
     "Screener quantitativo",
     "Fair value e sustentabilidade da renda",
   ]) {
-    assert.match(body, new RegExp(escapeRegExp(required)));
+    assert.match(body, new RegExp(escapeRegExp(required), "i"));
   }
 });
 
-test("fontes estratégicas de SEO e Prompt Premium estão versionadas", () => {
+test("fontes estratégicas e evidência VSLH11 estão versionadas", () => {
   const sourceFiles = [
     "docs/strategy/PLANO_SEO_90_DIAS_DADOS_FII.md",
     "docs/sources/premium-prompt/REFERENCIAS_PROMPT_PREMIUM_FII.md",
     "docs/sources/premium-prompt/README.md",
+    "docs/production-evidence/risk-lab/vslh11-phase-b1-manifest.json",
+    "docs/production-evidence/risk-lab/vslh11-phase-b1/index.json",
+    "docs/risk-lab/sprint-3-5-b1-vslh11.md",
+    "tests/risk-lab-vslh11-evidence.test.mjs",
   ];
 
   for (const sourceFile of sourceFiles) {
