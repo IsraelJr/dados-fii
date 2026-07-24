@@ -29,7 +29,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,8 +89,19 @@ jobs:
             tests/risk-lab-deva11-phase-a.test.ts \
             tests/risk-lab-knsc11-evidence.test.mjs 2>&1 | tee .tmp/knsc11-ci.log
 
+      # Fallback automatizado para indisponibilidade externa do Preview Vercel.
+      # Mantém o gate de build sem depender de cota, ação manual ou plano pago.
+      - name: Validate production build
+        id: production_build
+        shell: bash
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee .tmp/production-build.log
+
       - name: Upload failure diagnostics
-        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure')
+        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.production_build.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: risk-lab-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -100,5 +111,6 @@ jobs:
             .tmp/vslh11-ci.log
             .tmp/kncr11-ci.log
             .tmp/knsc11-ci.log
+            .tmp/production-build.log
           if-no-files-found: error
           retention-days: 3
