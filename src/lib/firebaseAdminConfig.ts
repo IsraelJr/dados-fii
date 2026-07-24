@@ -8,6 +8,8 @@ export type FirebaseAdminBootstrapConfig =
     projectId: string;
   };
 
+type FirebaseAdminEnvironment = Readonly<Record<string, string | undefined>>;
+
 function parseServiceAccount(raw: string) {
   let parsed: unknown;
   try {
@@ -24,7 +26,7 @@ function parseServiceAccount(raw: string) {
 }
 
 export function resolveFirebaseAdminBootstrapConfig(
-  environment: NodeJS.ProcessEnv = process.env,
+  environment: FirebaseAdminEnvironment = process.env,
 ): FirebaseAdminBootstrapConfig {
   const rawServiceAccount = environment.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
   if (rawServiceAccount) {
