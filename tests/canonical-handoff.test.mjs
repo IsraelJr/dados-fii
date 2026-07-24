@@ -93,13 +93,13 @@ test("fontes estratégicas foram versionadas e imagens permanecem tratadas hones
   ]) assert.equal(existsSync(file), true, `${file} deve existir`);
   assert.match(body, /PLANO_SEO_90_DIAS_DADOS_FII\.md/);
   assert.match(body, /REFERENCIAS_PROMPT_PREMIUM_FII\.md/);
-  assert.match(body, /nove imagens/);
+  assert.match(body, /nove (?:imagens|referências)/);
 });
 
 test("decisões abertas e critérios universais impedem conclusão prematura", () => {
   const body = readFileSync(HANDOFF, "utf8");
   assert.match(body, /Telegram permanece adiado; WhatsApp continua aberto/);
-  assert.match(body, /forma de cobrança/i);
+  assert.match(body, /mensal\/anual, trial, cupom, cobrança/i);
   for (const required of [
     "código está em `main`",
     "CI obrigatória está verde",
