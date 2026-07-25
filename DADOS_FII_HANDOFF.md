@@ -2,13 +2,13 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 6.8.0  
+**Versão:** 6.10.0  
 **Data:** 24/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**Base funcional auditada:** `1925b53a268f90b4c2f9a2733c4ac8df645a14ec`  
+**Base funcional auditada:** `c616437a0a44c1543015a709911c67f70f390b7d`  
 **Sprint corrente:** 3.5 — Coorte externa e backtest sem informação futura  
-**Próxima unidade de trabalho:** 3.5-B4 — MCCI11  
+**Próxima unidade de trabalho:** 3.5-C — dataset final e backtest externo sem informação futura  
 **Política documental:** existe apenas um Handoff canônico versionado no repositório: `DADOS_FII_HANDOFF.md`.
 
 ## Como interpretar os status
@@ -27,15 +27,17 @@ Uma validação pontual, confirmação verbal, workflow verde isolado ou teste e
 
 | Decisão vigente | Decisão substituída | Estado | Evidência ou motivo |
 |---|---|---|---|
-| Este Handoff v6.8.0 é a única referência canônica quando houver divergência. | Handoffs paralelos ou cópias antigas. | Vigente | Evita decisões concorrentes. |
+| Este Handoff v6.10.0 é a única referência canônica quando houver divergência. | Handoffs paralelos ou cópias antigas. | Vigente | Evita decisões concorrentes. |
 | Fases 1 e 2 estão formalmente concluídas. | Conclusão baseada apenas em fundos sentinela. | Concluída | Regressões globais e catálogo auditado. |
-| A Sprint corrente é a 3.5. | Sprint 3.4 como corrente. | Em andamento | Restam MCCI11, RBRY11, dataset e backtest. |
+| A Sprint corrente é a 3.5. | Sprint 3.4 como corrente. | Em andamento | Os seis fundos da coorte foram concluídos; restam dataset e backtest. |
 | A Sprint 3.5 é executada um fundo por PR. | Execução monolítica dos seis fundos. | Vigente | Cada caso tem evidência, hashes, testes e auditoria próprios. |
 | Fase 3.5-A — DEVA11 está formalmente concluída. | DEVA11 pendente. | Concluída | 85/85 documentos. |
 | Fase 3.5-B1 — VSLH11 está formalmente concluída. | VSLH11 pendente. | Concluída | 79/79 documentos. |
 | Fase 3.5-B2 — KNCR11 está formalmente concluída. | KNCR11 pendente. | Concluída | 52/52 documentos e 48 competências. |
 | Fase 3.5-B3 — KNSC11 está formalmente concluída. | KNSC11 como próxima fase. | Concluída | PR #118, merge `1925b53a268f90b4c2f9a2733c4ac8df645a14ec`, 52/52 documentos e 48 competências. |
-| A próxima fase é 3.5-B4 — MCCI11 e não inicia automaticamente. | Processar vários fundos em paralelo. | Planejada | Regra de parada entre unidades. |
+| Fase 3.5-B4 — MCCI11 está formalmente concluída. | MCCI11 pendente. | Concluída | PR #122, merge `d2000807cc51f66288491ccf715f7ed84ab63fb2`, 48/48 documentos e 46 competências selecionadas. |
+| Fase 3.5-B5 — RBRY11 está formalmente concluída. | RBRY11 pendente. | Concluída | PR #125, merge `c616437a0a44c1543015a709911c67f70f390b7d`, 54/54 documentos e 47 competências contínuas. |
+| A próxima fase é 3.5-C — dataset final e backtest e não inicia automaticamente. | Processar dataset/backtest junto com fundos individuais. | Planejada | Regra de parada após a coorte e antes do backtest. |
 | Correções de parser ou cálculo são gerais e testadas. | Patch especial por ticker. | Obrigatória | Evita corrigir um fundo e manter o defeito no universo. |
 | Preview Vercel é preferencial; fallback de build só é válido quando o diff não altera código de produto e a indisponibilidade externa está documentada. | Bloquear trabalho por quota externa ou dispensar deployment sem prova equivalente. | Vigente | PR #118 executou typecheck e `next build` no SHA final; mudanças de runtime continuam exigindo deployment real. |
 | Risk Lab permanece fora do Premium e das notificações até 3.5/3.6. | Integração antecipada. | Bloqueada | Produto não pode consumir metodologia não homologada. |
@@ -55,10 +57,10 @@ Uma validação pontual, confirmação verbal, workflow verde isolado ou teste e
 
 - Fases 1 e 2 estão formalmente concluídas.
 - Risk Lab 3.0–3.4 e reorganização 3.5-R estão concluídos.
-- Fases 3.5-A/DEVA11, 3.5-B1/VSLH11, 3.5-B2/KNCR11 e 3.5-B3/KNSC11 estão concluídas.
-- Sprint 3.5 completa permanece aberta.
-- Próxima unidade: 3.5-B4 — MCCI11.
-- Depois de MCCI11 ainda restam RBRY11, composição do dataset da coorte e backtest sem look-ahead.
+- Fases 3.5-A/DEVA11, 3.5-B1/VSLH11, 3.5-B2/KNCR11, 3.5-B3/KNSC11, 3.5-B4/MCCI11 e 3.5-B5/RBRY11 estão concluídas.
+- Os seis fundos da coorte externa estão formalmente concluídos.
+- Sprint 3.5 completa permanece aberta porque dataset e backtest ainda não foram executados.
+- Próxima unidade: 3.5-C — dataset final e backtest externo sem informação futura, ainda não iniciada.
 - Risk Lab permanece isolado de Premium e notificações até os gates das Sprints 3.5 e 3.6.
 - SEO-S1, Prompt Premium v3, Radar, Inteligência documental, Carteira histórica verdadeira, Screener quantitativo e Fair value e sustentabilidade da renda ainda não foram concluídos.
 
@@ -74,6 +76,8 @@ Uma validação pontual, confirmação verbal, workflow verde isolado ou teste e
 | 3.5-B1 — VSLH11 | Sim | Sim | Preview saudável; sem efeito de produto | **Concluída** |
 | 3.5-B2 — KNCR11 | Sim | Sim | Preview saudável; sem efeito de produto | **Concluída** |
 | 3.5-B3 — KNSC11 | Sim | Sim | Preview Ready durante a PR; build final saudável; sem código de produto no diff | **Concluída** |
+| 3.5-B4 — MCCI11 | Sim | Sim | Preview Ready; sem integração de produto | **Concluída** |
+| 3.5-B5 — RBRY11 | Sim | Sim | Preview Ready; sem integração de produto | **Concluída** |
 | Sprint 3.5 completa | Parcial | Parcial | Produto bloqueado | **Em andamento** |
 | Regra de meses encerrados | PR #65 | Testes declarados | Não mesclada | **Em implementação** |
 | SEO 90 dias | Plano | n/a | Não iniciado | **Planejada** |
@@ -109,7 +113,9 @@ A conclusão não se baseia apenas em TGAR11, VGIA11, MXRF11, KNCA11 ou BODB11; 
 - 3.5-B1 — VSLH11: concluída.
 - 3.5-B2 — KNCR11: concluída.
 - 3.5-B3 — KNSC11: concluída.
-- Sprint 3.5 completa: aberta.
+- 3.5-B4 — MCCI11: concluída.
+- 3.5-B5 — RBRY11: concluída.
+- Sprint 3.5 completa: aberta até dataset e backtest.
 - Integração com Premium/notificações: proibida antes dos gates 3.5/3.6.
 
 ### Evidência canônica da Fase 3.5-A — DEVA11
@@ -158,6 +164,33 @@ A conclusão não se baseia apenas em TGAR11, VGIA11, MXRF11, KNCA11 ou BODB11; 
 - observações: `00ddf8ec44c0f02757b766f3b98781d80649bc1fca973c4b46cf05a866014045`;
 - índice de evidência: `149ababbbd26ac4cf21b5462022e0c921cff3ff10a1797f0d4047fda2d3bdb65`.
 
+
+### Evidência canônica da Fase 3.5-B4 — MCCI11
+
+- issue `#121`; PR funcional `#122`;
+- merge funcional: `d2000807cc51f66288491ccf715f7ed84ab63fb2`;
+- documentos descobertos/classificados: `48/48`;
+- observações brutas: `47`; competências selecionadas: `46`;
+- período observado: `2022-01` a `2025-11`;
+- pendências: `0`; conflitos: `0`; lacuna explícita: `2025-02`;
+- classe secundária: `301632`/MCCI13;
+- deriva temporal `255155`: competência corrigida para `2021-12`, fora da coorte;
+- índice de evidência: `14c6ad2e55053d020688c0c99252e35a45c91a748cd946fd403b9acd0d99a817`.
+
+### Evidência canônica da Fase 3.5-B5 — RBRY11
+
+- issue `#124`; PR funcional `#125`;
+- merge funcional: `c616437a0a44c1543015a709911c67f70f390b7d`;
+- documentos descobertos/classificados: `54/54`;
+- observações brutas no diagnóstico: `49`; após retentativa: `50`; após sanitização: `49`;
+- competências selecionadas: `47`, contínuas de `2022-01` a `2025-11`;
+- pendências: `0`; conflitos: `0`; lacunas: `0`; maior sequência: `47` meses;
+- recuperação oficial: `987180`, competência `2025-08`, R$ 1,25 por cota;
+- classes secundárias: `300850`/RBRY15, `300852`/RBRY14, `300855`/RBRY13 e `350224`/RBRY13;
+- deriva temporal `254829`: competência corrigida para `2021-12`, fora da coorte;
+- reapresentações: `427520` v2 substitui `427474` v1; `1009923` v2 substitui `1009913` v1;
+- índice de evidência: `938b856f5a74edcd404b494f68a33654c1f68b4ae01a392de56e6cbc5c741ed1`.
+
 ---
 
 ## 3. Sprint atual
@@ -172,11 +205,11 @@ Ordem interna vigente:
 2. 3.5-B1 — VSLH11: concluída.
 3. 3.5-B2 — KNCR11: concluída.
 4. 3.5-B3 — KNSC11: concluída.
-5. 3.5-B4 — MCCI11: próxima, não iniciada.
-6. 3.5-B5 — RBRY11: planejada.
-7. Composição do dataset imutável da coorte.
-8. Backtest sem look-ahead e relatório de performance.
-9. Gate de encerramento da Sprint 3.5.
+5. 3.5-B4 — MCCI11: concluída.
+6. 3.5-B5 — RBRY11: concluída.
+7. 3.5-C — composição do dataset imutável da coorte: próxima, não iniciada.
+8. Backtest sem look-ahead e relatório de performance: não iniciado.
+9. Gate de encerramento da Sprint 3.5: pendente.
 
 A conclusão de um fundo não promove automaticamente o seguinte. Cada unidade exige issue, branch, PR, CI, evidência, merge, auditoria do `main` e atualização canônica.
 
@@ -184,22 +217,20 @@ A conclusão de um fundo não promove automaticamente o seguinte. Cada unidade e
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **3.5-B4 — MCCI11**.
-2. **3.5-B5 — RBRY11**.
-3. **3.5-C — dataset final e backtest externo sem informação futura**.
-4. **3.6 — calibração e homologação do ruleset**.
-5. **3.7 — Risk Lab read-only no Premium + Prompt Premium v3**.
-6. **SEO-S1, dias 1–15** — pode avançar em paralelo sem alterar a ordem funcional do Risk Lab.
-7. **4.1 — Radar: acompanhar fundo fora da carteira**.
-8. **Fase 4+** — Inteligência documental, Carteira histórica verdadeira, Screener quantitativo, Fair value e sustentabilidade da renda.
+1. **3.5-C — dataset final e backtest externo sem informação futura**.
+2. **3.6 — calibração e homologação do ruleset**.
+3. **3.7 — Risk Lab read-only no Premium + Prompt Premium v3**.
+4. **SEO-S1, dias 1–15** — pode avançar em paralelo sem alterar a ordem funcional do Risk Lab.
+5. **4.1 — Radar: acompanhar fundo fora da carteira**.
+6. **Fase 4+** — Inteligência documental, Carteira histórica verdadeira, Screener quantitativo, Fair value e sustentabilidade da renda.
 
 ---
 
 ## 5. Escopo e critérios de aceite de cada sprint
 
-### 3.5-B4 — MCCI11
+### 3.5-B4 — MCCI11 — concluída
 
-Escopo: processar somente MCCI11 com regras gerais já validadas, acrescentando regra nova apenas com evidência oficial e teste generalizável.
+Escopo concluído: processar somente MCCI11 com regras gerais já validadas, acrescentando regra nova apenas com evidência oficial e teste generalizável.
 
 Critérios mínimos:
 
@@ -212,6 +243,14 @@ Critérios mínimos:
 - gates DEVA11, VSLH11, KNCR11 e KNSC11 preservados;
 - CI central e deployment aplicável saudáveis;
 - merge e auditoria pós-merge antes da atualização canônica.
+
+### 3.5-B5 — RBRY11 — concluída
+
+- 54/54 documentos classificados;
+- retentativa oficial auditada sem alterar observações anteriores;
+- classes secundárias, deriva temporal e reapresentações resolvidas por regras gerais;
+- 47 competências contínuas, sem lacunas ou conflitos;
+- testes sintéticos, integrais, CI, build, Preview, merge e auditoria do `main` concluídos.
 
 ### 3.5-C — dataset e backtest
 
@@ -280,6 +319,8 @@ Critérios mínimos:
 - PR #112 — VSLH11; merge `1c4c96e571b7daa80a56d9a5be35e2af050e6469`.
 - PR #115 — KNCR11; merge `52c02e41a64a09eaa6d6649c30cd6ddb8f9fb693`.
 - PR #118 — KNSC11; merge `1925b53a268f90b4c2f9a2733c4ac8df645a14ec`.
+- PR #122 — MCCI11; merge `d2000807cc51f66288491ccf715f7ed84ab63fb2`.
+- PR #125 — RBRY11; merge `c616437a0a44c1543015a709911c67f70f390b7d`.
 - PR #65 — regra de mês corrente; aberta e precisa de rebase/CI antes de qualquer merge.
 
 ### Evidências principais
@@ -288,7 +329,11 @@ Critérios mínimos:
 - `docs/production-evidence/risk-lab/vslh11-phase-b1/`
 - `docs/production-evidence/risk-lab/kncr11-phase-b2/`
 - `docs/production-evidence/risk-lab/knsc11-phase-b3/`
+- `docs/production-evidence/risk-lab/mcci11-phase-b4/`
+- `docs/production-evidence/risk-lab/rbry11-phase-b5/`
 - `docs/risk-lab/sprint-3-5-b3-knsc11.md`
+- `docs/risk-lab/sprint-3-5-b4-mcci11.md`
+- `docs/risk-lab/sprint-3-5-b5-rbry11.md`
 - `tests/risk-lab-knsc11-evidence.test.mjs`
 - `tests/canonical-handoff.test.mjs`
 - `docs/strategy/PLANO_SEO_90_DIAS_DADOS_FII.md`
@@ -308,12 +353,12 @@ Branches de fase são temporárias. O estado aceito pertence ao `main`; branch o
 - RegulatoryDataService, scores, Health, Validation e Admin.
 - Timeline, relatórios, AI Insights e observabilidade.
 - Catálogo básico e validações globais da Fase 2.
-- Risk Lab até 3.4 e casos DEVA11, VSLH11, KNCR11 e KNSC11 da Sprint 3.5.
+- Risk Lab até 3.4 e os seis casos DEVA11, VSLH11, KNCR11, KNSC11, MCCI11 e RBRY11 da Sprint 3.5.
 - Governança central de GitHub Actions, build automatizado do Risk Lab e teste canônico do Handoff.
 
 ### Parciais
 
-- Sprint 3.5: quatro de seis fundos concluídos.
+- Sprint 3.5: seis de seis fundos concluídos; dataset e backtest permanecem pendentes.
 - Notificações materiais e digest: política definida, revisão ampla ainda necessária.
 - IFIX: calendário oficial e card manual parcialmente implantados.
 - Regra de meses encerrados: PR #65 não integrada.
@@ -321,7 +366,6 @@ Branches de fase são temporárias. O estado aceito pertence ao `main`; branch o
 
 ### Pendentes
 
-- MCCI11 e RBRY11.
 - Dataset final, backtest e calibração.
 - Prompt Premium v3 e integração read-only.
 - SEO-S1 e plano de 90 dias.
@@ -389,6 +433,8 @@ Branches de fase são temporárias. O estado aceito pertence ao `main`; branch o
 - testes determinísticos VSLH11
 - testes determinísticos KNCR11
 - testes determinísticos KNSC11
+- testes determinísticos MCCI11
+- testes determinísticos RBRY11
 - `npm run test:workflow-governance`
 - `npm run test:handoff`
 - `npm run typecheck`
@@ -427,9 +473,9 @@ Testes manuais podem complementar, mas não substituir gates automatizados.
 
 ### Próxima execução
 
-- Abrir issue e branch exclusivas para 3.5-B4 — MCCI11.
-- Reutilizar regras gerais de DEVA11, VSLH11, KNCR11 e KNSC11.
-- Não iniciar RBRY11 antes da parada e auditoria do MCCI11.
+- Abrir issue e branch exclusivas para 3.5-C — dataset final e backtest externo sem informação futura.
+- Consumir somente os seis casos imutáveis e auditados da coorte.
+- Não iniciar 3.6, Premium ou notificações antes do gate de encerramento da Sprint 3.5.
 
 ### Decisões de produto
 
