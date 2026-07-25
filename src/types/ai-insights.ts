@@ -28,6 +28,11 @@ export type PremiumAIInsights = {
   differentiatedInsight: string;
   portfolioReading: string;
   peerReading: string;
+  riskLabReading: string;
+  dataQualityReading: string;
+  managerModeConclusion: string;
+  positiveTriggers: string[];
+  negativeTriggers: string[];
   monitoringTriggers: string[];
   plainLanguage: string;
   sources: Array<{ provider: string; kind: string }>;

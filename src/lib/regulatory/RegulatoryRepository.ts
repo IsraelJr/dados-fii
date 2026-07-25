@@ -29,7 +29,7 @@ import type {
 } from "@/types/fund-catalog";
 import type { Phase2ClosureState } from "@/types/phase2-closure";
 
-type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync" | "catalog-preview" | "catalog-apply" | "catalog-audit" | "phase2-closure";
+type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync" | "catalog-preview" | "catalog-apply" | "catalog-audit" | "phase2-closure" | "premium-read";
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -697,6 +697,14 @@ export class RegulatoryRepository {
       .filter((alert) => alert.status === "active")
       .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
     return { generatedAt: nowIso(), latestRun: runs[0] || null, activeAlerts, recentRuns: runs };
+  }
+
+  async recordAuditEvent(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>) {
+    if (!String(actor || "").trim()) throw new Error("Ator de auditoria obrigatório.");
+    await adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc().set(
+      this.auditPayload(action, actor, ticker, safeFirestoreDocument(metadata || {})),
+      { merge: false },
+    );
   }
 
   private auditPayload(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>) {

@@ -24,7 +24,13 @@ async function generatePremium(request: NextRequest, context: RouteContext, hold
   }
   try {
     const { ticker } = await context.params;
-    const report = await regulatoryDataService.getPremiumReport(ticker, { requestKey: requestKey(request, authorization.identity.uid), holdings });
+    const fingerprint = requestKey(request, authorization.identity.uid);
+    const report = await regulatoryDataService.getPremiumReport(ticker, {
+      requestKey: fingerprint,
+      holdings,
+      auditActor: `premium:${fingerprint}`,
+      accessPlan: authorization.identity.plan,
+    });
     if (!report) return NextResponse.json({ ok: false, error: "Fundo não encontrado." }, { status: 404 });
     return NextResponse.json({ ok: true, report, access: { plan: authorization.identity.plan } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {

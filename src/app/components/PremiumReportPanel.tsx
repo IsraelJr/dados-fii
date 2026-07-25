@@ -24,6 +24,29 @@ function signedCurrency(number: number | null) {
   return `${number > 0 ? "+" : ""}${currency(number)}`;
 }
 
+function riskLabAvailabilityLabel(availability: PremiumFundReport["riskLab"]["availability"]) {
+  return {
+    disabled: "Desabilitado",
+    available: "Disponível",
+    outside_verified_cohort: "Fora da coorte verificada",
+    inconclusive: "Inconclusivo",
+  }[availability];
+}
+
+function riskLabDispositionLabel(disposition: PremiumFundReport["riskLab"]["disposition"]) {
+  if (disposition === null) return "-";
+  return {
+    none: "Sem estresse qualificante",
+    informational_recovery: "Recuperação informativa",
+    elevated_risk: "Risco histórico elevado",
+    inconclusive: "Inconclusivo",
+  }[disposition];
+}
+
+function dataQualityLevelLabel(level: PremiumFundReport["managerMode"]["dataQualityLevel"]) {
+  return { high: "Alta", medium: "Média", low: "Baixa" }[level];
+}
+
 function wallet() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(WALLET_STORAGE_KEY) || "[]") as WalletItem[];
@@ -73,7 +96,7 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.18em] text-amber-700"><Crown size={16} /> Relatório Premium</p>
-          <h2 className="mt-2 text-2xl font-black text-slate-900">Valuation, stress test, cenários e comparativos</h2>
+          <h2 className="mt-2 text-2xl font-black text-slate-900">Risk Lab, valuation, cenários e Modo Gestor informativo</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Análise protegida para assinantes, construída sobre dados regulatórios, ScoreEngine e AI Insights Engine.</p>
         </div>
         {!report && <button type="button" onClick={generate} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-full bg-amber-500 px-5 py-3 text-sm font-extrabold text-slate-950 hover:bg-amber-400 disabled:opacity-60">{loading ? <RefreshCw className="animate-spin" size={16} /> : <LockKeyhole size={16} />} {loading ? "Gerando…" : "Acessar Premium"}</button>}
@@ -83,11 +106,12 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
 
       {report && (
         <div className="mt-6 space-y-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <PremiumMetric label="Plano" content={productPlanLabel(plan)} description="Plano comercial que dá acesso a este relatório." />
             <PremiumMetric label="P/VP" content={value(report.valuation.pvp)} description="Preço da cota dividido pelo valor patrimonial por cota." />
             <PremiumMetric label="Ágio/desconto" content={value(report.valuation.premiumDiscountPercent, "%")} description="Positivo indica preço acima do VP; negativo indica preço abaixo do VP." />
             <PremiumMetric label="Percentil entre pares" content={report.comparative.percentile === null ? "Amostra insuficiente" : value(report.comparative.percentile, "%")} description="Posição da nota composta diante de fundos comparáveis; não mede retorno futuro." />
+            <PremiumMetric label="Risk Lab" content={report.riskLab.availability === "available" || report.riskLab.availability === "inconclusive" ? riskLabDispositionLabel(report.riskLab.disposition) : riskLabAvailabilityLabel(report.riskLab.availability)} description="Leitura histórica homologada e somente para consulta; não envia alertas nem recomenda operações." />
           </div>
 
           <PremiumSection title="Leitura de valuation"><p>{report.valuation.explanation}</p><p className="mt-2 text-xs text-slate-500">VP/cota estimado: {value(report.valuation.estimatedNavPerShare)}</p><p className="mt-3"><strong>Na prática:</strong> ágio ou desconto não muda o valor da carteira sozinho; mostra quanto o preço se afastou do patrimônio contábil. O peso da posição indica quanto essa avaliação merece atenção.</p></PremiumSection>
@@ -96,6 +120,22 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
             <p>{report.portfolioImpact.summary}</p>
             {report.portfolioImpact.available ? <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><PortfolioMetric label="Cotas" content={value(report.portfolioImpact.holdingQuotas, "", 0)} /><PortfolioMetric label="Valor da posição" content={currency(report.portfolioImpact.currentPositionValue)} /><PortfolioMetric label="Renda mensal estimada" content={currency(report.portfolioImpact.estimatedMonthlyIncome)} /><PortfolioMetric label="Peso na carteira" content={value(report.portfolioImpact.portfolioWeightPercent, "%")} /></div> : <p className="mt-3 rounded-xl bg-white p-3 text-sm ring-1 ring-amber-200">Adicione este fundo à carteira neste navegador para ver o efeito em reais.</p>}
             {!!report.portfolioImpact.totalHoldings && <p className="mt-3 text-xs text-slate-500">Cobertura de cotações: {report.portfolioImpact.coveredHoldings} de {report.portfolioImpact.totalHoldings} posições.</p>}
+          </PremiumSection>
+
+          <PremiumSection title="Risk Lab — leitura histórica homologada">
+            <p>{report.riskLab.summary}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><PortfolioMetric label="Disponibilidade" content={riskLabAvailabilityLabel(report.riskLab.availability)} /><PortfolioMetric label="Leitura" content={riskLabDispositionLabel(report.riskLab.disposition)} /><PortfolioMetric label="Versão das regras" content={report.riskLab.rulesetVersion} /><PortfolioMetric label="Modo" content="Somente leitura" /></div>
+            {report.riskLab.stressDetectedAt && <p className="mt-3 text-xs text-slate-500">Estresse conhecido em {new Date(report.riskLab.stressDetectedAt).toLocaleDateString("pt-BR")}{report.riskLab.recoveryDetectedAt ? ` · recuperação conhecida em ${new Date(report.riskLab.recoveryDetectedAt).toLocaleDateString("pt-BR")}` : ""}.</p>}
+            <ul className="mt-3 space-y-1 text-xs text-slate-500">{report.riskLab.limitations.map((item) => <li key={item}>• {item}</li>)}</ul>
+          </PremiumSection>
+
+          <PremiumSection title="Modo Gestor — qualidade e limites da decisão">
+            <div className="grid gap-3 sm:grid-cols-3"><PortfolioMetric label="Qualidade dos dados" content={`${report.managerMode.dataQualityScore}/100`} /><PortfolioMetric label="Nível" content={dataQualityLevelLabel(report.managerMode.dataQualityLevel)} /><PortfolioMetric label="Ação permitida" content="Monitoramento" /></div>
+            <p className="mt-4 font-bold text-slate-900">Leitura objetiva</p>
+            <ul className="mt-1 space-y-1">{report.managerMode.objectiveReading.map((item) => <li key={item}>• {item}</li>)}</ul>
+            <p className="mt-4 font-bold text-slate-900">Dados ainda indisponíveis para uma decisão de aporte</p>
+            <p className="mt-1">{report.managerMode.missingInputs.join("; ")}.</p>
+            <p className="mt-4 rounded-xl bg-white p-3 font-bold text-slate-900 ring-1 ring-amber-200">{report.managerMode.controlPrinciple}</p>
           </PremiumSection>
 
           <div className="grid gap-4 lg:grid-cols-3">
@@ -118,6 +158,13 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
             <p className="mt-1">{report.aiAnalysis.portfolioReading}</p>
             <p className="mt-4 font-bold text-slate-900">Contexto entre pares</p>
             <p className="mt-1">{report.aiAnalysis.peerReading}</p>
+            <p className="mt-4 font-bold text-slate-900">Leitura do Risk Lab</p>
+            <p className="mt-1">{report.aiAnalysis.riskLabReading}</p>
+            <p className="mt-4 font-bold text-slate-900">Qualidade dos dados e conclusão do Modo Gestor</p>
+            <p className="mt-1">{report.aiAnalysis.dataQualityReading}</p>
+            <p className="mt-2">{report.aiAnalysis.managerModeConclusion}</p>
+            {!!report.aiAnalysis.positiveTriggers.length && <><p className="mt-4 font-bold text-slate-900">Gatilhos positivos</p><ul className="mt-1 space-y-1">{report.aiAnalysis.positiveTriggers.map((item) => <li key={item}>• {item}</li>)}</ul></>}
+            {!!report.aiAnalysis.negativeTriggers.length && <><p className="mt-4 font-bold text-slate-900">Gatilhos negativos</p><ul className="mt-1 space-y-1">{report.aiAnalysis.negativeTriggers.map((item) => <li key={item}>• {item}</li>)}</ul></>}
             <p className="mt-4 font-bold text-slate-900">Gatilhos objetivos para acompanhar</p>
             <ul className="mt-1 space-y-1">{report.aiAnalysis.monitoringTriggers.map((item) => <li key={item}>• {item}</li>)}</ul>
             <p className="mt-4 font-bold text-slate-900">Em linguagem simples</p>

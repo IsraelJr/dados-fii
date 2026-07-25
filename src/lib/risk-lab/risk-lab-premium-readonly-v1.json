@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "registryVersion": "premium-readonly-v1",
+  "phase": "3.7",
+  "rulesetVersion": "0.2.0",
+  "dataset": {
+    "id": "risk-lab-credit-oos-phase-c-v1",
+    "version": "1.0.0",
+    "hash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+    "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726"
+  },
+  "evidence": {
+    "rulesetConfigHash": "91bf016c119ebbc929409c28f08a751ec4bcc6cb4f6f344656cfa7ef6818a4ec",
+    "calibrationReportHash": "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a",
+    "calibrationEvidenceHash": "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81",
+    "calibrationIndexHash": "35dd492e433855e50849cba05990bb9c5255be6f209fbcce5d5a9cb832ef0017"
+  },
+  "policy": {
+    "readOnly": true,
+    "notificationsAllowed": false,
+    "externalEffectsAllowed": false,
+    "outsideCohort": "explicit_unavailable",
+    "inconclusive": "preserve_unscored"
+  },
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "groundTruthStatus": "verified",
+      "outcome": "verified_correct",
+      "status": "stress_without_recovery",
+      "disposition": "elevated_risk",
+      "riskAlert": true,
+      "stressDetectedAt": "2022-10-07T17:35:00-03:00",
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null
+    },
+    {
+      "ticker": "VSLH11",
+      "groundTruthStatus": "verified",
+      "outcome": "verified_correct",
+      "status": "stress_without_recovery",
+      "disposition": "elevated_risk",
+      "riskAlert": true,
+      "stressDetectedAt": "2022-01-07T17:44:00-03:00",
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null
+    },
+    {
+      "ticker": "KNCR11",
+      "groundTruthStatus": "verified",
+      "outcome": "verified_correct",
+      "status": "no_qualifying_stress",
+      "disposition": "none",
+      "riskAlert": false,
+      "stressDetectedAt": null,
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null
+    },
+    {
+      "ticker": "KNSC11",
+      "groundTruthStatus": "verified",
+      "outcome": "verified_correct",
+      "status": "reversible_stress_confirmed",
+      "disposition": "informational_recovery",
+      "riskAlert": false,
+      "stressDetectedAt": "2022-09-30T17:49:00-03:00",
+      "recoveryDetectedAt": "2023-05-31T17:34:00-03:00",
+      "recoveryPercentOfBaseline": 89.97
+    },
+    {
+      "ticker": "MCCI11",
+      "groundTruthStatus": "blocked",
+      "outcome": "inconclusive_unscored",
+      "status": "inconclusive_unscored",
+      "disposition": "inconclusive",
+      "riskAlert": null,
+      "stressDetectedAt": null,
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null
+    },
+    {
+      "ticker": "RBRY11",
+      "groundTruthStatus": "verified",
+      "outcome": "verified_correct",
+      "status": "reversible_stress_confirmed",
+      "disposition": "informational_recovery",
+      "riskAlert": false,
+      "stressDetectedAt": "2022-12-09T17:34:00-03:00",
+      "recoveryDetectedAt": "2023-03-09T18:34:00-03:00",
+      "recoveryPercentOfBaseline": 90.2
+    }
+  ]
+}

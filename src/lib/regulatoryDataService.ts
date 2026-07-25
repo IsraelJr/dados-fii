@@ -29,6 +29,7 @@ import { validateRegulatoryFund } from "@/lib/regulatory/RegulatoryValidator";
 import { scoreEngine, type ScoreEngine } from "@/lib/scores/ScoreEngine";
 import { freeReportEngine, type FreeReportEngine } from "@/lib/reports/FreeReportEngine";
 import { premiumReportEngine, PremiumReportError, type PremiumPortfolioHolding, type PremiumReportEngine } from "@/lib/reports/PremiumReportEngine";
+import { riskLabPremiumReadModel, type RiskLabPremiumReadModel } from "@/lib/risk-lab/RiskLabPremiumReadModel";
 import { observabilityEngine, type ObservabilityEngine } from "@/lib/observability/ObservabilityEngine";
 import { automaticMonitor, type AutomaticMonitor } from "@/lib/monitor/AutomaticMonitor";
 import { fetchIfixComposition, ifixMembership } from "@/lib/indexes/IfixComposition";
@@ -83,6 +84,7 @@ export class RegulatoryDataService {
     private readonly freeReports: FreeReportEngine = freeReportEngine,
     private readonly aiInsights: AIInsightsEngine = aiInsightsEngine,
     private readonly premiumReports: PremiumReportEngine = premiumReportEngine,
+    private readonly riskLabPremium: RiskLabPremiumReadModel = riskLabPremiumReadModel,
     private readonly observability: ObservabilityEngine = observabilityEngine,
     private readonly monitor: AutomaticMonitor = automaticMonitor,
     private readonly catalogEngine: FundCatalogEngine = fundCatalogEngine,
@@ -432,7 +434,12 @@ export class RegulatoryDataService {
     });
   }
 
-  async getPremiumReport(value: unknown, options?: { requestKey?: string | null; holdings?: Array<{ ticker: string; quotas: number }> }): Promise<PremiumFundReport | null> {
+  async getPremiumReport(value: unknown, options?: {
+    requestKey?: string | null;
+    holdings?: Array<{ ticker: string; quotas: number }>;
+    auditActor?: string | null;
+    accessPlan?: string | null;
+  }): Promise<PremiumFundReport | null> {
     if (!featureEnabled("ENABLE_REPORT_PREMIUM")) {
       throw new PremiumReportError("Relatório Premium está desabilitado.", "PREMIUM_REPORT_DISABLED", 503);
     }
@@ -455,9 +462,25 @@ export class RegulatoryDataService {
         ...item,
         fund: portfolioData?.items[item.ticker] || null,
       }));
-      const draft = this.premiumReports.prepare(freeReport, peers, nowIso(), portfolioHoldings);
+      const riskLab = this.riskLabPremium.read(freeReport.ticker, {
+        enabled: featureEnabled("ENABLE_RISK_LAB_PREMIUM_READONLY", false),
+      });
+      const draft = this.premiumReports.prepare(freeReport, peers, nowIso(), portfolioHoldings, riskLab);
       const aiAnalysis = await this.aiInsights.generatePremiumInsights(draft, { requestKey: options?.requestKey });
-      return this.premiumReports.complete(draft, aiAnalysis);
+      const report = this.premiumReports.complete(draft, aiAnalysis);
+      await this.repository.recordAuditEvent("premium-read", options?.auditActor || "premium:server", freeReport.ticker, {
+        reportVersion: report.reportVersion,
+        promptVersion: report.aiAnalysis.metadata.promptVersion,
+        accessPlan: options?.accessPlan || "unknown",
+        riskLabAvailability: report.riskLab.availability,
+        riskLabDisposition: report.riskLab.disposition,
+        riskLabRiskAlert: report.riskLab.riskAlert,
+        rulesetVersion: report.riskLab.rulesetVersion,
+        readOnly: report.riskLab.readOnly,
+        notificationsAllowed: report.riskLab.notificationsAllowed,
+        externalEffectsAllowed: report.riskLab.externalEffectsAllowed,
+      });
+      return report;
     });
   }
 
