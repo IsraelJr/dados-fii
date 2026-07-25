@@ -35,7 +35,13 @@ jobs:
           new = 'function escapeRegExp(value) { return value.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, "\\\\$&"); }'
           if old not in text:
               raise SystemExit('Linha esperada de escapeRegExp não encontrada.')
-          path.write_text(text.replace(old, new))
+          text = text.replace(old, new)
+          marker = 'const test = String.raw`'
+          if marker not in text:
+              raise SystemExit('Marcador do teste gerado não encontrado.')
+          before, after = text.split(marker, 1)
+          after = after.replace('${', '\\${')
+          path.write_text(before + marker + after)
           PY
           node .tmp/update-handoff-v6-11.mjs 2>&1 | tee .tmp/handoff-generation.log
       - name: Upload generation diagnostic
