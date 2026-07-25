@@ -22,7 +22,20 @@ jobs:
           ref: docs/handoff-v6-11-phase-c
           fetch-depth: 0
       - name: Generate canonical Handoff and test
-        run: node .tmp/update-handoff-v6-11.mjs
+        id: generate
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          node .tmp/update-handoff-v6-11.mjs 2>&1 | tee .tmp/handoff-generation.log
+      - name: Upload generation diagnostic
+        if: failure() && steps.generate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: handoff-v6-11-generation-failure-${{ github.run_id }}
+          path: .tmp/handoff-generation.log
+          if-no-files-found: error
+          retention-days: 1
       - name: Commit canonical files only
         shell: bash
         run: |
