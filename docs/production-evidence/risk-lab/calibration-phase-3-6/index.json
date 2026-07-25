@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.6",
+  "status": "homologated",
+  "sourceRulesetVersion": "0.1.0",
+  "rulesetVersion": "0.2.0",
+  "datasetId": "risk-lab-credit-oos-phase-c-v1",
+  "datasetVersion": "1.0.0",
+  "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+  "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+  "sourcePhaseCIndexEvidenceHash": "edb90face1dddff390dcbf260cf60dc0bb3c053f20ea4ea5a17a0788b98c308e",
+  "execution": {
+    "runs": 2,
+    "run1": {
+      "evidenceHash": "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81",
+      "reportHash": "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a",
+      "rulesetConfigHash": "91bf016c119ebbc929409c28f08a751ec4bcc6cb4f6f344656cfa7ef6818a4ec"
+    },
+    "run2": {
+      "evidenceHash": "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81",
+      "reportHash": "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a",
+      "rulesetConfigHash": "91bf016c119ebbc929409c28f08a751ec4bcc6cb4f6f344656cfa7ef6818a4ec"
+    },
+    "hashesMatch": true
+  },
+  "selectedParameters": {
+    "stressThreshold": 0.8,
+    "recoveryThreshold": 0.89,
+    "minimumRecoveryDecisionMargin": 0.005
+  },
+  "result": {
+    "metrics": {
+      "totalCases": 6,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "inconclusiveCases": 1,
+      "verifiedAccuracyPercent": 100,
+      "coveragePercent": 83.33,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "riskAlerts": 2,
+      "informationalRecoveries": 2,
+      "noSignalCases": 2
+    },
+    "homologationAllowed": true,
+    "blockers": [],
+    "premiumIntegrated": false,
+    "notificationsSent": false
+  },
+  "files": {
+    "ruleset": {
+      "file": "docs/production-evidence/risk-lab/calibration-phase-3-6/ruleset.json",
+      "hash": "91bf016c119ebbc929409c28f08a751ec4bcc6cb4f6f344656cfa7ef6818a4ec"
+    },
+    "candidateSpace": {
+      "file": "docs/production-evidence/risk-lab/calibration-phase-3-6/candidate-space.json",
+      "hash": "163ce4218faad3f75f18f085ba62104a7e9871aeef13e5c53ee6f5469abb9d0d"
+    },
+    "report": {
+      "file": "docs/production-evidence/risk-lab/calibration-phase-3-6/calibration-report.json",
+      "hash": "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a"
+    }
+  },
+  "evidenceHash": "35dd492e433855e50849cba05990bb9c5255be6f209fbcce5d5a9cb832ef0017"
+}

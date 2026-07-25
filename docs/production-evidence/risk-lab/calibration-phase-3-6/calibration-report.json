@@ -1,0 +1,694 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.6",
+  "status": "homologated",
+  "sourceRulesetVersion": "0.1.0",
+  "rulesetVersion": "0.2.0",
+  "datasetId": "risk-lab-credit-oos-phase-c-v1",
+  "datasetVersion": "1.0.0",
+  "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+  "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+  "rulesetConfigHash": "91bf016c119ebbc929409c28f08a751ec4bcc6cb4f6f344656cfa7ef6818a4ec",
+  "candidateSpaceHash": "b34f2dddf9eb0b9d2bba4ec4351905bba723178eec7d65d1c8e286cbea5e320d",
+  "selectedParameters": {
+    "stressThreshold": 0.8,
+    "recoveryThreshold": 0.89,
+    "minimumRecoveryDecisionMargin": 0.005
+  },
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "role": "severe_deterioration",
+      "groundTruthStatus": "verified",
+      "scored": true,
+      "correct": true,
+      "outcome": "verified_correct",
+      "reason": "Deterioração grave preservada antes do evento material.",
+      "finalStatus": "stress_without_recovery",
+      "disposition": "elevated_risk",
+      "riskAlert": true,
+      "firstSignalAt": "2022-10-07T17:35:00-03:00",
+      "stressDetectedAt": "2022-10-07T17:35:00-03:00",
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null,
+      "recoveryDecisionMargin": null,
+      "lookAheadDetected": false,
+      "timeline": [
+        {
+          "asOf": "2021-02-05T17:31:00-03:00",
+          "status": "no_qualifying_stress",
+          "disposition": "none",
+          "riskAlert": false,
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-10-07T17:35:00-03:00",
+          "status": "stress_without_recovery",
+          "disposition": "elevated_risk",
+          "riskAlert": true,
+          "stressDetectedAt": "2022-10-07T17:35:00-03:00",
+          "recoveryDetectedAt": null
+        }
+      ],
+      "externalEffectsAllowed": false
+    },
+    {
+      "ticker": "VSLH11",
+      "role": "severe_deterioration",
+      "groundTruthStatus": "verified",
+      "scored": true,
+      "correct": true,
+      "outcome": "verified_correct",
+      "reason": "Deterioração grave preservada antes do evento material.",
+      "finalStatus": "stress_without_recovery",
+      "disposition": "elevated_risk",
+      "riskAlert": true,
+      "firstSignalAt": "2022-01-07T17:44:00-03:00",
+      "stressDetectedAt": "2022-01-07T17:44:00-03:00",
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null,
+      "recoveryDecisionMargin": null,
+      "lookAheadDetected": false,
+      "timeline": [
+        {
+          "asOf": "2021-03-08T20:26:00-03:00",
+          "status": "no_qualifying_stress",
+          "disposition": "none",
+          "riskAlert": false,
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-01-07T17:44:00-03:00",
+          "status": "stress_without_recovery",
+          "disposition": "elevated_risk",
+          "riskAlert": true,
+          "stressDetectedAt": "2022-01-07T17:44:00-03:00",
+          "recoveryDetectedAt": null
+        }
+      ],
+      "externalEffectsAllowed": false
+    },
+    {
+      "ticker": "KNCR11",
+      "role": "healthy_control",
+      "groundTruthStatus": "verified",
+      "scored": true,
+      "correct": true,
+      "outcome": "verified_correct",
+      "reason": "Controle saudável sem alerta de risco; disposição none.",
+      "finalStatus": "no_qualifying_stress",
+      "disposition": "none",
+      "riskAlert": false,
+      "firstSignalAt": null,
+      "stressDetectedAt": null,
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null,
+      "recoveryDecisionMargin": null,
+      "lookAheadDetected": false,
+      "timeline": [
+        {
+          "asOf": "2022-01-31T18:02:00-03:00",
+          "status": "no_qualifying_stress",
+          "disposition": "none",
+          "riskAlert": false,
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        }
+      ],
+      "externalEffectsAllowed": false
+    },
+    {
+      "ticker": "KNSC11",
+      "role": "healthy_control",
+      "groundTruthStatus": "verified",
+      "scored": true,
+      "correct": true,
+      "outcome": "verified_correct",
+      "reason": "Controle saudável sem alerta de risco; disposição informational_recovery.",
+      "finalStatus": "reversible_stress_confirmed",
+      "disposition": "informational_recovery",
+      "riskAlert": false,
+      "firstSignalAt": "2022-09-30T17:49:00-03:00",
+      "stressDetectedAt": "2022-09-30T17:49:00-03:00",
+      "recoveryDetectedAt": "2023-05-31T17:34:00-03:00",
+      "recoveryPercentOfBaseline": 89.97,
+      "recoveryDecisionMargin": 0.009699999999999931,
+      "lookAheadDetected": false,
+      "timeline": [
+        {
+          "asOf": "2022-02-01T15:23:00-03:00",
+          "status": "no_qualifying_stress",
+          "disposition": "none",
+          "riskAlert": false,
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-09-30T17:49:00-03:00",
+          "status": "stress_without_recovery",
+          "disposition": "elevated_risk",
+          "riskAlert": true,
+          "stressDetectedAt": "2022-09-30T17:49:00-03:00",
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2023-05-31T17:34:00-03:00",
+          "status": "reversible_stress_confirmed",
+          "disposition": "informational_recovery",
+          "riskAlert": false,
+          "stressDetectedAt": "2022-09-30T17:49:00-03:00",
+          "recoveryDetectedAt": "2023-05-31T17:34:00-03:00"
+        }
+      ],
+      "externalEffectsAllowed": false
+    },
+    {
+      "ticker": "MCCI11",
+      "role": "reversible_stress",
+      "groundTruthStatus": "blocked",
+      "scored": false,
+      "correct": null,
+      "outcome": "inconclusive_unscored",
+      "reason": "Verdade-terreno inconclusiva excluída da otimização e das métricas pontuadas.",
+      "finalStatus": "no_qualifying_stress",
+      "disposition": "none",
+      "riskAlert": false,
+      "firstSignalAt": null,
+      "stressDetectedAt": null,
+      "recoveryDetectedAt": null,
+      "recoveryPercentOfBaseline": null,
+      "recoveryDecisionMargin": null,
+      "lookAheadDetected": false,
+      "timeline": [
+        {
+          "asOf": "2022-02-10T17:34:00-03:00",
+          "status": "no_qualifying_stress",
+          "disposition": "none",
+          "riskAlert": false,
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        }
+      ],
+      "externalEffectsAllowed": false
+    },
+    {
+      "ticker": "RBRY11",
+      "role": "reversible_stress",
+      "groundTruthStatus": "verified",
+      "scored": true,
+      "correct": true,
+      "outcome": "verified_correct",
+      "reason": "Estresse reversível reproduzido sem alerta de risco persistente.",
+      "finalStatus": "reversible_stress_confirmed",
+      "disposition": "informational_recovery",
+      "riskAlert": false,
+      "firstSignalAt": "2022-12-09T17:34:00-03:00",
+      "stressDetectedAt": "2022-12-09T17:34:00-03:00",
+      "recoveryDetectedAt": "2023-03-09T18:34:00-03:00",
+      "recoveryPercentOfBaseline": 90.2,
+      "recoveryDecisionMargin": 0.01200000000000001,
+      "lookAheadDetected": false,
+      "timeline": [
+        {
+          "asOf": "2022-02-09T17:39:00-03:00",
+          "status": "no_qualifying_stress",
+          "disposition": "none",
+          "riskAlert": false,
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-12-09T17:34:00-03:00",
+          "status": "stress_without_recovery",
+          "disposition": "elevated_risk",
+          "riskAlert": true,
+          "stressDetectedAt": "2022-12-09T17:34:00-03:00",
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2023-03-09T18:34:00-03:00",
+          "status": "reversible_stress_confirmed",
+          "disposition": "informational_recovery",
+          "riskAlert": false,
+          "stressDetectedAt": "2022-12-09T17:34:00-03:00",
+          "recoveryDetectedAt": "2023-03-09T18:34:00-03:00"
+        }
+      ],
+      "externalEffectsAllowed": false
+    }
+  ],
+  "candidateSummaries": [
+    {
+      "recoveryThreshold": 0.81,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.03069999999999984,
+      "stable": true,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.82,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.02069999999999994,
+      "stable": true,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.83,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.010699999999999932,
+      "stable": true,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.84,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.0006999999999999229,
+      "stable": false,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.85,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.0232,
+      "stable": true,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.86,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.01319999999999999,
+      "stable": true,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.87,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.0031999999999999806,
+      "stable": false,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.88,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.01969999999999994,
+      "stable": true,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.89,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 0,
+      "reversibleMisses": 0,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.009699999999999931,
+      "stable": true,
+      "lookAheadDetected": false
+    },
+    {
+      "recoveryThreshold": 0.9,
+      "verifiedCases": 5,
+      "correctVerified": 4,
+      "severeMisses": 0,
+      "healthyRiskAlerts": 1,
+      "reversibleMisses": 0,
+      "falsePositives": 1,
+      "falseNegatives": 0,
+      "minimumRecoveryDecisionMargin": 0.0020000000000000018,
+      "stable": false,
+      "lookAheadDetected": false
+    }
+  ],
+  "leaveOneCaseOut": [
+    {
+      "holdoutTicker": "DEVA11",
+      "trainingTickers": [
+        "VSLH11",
+        "KNCR11",
+        "KNSC11",
+        "RBRY11"
+      ],
+      "selectedRecoveryThreshold": 0.89,
+      "selectedCandidateStable": true,
+      "trainingCorrect": 4,
+      "trainingVerified": 4,
+      "holdoutCorrect": true,
+      "holdoutStatus": "stress_without_recovery",
+      "holdoutDisposition": "elevated_risk"
+    },
+    {
+      "holdoutTicker": "VSLH11",
+      "trainingTickers": [
+        "DEVA11",
+        "KNCR11",
+        "KNSC11",
+        "RBRY11"
+      ],
+      "selectedRecoveryThreshold": 0.89,
+      "selectedCandidateStable": true,
+      "trainingCorrect": 4,
+      "trainingVerified": 4,
+      "holdoutCorrect": true,
+      "holdoutStatus": "stress_without_recovery",
+      "holdoutDisposition": "elevated_risk"
+    },
+    {
+      "holdoutTicker": "KNCR11",
+      "trainingTickers": [
+        "DEVA11",
+        "VSLH11",
+        "KNSC11",
+        "RBRY11"
+      ],
+      "selectedRecoveryThreshold": 0.89,
+      "selectedCandidateStable": true,
+      "trainingCorrect": 4,
+      "trainingVerified": 4,
+      "holdoutCorrect": true,
+      "holdoutStatus": "no_qualifying_stress",
+      "holdoutDisposition": "none"
+    },
+    {
+      "holdoutTicker": "KNSC11",
+      "trainingTickers": [
+        "DEVA11",
+        "VSLH11",
+        "KNCR11",
+        "RBRY11"
+      ],
+      "selectedRecoveryThreshold": 0.89,
+      "selectedCandidateStable": true,
+      "trainingCorrect": 4,
+      "trainingVerified": 4,
+      "holdoutCorrect": true,
+      "holdoutStatus": "reversible_stress_confirmed",
+      "holdoutDisposition": "informational_recovery"
+    },
+    {
+      "holdoutTicker": "RBRY11",
+      "trainingTickers": [
+        "DEVA11",
+        "VSLH11",
+        "KNCR11",
+        "KNSC11"
+      ],
+      "selectedRecoveryThreshold": 0.89,
+      "selectedCandidateStable": true,
+      "trainingCorrect": 4,
+      "trainingVerified": 4,
+      "holdoutCorrect": true,
+      "holdoutStatus": "reversible_stress_confirmed",
+      "holdoutDisposition": "informational_recovery"
+    }
+  ],
+  "metrics": {
+    "totalCases": 6,
+    "verifiedCases": 5,
+    "correctVerified": 5,
+    "inconclusiveCases": 1,
+    "verifiedAccuracyPercent": 100,
+    "coveragePercent": 83.33,
+    "falsePositives": 0,
+    "falseNegatives": 0,
+    "riskAlerts": 2,
+    "informationalRecoveries": 2,
+    "noSignalCases": 2
+  },
+  "checks": [
+    {
+      "id": "source.dataset-hash",
+      "status": "passed",
+      "message": "O dataset da 3.5-C deve permanecer imutável.",
+      "metadata": {
+        "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae"
+      }
+    },
+    {
+      "id": "source.cohort-hash",
+      "status": "passed",
+      "message": "A identidade da coorte deve permanecer imutável.",
+      "metadata": {
+        "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726"
+      }
+    },
+    {
+      "id": "source.performance-preserved",
+      "status": "passed",
+      "message": "As falhas originais da 3.5-C não podem ser apagadas retrospectivamente.",
+      "metadata": {
+        "originalOutcomes": {
+          "DEVA11": "true_positive",
+          "VSLH11": "true_positive",
+          "KNCR11": "true_negative",
+          "KNSC11": "false_positive",
+          "MCCI11": "inconclusive",
+          "RBRY11": "true_positive"
+        }
+      }
+    },
+    {
+      "id": "candidate-space.bounded",
+      "status": "passed",
+      "message": "O espaço de candidatos deve permanecer limitado.",
+      "metadata": {
+        "candidateCount": 10
+      }
+    },
+    {
+      "id": "candidate.selected",
+      "status": "passed",
+      "message": "O parâmetro versionado deve coincidir com a seleção reproduzida.",
+      "metadata": {
+        "selected": 0.89
+      }
+    },
+    {
+      "id": "candidate.margin",
+      "status": "passed",
+      "message": "A decisão deve possuir margem mínima de recuperação.",
+      "metadata": {
+        "minimumObserved": 0.009699999999999931
+      }
+    },
+    {
+      "id": "validation.leave-one-case-out",
+      "status": "passed",
+      "message": "Todos os folds fora da amostra devem selecionar o mesmo parâmetro e acertar o holdout.",
+      "metadata": {
+        "folds": [
+          {
+            "holdoutTicker": "DEVA11",
+            "trainingTickers": [
+              "VSLH11",
+              "KNCR11",
+              "KNSC11",
+              "RBRY11"
+            ],
+            "selectedRecoveryThreshold": 0.89,
+            "selectedCandidateStable": true,
+            "trainingCorrect": 4,
+            "trainingVerified": 4,
+            "holdoutCorrect": true,
+            "holdoutStatus": "stress_without_recovery",
+            "holdoutDisposition": "elevated_risk"
+          },
+          {
+            "holdoutTicker": "VSLH11",
+            "trainingTickers": [
+              "DEVA11",
+              "KNCR11",
+              "KNSC11",
+              "RBRY11"
+            ],
+            "selectedRecoveryThreshold": 0.89,
+            "selectedCandidateStable": true,
+            "trainingCorrect": 4,
+            "trainingVerified": 4,
+            "holdoutCorrect": true,
+            "holdoutStatus": "stress_without_recovery",
+            "holdoutDisposition": "elevated_risk"
+          },
+          {
+            "holdoutTicker": "KNCR11",
+            "trainingTickers": [
+              "DEVA11",
+              "VSLH11",
+              "KNSC11",
+              "RBRY11"
+            ],
+            "selectedRecoveryThreshold": 0.89,
+            "selectedCandidateStable": true,
+            "trainingCorrect": 4,
+            "trainingVerified": 4,
+            "holdoutCorrect": true,
+            "holdoutStatus": "no_qualifying_stress",
+            "holdoutDisposition": "none"
+          },
+          {
+            "holdoutTicker": "KNSC11",
+            "trainingTickers": [
+              "DEVA11",
+              "VSLH11",
+              "KNCR11",
+              "RBRY11"
+            ],
+            "selectedRecoveryThreshold": 0.89,
+            "selectedCandidateStable": true,
+            "trainingCorrect": 4,
+            "trainingVerified": 4,
+            "holdoutCorrect": true,
+            "holdoutStatus": "reversible_stress_confirmed",
+            "holdoutDisposition": "informational_recovery"
+          },
+          {
+            "holdoutTicker": "RBRY11",
+            "trainingTickers": [
+              "DEVA11",
+              "VSLH11",
+              "KNCR11",
+              "KNSC11"
+            ],
+            "selectedRecoveryThreshold": 0.89,
+            "selectedCandidateStable": true,
+            "trainingCorrect": 4,
+            "trainingVerified": 4,
+            "holdoutCorrect": true,
+            "holdoutStatus": "reversible_stress_confirmed",
+            "holdoutDisposition": "informational_recovery"
+          }
+        ]
+      }
+    },
+    {
+      "id": "performance.verified",
+      "status": "passed",
+      "message": "Os cinco casos verificáveis devem ser classificados sem falso positivo ou falso negativo.",
+      "metadata": {
+        "metrics": {
+          "totalCases": 6,
+          "verifiedCases": 5,
+          "correctVerified": 5,
+          "inconclusiveCases": 1,
+          "verifiedAccuracyPercent": 100,
+          "coveragePercent": 83.33,
+          "falsePositives": 0,
+          "falseNegatives": 0,
+          "riskAlerts": 2,
+          "informationalRecoveries": 2,
+          "noSignalCases": 2
+        }
+      }
+    },
+    {
+      "id": "performance.knsc",
+      "status": "passed",
+      "message": "KNSC11 deve deixar de gerar alerta de risco por regra geral.",
+      "metadata": {}
+    },
+    {
+      "id": "performance.mcci",
+      "status": "passed",
+      "message": "MCCI11 deve permanecer inconclusivo e fora da otimização.",
+      "metadata": {
+        "mcci": {
+          "ticker": "MCCI11",
+          "role": "reversible_stress",
+          "groundTruthStatus": "blocked",
+          "scored": false,
+          "correct": null,
+          "outcome": "inconclusive_unscored",
+          "reason": "Verdade-terreno inconclusiva excluída da otimização e das métricas pontuadas.",
+          "finalStatus": "no_qualifying_stress",
+          "disposition": "none",
+          "riskAlert": false,
+          "firstSignalAt": null,
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null,
+          "recoveryPercentOfBaseline": null,
+          "recoveryDecisionMargin": null,
+          "lookAheadDetected": false,
+          "timeline": [
+            {
+              "asOf": "2022-02-10T17:34:00-03:00",
+              "status": "no_qualifying_stress",
+              "disposition": "none",
+              "riskAlert": false,
+              "stressDetectedAt": null,
+              "recoveryDetectedAt": null
+            }
+          ],
+          "externalEffectsAllowed": false
+        }
+      }
+    },
+    {
+      "id": "look-ahead.none",
+      "status": "passed",
+      "message": "Nenhum caso pode usar informação futura.",
+      "metadata": {}
+    },
+    {
+      "id": "isolation.external-effects",
+      "status": "passed",
+      "message": "A Sprint 3.6 não pode habilitar Premium ou notificações.",
+      "metadata": {}
+    }
+  ],
+  "blockers": [],
+  "homologationAllowed": true,
+  "premiumIntegrated": false,
+  "notificationsSent": false,
+  "evidenceHash": "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81"
+}
