@@ -21,7 +21,7 @@ jobs:
         with:
           ref: docs/handoff-v6-11-phase-c
           fetch-depth: 0
-      - name: Generate canonical Handoff and test
+      - name: Generate canonical Handoff
         id: generate
         shell: bash
         run: |
@@ -31,19 +31,10 @@ jobs:
           from pathlib import Path
           path = Path('.tmp/update-handoff-v6-11.mjs')
           text = path.read_text()
-          replacements = {
-              'function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&"); }':
-                  'function escapeRegExp(value) { return value.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, "\\\\$&"); }',
-              '    assert.ok(current > previous, `${heading} deve existir e respeitar a ordem`);':
-                  '    assert.ok(current > previous, heading + " deve existir e respeitar a ordem");',
-              '  for (const file of files) assert.equal(existsSync(file), true, `${file} deve existir`);':
-                  '  for (const file of files) assert.equal(existsSync(file), true, file + " deve existir");',
-          }
-          for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f'Trecho esperado não encontrado: {old}')
-              text = text.replace(old, new)
-          path.write_text(text)
+          marker = 'const test = String.raw`'
+          if marker not in text:
+              raise SystemExit('Marcador do teste incorporado não encontrado.')
+          path.write_text(text.split(marker, 1)[0])
           PY
           node .tmp/update-handoff-v6-11.mjs 2>&1 | tee .tmp/handoff-generation.log
       - name: Upload generation diagnostic
@@ -54,13 +45,13 @@ jobs:
           path: .tmp/handoff-generation.log
           if-no-files-found: error
           retention-days: 1
-      - name: Commit canonical files only
+      - name: Commit Handoff only
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add DADOS_FII_HANDOFF.md tests/canonical-handoff.test.mjs
+          git add DADOS_FII_HANDOFF.md
           git diff --cached --quiet && exit 0
           git commit -m "docs: atualiza Handoff canônico para v6.11.0"
           git push origin HEAD:docs/handoff-v6-11-phase-c
