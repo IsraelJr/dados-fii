@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-B5",
+  "ticker": "RBRY11",
+  "status": "complete",
+  "identity": {
+    "ticker": "RBRY11",
+    "cnpj": "30166700000111",
+    "role": "reversible_stress",
+    "fromDate": "2022-01-01",
+    "untilDate": "2025-12-31"
+  },
+  "sourceArtifacts": {
+    "diagnostic": {
+      "workflowRunId": 29881954620,
+      "artifactId": 8515476365,
+      "artifactName": "risk-lab-frozen-dividend-checkpoint-v3",
+      "artifactDigest": "sha256:8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+      "releaseCommit": "b54bc58276f43695c3f48f2aa8c9f47a2cadac2a"
+    },
+    "officialRetry": {
+      "workflowRunId": 30128298963,
+      "artifactId": 8610152329,
+      "artifactName": "rbry11-official-retry-30128298963-1",
+      "artifactDigest": "sha256:7399a9fda29f298c051da2f35b8bd96921e93ffd09daef2a4df6552a5465ed45",
+      "headCommit": "46ea417d9976fbc779c73dcd60de277fd129257d"
+    }
+  },
+  "sourceVerification": {
+    "diagnosticZipSha256": "8ed76121aa14086cba740ad921cdcef925e44bd274cb86ca42bc14bba1ee9d0e",
+    "retryZipSha256": "7399a9fda29f298c051da2f35b8bd96921e93ffd09daef2a4df6552a5465ed45",
+    "bothArtifactsRedownloadedAndMatched": true
+  },
+  "result": {
+    "documentsDiscovered": 54,
+    "documentsClassified": 54,
+    "baselineCompletedDocuments": 49,
+    "baselineRawObservations": 49,
+    "retriedRawObservations": 50,
+    "observationsAfterTemporalSanitization": 49,
+    "selectedMonthlyObservations": 47,
+    "pendingDocuments": 0,
+    "conflicts": 0,
+    "missingMonths": [],
+    "longestContiguousSequence": 47
+  },
+  "deterministicHashes": {
+    "baselineCheckpointHash": "fcdac97fb7bafabb0b5199a31ac2e92b585973af6e08256b45c268a5162cb08a",
+    "retriedCheckpointHash": "39de4494f0050568601f81a9db1eb3145df584ffb8d6406a6e85ccc91a38e0df",
+    "sanitizedCheckpointHash": "e1b080d2f097fadbe3dcc695bbb5d06f4a2c389671b5125ce26efd7ad8874815",
+    "finalizedCheckpointHash": "e1b080d2f097fadbe3dcc695bbb5d06f4a2c389671b5125ce26efd7ad8874815",
+    "retryAuditHash": "0f3848ee50d998a4a49f286ddb21b3afc362ae0492b7aa3f6217d02952f87b40",
+    "sanitizationHash": "cd3b231797d25522cd5165191adc4ec0772e5a4ea16afea27b78f29d392ec559",
+    "caseHash": "7ad063f48238652e10862fb0bbbc0d655413afb62ae10a50ff59af4076e6178d",
+    "auditHash": "00b9b25a9e063f95c2041a50f7893a6138daab241cfd59647a677eeafbfebb52",
+    "combinedObservationsHash": "5085c1610ab8b35c9835443779ef33995540f4ec766a31302694963230dc4e85",
+    "evidenceHash": "938b856f5a74edcd404b494f68a33654c1f68b4ae01a392de56e6cbc5c741ed1"
+  },
+  "safety": {
+    "tickerHardcodeInSharedAuditor": false,
+    "documentHardcodeInSharedAuditor": false,
+    "tickerHardcodeInSharedSanitizer": false,
+    "documentHardcodeInSharedSanitizer": false,
+    "productIntegration": false,
+    "premiumIntegration": false,
+    "notificationIntegration": false,
+    "backtestExecuted": false
+  },
+  "files": [
+    "index.json",
+    "observations-2022.json",
+    "observations-2023.json",
+    "observations-2024.json",
+    "observations-2025.json"
+  ]
+}
