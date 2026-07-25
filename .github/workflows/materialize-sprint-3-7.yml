@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/materialize-sprint-3-7.yml"
-      - ".tmp/materialize-sprint-3-7.py.gz.b64"
+      - ".tmp/materialize-sprint-3-7-chunk-*"
   workflow_dispatch:
 
 permissions:
@@ -37,9 +37,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(wc -c < .tmp/materialize-sprint-3-7.py.gz.b64)" = "21504"
-          echo 'ae31527702dfa1c60bf39c2d6d14c4ef0370e2b2aec7ef7b800f6819c20e763c  .tmp/materialize-sprint-3-7.py.gz.b64' | sha256sum -c -
-          base64 -d .tmp/materialize-sprint-3-7.py.gz.b64 | gzip -d > .tmp/materialize-sprint-3-7.py
+          echo '804bedd7fa7676711bbe1aefd3f7baa4b0a5442dc5a43b0d93031db74207aa2c  .tmp/materialize-sprint-3-7-chunk-00' | sha256sum -c -
+          echo 'c0860944ab970b4a5fb92bd4c5fd0a62d70cdcd735a98d2273147df37318981c  .tmp/materialize-sprint-3-7-chunk-01' | sha256sum -c -
+          echo 'fc552d812cdd66526b46e249f7629103a1c283eefd780800cc44f01c5b18441f  .tmp/materialize-sprint-3-7-chunk-02' | sha256sum -c -
+          echo '90c05023423f7df71b4888e93848f5ddd6992a2a7194acd3e000bc3d14aaba15  .tmp/materialize-sprint-3-7-chunk-03' | sha256sum -c -
+          cat .tmp/materialize-sprint-3-7-chunk-00 .tmp/materialize-sprint-3-7-chunk-01 .tmp/materialize-sprint-3-7-chunk-02 .tmp/materialize-sprint-3-7-chunk-03 > .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed
+          test "$(wc -c < .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed)" = "21504"
+          echo 'ae31527702dfa1c60bf39c2d6d14c4ef0370e2b2aec7ef7b800f6819c20e763c  .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed' | sha256sum -c -
+          base64 -d .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed | gzip -d > .tmp/materialize-sprint-3-7.py
           echo '30b9a4ef8555acc6c09ec31c89cf1ec2980b54efc546486b877e2a20d56faaff  .tmp/materialize-sprint-3-7.py' | sha256sum -c -
           python -m py_compile .tmp/materialize-sprint-3-7.py
 
