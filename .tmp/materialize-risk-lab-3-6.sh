@@ -10,6 +10,14 @@ tar -xzf .tmp/cal36-permanent.tar.gz -C .
 python - <<'PY'
 from pathlib import Path
 
+source_path = Path('src/lib/risk-lab/RiskLabRulesetV020.ts')
+source = source_path.read_text()
+old_constructor = 'export class RiskLabRulesetV020 {\n  constructor(private readonly config: RiskLabRulesetV020Config = loadRiskLabRulesetV020Config()) {}\n'
+new_constructor = 'export class RiskLabRulesetV020 {\n  private readonly config: RiskLabRulesetV020Config;\n\n  constructor(config: RiskLabRulesetV020Config = loadRiskLabRulesetV020Config()) {\n    this.config = config;\n  }\n'
+if source.count(old_constructor) != 1:
+    raise SystemExit('Construtor esperado do ruleset não foi encontrado de forma única.')
+source_path.write_text(source.replace(old_constructor, new_constructor, 1))
+
 path = Path('.github/workflows/risk-lab.yml')
 text = path.read_text()
 start = '  # BEGIN TEMP MATERIALIZER 3.6\n'
