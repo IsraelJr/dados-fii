@@ -37,10 +37,10 @@ test("existe somente um Handoff canônico", () => {
 test("Handoff possui versão, data, base e próxima unidade vigentes", () => {
   const text = body();
   assert.equal(text.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(text, /\*\*Versão:\*\* 6\.11\.0/);
+  assert.match(text, /\*\*Versão:\*\* 6\.12\.0/);
   assert.match(text, /\*\*Data:\*\* 25\/07\/2026/);
-  assert.match(text, /\*\*Base funcional auditada:\*\* `ef0c621f2f813009fdb3999b721e4f4a6568c134`/);
-  assert.match(text, /Próxima unidade de trabalho:\*\* 3\.6 — calibração e homologação do ruleset — não iniciada/);
+  assert.match(text, /\*\*Base funcional auditada:\*\* `bfdc186057652a535025d19beae061856624d5c1`/);
+  assert.match(text, /Próxima unidade de trabalho:\*\* 3\.7 — Risk Lab read-only no Premium \+ Prompt Premium v3 — não iniciada/);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -67,21 +67,21 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("Sprint 3.5 está concluída e 3.6 não foi iniciada", () => {
+test("Sprints 3.5 e 3.6 estão concluídas e 3.7 não foi iniciada", () => {
   const text = body();
   for (const required of [
-    "A Sprint 3.5 está formalmente concluída",
-    "Sprint 3.5 completa: formalmente concluída",
-    "Sprint 3.6 — calibração e homologação do ruleset",
+    "A Sprint 3.6 está formalmente concluída",
+    "Sprint 3.6 completa: formalmente concluída",
+    "Sprint 3.7 — Risk Lab read-only no Premium + Prompt Premium v3",
     "Estado: **planejada e não iniciada**",
-    "A Sprint 3.6 não foi iniciada automaticamente",
-    "ruleset `0.1.0` não está homologado",
-    "Risk Lab não está liberado para Premium/notificações",
+    "A Sprint 3.7 não foi iniciada automaticamente",
+    "ruleset `0.2.0` está homologado",
+    "Risk Lab não está integrado ao Premium/notificações",
   ]) {
     assert.match(text, new RegExp(escapeRegExp(required), "i"));
   }
-  assert.doesNotMatch(text, /dataset e backtest permanecem pendentes/i);
-  assert.doesNotMatch(text, /Sprint 3\.5 não está concluída/i);
+  assert.doesNotMatch(text, /Sprint 3\.6 não está concluída/i);
+  assert.doesNotMatch(text, /ruleset `0\.1\.0` não está homologado/i);
 });
 
 test("evidência canônica da fase 3.5-C está registrada sem maquiar desempenho", () => {
@@ -104,6 +104,25 @@ test("evidência canônica da fase 3.5-C está registrada sem maquiar desempenho
   }
 });
 
+test("evidência canônica da Sprint 3.6 está registrada", () => {
+  const text = body();
+  for (const required of [
+    "merge funcional: `bfdc186057652a535025d19beae061856624d5c1`",
+    "ruleset homologado: `0.2.0`",
+    "recuperação `89%`",
+    "falsos positivos `0`",
+    "falsos negativos `0`",
+    "MCCI11: `inconclusive_unscored`",
+    "`91bf016c119ebbc929409c28f08a751ec4bcc6cb4f6f344656cfa7ef6818a4ec`",
+    "`22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a`",
+    "`35dd492e433855e50849cba05990bb9c5255be6f209fbcce5d5a9cb832ef0017`",
+    "Premium integrado: `false`",
+    "notificações enviadas: `false`",
+  ]) {
+    assert.match(text, new RegExp(escapeRegExp(required), "i"));
+  }
+});
+
 test("arquivos e gates permanentes da 3.5-C existem", () => {
   const files = [
     "docs/production-evidence/risk-lab/cohort-phase-c/index.json",
@@ -116,12 +135,20 @@ test("arquivos e gates permanentes da 3.5-C existem", () => {
     "src/lib/risk-lab/frozen-cohort-phase-c-v1.json",
     "tests/risk-lab-cohort-phase-c-evidence.test.mjs",
     "tests/risk-lab-frozen-cohort-phase-c.test.ts",
+    "docs/production-evidence/risk-lab/calibration-phase-3-6/index.json",
+    "docs/production-evidence/risk-lab/calibration-phase-3-6/calibration-report.json",
+    "docs/production-evidence/risk-lab/calibration-phase-3-6-manifest.json",
+    "src/lib/risk-lab/RiskLabRulesetV020.ts",
+    "src/lib/risk-lab/FrozenCalibrationPhase36.ts",
+    "tests/risk-lab-calibration-phase-3-6.test.ts",
+    "tests/risk-lab-calibration-phase-3-6-evidence.test.mjs",
   ];
   for (const file of files) {
     assert.equal(existsSync(file), true, file + " deve existir");
   }
   const workflow = readFileSync(".github/workflows/risk-lab.yml", "utf8");
   assert.match(workflow, /Validate immutable cohort dataset and no-look-ahead backtest/);
+  assert.match(workflow, /Validate calibrated and homologated Risk Lab ruleset/);
 });
 
 test("roadmap, fallback e critérios globais permanecem protegidos", () => {
