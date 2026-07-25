@@ -67,10 +67,10 @@ jobs:
         run: |
           set -euo pipefail
           python .tmp/materialize-sprint-3-7.py 2>&1 | tee .tmp/materialize-sprint-3-7.log
-          python - <<'PY'
+          python - <<'PY' 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
           from pathlib import Path
           replacements = {
-              'tests/premium-prompt-v3.test.ts': ('/campos determinísticos/i', '/cálculos determinísticos/i'),
+              'tests/premium-prompt-v3.test.ts': ('"campos determinísticos"', '"cálculos determinísticos"'),
               'tests/report-ai-insights.test.ts': ('/não repetir o resumo gratuito/i', '/sem repetir o resumo gratuito/i'),
           }
           for filename, (old, new) in replacements.items():
@@ -79,6 +79,7 @@ jobs:
               if text.count(old) != 1:
                   raise SystemExit(f'Expectativa textual divergente em {filename}: {old}')
               path.write_text(text.replace(old, new, 1))
+          print('Expectativas textuais alinhadas ao Prompt Premium v3.')
           PY
           npm run test:sprint3.7 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
           npm run typecheck 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
