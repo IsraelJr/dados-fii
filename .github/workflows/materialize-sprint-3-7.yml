@@ -1,0 +1,97 @@
+name: Materialize Sprint 3.7 Premium Readonly
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/materialize-sprint-3-7.yml"
+      - ".tmp/materialize-sprint-3-7.py.gz.b64"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-sprint-3-7-premium-readonly
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.head_ref == 'agent/sprint-3-7-premium-readonly' || github.ref_name == 'agent/sprint-3-7-premium-readonly'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/sprint-3-7-premium-readonly
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify and reconstruct materializer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(wc -c < .tmp/materialize-sprint-3-7.py.gz.b64)" = "21504"
+          echo 'ae31527702dfa1c60bf39c2d6d14c4ef0370e2b2aec7ef7b800f6819c20e763c  .tmp/materialize-sprint-3-7.py.gz.b64' | sha256sum -c -
+          base64 -d .tmp/materialize-sprint-3-7.py.gz.b64 | gzip -d > .tmp/materialize-sprint-3-7.py
+          echo '30b9a4ef8555acc6c09ec31c89cf1ec2980b54efc546486b877e2a20d56faaff  .tmp/materialize-sprint-3-7.py' | sha256sum -c -
+          python -m py_compile .tmp/materialize-sprint-3-7.py
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Materialize implementation
+        id: materialize
+        shell: bash
+        run: |
+          set -o pipefail
+          python .tmp/materialize-sprint-3-7.py 2>&1 | tee .tmp/materialize-sprint-3-7.log
+          npm run test:sprint3.7 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
+          npm run typecheck 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
+
+      - name: Upload diagnostic
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint-3-7-materialization-failure-${{ github.run_id }}
+          path: .tmp/materialize-sprint-3-7.log
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Commit permanent files only
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            package.json \
+            src/app/api/fii/[ticker]/report/premium/route.ts \
+            src/app/components/PremiumReportPanel.tsx \
+            src/lib/ai/AIInsightsEngine.ts \
+            src/lib/ai/PremiumPromptV3.ts \
+            src/lib/featureFlags.ts \
+            src/lib/regulatory/RegulatoryRepository.ts \
+            src/lib/regulatoryDataService.ts \
+            src/lib/reports/PremiumReportEngine.ts \
+            src/lib/risk-lab/RiskLabPremiumReadModel.ts \
+            src/lib/risk-lab/risk-lab-premium-readonly-v1.json \
+            src/types/ai-insights.ts \
+            src/types/premium-report.ts \
+            tests/report-ai-insights.test.ts \
+            tests/risk-lab-premium-readonly.test.ts \
+            tests/premium-prompt-v3.test.ts \
+            tests/risk-lab-premium-integration.test.mjs \
+            docs/premium/PROMPT_PREMIUM_V3.md \
+            docs/risk-lab/sprint-3-7-premium-readonly.md \
+            docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json
+          git diff --cached --check
+          git commit -m 'feat: integra Risk Lab read-only ao Premium'
+          git push origin HEAD:agent/sprint-3-7-premium-readonly
