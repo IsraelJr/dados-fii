@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-C",
+  "status": "complete",
+  "expected": {
+    "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+    "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+    "observationCount": 318,
+    "registryHash": "a4648fd3c2136d5c5025ce0a6e2e46ac5765c004bbf840db2efa17a24cc0a8f5",
+    "datasetIndexHash": "0fcc5e4e5a7963f48076b0a34dd0a6836477f806bd1a9bbe0dd3d7b00c21078e",
+    "backtestEvidenceHash": "4b0ced4e8ef662a23317e850353209b72804745be3afa7dc128e05356b2e7c6f",
+    "backtestReportHash": "2d0eedbde1afe8ede7903f7b8b487e1c53adc57fb56ca172a1865bba950e1bbc",
+    "indexEvidenceHash": "edb90face1dddff390dcbf260cf60dc0bb3c053f20ea4ea5a17a0788b98c308e",
+    "metrics": {
+      "totalCases": 6,
+      "conclusiveCases": 5,
+      "truePositives": 3,
+      "trueNegatives": 1,
+      "falsePositives": 1,
+      "falseNegatives": 0,
+      "inconclusiveCases": 1,
+      "coveragePercent": 83.33,
+      "averageLeadTimeDays": 220.52,
+      "minimumLeadTimeDays": 90.04,
+      "maximumLeadTimeDays": 422.26
+    },
+    "outcomes": {
+      "DEVA11": "true_positive",
+      "VSLH11": "true_positive",
+      "KNCR11": "true_negative",
+      "KNSC11": "false_positive",
+      "MCCI11": "inconclusive",
+      "RBRY11": "true_positive"
+    }
+  }
+}

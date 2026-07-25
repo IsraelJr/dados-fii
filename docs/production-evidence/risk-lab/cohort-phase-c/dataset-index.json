@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-C",
+  "datasetId": "risk-lab-credit-oos-phase-c-v1",
+  "datasetVersion": "1.0.0",
+  "rulesetVersion": "0.1.0",
+  "evaluatedAt": "2026-07-25T00:00:00-03:00",
+  "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+  "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+  "observationCount": 318,
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "role": "severe_deterioration",
+      "indexPath": "docs/production-evidence/risk-lab/deva11-phase-a/index.json",
+      "indexEvidenceHash": "62a19d9b20b57b49489d7ab51ed85d72505625ca68f47762a5045fc3c650993b",
+      "combinedObservationsHash": "6788292746eeb5321d36cd198c75b5810c3797cead357341cc04df9254fee20c",
+      "observations": 65,
+      "missingMonths": [
+        "2024-07"
+      ],
+      "longestContiguousSequence": 42
+    },
+    {
+      "ticker": "VSLH11",
+      "role": "severe_deterioration",
+      "indexPath": "docs/production-evidence/risk-lab/vslh11-phase-b1/index.json",
+      "indexEvidenceHash": "952c88ec36f930ce83d153bedb07344226cf8d9029d14ada1576514214269092",
+      "combinedObservationsHash": "2551679cf4a16ecb389c474f26c541670db69c7c39f34484a28cc6a61cae85ea",
+      "observations": 64,
+      "missingMonths": [
+        "2023-12"
+      ],
+      "longestContiguousSequence": 34
+    },
+    {
+      "ticker": "KNCR11",
+      "role": "healthy_control",
+      "indexPath": "docs/production-evidence/risk-lab/kncr11-phase-b2/index.json",
+      "indexEvidenceHash": "c11de46d43de21e98a3eb6986a8fb5c0692465672c412b3329f20d86a9bfd1bb",
+      "combinedObservationsHash": "fd7e47d03fbea224b1a0e4d0dff0629c20d59fa6fced2c8348c2aacbf417d09f",
+      "observations": 48,
+      "missingMonths": [],
+      "longestContiguousSequence": 48
+    },
+    {
+      "ticker": "KNSC11",
+      "role": "healthy_control",
+      "indexPath": "docs/production-evidence/risk-lab/knsc11-phase-b3/index.json",
+      "indexEvidenceHash": "149ababbbd26ac4cf21b5462022e0c921cff3ff10a1797f0d4047fda2d3bdb65",
+      "combinedObservationsHash": "00ddf8ec44c0f02757b766f3b98781d80649bc1fca973c4b46cf05a866014045",
+      "observations": 48,
+      "missingMonths": [],
+      "longestContiguousSequence": 48
+    },
+    {
+      "ticker": "MCCI11",
+      "role": "reversible_stress",
+      "indexPath": "docs/production-evidence/risk-lab/mcci11-phase-b4/index.json",
+      "indexEvidenceHash": "14c6ad2e55053d020688c0c99252e35a45c91a748cd946fd403b9acd0d99a817",
+      "combinedObservationsHash": "75d66bf48e8d838529dd847385aadf073a8cf51aac53cbb8130bda125e42709e",
+      "observations": 46,
+      "missingMonths": [
+        "2025-02"
+      ],
+      "longestContiguousSequence": 37
+    },
+    {
+      "ticker": "RBRY11",
+      "role": "reversible_stress",
+      "indexPath": "docs/production-evidence/risk-lab/rbry11-phase-b5/index.json",
+      "indexEvidenceHash": "938b856f5a74edcd404b494f68a33654c1f68b4ae01a392de56e6cbc5c741ed1",
+      "combinedObservationsHash": "5085c1610ab8b35c9835443779ef33995540f4ec766a31302694963230dc4e85",
+      "observations": 47,
+      "missingMonths": [],
+      "longestContiguousSequence": 47
+    }
+  ],
+  "datasetIndexHash": "0fcc5e4e5a7963f48076b0a34dd0a6836477f806bd1a9bbe0dd3d7b00c21078e"
+}
