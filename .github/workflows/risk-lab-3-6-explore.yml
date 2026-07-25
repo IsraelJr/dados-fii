@@ -5,12 +5,12 @@ on:
     branches:
       - agent/sprint-3-6-calibration
     paths:
-      - ".tmp/explore-risk-lab-3-6.ts"
+      - ".tmp/explore-risk-lab-3-6.mjs"
       - ".github/workflows/risk-lab-3-6-explore.yml"
   pull_request:
     branches: [main]
     paths:
-      - ".tmp/explore-risk-lab-3-6.ts"
+      - ".tmp/explore-risk-lab-3-6.mjs"
       - ".github/workflows/risk-lab-3-6-explore.yml"
   workflow_dispatch:
 
@@ -34,7 +34,7 @@ jobs:
 
       - name: Explore bounded calibration space
         run: |
-          node --import ./tests/register-ts-loader.mjs --experimental-strip-types .tmp/explore-risk-lab-3-6.ts | tee .tmp/risk-lab-3-6-exploration.log
+          node .tmp/explore-risk-lab-3-6.mjs | tee .tmp/risk-lab-3-6-exploration.log
 
       - name: Upload deterministic diagnostic
         uses: actions/upload-artifact@v4
