@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/update-handoff-v6-13.yml"
       - ".tmp/update-handoff-v6-13.py"
+      - ".tmp/fix-update-handoff-v6-13.py"
   workflow_dispatch:
 
 permissions:
@@ -38,7 +39,8 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p .tmp
-          python .tmp/update-handoff-v6-13.py 2>&1 | tee .tmp/update-handoff-v6-13.log
+          python .tmp/fix-update-handoff-v6-13.py 2>&1 | tee .tmp/update-handoff-v6-13.log
+          python .tmp/update-handoff-v6-13.py 2>&1 | tee -a .tmp/update-handoff-v6-13.log
           npm run test:handoff 2>&1 | tee -a .tmp/update-handoff-v6-13.log
 
       - name: Upload diagnostic
