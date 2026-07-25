@@ -27,6 +27,16 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p .tmp
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.tmp/update-handoff-v6-11.mjs')
+          text = path.read_text()
+          old = 'function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&"); }'
+          new = 'function escapeRegExp(value) { return value.replace(/[-/\\\\^$*+?.()|[\\]{}]/g, "\\\\$&"); }'
+          if old not in text:
+              raise SystemExit('Linha esperada de escapeRegExp não encontrada.')
+          path.write_text(text.replace(old, new))
+          PY
           node .tmp/update-handoff-v6-11.mjs 2>&1 | tee .tmp/handoff-generation.log
       - name: Upload generation diagnostic
         if: failure() && steps.generate.outcome == 'failure'
