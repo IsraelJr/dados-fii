@@ -272,8 +272,7 @@ function loadCase(root: string, registry: FrozenCohortRegistry, item: FrozenCoho
   assertCondition(index.result.pendingDocuments === 0, `${item.ticker}: existem documentos pendentes.`);
   assertCondition(index.result.conflicts === 0, `${item.ticker}: existem conflitos.`);
 
-  const indexPayload = { ...index };
-  delete indexPayload.evidenceHash;
+  const { evidenceHash: _ignoredEvidenceHash, ...indexPayload } = index;
   assertCondition(hashValue(indexPayload) === index.evidenceHash, `${item.ticker}: evidenceHash do índice divergente.`);
   assertCondition(index.evidenceHash === item.expectedEvidenceHash, `${item.ticker}: evidenceHash não corresponde ao registro congelado.`);
 
