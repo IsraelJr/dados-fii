@@ -1,0 +1,63 @@
+name: Update Canonical Handoff v6.13
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-handoff-v6-13.yml"
+      - ".tmp/update-handoff-v6-13.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.head_ref == 'docs/handoff-v6-13-sprint-3-7-pending-production' || github.ref_name == 'docs/handoff-v6-13-sprint-3-7-pending-production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: docs/handoff-v6-13-sprint-3-7-pending-production
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Generate canonical Handoff and test
+        id: generate
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          python .tmp/update-handoff-v6-13.py 2>&1 | tee .tmp/update-handoff-v6-13.log
+          npm run test:handoff 2>&1 | tee -a .tmp/update-handoff-v6-13.log
+
+      - name: Upload diagnostic
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: handoff-v6-13-failure-${{ github.run_id }}
+          path: .tmp/update-handoff-v6-13.log
+          if-no-files-found: warn
+          retention-days: 2
+
+      - name: Commit canonical files only
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add DADOS_FII_HANDOFF.md tests/canonical-handoff.test.mjs
+          git diff --cached --check
+          git commit -m 'docs: atualiza Handoff canônico para v6.13.0'
+          git push origin HEAD:docs/handoff-v6-13-sprint-3-7-pending-production
