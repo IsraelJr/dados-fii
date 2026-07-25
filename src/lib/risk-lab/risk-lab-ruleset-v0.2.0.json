@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.6",
+  "rulesetVersion": "0.2.0",
+  "sourceRulesetVersion": "0.1.0",
+  "dataset": {
+    "id": "risk-lab-credit-oos-phase-c-v1",
+    "version": "1.0.0",
+    "hash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+    "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726"
+  },
+  "structure": {
+    "baselineMonths": 6,
+    "stressMonths": 3,
+    "recoveryMonths": 3
+  },
+  "candidateSpace": {
+    "stressThresholds": [
+      0.8
+    ],
+    "recoveryThresholds": [
+      0.81,
+      0.82,
+      0.83,
+      0.84,
+      0.85,
+      0.86,
+      0.87,
+      0.88,
+      0.89,
+      0.9
+    ],
+    "minimumRecoveryDecisionMargin": 0.005
+  },
+  "selection": {
+    "validationProtocol": "leave-one-verified-case-out",
+    "priority": [
+      "minimize_severe_misses",
+      "minimize_healthy_risk_alerts",
+      "minimize_reversible_misses",
+      "maximize_verified_correct",
+      "minimize_distance_from_source_recovery_threshold",
+      "prefer_higher_recovery_threshold"
+    ]
+  },
+  "selectedParameters": {
+    "stressThreshold": 0.8,
+    "recoveryThreshold": 0.89
+  },
+  "policy": {
+    "riskAlertStatuses": [
+      "stress_without_recovery",
+      "recovery_blocked_by_material_credit_event"
+    ],
+    "informationalStatuses": [
+      "reversible_stress_confirmed"
+    ],
+    "inconclusiveGroundTruth": "exclude_from_optimization_and_scored_metrics",
+    "externalEffectsAllowed": false
+  }
+}

@@ -20,53 +20,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: risk-lab-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # BEGIN TEMP MATERIALIZER 3.6
-  materialize_phase_3_6:
-    if: github.head_ref == 'agent/sprint-3-6-calibration'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout source branch
-        uses: actions/checkout@v4
-        with:
-          ref: agent/sprint-3-6-calibration
-          fetch-depth: 0
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install frozen dependencies
-        run: npm ci --silent
-
-      - name: Materialize permanent Sprint 3.6 implementation
-        id: materialize
-        shell: bash
-        run: |
-          set +e
-          bash .tmp/materialize-risk-lab-3-6.sh > .tmp/materialize-phase-3-6.log 2>&1
-          status=$?
-          cat .tmp/materialize-phase-3-6.log
-          exit $status
-
-      - name: Upload materialization diagnostic
-        if: failure() && steps.materialize.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: risk-lab-3-6-materialization-failure-${{ github.run_id }}
-          path: .tmp/materialize-phase-3-6.log
-          if-no-files-found: error
-          retention-days: 3
-  # END TEMP MATERIALIZER 3.6
 
   validate:
     runs-on: ubuntu-latest
@@ -160,6 +120,15 @@ jobs:
             tests/risk-lab-frozen-cohort-phase-c.test.ts \
             tests/risk-lab-cohort-phase-c-evidence.test.mjs 2>&1 | tee .tmp/phase-c-ci.log
 
+      - name: Validate calibrated and homologated Risk Lab ruleset
+        id: phase_3_6_tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \
+            tests/risk-lab-calibration-phase-3-6.test.ts \
+            tests/risk-lab-calibration-phase-3-6-evidence.test.mjs 2>&1 | tee .tmp/phase-3-6-ci.log
+
       - name: Validate TypeScript diagnostics
         id: typecheck
         shell: bash
@@ -221,7 +190,7 @@ jobs:
           npm run build 2>&1 | tee .tmp/production-build.log
 
       - name: Upload failure diagnostics
-        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.mcci11_tests.outcome == 'failure' || steps.rbry11_tests.outcome == 'failure' || steps.phase_c_tests.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.build_firebase_credentials.outcome == 'failure' || steps.production_build.outcome == 'failure')
+        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.mcci11_tests.outcome == 'failure' || steps.rbry11_tests.outcome == 'failure' || steps.phase_c_tests.outcome == 'failure' || steps.phase_3_6_tests.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.build_firebase_credentials.outcome == 'failure' || steps.production_build.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: risk-lab-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -234,6 +203,7 @@ jobs:
             .tmp/mcci11-ci.log
             .tmp/rbry11-ci.log
             .tmp/phase-c-ci.log
+            .tmp/phase-3-6-ci.log
             .tmp/typecheck.log
             .tmp/production-build.log
           if-no-files-found: error

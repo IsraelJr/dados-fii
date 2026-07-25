@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.6",
+  "status": "complete",
+  "expected": {
+    "sourceRulesetVersion": "0.1.0",
+    "rulesetVersion": "0.2.0",
+    "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+    "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+    "rulesetConfigHash": "91bf016c119ebbc929409c28f08a751ec4bcc6cb4f6f344656cfa7ef6818a4ec",
+    "candidateSpaceHash": "b34f2dddf9eb0b9d2bba4ec4351905bba723178eec7d65d1c8e286cbea5e320d",
+    "selectedParameters": {
+      "stressThreshold": 0.8,
+      "recoveryThreshold": 0.89,
+      "minimumRecoveryDecisionMargin": 0.005
+    },
+    "reportEvidenceHash": "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81",
+    "reportFileHash": "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a",
+    "candidateSpaceEvidenceHash": "163ce4218faad3f75f18f085ba62104a7e9871aeef13e5c53ee6f5469abb9d0d",
+    "indexEvidenceHash": "35dd492e433855e50849cba05990bb9c5255be6f209fbcce5d5a9cb832ef0017",
+    "metrics": {
+      "totalCases": 6,
+      "verifiedCases": 5,
+      "correctVerified": 5,
+      "inconclusiveCases": 1,
+      "verifiedAccuracyPercent": 100,
+      "coveragePercent": 83.33,
+      "falsePositives": 0,
+      "falseNegatives": 0,
+      "riskAlerts": 2,
+      "informationalRecoveries": 2,
+      "noSignalCases": 2
+    },
+    "outcomes": {
+      "DEVA11": "verified_correct",
+      "VSLH11": "verified_correct",
+      "KNCR11": "verified_correct",
+      "KNSC11": "verified_correct",
+      "MCCI11": "inconclusive_unscored",
+      "RBRY11": "verified_correct"
+    },
+    "dispositions": {
+      "DEVA11": "elevated_risk",
+      "VSLH11": "elevated_risk",
+      "KNCR11": "none",
+      "KNSC11": "informational_recovery",
+      "MCCI11": "none",
+      "RBRY11": "informational_recovery"
+    },
+    "foldThresholds": {
+      "DEVA11": 0.89,
+      "VSLH11": 0.89,
+      "KNCR11": 0.89,
+      "KNSC11": 0.89,
+      "RBRY11": 0.89
+    }
+  }
+}
