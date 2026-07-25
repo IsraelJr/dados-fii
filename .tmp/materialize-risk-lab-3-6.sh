@@ -13,11 +13,20 @@ import json
 
 source_path = Path('src/lib/risk-lab/RiskLabRulesetV020.ts')
 source = source_path.read_text()
-old_constructor = 'export class RiskLabRulesetV020 {\n  constructor(private readonly config: RiskLabRulesetV020Config = loadRiskLabRulesetV020Config()) {}\n'
-new_constructor = 'export class RiskLabRulesetV020 {\n  private readonly config: RiskLabRulesetV020Config;\n\n  constructor(config: RiskLabRulesetV020Config = loadRiskLabRulesetV020Config()) {\n    this.config = config;\n  }\n'
-if source.count(old_constructor) != 1:
-    raise SystemExit('Construtor esperado do ruleset não foi encontrado de forma única.')
-source_path.write_text(source.replace(old_constructor, new_constructor, 1))
+source_replacements = [
+  (
+    'export class RiskLabRulesetV020 {\n  constructor(private readonly config: RiskLabRulesetV020Config = loadRiskLabRulesetV020Config()) {}\n',
+    'export class RiskLabRulesetV020 {\n  private readonly config: RiskLabRulesetV020Config;\n\n  constructor(config: RiskLabRulesetV020Config = loadRiskLabRulesetV020Config()) {\n    this.config = config;\n  }\n',
+  ),
+  ('config.candidateSpace.recoveryThresholds.length === 21', 'config.candidateSpace.recoveryThresholds.length === 10'),
+  ('config.candidateSpace.recoveryThresholds[0] === 0.7', 'config.candidateSpace.recoveryThresholds[0] === 0.81'),
+  ('config.candidateSpace.recoveryThresholds[20] === 0.9', 'config.candidateSpace.recoveryThresholds[9] === 0.9'),
+]
+for old, new in source_replacements:
+    if source.count(old) != 1:
+        raise SystemExit(f'Trecho esperado ausente ou duplicado no ruleset: {old}')
+    source = source.replace(old, new, 1)
+source_path.write_text(source)
 
 config_path = Path('src/lib/risk-lab/risk-lab-ruleset-v0.2.0.json')
 config = json.loads(config_path.read_text())
