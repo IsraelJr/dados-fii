@@ -23,12 +23,33 @@ jobs:
           ref: agent/sprint-3-5-b5-rbry11
           fetch-depth: 0
 
-      - name: Correct transport byte and verify final bundle
+      - name: Recover unique transport byte and verify final bundle
         shell: bash
         run: |
           set -euo pipefail
-          test "$(grep -o 'hk8lYESF' .tmp/rbry-bundle-01 | wc -l)" -eq 1
-          sed -i 's/hk8lYESF/hk8lZESF/' .tmp/rbry-bundle-01
+          python - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+
+          path = Path('.tmp/rbry-bundle-01')
+          data = bytearray(path.read_bytes())
+          target = '57add64f381c1e1889c8f70ec7d87b467deedba4b3f3081db934054d32f2406a'
+          alphabet = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+          matches = []
+          for index, original in enumerate(data):
+              for candidate in alphabet:
+                  if candidate == original:
+                      continue
+                  data[index] = candidate
+                  if sha256(data).hexdigest() == target:
+                      matches.append((index, original, candidate, bytes(data)))
+                  data[index] = original
+          if len(matches) != 1:
+              raise SystemExit(f'Esperada uma correção única; encontradas {len(matches)}.')
+          index, original, candidate, corrected = matches[0]
+          path.write_bytes(corrected)
+          print(f'Correção única aplicada no byte {index}: {chr(original)} -> {chr(candidate)}')
+          PY
           echo "a68cef8147eae4165fdd55e4c4a3b0ad63855364d281d2c8ccf30879239708cd  .tmp/rbry-bundle-00" | sha256sum -c -
           echo "57add64f381c1e1889c8f70ec7d87b467deedba4b3f3081db934054d32f2406a  .tmp/rbry-bundle-01" | sha256sum -c -
           echo "accdc2075db47b2e4c4132a269b168e517a86b729f8e4ec427d9f2ed7a48dce2  .tmp/rbry-bundle-02" | sha256sum -c -
