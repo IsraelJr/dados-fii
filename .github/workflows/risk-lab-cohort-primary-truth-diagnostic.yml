@@ -1,0 +1,46 @@
+name: Diagnose Risk Lab Cohort Primary Truth
+
+on:
+  push:
+    branches: [agent/sprint-3-5-c-dataset-backtest]
+    paths:
+      - ".github/workflows/risk-lab-cohort-primary-truth-diagnostic.yml"
+      - "scripts/diagnose-risk-lab-cohort-primary-truth.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: risk-lab-cohort-primary-truth-diagnostic
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/sprint-3-5-c-dataset-backtest
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Discover and screen official primary sources
+        run: node --import ./tests/register-ts-loader.mjs --experimental-strip-types scripts/diagnose-risk-lab-cohort-primary-truth.ts
+
+      - name: Upload diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-cohort-primary-truth-${{ github.run_id }}
+          path: risk-lab-cohort-primary-truth-diagnostic.json
+          if-no-files-found: error
+          retention-days: 3
