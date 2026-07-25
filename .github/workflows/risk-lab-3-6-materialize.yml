@@ -61,8 +61,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \\
-            tests/risk-lab-calibration-phase-3-6.test.ts \\
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \
+            tests/risk-lab-calibration-phase-3-6.test.ts \
             tests/risk-lab-calibration-phase-3-6-evidence.test.mjs 2>&1 | tee .tmp/phase-3-6-ci.log
 
 '''
