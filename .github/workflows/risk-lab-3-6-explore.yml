@@ -7,6 +7,11 @@ on:
     paths:
       - ".tmp/explore-risk-lab-3-6.ts"
       - ".github/workflows/risk-lab-3-6-explore.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".tmp/explore-risk-lab-3-6.ts"
+      - ".github/workflows/risk-lab-3-6-explore.yml"
   workflow_dispatch:
 
 permissions:
