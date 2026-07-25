@@ -5,8 +5,7 @@ import test from "node:test";
 
 const ROOT = process.cwd();
 const HANDOFF = "DADOS_FII_HANDOFF.md";
-const EXACT_FIRST_LINE =
-  "Este documento substitui todos os planejamentos anteriores quando houver divergência.";
+const EXACT_FIRST_LINE = "Este documento substitui todos os planejamentos anteriores quando houver divergência.";
 
 function walk(directory, output = []) {
   for (const entry of readdirSync(directory)) {
@@ -24,23 +23,26 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-test("existe somente um Handoff canônico do Dados FII no Git", () => {
-  const matches = walk(ROOT)
-    .filter((file) => /(?:^|\/)DADOS_FII_HANDOFF(?:_v[^/]*)?\.md$/i.test(file))
-    .sort();
+function body() {
+  return readFileSync(HANDOFF, "utf8");
+}
+
+test("existe somente um Handoff canônico do Dados FII", () => {
+  const matches = walk(ROOT).filter((file) => /(?:^|\/)DADOS_FII_HANDOFF(?:_v[^/]*)?\.md$/i.test(file)).sort();
   assert.deepEqual(matches, [HANDOFF]);
 });
 
-test("Handoff possui precedência, versão e data vigentes", () => {
-  const body = readFileSync(HANDOFF, "utf8");
-  assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 6\.8\.0/);
-  assert.match(body, /\*\*Data:\*\* 24\/07\/2026/);
-  assert.match(body, /existe apenas um Handoff canônico versionado no repositório/i);
+test("Handoff possui precedência, versão, data e base funcional vigentes", () => {
+  const text = body();
+  assert.equal(text.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
+  assert.match(text, /\*\*Versão:\*\* 6\.10\.0/);
+  assert.match(text, /\*\*Data:\*\* 24\/07\/2026/);
+  assert.match(text, /\*\*Base funcional auditada:\*\* `c616437a0a44c1543015a709911c67f70f390b7d`/);
+  assert.match(text, /existe apenas um Handoff canônico versionado no repositório/i);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
-  const body = readFileSync(HANDOFF, "utf8");
+  const text = body();
   const headings = [
     "## 1. Estado atual do projeto",
     "## 2. Fases concluídas",
@@ -57,28 +59,66 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   ];
   let previous = -1;
   for (const heading of headings) {
-    const current = body.indexOf(heading);
+    const current = text.indexOf(heading);
     assert.ok(current > previous, `${heading} deve existir e respeitar a ordem`);
     previous = current;
   }
 });
 
-test("estado canônico mantém quatro fundos concluídos e MCCI11 como próxima fase", () => {
-  const body = readFileSync(HANDOFF, "utf8");
-  assert.match(body, /Fase 3\.5-A — DEVA11 está formalmente concluída/);
-  assert.match(body, /Fase 3\.5-B1 — VSLH11 está formalmente concluída/);
-  assert.match(body, /Fase 3\.5-B2 — KNCR11 está formalmente concluída/);
-  assert.match(body, /Fase 3\.5-B3 — KNSC11 está formalmente concluída/);
-  assert.match(body, /Próxima unidade de trabalho:\*\* 3\.5-B4 — MCCI11/);
-  assert.match(body, /documentos descobertos\/classificados: `85\/85`/);
-  assert.match(body, /documentos descobertos\/classificados: `79\/79`/);
-  assert.match(body, /merge funcional: `1925b53a268f90b4c2f9a2733c4ac8df645a14ec`/);
-  assert.match(body, /índice de evidência: `149ababbbd26ac4cf21b5462022e0c921cff3ff10a1797f0d4047fda2d3bdb65`/);
-  assert.match(body, /3\.5-B4 — MCCI11: próxima, não iniciada/);
+test("os seis fundos estão formalmente concluídos e 3.5-C é a próxima unidade", () => {
+  const text = body();
+  for (const required of [
+    "Fase 3.5-A — DEVA11 está formalmente concluída",
+    "Fase 3.5-B1 — VSLH11 está formalmente concluída",
+    "Fase 3.5-B2 — KNCR11 está formalmente concluída",
+    "Fase 3.5-B3 — KNSC11 está formalmente concluída",
+    "Fase 3.5-B4 — MCCI11 está formalmente concluída",
+    "Fase 3.5-B5 — RBRY11 está formalmente concluída",
+    "Os seis fundos da coorte externa estão formalmente concluídos",
+    "Próxima unidade de trabalho:** 3.5-C — dataset final e backtest externo sem informação futura",
+    "Sprint 3.5 completa permanece aberta porque dataset e backtest ainda não foram executados",
+  ]) assert.match(text, new RegExp(escapeRegExp(required), "i"));
+  assert.doesNotMatch(text, /MCCI11 e RBRY11\.\n- Dataset final/);
 });
 
-test("roadmap inclui SEO, Premium v3, Radar e diferenciais estratégicos", () => {
-  const body = readFileSync(HANDOFF, "utf8");
+test("evidência canônica do MCCI11 está registrada", () => {
+  const text = body();
+  assert.match(text, /merge funcional: `d2000807cc51f66288491ccf715f7ed84ab63fb2`/);
+  assert.match(text, /documentos descobertos\/classificados: `48\/48`/);
+  assert.match(text, /lacuna explícita: `2025-02`/);
+  assert.match(text, /índice de evidência: `14c6ad2e55053d020688c0c99252e35a45c91a748cd946fd403b9acd0d99a817`/);
+});
+
+test("evidência canônica do RBRY11 está registrada", () => {
+  const text = body();
+  assert.match(text, /merge funcional: `c616437a0a44c1543015a709911c67f70f390b7d`/);
+  assert.match(text, /documentos descobertos\/classificados: `54\/54`/);
+  assert.match(text, /competências selecionadas: `47`, contínuas de `2022-01` a `2025-11`/);
+  assert.match(text, /recuperação oficial: `987180`, competência `2025-08`, R\$ 1,25 por cota/);
+  assert.match(text, /índice de evidência: `938b856f5a74edcd404b494f68a33654c1f68b4ae01a392de56e6cbc5c741ed1`/);
+});
+
+test("evidências dos seis fundos e testes permanentes estão versionados", () => {
+  const files = [
+    "docs/production-evidence/risk-lab/deva11-phase-a/index.json",
+    "docs/production-evidence/risk-lab/vslh11-phase-b1/index.json",
+    "docs/production-evidence/risk-lab/kncr11-phase-b2/index.json",
+    "docs/production-evidence/risk-lab/knsc11-phase-b3/index.json",
+    "docs/production-evidence/risk-lab/mcci11-phase-b4/index.json",
+    "docs/production-evidence/risk-lab/rbry11-phase-b5/index.json",
+    "docs/risk-lab/sprint-3-5-b4-mcci11.md",
+    "docs/risk-lab/sprint-3-5-b5-rbry11.md",
+    "src/lib/risk-lab/FrozenDividendRetryCheckpointAuditor.ts",
+    "tests/risk-lab-mcci11-evidence.test.mjs",
+    "tests/risk-lab-rbry11-evidence.test.mjs",
+  ];
+  for (const file of files) assert.equal(existsSync(file), true, `${file} deve existir`);
+  assert.equal(existsSync(".github/workflows/risk-lab-rbry11-retry.yml"), false);
+  assert.equal(existsSync("scripts/risk-lab-retry-rbry11.mjs"), false);
+});
+
+test("roadmap estratégico e bloqueios de produto permanecem preservados", () => {
+  const text = body();
   for (const required of [
     "SEO-S1, dias 1–15",
     "3.7 — Risk Lab read-only no Premium + Prompt Premium v3",
@@ -89,40 +129,21 @@ test("roadmap inclui SEO, Premium v3, Radar e diferenciais estratégicos", () =>
     "Carteira histórica verdadeira",
     "Screener quantitativo",
     "Fair value e sustentabilidade da renda",
-  ]) assert.match(body, new RegExp(escapeRegExp(required), "i"));
+    "Risk Lab permanece fora do Premium e das notificações até 3.5/3.6",
+  ]) assert.match(text, new RegExp(escapeRegExp(required), "i"));
 });
 
-test("evidências dos quatro fundos e fontes estratégicas estão versionadas", () => {
-  const sourceFiles = [
-    "docs/strategy/PLANO_SEO_90_DIAS_DADOS_FII.md",
-    "docs/sources/premium-prompt/REFERENCIAS_PROMPT_PREMIUM_FII.md",
-    "docs/sources/premium-prompt/README.md",
-    "docs/production-evidence/risk-lab/vslh11-phase-b1/index.json",
-    "docs/production-evidence/risk-lab/kncr11-phase-b2/index.json",
-    "docs/production-evidence/risk-lab/knsc11-phase-b3-manifest.json",
-    "docs/production-evidence/risk-lab/knsc11-phase-b3/index.json",
-    "docs/risk-lab/sprint-3-5-b3-knsc11.md",
-    "tests/risk-lab-knsc11-evidence.test.mjs",
-  ];
-  for (const sourceFile of sourceFiles) {
-    assert.equal(existsSync(sourceFile), true, `${sourceFile} deve existir`);
-  }
-  const visualReadme = readFileSync(sourceFiles[2], "utf8");
-  assert.match(visualReadme, /não estavam acessíveis como binários/i);
-  assert.match(visualReadme, /nenhum hash foi inventado/i);
-});
-
-test("fallback de deployment não pode mascarar mudança de runtime", () => {
-  const body = readFileSync(HANDOFF, "utf8");
+test("fallback de deployment não mascara mudança de runtime", () => {
+  const text = body();
   for (const required of [
     "fallback de build só é válido quando o diff não altera código de produto",
     "Se o diff alterar código de runtime, build local/CI não substitui Preview ou deployment real",
     "credenciais descartáveis no runner",
-  ]) assert.match(body, new RegExp(escapeRegExp(required), "i"));
+  ]) assert.match(text, new RegExp(escapeRegExp(required), "i"));
 });
 
-test("critérios de conclusão impedem certificação sem evidência global", () => {
-  const body = readFileSync(HANDOFF, "utf8");
+test("critérios globais de conclusão continuam obrigatórios", () => {
+  const text = body();
   for (const required of [
     "código está em `main`",
     "CI obrigatória está verde no SHA da PR",
@@ -130,5 +151,6 @@ test("critérios de conclusão impedem certificação sem evidência global", ()
     "correções são globais e testadas",
     "evidência final está no Git",
     "issue da fase só é encerrada após auditoria da `main`",
-  ]) assert.match(body, new RegExp(escapeRegExp(required)));
+    "Handoff canônico foi atualizado e protegido por teste",
+  ]) assert.match(text, new RegExp(escapeRegExp(required)));
 });
