@@ -2,13 +2,13 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 6.10.0  
-**Data:** 24/07/2026  
+**Versão:** 6.11.0  
+**Data:** 25/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**Base funcional auditada:** `c616437a0a44c1543015a709911c67f70f390b7d`  
-**Sprint corrente:** 3.5 — Coorte externa e backtest sem informação futura  
-**Próxima unidade de trabalho:** 3.5-C — dataset final e backtest externo sem informação futura  
+**Base funcional auditada:** `ef0c621f2f813009fdb3999b721e4f4a6568c134`  
+**Sprint corrente:** 3.6 — calibração e homologação do ruleset — planejada, não iniciada  
+**Próxima unidade de trabalho:** 3.6 — calibração e homologação do ruleset — não iniciada  
 **Política documental:** existe apenas um Handoff canônico versionado no repositório: `DADOS_FII_HANDOFF.md`.
 
 ## Como interpretar os status
@@ -27,9 +27,9 @@ Uma validação pontual, confirmação verbal, workflow verde isolado ou teste e
 
 | Decisão vigente | Decisão substituída | Estado | Evidência ou motivo |
 |---|---|---|---|
-| Este Handoff v6.10.0 é a única referência canônica quando houver divergência. | Handoffs paralelos ou cópias antigas. | Vigente | Evita decisões concorrentes. |
+| Este Handoff v6.11.0 é a única referência canônica quando houver divergência. | Handoffs paralelos ou cópias antigas. | Vigente | Evita decisões concorrentes. |
 | Fases 1 e 2 estão formalmente concluídas. | Conclusão baseada apenas em fundos sentinela. | Concluída | Regressões globais e catálogo auditado. |
-| A Sprint corrente é a 3.5. | Sprint 3.4 como corrente. | Em andamento | Os seis fundos da coorte foram concluídos; restam dataset e backtest. |
+| A Sprint 3.5 está formalmente concluída e a 3.6 é a próxima unidade, ainda não iniciada. | Sprint 3.5 em andamento. | Concluída / planejada | PR #128, merge `ef0c621f2f813009fdb3999b721e4f4a6568c134`; backtest concluído com calibração obrigatória. |
 | A Sprint 3.5 é executada um fundo por PR. | Execução monolítica dos seis fundos. | Vigente | Cada caso tem evidência, hashes, testes e auditoria próprios. |
 | Fase 3.5-A — DEVA11 está formalmente concluída. | DEVA11 pendente. | Concluída | 85/85 documentos. |
 | Fase 3.5-B1 — VSLH11 está formalmente concluída. | VSLH11 pendente. | Concluída | 79/79 documentos. |
@@ -37,7 +37,8 @@ Uma validação pontual, confirmação verbal, workflow verde isolado ou teste e
 | Fase 3.5-B3 — KNSC11 está formalmente concluída. | KNSC11 como próxima fase. | Concluída | PR #118, merge `1925b53a268f90b4c2f9a2733c4ac8df645a14ec`, 52/52 documentos e 48 competências. |
 | Fase 3.5-B4 — MCCI11 está formalmente concluída. | MCCI11 pendente. | Concluída | PR #122, merge `d2000807cc51f66288491ccf715f7ed84ab63fb2`, 48/48 documentos e 46 competências selecionadas. |
 | Fase 3.5-B5 — RBRY11 está formalmente concluída. | RBRY11 pendente. | Concluída | PR #125, merge `c616437a0a44c1543015a709911c67f70f390b7d`, 54/54 documentos e 47 competências contínuas. |
-| A próxima fase é 3.5-C — dataset final e backtest e não inicia automaticamente. | Processar dataset/backtest junto com fundos individuais. | Planejada | Regra de parada após a coorte e antes do backtest. |
+| Fase 3.5-C — dataset final e backtest está formalmente concluída. | Dataset/backtest pendente. | Concluída | 318 observações, cobertura de 83,33%, zero falso negativo, um falso positivo e um inconclusivo. |
+| A próxima fase é 3.6 — calibração e homologação e não inicia automaticamente. | Promover o ruleset diretamente ao produto. | Planejada | O ruleset `0.1.0` não está homologado; KNSC11 e MCCI11 exigem calibração sem look-ahead. |
 | Correções de parser ou cálculo são gerais e testadas. | Patch especial por ticker. | Obrigatória | Evita corrigir um fundo e manter o defeito no universo. |
 | Preview Vercel é preferencial; fallback de build só é válido quando o diff não altera código de produto e a indisponibilidade externa está documentada. | Bloquear trabalho por quota externa ou dispensar deployment sem prova equivalente. | Vigente | PR #118 executou typecheck e `next build` no SHA final; mudanças de runtime continuam exigindo deployment real. |
 | Risk Lab permanece fora do Premium e das notificações até 3.5/3.6. | Integração antecipada. | Bloqueada | Produto não pode consumir metodologia não homologada. |
@@ -57,11 +58,12 @@ Uma validação pontual, confirmação verbal, workflow verde isolado ou teste e
 
 - Fases 1 e 2 estão formalmente concluídas.
 - Risk Lab 3.0–3.4 e reorganização 3.5-R estão concluídos.
-- Fases 3.5-A/DEVA11, 3.5-B1/VSLH11, 3.5-B2/KNCR11, 3.5-B3/KNSC11, 3.5-B4/MCCI11 e 3.5-B5/RBRY11 estão concluídas.
-- Os seis fundos da coorte externa estão formalmente concluídos.
-- Sprint 3.5 completa permanece aberta porque dataset e backtest ainda não foram executados.
-- Próxima unidade: 3.5-C — dataset final e backtest externo sem informação futura, ainda não iniciada.
-- Risk Lab permanece isolado de Premium e notificações até os gates das Sprints 3.5 e 3.6.
+- Fases 3.5-A/DEVA11, 3.5-B1/VSLH11, 3.5-B2/KNCR11, 3.5-B3/KNSC11, 3.5-B4/MCCI11, 3.5-B5/RBRY11 e 3.5-C/dataset e backtest estão formalmente concluídas.
+- A Sprint 3.5 está formalmente concluída.
+- O backtest consolidou 318 observações e terminou como `completed_requires_calibration`: 3 verdadeiros positivos, 1 verdadeiro negativo, 1 falso positivo, 0 falsos negativos e 1 inconclusivo.
+- Cobertura: 83,33%; lead time médio: 220,52 dias.
+- Próxima unidade: 3.6 — calibração e homologação do ruleset, ainda não iniciada.
+- Risk Lab permanece isolado de Premium e notificações até a conclusão e homologação da Sprint 3.6.
 - SEO-S1, Prompt Premium v3, Radar, Inteligência documental, Carteira histórica verdadeira, Screener quantitativo e Fair value e sustentabilidade da renda ainda não foram concluídos.
 
 ### Auditoria do estado
@@ -78,7 +80,9 @@ Uma validação pontual, confirmação verbal, workflow verde isolado ou teste e
 | 3.5-B3 — KNSC11 | Sim | Sim | Preview Ready durante a PR; build final saudável; sem código de produto no diff | **Concluída** |
 | 3.5-B4 — MCCI11 | Sim | Sim | Preview Ready; sem integração de produto | **Concluída** |
 | 3.5-B5 — RBRY11 | Sim | Sim | Preview Ready; sem integração de produto | **Concluída** |
-| Sprint 3.5 completa | Parcial | Parcial | Produto bloqueado | **Em andamento** |
+| 3.5-C — dataset e backtest | Sim | Sim | Build final saudável; Preview anterior Ready; quota externa documentada; sem integração de produto | **Concluída; requer calibração** |
+| Sprint 3.5 completa | Sim | Sim | Produto permanece bloqueado até 3.6 | **Formalmente concluída** |
+| Sprint 3.6 — calibração | Não | Não | Não iniciada | **Planejada** |
 | Regra de meses encerrados | PR #65 | Testes declarados | Não mesclada | **Em implementação** |
 | SEO 90 dias | Plano | n/a | Não iniciado | **Planejada** |
 | Prompt Premium v3 | Contrato | Casos definidos | Não implantado | **Planejada para 3.7** |
@@ -115,7 +119,9 @@ A conclusão não se baseia apenas em TGAR11, VGIA11, MXRF11, KNCA11 ou BODB11; 
 - 3.5-B3 — KNSC11: concluída.
 - 3.5-B4 — MCCI11: concluída.
 - 3.5-B5 — RBRY11: concluída.
-- Sprint 3.5 completa: aberta até dataset e backtest.
+- 3.5-C — dataset e backtest sem look-ahead: concluída; resultado requer calibração.
+- Sprint 3.5 completa: formalmente concluída.
+- Sprint 3.6: planejada e não iniciada.
 - Integração com Premium/notificações: proibida antes dos gates 3.5/3.6.
 
 ### Evidência canônica da Fase 3.5-A — DEVA11
@@ -191,38 +197,52 @@ A conclusão não se baseia apenas em TGAR11, VGIA11, MXRF11, KNCA11 ou BODB11; 
 - reapresentações: `427520` v2 substitui `427474` v1; `1009923` v2 substitui `1009913` v1;
 - índice de evidência: `938b856f5a74edcd404b494f68a33654c1f68b4ae01a392de56e6cbc5c741ed1`.
 
+
+### Evidência canônica da Fase 3.5-C — dataset e backtest sem look-ahead
+
+- issue `#127`; PR funcional `#128`;
+- merge funcional: `ef0c621f2f813009fdb3999b721e4f4a6568c134`;
+- dataset: `risk-lab-credit-oos-phase-c-v1`, versão `1.0.0`, metodologia `3.5-C.1`, ruleset `0.1.0`;
+- observações consolidadas: `318`;
+- duas execuções independentes com hashes idênticos;
+- hash da identidade da coorte: `97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726`;
+- hash do dataset: `f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae`;
+- hash da evidência do backtest: `4b0ced4e8ef662a23317e850353209b72804745be3afa7dc128e05356b2e7c6f`;
+- índice final: `edb90face1dddff390dcbf260cf60dc0bb3c053f20ea4ea5a17a0788b98c308e`;
+- resultados: DEVA11 verdadeiro positivo, VSLH11 verdadeiro positivo, KNCR11 verdadeiro negativo, KNSC11 falso positivo, MCCI11 inconclusivo e RBRY11 verdadeiro positivo;
+- métricas: cobertura `83,33%`, lead time médio `220,52 dias`, mínimo `90,04` e máximo `422,26`;
+- falsos negativos: `0`; falso positivo: `1`; inconclusivo: `1`;
+- bloqueadores metodológicos: `0`; calibração obrigatória: `true`; homologação permitida: `false`;
+- Premium integrado: `false`; notificações enviadas: `false`.
+
 ---
 
 ## 3. Sprint atual
 
-### Sprint 3.5 — Coorte externa e backtest sem informação futura
+### Sprint 3.6 — calibração e homologação do ruleset
 
-Estado: **em andamento**.
+Estado: **planejada e não iniciada**.
 
-Ordem interna vigente:
+Entrada obrigatória:
 
-1. 3.5-A — DEVA11: concluída.
-2. 3.5-B1 — VSLH11: concluída.
-3. 3.5-B2 — KNCR11: concluída.
-4. 3.5-B3 — KNSC11: concluída.
-5. 3.5-B4 — MCCI11: concluída.
-6. 3.5-B5 — RBRY11: concluída.
-7. 3.5-C — composição do dataset imutável da coorte: próxima, não iniciada.
-8. Backtest sem look-ahead e relatório de performance: não iniciado.
-9. Gate de encerramento da Sprint 3.5: pendente.
+1. preservar o dataset e os hashes da Sprint 3.5 sem reclassificação retrospectiva;
+2. tratar o falso positivo do KNSC11;
+3. tratar o caso inconclusivo do MCCI11;
+4. manter zero falsos negativos na coorte sem ajustar regras com informação futura;
+5. demonstrar parâmetros derivados, versionados e reproduzíveis;
+6. manter Premium e notificações bloqueados até homologação formal.
 
-A conclusão de um fundo não promove automaticamente o seguinte. Cada unidade exige issue, branch, PR, CI, evidência, merge, auditoria do `main` e atualização canônica.
+A Sprint 3.6 não foi iniciada automaticamente. Exige issue, branch, PR, CI, evidência, merge, auditoria do `main` e atualização canônica próprios.
 
 ---
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **3.5-C — dataset final e backtest externo sem informação futura**.
-2. **3.6 — calibração e homologação do ruleset**.
-3. **3.7 — Risk Lab read-only no Premium + Prompt Premium v3**.
-4. **SEO-S1, dias 1–15** — pode avançar em paralelo sem alterar a ordem funcional do Risk Lab.
-5. **4.1 — Radar: acompanhar fundo fora da carteira**.
-6. **Fase 4+** — Inteligência documental, Carteira histórica verdadeira, Screener quantitativo, Fair value e sustentabilidade da renda.
+1. **3.6 — calibração e homologação do ruleset** — não iniciada.
+2. **3.7 — Risk Lab read-only no Premium + Prompt Premium v3**.
+3. **SEO-S1, dias 1–15** — pode avançar em paralelo sem alterar a ordem funcional do Risk Lab.
+4. **4.1 — Radar: acompanhar fundo fora da carteira**.
+5. **Fase 4+** — Inteligência documental, Carteira histórica verdadeira, Screener quantitativo, Fair value e sustentabilidade da renda.
 
 ---
 
@@ -252,14 +272,17 @@ Critérios mínimos:
 - 47 competências contínuas, sem lacunas ou conflitos;
 - testes sintéticos, integrais, CI, build, Preview, merge e auditoria do `main` concluídos.
 
-### 3.5-C — dataset e backtest
+### 3.5-C — dataset e backtest — concluída
 
 - seis casos completos e imutáveis;
-- verdade-terreno primária;
+- verdade-terreno primária com PDFs críticos e hashes;
+- 318 observações consolidadas;
 - nenhum uso de informação futura;
-- métricas de cobertura, lead time, falso positivo, falso negativo e inconclusivos;
+- duas execuções com hashes idênticos;
+- cobertura de 83,33%, 3 verdadeiros positivos, 1 verdadeiro negativo, 1 falso positivo, 0 falsos negativos e 1 inconclusivo;
+- resultado `completed_requires_calibration`;
 - nenhum efeito em Premium ou notificações;
-- resultado reproduzível e evidência persistida no Git.
+- evidência persistida no Git e gate permanente na CI.
 
 ### 3.6 — calibração
 
@@ -321,6 +344,7 @@ Critérios mínimos:
 - PR #118 — KNSC11; merge `1925b53a268f90b4c2f9a2733c4ac8df645a14ec`.
 - PR #122 — MCCI11; merge `d2000807cc51f66288491ccf715f7ed84ab63fb2`.
 - PR #125 — RBRY11; merge `c616437a0a44c1543015a709911c67f70f390b7d`.
+- PR #128 — dataset e backtest 3.5-C; merge `ef0c621f2f813009fdb3999b721e4f4a6568c134`.
 - PR #65 — regra de mês corrente; aberta e precisa de rebase/CI antes de qualquer merge.
 
 ### Evidências principais
@@ -331,6 +355,12 @@ Critérios mínimos:
 - `docs/production-evidence/risk-lab/knsc11-phase-b3/`
 - `docs/production-evidence/risk-lab/mcci11-phase-b4/`
 - `docs/production-evidence/risk-lab/rbry11-phase-b5/`
+- `docs/production-evidence/risk-lab/cohort-phase-c/`
+- `docs/production-evidence/risk-lab/cohort-phase-c-manifest.json`
+- `docs/risk-lab/sprint-3-5-c-dataset-backtest.md`
+- `src/lib/risk-lab/FrozenCohortPhaseC.ts`
+- `tests/risk-lab-cohort-phase-c-evidence.test.mjs`
+- `tests/risk-lab-frozen-cohort-phase-c.test.ts`
 - `docs/risk-lab/sprint-3-5-b3-knsc11.md`
 - `docs/risk-lab/sprint-3-5-b4-mcci11.md`
 - `docs/risk-lab/sprint-3-5-b5-rbry11.md`
@@ -353,12 +383,12 @@ Branches de fase são temporárias. O estado aceito pertence ao `main`; branch o
 - RegulatoryDataService, scores, Health, Validation e Admin.
 - Timeline, relatórios, AI Insights e observabilidade.
 - Catálogo básico e validações globais da Fase 2.
-- Risk Lab até 3.4 e os seis casos DEVA11, VSLH11, KNCR11, KNSC11, MCCI11 e RBRY11 da Sprint 3.5.
+- Risk Lab até 3.4, os seis casos da coorte e a Fase 3.5-C de dataset e backtest; Sprint 3.5 formalmente concluída.
 - Governança central de GitHub Actions, build automatizado do Risk Lab e teste canônico do Handoff.
 
 ### Parciais
 
-- Sprint 3.5: seis de seis fundos concluídos; dataset e backtest permanecem pendentes.
+- Sprint 3.6: planejada e não iniciada; calibração deve resolver KNSC11 falso positivo e MCCI11 inconclusivo sem look-ahead.
 - Notificações materiais e digest: política definida, revisão ampla ainda necessária.
 - IFIX: calendário oficial e card manual parcialmente implantados.
 - Regra de meses encerrados: PR #65 não integrada.
@@ -366,7 +396,7 @@ Branches de fase são temporárias. O estado aceito pertence ao `main`; branch o
 
 ### Pendentes
 
-- Dataset final, backtest e calibração.
+- Calibração e homologação da Sprint 3.6.
 - Prompt Premium v3 e integração read-only.
 - SEO-S1 e plano de 90 dias.
 - Radar/Acompanhar fundo.
@@ -435,6 +465,7 @@ Branches de fase são temporárias. O estado aceito pertence ao `main`; branch o
 - testes determinísticos KNSC11
 - testes determinísticos MCCI11
 - testes determinísticos RBRY11
+- testes do dataset e backtest da Fase 3.5-C
 - `npm run test:workflow-governance`
 - `npm run test:handoff`
 - `npm run typecheck`
@@ -445,9 +476,9 @@ Branches de fase são temporárias. O estado aceito pertence ao `main`; branch o
 ### Regra de deployment aplicável
 
 - Preview/deployment real é obrigatório quando o diff altera código executado pelo produto.
-- Quando a plataforma recusa o deploy antes do build por quota externa e o diff contém somente workflow, testes, documentação e evidência, o `next build` automatizado no SHA pode cumprir o gate.
-- A exceção exige registro do erro externo, credenciais descartáveis no runner, typecheck verde e ausência comprovada de código de produto no diff.
-- O fallback de build só é válido quando o diff não altera código de produto.
+- Quando a plataforma recusa o deploy antes do build por quota externa e o diff contém somente workflow, testes, documentação, evidência ou código offline do Risk Lab não importado pelo runtime do produto, o `next build` automatizado no SHA pode cumprir o gate.
+- A exceção exige registro do erro externo, credenciais descartáveis no runner, typecheck verde e ausência comprovada de integração com código executado pelo produto.
+- O fallback de build só é válido quando o diff não altera o comportamento do produto em runtime.
 - Se o diff alterar código de runtime, build local/CI não substitui Preview ou deployment real.
 
 ### Regra de conclusão
@@ -473,9 +504,9 @@ Testes manuais podem complementar, mas não substituir gates automatizados.
 
 ### Próxima execução
 
-- Abrir issue e branch exclusivas para 3.5-C — dataset final e backtest externo sem informação futura.
-- Consumir somente os seis casos imutáveis e auditados da coorte.
-- Não iniciar 3.6, Premium ou notificações antes do gate de encerramento da Sprint 3.5.
+- Abrir issue e branch exclusivas para 3.6 — calibração e homologação do ruleset, somente mediante nova instrução do usuário.
+- Consumir o dataset imutável da 3.5-C sem alterar verdade-terreno, papéis ou hashes históricos.
+- Não iniciar 3.7, Premium ou notificações antes da homologação formal da Sprint 3.6.
 
 ### Decisões de produto
 
@@ -495,4 +526,4 @@ Testes manuais podem complementar, mas não substituir gates automatizados.
 
 ### Regra de parada
 
-Este documento registra o KNSC11 como concluído e o MCCI11 como próximo. A Sprint 3.5 não está concluída, o Risk Lab não está liberado para Premium/notificações e nenhuma fase seguinte deve ser promovida sem evidência e testes próprios.
+Este documento registra a Sprint 3.5 como formalmente concluída e a Sprint 3.6 como próxima unidade planejada, ainda não iniciada. O ruleset `0.1.0` não está homologado, o Risk Lab não está liberado para Premium/notificações e nenhuma fase seguinte deve ser promovida sem evidência e testes próprios.
