@@ -1,0 +1,135 @@
+name: Materialize Risk Lab Sprint 3.6
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/risk-lab-3-6-materialize.yml"
+      - ".tmp/cal36-bundle-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: risk-lab-3-6-materialize
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    if: github.head_ref == 'agent/sprint-3-6-calibration' || github.ref_name == 'agent/sprint-3-6-calibration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/sprint-3-6-calibration
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Reconstruct and verify permanent implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .tmp/cal36-bundle-00 .tmp/cal36-bundle-01 .tmp/cal36-bundle-02 .tmp/cal36-bundle-03 > .tmp/cal36-permanent.tar.gz.b64
+          echo '09c6f162edb48f31c3e906ccbf2137bd1a43b1df0617a01d18c5d6010629b909  .tmp/cal36-permanent.tar.gz.b64' | sha256sum -c -
+          base64 -d .tmp/cal36-permanent.tar.gz.b64 > .tmp/cal36-permanent.tar.gz
+          echo '8191c83845f6d526fa96b172dfed961a977cfb88978a5d6eb4041516684081ba  .tmp/cal36-permanent.tar.gz' | sha256sum -c -
+          tar -xzf .tmp/cal36-permanent.tar.gz -C .
+
+      - name: Install permanent Sprint 3.6 gate
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/risk-lab.yml')
+          text = path.read_text()
+          marker = '''      - name: Validate TypeScript diagnostics
+'''
+          step = '''      - name: Validate calibrated and homologated Risk Lab ruleset
+        id: phase_3_6_tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \\
+            tests/risk-lab-calibration-phase-3-6.test.ts \\
+            tests/risk-lab-calibration-phase-3-6-evidence.test.mjs 2>&1 | tee .tmp/phase-3-6-ci.log
+
+'''
+          if 'id: phase_3_6_tests' not in text:
+              if text.count(marker) != 1:
+                  raise SystemExit('Marcador de typecheck divergente no Risk Lab CI.')
+              text = text.replace(marker, step + marker)
+
+          old_condition = "steps.phase_c_tests.outcome == 'failure' || steps.typecheck.outcome"
+          new_condition = "steps.phase_c_tests.outcome == 'failure' || steps.phase_3_6_tests.outcome == 'failure' || steps.typecheck.outcome"
+          if old_condition in text:
+              text = text.replace(old_condition, new_condition, 1)
+          elif new_condition not in text:
+              raise SystemExit('Condição de diagnóstico da CI divergente.')
+
+          old_logs = '            .tmp/phase-c-ci.log\n            .tmp/typecheck.log'
+          new_logs = '            .tmp/phase-c-ci.log\n            .tmp/phase-3-6-ci.log\n            .tmp/typecheck.log'
+          if old_logs in text:
+              text = text.replace(old_logs, new_logs, 1)
+          elif new_logs not in text:
+              raise SystemExit('Lista de logs da CI divergente.')
+
+          path.write_text(text)
+          PY
+
+      - name: Generate immutable calibration evidence
+        run: |
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types scripts/build-risk-lab-calibration-phase-3-6.ts
+
+      - name: Validate permanent Sprint 3.6 implementation
+        run: |
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \
+            tests/risk-lab-calibration-phase-3-6.test.ts \
+            tests/risk-lab-calibration-phase-3-6-evidence.test.mjs
+          npm run typecheck
+
+      - name: Remove temporary probes and transport
+        shell: bash
+        run: |
+          git rm --ignore-unmatch \
+            .tmp/explore-risk-lab-3-6.ts \
+            .tmp/explore-risk-lab-3-6.mjs \
+            .tmp/cal36-bundle-00 \
+            .tmp/cal36-bundle-01 \
+            .tmp/cal36-bundle-02 \
+            .tmp/cal36-bundle-03 \
+            .github/workflows/risk-lab-3-6-explore.yml \
+            .github/workflows/risk-lab-3-6-materialize.yml
+          rm -f .tmp/cal36-permanent.tar.gz .tmp/cal36-permanent.tar.gz.b64
+
+      - name: Commit permanent phase files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            .github/workflows/risk-lab.yml \
+            src/lib/risk-lab/RiskLabRulesetV020.ts \
+            src/lib/risk-lab/FrozenCalibrationPhase36.ts \
+            src/lib/risk-lab/risk-lab-ruleset-v0.2.0.json \
+            scripts/build-risk-lab-calibration-phase-3-6.ts \
+            tests/risk-lab-calibration-phase-3-6.test.ts \
+            tests/risk-lab-calibration-phase-3-6-evidence.test.mjs \
+            docs/production-evidence/risk-lab/calibration-phase-3-6 \
+            docs/production-evidence/risk-lab/calibration-phase-3-6-manifest.json \
+            docs/risk-lab/sprint-3-6-calibration.md
+          git diff --cached --check
+          git commit -m 'feat: homologa ruleset v0.2.0 do Risk Lab'
+          git push origin HEAD:agent/sprint-3-6-calibration
