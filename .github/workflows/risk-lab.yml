@@ -49,7 +49,23 @@ jobs:
         run: npm ci --silent
 
       - name: Materialize permanent Sprint 3.6 implementation
-        run: bash .tmp/materialize-risk-lab-3-6.sh
+        id: materialize
+        shell: bash
+        run: |
+          set +e
+          bash .tmp/materialize-risk-lab-3-6.sh > .tmp/materialize-phase-3-6.log 2>&1
+          status=$?
+          cat .tmp/materialize-phase-3-6.log
+          exit $status
+
+      - name: Upload materialization diagnostic
+        if: failure() && steps.materialize.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-3-6-materialization-failure-${{ github.run_id }}
+          path: .tmp/materialize-phase-3-6.log
+          if-no-files-found: error
+          retention-days: 3
   # END TEMP MATERIALIZER 3.6
 
   validate:
