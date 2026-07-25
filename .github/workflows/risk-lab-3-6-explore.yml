@@ -1,0 +1,42 @@
+name: Explore Risk Lab 3.6 Calibration
+
+on:
+  push:
+    branches:
+      - agent/sprint-3-6-calibration
+    paths:
+      - ".tmp/explore-risk-lab-3-6.ts"
+      - ".github/workflows/risk-lab-3-6-explore.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Explore bounded calibration space
+        run: |
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types .tmp/explore-risk-lab-3-6.ts | tee .tmp/risk-lab-3-6-exploration.log
+
+      - name: Upload deterministic diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-3-6-exploration-${{ github.run_id }}
+          path: |
+            .tmp/risk-lab-3-6-exploration.json
+            .tmp/risk-lab-3-6-exploration.log
+          if-no-files-found: error
+          retention-days: 3
