@@ -41,6 +41,7 @@
     "runtimeEquivalentAfterPreview": true,
     "postPreviewChanges": [
       "docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json",
+      "docs/risk-lab/sprint-3-7-premium-readonly.md",
       "tests/risk-lab-premium-integration.test.mjs"
     ],
     "phase2ClosureCi": "passed",
@@ -55,5 +56,5 @@
     "src/lib/ai/PremiumPromptV3.ts": "d5f09eff972161eda45b0cc79045239f8a861c37ec1ad3c0bac6d3005412875e",
     "docs/premium/PROMPT_PREMIUM_V3.md": "63c237b601f6e2b143b396a23ce354b9313f9bb607884a323a36ff4fd7250eeb"
   },
-  "evidenceHash": "4ad4341b88eaba5e8568ea735f2cee534bfc22fabf1b5f83bfb19425b99d20ec"
+  "evidenceHash": "ba9c8d516082105a4eae9ec1af8055da30533ca22f6b9581f0735c4e0a533b14"
 }
