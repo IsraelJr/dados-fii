@@ -37,10 +37,10 @@ test("existe somente um Handoff canônico", () => {
 test("Handoff possui versão, data, base e próxima unidade vigentes", () => {
   const text = body();
   assert.equal(text.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(text, /\*\*Versão:\*\* 6\.12\.0/);
+  assert.match(text, /\*\*Versão:\*\* 6\.13\.0/);
   assert.match(text, /\*\*Data:\*\* 25\/07\/2026/);
-  assert.match(text, /\*\*Base funcional auditada:\*\* `bfdc186057652a535025d19beae061856624d5c1`/);
-  assert.match(text, /Próxima unidade de trabalho:\*\* 3\.7 — Risk Lab read-only no Premium \+ Prompt Premium v3 — não iniciada/);
+  assert.match(text, /\*\*Base funcional auditada:\*\* `7391791b09b1615a86e29c2002b74f95f55e833e`/);
+  assert.match(text, /Próxima unidade de trabalho:\*\* concluir deployment de produção e ativação controlada da Sprint 3\.7 — bloqueada por quota Vercel/);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -67,20 +67,22 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("Sprints 3.5 e 3.6 estão concluídas e 3.7 não foi iniciada", () => {
+test("Sprint 3.7 está mesclada, mas a conclusão formal permanece bloqueada por produção", () => {
   const text = body();
   for (const required of [
     "A Sprint 3.6 está formalmente concluída",
     "Sprint 3.6 completa: formalmente concluída",
     "Sprint 3.7 — Risk Lab read-only no Premium + Prompt Premium v3",
-    "Estado: **planejada e não iniciada**",
-    "A Sprint 3.7 não foi iniciada automaticamente",
-    "ruleset `0.2.0` está homologado",
-    "Risk Lab não está integrado ao Premium/notificações",
+    "implementada, testada e mesclada; conclusão formal bloqueada por deployment de produção",
+    "deployment de produção do merge",
+    "quota diária do Vercel",
+    "ENABLE_RISK_LAB_PREMIUM_READONLY",
+    "Notificações do Risk Lab continuam proibidas",
+    "nenhuma etapa seguinte deve iniciar",
   ]) {
     assert.match(text, new RegExp(escapeRegExp(required), "i"));
   }
-  assert.doesNotMatch(text, /Sprint 3\.6 não está concluída/i);
+  assert.doesNotMatch(text, /A Sprint 3\.7 está formalmente concluída/i);
   assert.doesNotMatch(text, /ruleset `0\.1\.0` não está homologado/i);
 });
 
@@ -123,6 +125,22 @@ test("evidência canônica da Sprint 3.6 está registrada", () => {
   }
 });
 
+test("evidência canônica da Sprint 3.7 e bloqueio de produção estão registrados", () => {
+  const text = body();
+  for (const required of [
+    "merge funcional: `7391791b09b1615a86e29c2002b74f95f55e833e`",
+    "`982b1c9911610eb58ad6e0af5ea6ed801063c2b9f80783a5ee9c0b45b6de9ac9`",
+    "`de2d1abd481e2a66b296dc7eab667277cc8072c807872f9f7b3982da8aa9bbcd`",
+    "premium-fund-analysis-v3",
+    "premium-manager-mode-v3",
+    "Preview do runtime",
+    "api-deployments-free-per-day",
+    "conclusão formal: `false`",
+  ]) {
+    assert.match(text, new RegExp(escapeRegExp(required), "i"));
+  }
+});
+
 test("arquivos e gates permanentes da 3.5-C existem", () => {
   const files = [
     "docs/production-evidence/risk-lab/cohort-phase-c/index.json",
@@ -142,6 +160,13 @@ test("arquivos e gates permanentes da 3.5-C existem", () => {
     "src/lib/risk-lab/FrozenCalibrationPhase36.ts",
     "tests/risk-lab-calibration-phase-3-6.test.ts",
     "tests/risk-lab-calibration-phase-3-6-evidence.test.mjs",
+    "docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json",
+    "docs/risk-lab/sprint-3-7-premium-readonly.md",
+    "docs/premium/PROMPT_PREMIUM_V3.md",
+    "src/lib/risk-lab/RiskLabPremiumReadModel.ts",
+    "src/lib/risk-lab/risk-lab-premium-readonly-v1.json",
+    "tests/risk-lab-premium-readonly.test.ts",
+    "tests/risk-lab-premium-integration.test.mjs",
   ];
   for (const file of files) {
     assert.equal(existsSync(file), true, file + " deve existir");
@@ -149,12 +174,13 @@ test("arquivos e gates permanentes da 3.5-C existem", () => {
   const workflow = readFileSync(".github/workflows/risk-lab.yml", "utf8");
   assert.match(workflow, /Validate immutable cohort dataset and no-look-ahead backtest/);
   assert.match(workflow, /Validate calibrated and homologated Risk Lab ruleset/);
+  assert.match(workflow, /Validate Premium read-only integration and Prompt v3/);
 });
 
 test("roadmap, fallback e critérios globais permanecem protegidos", () => {
   const text = body();
   for (const required of [
-    "3.7 — Risk Lab read-only no Premium + Prompt Premium v3",
+    "3.7-D — concluir deployment de produção, ativação controlada e smoke test",
     "4.1 — Radar: acompanhar fundo fora da carteira",
     "Grátis até 1",
     "Premium até 10",
