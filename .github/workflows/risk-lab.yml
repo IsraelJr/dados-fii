@@ -99,6 +99,17 @@ jobs:
             tests/risk-lab-deva11-phase-a.test.ts \
             tests/risk-lab-mcci11-evidence.test.mjs 2>&1 | tee .tmp/mcci11-ci.log
 
+      - name: Validate deterministic RBRY11 phase
+        id: rbry11_tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test \
+            tests/risk-lab-frozen-dividend-retry-checkpoint-auditor.test.ts \
+            tests/risk-lab-frozen-dividend-observation-window-sanitizer.test.ts \
+            tests/risk-lab-deva11-phase-a.test.ts \
+            tests/risk-lab-rbry11-evidence.test.mjs 2>&1 | tee .tmp/rbry11-ci.log
+
       - name: Validate TypeScript diagnostics
         id: typecheck
         shell: bash
@@ -160,7 +171,7 @@ jobs:
           npm run build 2>&1 | tee .tmp/production-build.log
 
       - name: Upload failure diagnostics
-        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.mcci11_tests.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.build_firebase_credentials.outcome == 'failure' || steps.production_build.outcome == 'failure')
+        if: failure() && (steps.risk_lab_tests.outcome == 'failure' || steps.deva11_tests.outcome == 'failure' || steps.vslh11_tests.outcome == 'failure' || steps.kncr11_tests.outcome == 'failure' || steps.knsc11_tests.outcome == 'failure' || steps.mcci11_tests.outcome == 'failure' || steps.rbry11_tests.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.build_firebase_credentials.outcome == 'failure' || steps.production_build.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: risk-lab-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -171,6 +182,7 @@ jobs:
             .tmp/kncr11-ci.log
             .tmp/knsc11-ci.log
             .tmp/mcci11-ci.log
+            .tmp/rbry11-ci.log
             .tmp/typecheck.log
             .tmp/production-build.log
           if-no-files-found: error
