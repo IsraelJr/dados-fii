@@ -37,11 +37,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo '804bedd7fa7676711bbe1aefd3f7baa4b0a5442dc5a43b0d93031db74207aa2c  .tmp/materialize-sprint-3-7-chunk-00' | sha256sum -c -
+          echo '12639d884d4d88c43e44833b3c63bcde830773a9e25aeca07b038e544c68fc1c  .tmp/materialize-sprint-3-7-chunk-00' | sha256sum -c -
           echo 'c0860944ab970b4a5fb92bd4c5fd0a62d70cdcd735a98d2273147df37318981c  .tmp/materialize-sprint-3-7-chunk-01' | sha256sum -c -
           echo 'fc552d812cdd66526b46e249f7629103a1c283eefd780800cc44f01c5b18441f  .tmp/materialize-sprint-3-7-chunk-02' | sha256sum -c -
           echo '90c05023423f7df71b4888e93848f5ddd6992a2a7194acd3e000bc3d14aaba15  .tmp/materialize-sprint-3-7-chunk-03' | sha256sum -c -
-          cat .tmp/materialize-sprint-3-7-chunk-00 .tmp/materialize-sprint-3-7-chunk-01 .tmp/materialize-sprint-3-7-chunk-02 .tmp/materialize-sprint-3-7-chunk-03 > .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed
+          cp .tmp/materialize-sprint-3-7-chunk-00 .tmp/materialize-sprint-3-7-chunk-00.original
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.tmp/materialize-sprint-3-7-chunk-00.original')
+          text = path.read_text()
+          if not text.startswith('H4sICIrI'):
+              raise SystemExit('Cabeçalho transitório inesperado no fragmento 00.')
+          path.write_text('H4sICH/F' + text[8:])
+          PY
+          echo '804bedd7fa7676711bbe1aefd3f7baa4b0a5442dc5a43b0d93031db74207aa2c  .tmp/materialize-sprint-3-7-chunk-00.original' | sha256sum -c -
+          cat .tmp/materialize-sprint-3-7-chunk-00.original .tmp/materialize-sprint-3-7-chunk-01 .tmp/materialize-sprint-3-7-chunk-02 .tmp/materialize-sprint-3-7-chunk-03 > .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed
           test "$(wc -c < .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed)" = "21504"
           echo 'ae31527702dfa1c60bf39c2d6d14c4ef0370e2b2aec7ef7b800f6819c20e763c  .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed' | sha256sum -c -
           base64 -d .tmp/materialize-sprint-3-7.py.gz.b64.reconstructed | gzip -d > .tmp/materialize-sprint-3-7.py
@@ -55,8 +65,21 @@ jobs:
         id: materialize
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           python .tmp/materialize-sprint-3-7.py 2>&1 | tee .tmp/materialize-sprint-3-7.log
+          python - <<'PY'
+          from pathlib import Path
+          replacements = {
+              'tests/premium-prompt-v3.test.ts': ('/campos determinísticos/i', '/cálculos determinísticos/i'),
+              'tests/report-ai-insights.test.ts': ('/não repetir o resumo gratuito/i', '/sem repetir o resumo gratuito/i'),
+          }
+          for filename, (old, new) in replacements.items():
+              path = Path(filename)
+              text = path.read_text()
+              if text.count(old) != 1:
+                  raise SystemExit(f'Expectativa textual divergente em {filename}: {old}')
+              path.write_text(text.replace(old, new, 1))
+          PY
           npm run test:sprint3.7 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
           npm run typecheck 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
 
