@@ -1,0 +1,409 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "risk-lab-credit-oos-phase-c-v1",
+  "datasetVersion": "1.0.0",
+  "methodologyVersion": "3.5-C.1",
+  "rulesetVersion": "0.1.0",
+  "evaluatedAt": "2026-07-25T00:00:00-03:00",
+  "expectedCohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+  "preRegisteredCohortIdentityHash": "620c26abbf30b4f96ef3de9dbfd8eb6c7b9e6d1fe56851d70079d39d0f490fd1",
+  "sourceCatalogs": [
+    {
+      "year": 2021,
+      "sourceHash": "4eebbc9109c225ae0271896cf1b8e057066b2855fdae6bc21bbdd09239416660"
+    },
+    {
+      "year": 2022,
+      "sourceHash": "b759e71fa86cb91dbaabe826c74e96b81e90cd03a6ba133bc09f9af0ff3d1780"
+    },
+    {
+      "year": 2023,
+      "sourceHash": "e0140897ca12af5d15ed24f701f0d5af796d01a10db8d9646b2dad1f4e3dc27d"
+    },
+    {
+      "year": 2024,
+      "sourceHash": "bef141cbeb86a7b3cbb0495207a19bcfcfe40c60e3e0a917210013518dbea918"
+    },
+    {
+      "year": 2025,
+      "sourceHash": "1932377eae369cfa72159446dc003cca6330feddb317b5d98b1814944f243971"
+    },
+    {
+      "year": 2026,
+      "sourceHash": "ec518ab85906625eb628697e1154346c11a2f6804a337303b144447db6a6c7ef"
+    }
+  ],
+  "provenance": {
+    "sourceCoverage": {
+      "workflowRunId": 30145144697,
+      "artifactId": 8615738454,
+      "artifactDigest": "sha256:f764a7b16465b50a4b00b8602aeeef0a71872388ba670f5d9160fba7d8d5faa9",
+      "artifactHash": "d5c905d97b77d9f3cca9ad760d50d6f5557db1c3c4011b251b773656e3ce1683"
+    },
+    "dividendWindows": {
+      "workflowRunId": 30144937254,
+      "artifactId": 8615667982,
+      "artifactDigest": "sha256:9f8e6944961ee0a4e5d8ec91eadea77bd843ec5befa43b122ee43ab96725b63b",
+      "artifactHash": "3a1af24025fc7598c569569784a1eb6b0f35f7b91ea64635b633a6d0d8b77c44"
+    },
+    "criticalPdfs": {
+      "artifacts": [
+        {
+          "workflowRunId": 30145411147,
+          "artifactId": 8615844301,
+          "artifactDigest": "sha256:2c3f11cf888484e11047a3907dafb85b5f429cfb4544b50695fe9fff0a71d2b4",
+          "artifactHash": "fa64f3b48554286752b383b385b778bba1f5690a1b8db9e1235b58aadd75144c"
+        },
+        {
+          "workflowRunId": 30145542189,
+          "artifactId": 8615865190,
+          "artifactDigest": "sha256:ef1ac71db36877251332dfc8315df7271217cea3b5aa281ebc1797c9b666dd5c",
+          "artifactHash": "3028151b793650daa0de8a79ea65a0be1efc9cc2954258ca8fcb323f7e3574ff"
+        }
+      ]
+    }
+  },
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "cnpj": "37087810000137",
+      "role": "severe_deterioration",
+      "fromDate": "2021-01-01",
+      "untilDate": "2026-07-22",
+      "indexPath": "docs/production-evidence/risk-lab/deva11-phase-a/index.json",
+      "expectedEvidenceHash": "62a19d9b20b57b49489d7ab51ed85d72505625ca68f47762a5045fc3c650993b",
+      "expectedCombinedObservationsHash": "6788292746eeb5321d36cd198c75b5810c3797cead357341cc04df9254fee20c"
+    },
+    {
+      "ticker": "VSLH11",
+      "cnpj": "36244015000142",
+      "role": "severe_deterioration",
+      "fromDate": "2021-01-01",
+      "untilDate": "2026-07-22",
+      "indexPath": "docs/production-evidence/risk-lab/vslh11-phase-b1/index.json",
+      "expectedEvidenceHash": "952c88ec36f930ce83d153bedb07344226cf8d9029d14ada1576514214269092",
+      "expectedCombinedObservationsHash": "2551679cf4a16ecb389c474f26c541670db69c7c39f34484a28cc6a61cae85ea"
+    },
+    {
+      "ticker": "KNCR11",
+      "cnpj": "16706958000132",
+      "role": "healthy_control",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "indexPath": "docs/production-evidence/risk-lab/kncr11-phase-b2/index.json",
+      "expectedEvidenceHash": "c11de46d43de21e98a3eb6986a8fb5c0692465672c412b3329f20d86a9bfd1bb",
+      "expectedCombinedObservationsHash": "fd7e47d03fbea224b1a0e4d0dff0629c20d59fa6fced2c8348c2aacbf417d09f"
+    },
+    {
+      "ticker": "KNSC11",
+      "cnpj": "35864448000138",
+      "role": "healthy_control",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "indexPath": "docs/production-evidence/risk-lab/knsc11-phase-b3/index.json",
+      "expectedEvidenceHash": "149ababbbd26ac4cf21b5462022e0c921cff3ff10a1797f0d4047fda2d3bdb65",
+      "expectedCombinedObservationsHash": "00ddf8ec44c0f02757b766f3b98781d80649bc1fca973c4b46cf05a866014045"
+    },
+    {
+      "ticker": "MCCI11",
+      "cnpj": "23648935000184",
+      "role": "reversible_stress",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "indexPath": "docs/production-evidence/risk-lab/mcci11-phase-b4/index.json",
+      "expectedEvidenceHash": "14c6ad2e55053d020688c0c99252e35a45c91a748cd946fd403b9acd0d99a817",
+      "expectedCombinedObservationsHash": "75d66bf48e8d838529dd847385aadf073a8cf51aac53cbb8130bda125e42709e"
+    },
+    {
+      "ticker": "RBRY11",
+      "cnpj": "30166700000111",
+      "role": "reversible_stress",
+      "fromDate": "2022-01-01",
+      "untilDate": "2025-12-31",
+      "indexPath": "docs/production-evidence/risk-lab/rbry11-phase-b5/index.json",
+      "expectedEvidenceHash": "938b856f5a74edcd404b494f68a33654c1f68b4ae01a392de56e6cbc5c741ed1",
+      "expectedCombinedObservationsHash": "5085c1610ab8b35c9835443779ef33995540f4ec766a31302694963230dc4e85"
+    }
+  ],
+  "primaryTruth": [
+    {
+      "ticker": "DEVA11",
+      "catalogCoverageComplete": true,
+      "catalogDocumentCount": 74,
+      "catalogDocumentsHash": "4039cca5c825d88cc3e228d224bf2ccdc715ed3eef3e5f665ee297eb5db66500",
+      "catalogScreenHash": "fe7a0bc23e3cd3cc335240c00625a234c70cb8305fe033b256aae8341717d3ba",
+      "criticalDocuments": [
+        {
+          "documentId": "424937",
+          "receivedAt": "2023-03-06T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424937",
+          "status": "extracted",
+          "sourceHash": "be5238d18faf2a4f3fd1f6a13a59f01708ea746c203292e2b41381916286d116",
+          "textHash": "8ba8303d4c86bfacf3cea5a48805f410d05376e5c86da5aabe5481f9dea39611",
+          "matches": [
+            {
+              "type": "default",
+              "term": "NAO PAGAMENTO",
+              "excerpt": "AO EM ASSEMBLEIA. ATE A SEGUNDA-FEIRA (06/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, 213, CJ. 41, VILA OLIMPIA, CEP 04.551-010 (“SECURITIZADORA”), NO CONTEXTO DO INADIMPLEMENTO DA OBRIG"
+            }
+          ]
+        }
+      ],
+      "materialEvent": {
+        "documentId": "424937",
+        "knownAt": "2023-03-06T00:00:00-03:00",
+        "type": "default",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424937",
+        "sourceHash": "be5238d18faf2a4f3fd1f6a13a59f01708ea746c203292e2b41381916286d116",
+        "textHash": "8ba8303d4c86bfacf3cea5a48805f410d05376e5c86da5aabe5481f9dea39611",
+        "term": "NAO PAGAMENTO",
+        "excerpt": "AO EM ASSEMBLEIA. ATE A SEGUNDA-FEIRA (06/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, 213, CJ. 41, VILA OLIMPIA, CEP 04.551-010 (“SECURITIZADORA”), NO CONTEXTO DO INADIMPLEMENTO DA OBRIG"
+      }
+    },
+    {
+      "ticker": "VSLH11",
+      "catalogCoverageComplete": true,
+      "catalogDocumentCount": 84,
+      "catalogDocumentsHash": "4ab43120a0cc2f9cf8d86c68888bdd6d9db1046414001a7767ae374f81e4eea3",
+      "catalogScreenHash": "fe7a0bc23e3cd3cc335240c00625a234c70cb8305fe033b256aae8341717d3ba",
+      "criticalDocuments": [
+        {
+          "documentId": "424942",
+          "receivedAt": "2023-03-06T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424942",
+          "status": "extracted",
+          "sourceHash": "7ba3d5257a27078ff56a3c506fd0b60b560b2b79c49bdd667addb3567c2e39d9",
+          "textHash": "955541639d0d623b1b995729a65be640033eb0abed2e0a512b84f319549c5580",
+          "matches": [
+            {
+              "type": "default",
+              "term": "NAO PAGAMENTO",
+              "excerpt": "6/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, "
+            }
+          ]
+        }
+      ],
+      "materialEvent": {
+        "documentId": "424942",
+        "knownAt": "2023-03-06T00:00:00-03:00",
+        "type": "default",
+        "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424942",
+        "sourceHash": "7ba3d5257a27078ff56a3c506fd0b60b560b2b79c49bdd667addb3567c2e39d9",
+        "textHash": "955541639d0d623b1b995729a65be640033eb0abed2e0a512b84f319549c5580",
+        "term": "NAO PAGAMENTO",
+        "excerpt": "6/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, "
+      }
+    },
+    {
+      "ticker": "KNCR11",
+      "catalogCoverageComplete": true,
+      "catalogDocumentCount": 89,
+      "catalogDocumentsHash": "25c30c347873d40f41846a3425f0198f77d3b95ef0bda01ca55c06d883e669ce",
+      "catalogScreenHash": "f8413dbea831526616b58fc84ddf9b1a56bfa03e104ebda86ed0acad3cf2f2af",
+      "criticalDocuments": [
+        {
+          "documentId": "601312",
+          "receivedAt": "2024-02-09T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=601312",
+          "status": "extracted",
+          "sourceHash": "d97be80c1702e0bef96f207b293708edfbb9efe5bf1263b33f3f2bb8ed8db5f1",
+          "textHash": "208090d9a47b6cdb71b2faba3dcce096e34400782af6a06450cc3a8a6bed70a5",
+          "matches": []
+        },
+        {
+          "documentId": "754234",
+          "receivedAt": "2024-10-08T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=754234",
+          "status": "extracted",
+          "sourceHash": "7d6da29152b559c4d85f63bbc91ca15754ded4e4a656a27fcc741a656c8765d8",
+          "textHash": "67d0461c7dba5e33d63872be2263d7fdb15b0f565e0b8e2a5161e8f0b8bd4dd0",
+          "matches": []
+        },
+        {
+          "documentId": "962129",
+          "receivedAt": "2025-08-07T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=962129",
+          "status": "extracted",
+          "sourceHash": "909d74e3a8af426666754a951d566fdd1c51a61be7fcf215e0ff3ee29e6cc29b",
+          "textHash": "9768e02c5e36b4e9b924de51bacfe5cb4955c3b28d8cda05ddd6a62d398d63ac",
+          "matches": []
+        }
+      ],
+      "materialEvent": null
+    },
+    {
+      "ticker": "KNSC11",
+      "catalogCoverageComplete": true,
+      "catalogDocumentCount": 84,
+      "catalogDocumentsHash": "ce1e30ed187d99c9ab66c43602663dda89d283c20d2695e08c67faecb7451e03",
+      "catalogScreenHash": "f8413dbea831526616b58fc84ddf9b1a56bfa03e104ebda86ed0acad3cf2f2af",
+      "criticalDocuments": [
+        {
+          "documentId": "259720",
+          "receivedAt": "2022-01-26T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=259720",
+          "status": "extracted",
+          "sourceHash": "4a9fe10d046c706fef2a5d92c14fd3af665dfce52f37688fc3594672dae0f62c",
+          "textHash": "d6d30323dbed7822d1da00da9247944eb248ffa69fcfe17ef9df432ce8f53339",
+          "matches": []
+        },
+        {
+          "documentId": "543642",
+          "receivedAt": "2023-10-30T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=543642",
+          "status": "extracted",
+          "sourceHash": "a93a354a968e2d70a45b69b246eab4269816bbdc4214f2e914f44c276faee704",
+          "textHash": "ed1a893578f97a2a84bc5697d8306359cfcbb02a81114d3bd9cc51c1e6e1e08b",
+          "matches": []
+        },
+        {
+          "documentId": "717289",
+          "receivedAt": "2024-08-13T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=717289",
+          "status": "extracted",
+          "sourceHash": "df074baa8660df9cda9a376db48d26484b3e89a595f6a6f93c7d6b4968977ca8",
+          "textHash": "9b1822f4dc1704ba1805a5393946400ae88ec817baa817cf047fd6bbfabefafc",
+          "matches": []
+        }
+      ],
+      "materialEvent": null
+    },
+    {
+      "ticker": "MCCI11",
+      "catalogCoverageComplete": true,
+      "catalogDocumentCount": 98,
+      "catalogDocumentsHash": "e4b92643af8e093d3a9cd6e2835c7998947694f4caf33764b7db0adb863062a9",
+      "catalogScreenHash": "f8413dbea831526616b58fc84ddf9b1a56bfa03e104ebda86ed0acad3cf2f2af",
+      "criticalDocuments": [
+        {
+          "documentId": "281671",
+          "receivedAt": "2022-03-28T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=281671",
+          "status": "extracted",
+          "sourceHash": "9170e24f6955dbf8b85a3a27afc82659a2d50e936a18a8f5f2f0e63ea7e1238d",
+          "textHash": "cb4e58a7fd8962da5cecd515bfe518b8b7feae7e0f53646d601f859d78d39d13",
+          "matches": []
+        },
+        {
+          "documentId": "285884",
+          "receivedAt": "2022-04-05T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=285884",
+          "status": "extracted",
+          "sourceHash": "fcae6dbeff31af91c313a930e71e279949b4aba317ef63eecf08bb92805386b9",
+          "textHash": "8fd4f9e4e20eda7ac1873d29b57b65f8ef8b9759dc7abb9481f32a8e5d4f6774",
+          "matches": []
+        },
+        {
+          "documentId": "351757",
+          "receivedAt": "2022-09-14T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=351757",
+          "status": "extracted",
+          "sourceHash": "69a08b7ee1c681aa01f79469a8d9c377fe61c19d67ea767e55a50c8e25669394",
+          "textHash": "bf5f66b3f02227cb4bb3502514f2ad1551eef1d1fc7d758a3b722c040c1472e5",
+          "matches": []
+        }
+      ],
+      "materialEvent": null
+    },
+    {
+      "ticker": "RBRY11",
+      "catalogCoverageComplete": true,
+      "catalogDocumentCount": 116,
+      "catalogDocumentsHash": "5381bcb38f9b91f54ba1154fc0189d258c734361ab8c89bcb1cc242b8523e9b5",
+      "catalogScreenHash": "f8413dbea831526616b58fc84ddf9b1a56bfa03e104ebda86ed0acad3cf2f2af",
+      "criticalDocuments": [
+        {
+          "documentId": "272948",
+          "receivedAt": "2022-02-25T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=272948",
+          "status": "extracted",
+          "sourceHash": "f4ff69a2473d5c2a8dba6f96e79e5e499c8b93665f9efc5d56b622361a8e5597",
+          "textHash": "6ceac514de1571f67d9dc2d5657ffc532c358c3b83d8051bc1eb7d752d227122",
+          "matches": []
+        },
+        {
+          "documentId": "283124",
+          "receivedAt": "2022-03-30T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=283124",
+          "status": "extracted",
+          "sourceHash": "8796c11dd0bf8168db951b50469b94d09452c1a13472e7d21d0bf8d07827422a",
+          "textHash": "7ea9ef1985f3eea4845059eef4e0ff825332866674a23005807d6f988eeb566a",
+          "matches": []
+        },
+        {
+          "documentId": "325760",
+          "receivedAt": "2022-07-13T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=325760",
+          "status": "extracted",
+          "sourceHash": "fd57a709a261c64590ba4c36aaf6c889c9e9fa1be1d314c08b63367ec1a4c96d",
+          "textHash": "f5f6958d5272e8ba7be4259c72a6b09f5e8b6ae7b709f3ae517795f29fae0ec0",
+          "matches": []
+        },
+        {
+          "documentId": "332848",
+          "receivedAt": "2022-08-02T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=332848",
+          "status": "extracted",
+          "sourceHash": "5b0eb72fc55a238223571200d96269b340d175a301756a0ae4118753335f265c",
+          "textHash": "9ec00dfb086fea61c0f3cfbc421f331919175880746fb6692cfd473e5d02b406",
+          "matches": []
+        },
+        {
+          "documentId": "398994",
+          "receivedAt": "2023-01-06T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=398994",
+          "status": "extracted",
+          "sourceHash": "24cd8e5a7b659d5e4769ac20ebe3557a4ea8a0af8b15c518f007be9cc11b91b3",
+          "textHash": "a5c4af7581adf365249f5d568583c36fd507804a8b3253098f18c6ff4616b6cf",
+          "matches": []
+        },
+        {
+          "documentId": "595236",
+          "receivedAt": "2024-02-02T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=595236",
+          "status": "extracted",
+          "sourceHash": "b9d7fdefe77a0e1574dc3b1fcd999ebcedd1a972c41c0fb08211670fb00b5038",
+          "textHash": "7b144daf8c37eabb5adc8a5da27a749c384d5feaa32cd4cbf30fea968a3af95a",
+          "matches": []
+        },
+        {
+          "documentId": "612913",
+          "receivedAt": "2024-03-01T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=612913",
+          "status": "extracted",
+          "sourceHash": "e1489f4538e64dfd6ad97333eeab5b85395b0c5ed47ed28b823ac79a278497c0",
+          "textHash": "521ba132b8e469fbb31f1bf6734c5669eab5aa5b55dac4a5decbd207b47a9143",
+          "matches": []
+        },
+        {
+          "documentId": "690779",
+          "receivedAt": "2024-07-02T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=690779",
+          "status": "extracted",
+          "sourceHash": "1c6cc0c53b0e806ddbf8907211b158ce6c517eb7ce3faa707579db1a12119428",
+          "textHash": "18816e79e263298fc9a4d36264f9883dfdb442a9d9f2d3a1e3c4681e4fd5a45c",
+          "matches": []
+        },
+        {
+          "documentId": "802386",
+          "receivedAt": "2024-12-16T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=802386",
+          "status": "extracted",
+          "sourceHash": "7f46e169d7c8f569dfda2072383aff5e95cb21deec8c62db5acabfa7927e7dc0",
+          "textHash": "f9a568d5ae6c9aebb1ee6e0006848b1d1db915d6cb177369bcb576e0f88425b9",
+          "matches": []
+        },
+        {
+          "documentId": "1058416",
+          "receivedAt": "2025-12-11T00:00:00-03:00",
+          "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=1058416",
+          "status": "extracted",
+          "sourceHash": "20556196db372b0a61f9b826c70adf3d86b31b4bf2c204f6649c09e6ee8017dd",
+          "textHash": "1da56a8ac0406e2b791bb0417e52875081322e539b06c4dfa2661218e04ca42e",
+          "matches": []
+        }
+      ],
+      "materialEvent": null
+    }
+  ]
+}

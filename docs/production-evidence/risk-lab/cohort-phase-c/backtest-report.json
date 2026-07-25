@@ -1,0 +1,817 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-C",
+  "datasetId": "risk-lab-credit-oos-phase-c-v1",
+  "datasetVersion": "1.0.0",
+  "methodologyVersion": "3.5-C.1",
+  "rulesetVersion": "0.1.0",
+  "evaluatedAt": "2026-07-25T00:00:00-03:00",
+  "status": "completed_requires_calibration",
+  "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+  "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+  "observationCount": 318,
+  "cases": [
+    {
+      "ticker": "DEVA11",
+      "role": "severe_deterioration",
+      "indexPath": "docs/production-evidence/risk-lab/deva11-phase-a/index.json",
+      "indexEvidenceHash": "62a19d9b20b57b49489d7ab51ed85d72505625ca68f47762a5045fc3c650993b",
+      "combinedObservationsHash": "6788292746eeb5321d36cd198c75b5810c3797cead357341cc04df9254fee20c",
+      "observations": 65,
+      "missingMonths": [
+        "2024-07"
+      ],
+      "longestContiguousSequence": 42,
+      "firstSignalAt": "2022-10-07T17:35:00-03:00",
+      "finalDetector": {
+        "ticker": "DEVA11",
+        "status": "stress_without_recovery",
+        "baselineMonths": [
+          "2022-01",
+          "2022-02",
+          "2022-03",
+          "2022-04",
+          "2022-05",
+          "2022-06"
+        ],
+        "baselineMedian": 1.355,
+        "stressMonths": [
+          "2022-07",
+          "2022-08",
+          "2022-09"
+        ],
+        "stressAverage": 0.933333,
+        "stressDropPercent": 31.12,
+        "stressDetectedAt": "2022-10-07T17:35:00-03:00",
+        "recoveryMonths": [],
+        "recoveryAverage": null,
+        "recoveryPercentOfBaseline": null,
+        "recoveryDetectedAt": null,
+        "blockingCreditEvent": null,
+        "observationsUsed": 65
+      },
+      "timeline": [
+        {
+          "asOf": "2021-02-05T17:31:00-03:00",
+          "observationsKnown": 1,
+          "detectorStatus": "no_qualifying_stress",
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-10-07T17:35:00-03:00",
+          "observationsKnown": 21,
+          "detectorStatus": "stress_without_recovery",
+          "stressDetectedAt": "2022-10-07T17:35:00-03:00",
+          "recoveryDetectedAt": null
+        }
+      ],
+      "groundTruth": {
+        "status": "verified",
+        "eventAt": "2023-03-06T00:00:00-03:00",
+        "stressAt": null,
+        "recoveryAt": null,
+        "evidence": [
+          {
+            "kind": "catalog_coverage",
+            "documentId": "CVM:DEVA11",
+            "knownAt": "2026-07-22",
+            "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/",
+            "sourceHash": "4039cca5c825d88cc3e228d224bf2ccdc715ed3eef3e5f665ee297eb5db66500",
+            "textHash": null,
+            "excerpt": "74 documentos do fundo foram indexados com cobertura anual completa."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "424937",
+            "knownAt": "2023-03-06T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424937",
+            "sourceHash": "be5238d18faf2a4f3fd1f6a13a59f01708ea746c203292e2b41381916286d116",
+            "textHash": "8ba8303d4c86bfacf3cea5a48805f410d05376e5c86da5aabe5481f9dea39611",
+            "excerpt": "AO EM ASSEMBLEIA. ATE A SEGUNDA-FEIRA (06/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, 213, CJ. 41, VILA OLIMPIA, CEP 04.551-010 (“SECURITIZADORA”), NO CONTEXTO DO INADIMPLEMENTO DA OBRIG"
+          },
+          {
+            "kind": "dividend_series",
+            "documentId": "DEVA11:DIVIDEND-SERIES",
+            "knownAt": "2026-07-07T17:02:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=1241207&cvm=true",
+            "sourceHash": "c82aa14c47208d1d665cbb6b2abbafecf83dc3d6c45291b56e30dc4ce3d6d795",
+            "textHash": null,
+            "excerpt": "65 observações mensais primárias congeladas."
+          },
+          {
+            "kind": "material_event",
+            "documentId": "424937",
+            "knownAt": "2023-03-06T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424937",
+            "sourceHash": "be5238d18faf2a4f3fd1f6a13a59f01708ea746c203292e2b41381916286d116",
+            "textHash": "8ba8303d4c86bfacf3cea5a48805f410d05376e5c86da5aabe5481f9dea39611",
+            "excerpt": "AO EM ASSEMBLEIA. ATE A SEGUNDA-FEIRA (06/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, 213, CJ. 41, VILA OLIMPIA, CEP 04.551-010 (“SECURITIZADORA”), NO CONTEXTO DO INADIMPLEMENTO DA OBRIG"
+          }
+        ],
+        "blockers": [],
+        "verificationHash": "36004c9b2cb66c8c67666a37057d67f1c8c97ace72956797fab814b426e82d93"
+      },
+      "outcome": "true_positive",
+      "leadTimeDays": 149.27,
+      "lookAheadDetected": false,
+      "blockers": [],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "VSLH11",
+      "role": "severe_deterioration",
+      "indexPath": "docs/production-evidence/risk-lab/vslh11-phase-b1/index.json",
+      "indexEvidenceHash": "952c88ec36f930ce83d153bedb07344226cf8d9029d14ada1576514214269092",
+      "combinedObservationsHash": "2551679cf4a16ecb389c474f26c541670db69c7c39f34484a28cc6a61cae85ea",
+      "observations": 64,
+      "missingMonths": [
+        "2023-12"
+      ],
+      "longestContiguousSequence": 34,
+      "firstSignalAt": "2022-01-07T17:44:00-03:00",
+      "finalDetector": {
+        "ticker": "VSLH11",
+        "status": "stress_without_recovery",
+        "baselineMonths": [
+          "2021-04",
+          "2021-05",
+          "2021-06",
+          "2021-07",
+          "2021-08",
+          "2021-09"
+        ],
+        "baselineMedian": 0.16,
+        "stressMonths": [
+          "2021-10",
+          "2021-11",
+          "2021-12"
+        ],
+        "stressAverage": 0.125333,
+        "stressDropPercent": 21.67,
+        "stressDetectedAt": "2022-01-07T17:44:00-03:00",
+        "recoveryMonths": [],
+        "recoveryAverage": null,
+        "recoveryPercentOfBaseline": null,
+        "recoveryDetectedAt": null,
+        "blockingCreditEvent": null,
+        "observationsUsed": 64
+      },
+      "timeline": [
+        {
+          "asOf": "2021-03-08T20:26:00-03:00",
+          "observationsKnown": 1,
+          "detectorStatus": "no_qualifying_stress",
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-01-07T17:44:00-03:00",
+          "observationsKnown": 11,
+          "detectorStatus": "stress_without_recovery",
+          "stressDetectedAt": "2022-01-07T17:44:00-03:00",
+          "recoveryDetectedAt": null
+        }
+      ],
+      "groundTruth": {
+        "status": "verified",
+        "eventAt": "2023-03-06T00:00:00-03:00",
+        "stressAt": null,
+        "recoveryAt": null,
+        "evidence": [
+          {
+            "kind": "catalog_coverage",
+            "documentId": "CVM:VSLH11",
+            "knownAt": "2026-07-22",
+            "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/",
+            "sourceHash": "4ab43120a0cc2f9cf8d86c68888bdd6d9db1046414001a7767ae374f81e4eea3",
+            "textHash": null,
+            "excerpt": "84 documentos do fundo foram indexados com cobertura anual completa."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "424942",
+            "knownAt": "2023-03-06T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424942",
+            "sourceHash": "7ba3d5257a27078ff56a3c506fd0b60b560b2b79c49bdd667addb3567c2e39d9",
+            "textHash": "955541639d0d623b1b995729a65be640033eb0abed2e0a512b84f319549c5580",
+            "excerpt": "6/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, "
+          },
+          {
+            "kind": "dividend_series",
+            "documentId": "VSLH11:DIVIDEND-SERIES",
+            "knownAt": "2026-07-07T17:02:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=1241214&cvm=true",
+            "sourceHash": "3939058cf70afb9dac2a02871f346ce71fc66dbc858596093f2df805911383c2",
+            "textHash": null,
+            "excerpt": "64 observações mensais primárias congeladas."
+          },
+          {
+            "kind": "material_event",
+            "documentId": "424942",
+            "knownAt": "2023-03-06T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=424942",
+            "sourceHash": "7ba3d5257a27078ff56a3c506fd0b60b560b2b79c49bdd667addb3567c2e39d9",
+            "textHash": "955541639d0d623b1b995729a65be640033eb0abed2e0a512b84f319549c5580",
+            "excerpt": "6/03), ENVIAREMOS UMA ATUALIZACAO E MANTERMOS A VORTX INFORMADA DOS PROXIMOS PASSOS. DESTA FORMA, A AGENTE FIDUCIARIA INFORMOU QUE CONVOCARA UMA ASSEMBLEIA GERAL DE TITULARES DO CRI, NA SEGUNDA-FEIRA, 06.03.2023, PARA DELIBERAREM ACERCA DO NAO PAGAMENTO PREVISTO PELO EMISSOR, E AS PROVIDENCIAS A SEREM TOMADAS DE ACORDO COM O TERMO DE SECURITIZACAO. EM 05/03/2023, A EMISSORA PUBLICOU UM COMUNICADO AO MERCADO INFORMANDO O QUE SEGUE: A FORTE SECURITIZADORA S.A., COMPANHIA SECURITIZADORA, INSCRITA NO CADASTRO NACIONAL DE PESSOAS JURIDICAS DO MINISTERIO DA ECONOMIA SOB O Nº 12.979.898/0001-70, COM SEDE NA CIDADE DE SAO PAULO, ESTADO DE SAO PAULO, NA RUA FIDENCIO RAMOS, "
+          }
+        ],
+        "blockers": [],
+        "verificationHash": "f6ef3482987d80447cbc1a25a9b63d7a2d98f6f6560d3719d977c4f15d2652f9"
+      },
+      "outcome": "true_positive",
+      "leadTimeDays": 422.26,
+      "lookAheadDetected": false,
+      "blockers": [],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "KNCR11",
+      "role": "healthy_control",
+      "indexPath": "docs/production-evidence/risk-lab/kncr11-phase-b2/index.json",
+      "indexEvidenceHash": "c11de46d43de21e98a3eb6986a8fb5c0692465672c412b3329f20d86a9bfd1bb",
+      "combinedObservationsHash": "fd7e47d03fbea224b1a0e4d0dff0629c20d59fa6fced2c8348c2aacbf417d09f",
+      "observations": 48,
+      "missingMonths": [],
+      "longestContiguousSequence": 48,
+      "firstSignalAt": null,
+      "finalDetector": {
+        "ticker": "KNCR11",
+        "status": "no_qualifying_stress",
+        "baselineMonths": [],
+        "baselineMedian": null,
+        "stressMonths": [],
+        "stressAverage": null,
+        "stressDropPercent": null,
+        "stressDetectedAt": null,
+        "recoveryMonths": [],
+        "recoveryAverage": null,
+        "recoveryPercentOfBaseline": null,
+        "recoveryDetectedAt": null,
+        "blockingCreditEvent": null,
+        "observationsUsed": 48
+      },
+      "timeline": [
+        {
+          "asOf": "2022-01-31T18:02:00-03:00",
+          "observationsKnown": 1,
+          "detectorStatus": "no_qualifying_stress",
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        }
+      ],
+      "groundTruth": {
+        "status": "verified",
+        "eventAt": null,
+        "stressAt": null,
+        "recoveryAt": null,
+        "evidence": [
+          {
+            "kind": "catalog_coverage",
+            "documentId": "CVM:KNCR11",
+            "knownAt": "2025-12-31",
+            "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/",
+            "sourceHash": "25c30c347873d40f41846a3425f0198f77d3b95ef0bda01ca55c06d883e669ce",
+            "textHash": null,
+            "excerpt": "89 documentos do fundo foram indexados com cobertura anual completa."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "601312",
+            "knownAt": "2024-02-09T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=601312",
+            "sourceHash": "d97be80c1702e0bef96f207b293708edfbb9efe5bf1263b33f3f2bb8ed8db5f1",
+            "textHash": "208090d9a47b6cdb71b2faba3dcce096e34400782af6a06450cc3a8a6bed70a5",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "754234",
+            "knownAt": "2024-10-08T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=754234",
+            "sourceHash": "7d6da29152b559c4d85f63bbc91ca15754ded4e4a656a27fcc741a656c8765d8",
+            "textHash": "67d0461c7dba5e33d63872be2263d7fdb15b0f565e0b8e2a5161e8f0b8bd4dd0",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "962129",
+            "knownAt": "2025-08-07T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=962129",
+            "sourceHash": "909d74e3a8af426666754a951d566fdd1c51a61be7fcf215e0ff3ee29e6cc29b",
+            "textHash": "9768e02c5e36b4e9b924de51bacfe5cb4955c3b28d8cda05ddd6a62d398d63ac",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "dividend_series",
+            "documentId": "KNCR11:DIVIDEND-SERIES",
+            "knownAt": "2025-12-30T18:04:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=1073526&cvm=true",
+            "sourceHash": "93389f7289ffd3028513d2ec96bde7ce3bbc2007c08d8e24efdfd14218141b80",
+            "textHash": null,
+            "excerpt": "48 observações mensais primárias congeladas."
+          }
+        ],
+        "blockers": [],
+        "verificationHash": "cc660b832871ec8a11900791b1fb6dafb1bc3cd46a5f02725a21c0e785bfcb95"
+      },
+      "outcome": "true_negative",
+      "leadTimeDays": null,
+      "lookAheadDetected": false,
+      "blockers": [],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "KNSC11",
+      "role": "healthy_control",
+      "indexPath": "docs/production-evidence/risk-lab/knsc11-phase-b3/index.json",
+      "indexEvidenceHash": "149ababbbd26ac4cf21b5462022e0c921cff3ff10a1797f0d4047fda2d3bdb65",
+      "combinedObservationsHash": "00ddf8ec44c0f02757b766f3b98781d80649bc1fca973c4b46cf05a866014045",
+      "observations": 48,
+      "missingMonths": [],
+      "longestContiguousSequence": 48,
+      "firstSignalAt": "2022-09-30T17:49:00-03:00",
+      "finalDetector": {
+        "ticker": "KNSC11",
+        "status": "stress_without_recovery",
+        "baselineMonths": [
+          "2022-01",
+          "2022-02",
+          "2022-03",
+          "2022-04",
+          "2022-05",
+          "2022-06"
+        ],
+        "baselineMedian": 1.13,
+        "stressMonths": [
+          "2022-07",
+          "2022-08",
+          "2022-09"
+        ],
+        "stressAverage": 0.703333,
+        "stressDropPercent": 37.76,
+        "stressDetectedAt": "2022-09-30T17:49:00-03:00",
+        "recoveryMonths": [],
+        "recoveryAverage": null,
+        "recoveryPercentOfBaseline": null,
+        "recoveryDetectedAt": null,
+        "blockingCreditEvent": null,
+        "observationsUsed": 48
+      },
+      "timeline": [
+        {
+          "asOf": "2022-02-01T15:23:00-03:00",
+          "observationsKnown": 1,
+          "detectorStatus": "no_qualifying_stress",
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-09-30T17:49:00-03:00",
+          "observationsKnown": 9,
+          "detectorStatus": "stress_without_recovery",
+          "stressDetectedAt": "2022-09-30T17:49:00-03:00",
+          "recoveryDetectedAt": null
+        }
+      ],
+      "groundTruth": {
+        "status": "verified",
+        "eventAt": null,
+        "stressAt": null,
+        "recoveryAt": null,
+        "evidence": [
+          {
+            "kind": "catalog_coverage",
+            "documentId": "CVM:KNSC11",
+            "knownAt": "2025-12-31",
+            "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/",
+            "sourceHash": "ce1e30ed187d99c9ab66c43602663dda89d283c20d2695e08c67faecb7451e03",
+            "textHash": null,
+            "excerpt": "84 documentos do fundo foram indexados com cobertura anual completa."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "259720",
+            "knownAt": "2022-01-26T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=259720",
+            "sourceHash": "4a9fe10d046c706fef2a5d92c14fd3af665dfce52f37688fc3594672dae0f62c",
+            "textHash": "d6d30323dbed7822d1da00da9247944eb248ffa69fcfe17ef9df432ce8f53339",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "543642",
+            "knownAt": "2023-10-30T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=543642",
+            "sourceHash": "a93a354a968e2d70a45b69b246eab4269816bbdc4214f2e914f44c276faee704",
+            "textHash": "ed1a893578f97a2a84bc5697d8306359cfcbb02a81114d3bd9cc51c1e6e1e08b",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "717289",
+            "knownAt": "2024-08-13T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=717289",
+            "sourceHash": "df074baa8660df9cda9a376db48d26484b3e89a595f6a6f93c7d6b4968977ca8",
+            "textHash": "9b1822f4dc1704ba1805a5393946400ae88ec817baa817cf047fd6bbfabefafc",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "dividend_series",
+            "documentId": "KNSC11:DIVIDEND-SERIES",
+            "knownAt": "2025-12-30T18:04:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=1073533&cvm=true",
+            "sourceHash": "9eff94516f3ba25763032ec4e29e00ae98641b1c84f7061c31c418c487a03199",
+            "textHash": null,
+            "excerpt": "48 observações mensais primárias congeladas."
+          }
+        ],
+        "blockers": [],
+        "verificationHash": "4ba1cb3724865bfc02b7d832a7fb40b63aed268efff38b1215f6ea09636bf3c8"
+      },
+      "outcome": "false_positive",
+      "leadTimeDays": null,
+      "lookAheadDetected": false,
+      "blockers": [
+        "Controle saudável recebeu sinal de deterioração sem evento material primário."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "MCCI11",
+      "role": "reversible_stress",
+      "indexPath": "docs/production-evidence/risk-lab/mcci11-phase-b4/index.json",
+      "indexEvidenceHash": "14c6ad2e55053d020688c0c99252e35a45c91a748cd946fd403b9acd0d99a817",
+      "combinedObservationsHash": "75d66bf48e8d838529dd847385aadf073a8cf51aac53cbb8130bda125e42709e",
+      "observations": 46,
+      "missingMonths": [
+        "2025-02"
+      ],
+      "longestContiguousSequence": 37,
+      "firstSignalAt": null,
+      "finalDetector": {
+        "ticker": "MCCI11",
+        "status": "no_qualifying_stress",
+        "baselineMonths": [],
+        "baselineMedian": null,
+        "stressMonths": [],
+        "stressAverage": null,
+        "stressDropPercent": null,
+        "stressDetectedAt": null,
+        "recoveryMonths": [],
+        "recoveryAverage": null,
+        "recoveryPercentOfBaseline": null,
+        "recoveryDetectedAt": null,
+        "blockingCreditEvent": null,
+        "observationsUsed": 46
+      },
+      "timeline": [
+        {
+          "asOf": "2022-02-10T17:34:00-03:00",
+          "observationsKnown": 1,
+          "detectorStatus": "no_qualifying_stress",
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        }
+      ],
+      "groundTruth": {
+        "status": "blocked",
+        "eventAt": null,
+        "stressAt": null,
+        "recoveryAt": null,
+        "evidence": [
+          {
+            "kind": "catalog_coverage",
+            "documentId": "CVM:MCCI11",
+            "knownAt": "2025-12-31",
+            "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/",
+            "sourceHash": "e4b92643af8e093d3a9cd6e2835c7998947694f4caf33764b7db0adb863062a9",
+            "textHash": null,
+            "excerpt": "98 documentos do fundo foram indexados com cobertura anual completa."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "281671",
+            "knownAt": "2022-03-28T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=281671",
+            "sourceHash": "9170e24f6955dbf8b85a3a27afc82659a2d50e936a18a8f5f2f0e63ea7e1238d",
+            "textHash": "cb4e58a7fd8962da5cecd515bfe518b8b7feae7e0f53646d601f859d78d39d13",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "285884",
+            "knownAt": "2022-04-05T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=285884",
+            "sourceHash": "fcae6dbeff31af91c313a930e71e279949b4aba317ef63eecf08bb92805386b9",
+            "textHash": "8fd4f9e4e20eda7ac1873d29b57b65f8ef8b9759dc7abb9481f32a8e5d4f6774",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "351757",
+            "knownAt": "2022-09-14T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=351757",
+            "sourceHash": "69a08b7ee1c681aa01f79469a8d9c377fe61c19d67ea767e55a50c8e25669394",
+            "textHash": "bf5f66b3f02227cb4bb3502514f2ad1551eef1d1fc7d758a3b722c040c1472e5",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "dividend_series",
+            "documentId": "MCCI11:DIVIDEND-SERIES",
+            "knownAt": "2025-12-10T18:22:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=1058209&cvm=true",
+            "sourceHash": "e03b3adf20a02f11f17c83d1da90b1bf46e35733e6d83f31c6eb6337c9cb9de8",
+            "textHash": null,
+            "excerpt": "46 observações mensais primárias congeladas."
+          }
+        ],
+        "blockers": [
+          "A série primária não confirmou estresse reversível segundo a definição pré-registrada."
+        ],
+        "verificationHash": "ae603fefd9e2686668484b69b01bd61ec1890b0a405b3326326d880eeeab6fcb"
+      },
+      "outcome": "inconclusive",
+      "leadTimeDays": null,
+      "lookAheadDetected": false,
+      "blockers": [
+        "A série primária não confirmou estresse reversível segundo a definição pré-registrada."
+      ],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    },
+    {
+      "ticker": "RBRY11",
+      "role": "reversible_stress",
+      "indexPath": "docs/production-evidence/risk-lab/rbry11-phase-b5/index.json",
+      "indexEvidenceHash": "938b856f5a74edcd404b494f68a33654c1f68b4ae01a392de56e6cbc5c741ed1",
+      "combinedObservationsHash": "5085c1610ab8b35c9835443779ef33995540f4ec766a31302694963230dc4e85",
+      "observations": 47,
+      "missingMonths": [],
+      "longestContiguousSequence": 47,
+      "firstSignalAt": "2022-12-09T17:34:00-03:00",
+      "finalDetector": {
+        "ticker": "RBRY11",
+        "status": "reversible_stress_confirmed",
+        "baselineMonths": [
+          "2022-03",
+          "2022-04",
+          "2022-05",
+          "2022-06",
+          "2022-07",
+          "2022-08"
+        ],
+        "baselineMedian": 1.275,
+        "stressMonths": [
+          "2022-09",
+          "2022-10",
+          "2022-11"
+        ],
+        "stressAverage": 1,
+        "stressDropPercent": 21.57,
+        "stressDetectedAt": "2022-12-09T17:34:00-03:00",
+        "recoveryMonths": [
+          "2022-12",
+          "2023-01",
+          "2023-02"
+        ],
+        "recoveryAverage": 1.15,
+        "recoveryPercentOfBaseline": 90.2,
+        "recoveryDetectedAt": "2023-03-09T18:34:00-03:00",
+        "blockingCreditEvent": null,
+        "observationsUsed": 47
+      },
+      "timeline": [
+        {
+          "asOf": "2022-02-09T17:39:00-03:00",
+          "observationsKnown": 1,
+          "detectorStatus": "no_qualifying_stress",
+          "stressDetectedAt": null,
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2022-12-09T17:34:00-03:00",
+          "observationsKnown": 11,
+          "detectorStatus": "stress_without_recovery",
+          "stressDetectedAt": "2022-12-09T17:34:00-03:00",
+          "recoveryDetectedAt": null
+        },
+        {
+          "asOf": "2023-03-09T18:34:00-03:00",
+          "observationsKnown": 14,
+          "detectorStatus": "reversible_stress_confirmed",
+          "stressDetectedAt": "2022-12-09T17:34:00-03:00",
+          "recoveryDetectedAt": "2023-03-09T18:34:00-03:00"
+        }
+      ],
+      "groundTruth": {
+        "status": "verified",
+        "eventAt": null,
+        "stressAt": "2022-12-09T17:34:00-03:00",
+        "recoveryAt": "2023-03-09T18:34:00-03:00",
+        "evidence": [
+          {
+            "kind": "catalog_coverage",
+            "documentId": "CVM:RBRY11",
+            "knownAt": "2025-12-31",
+            "sourceUrl": "https://dados.cvm.gov.br/dados/FI/DOC/EVENTUAL/DADOS/",
+            "sourceHash": "5381bcb38f9b91f54ba1154fc0189d258c734361ab8c89bcb1cc242b8523e9b5",
+            "textHash": null,
+            "excerpt": "116 documentos do fundo foram indexados com cobertura anual completa."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "272948",
+            "knownAt": "2022-02-25T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=272948",
+            "sourceHash": "f4ff69a2473d5c2a8dba6f96e79e5e499c8b93665f9efc5d56b622361a8e5597",
+            "textHash": "6ceac514de1571f67d9dc2d5657ffc532c358c3b83d8051bc1eb7d752d227122",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "283124",
+            "knownAt": "2022-03-30T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=283124",
+            "sourceHash": "8796c11dd0bf8168db951b50469b94d09452c1a13472e7d21d0bf8d07827422a",
+            "textHash": "7ea9ef1985f3eea4845059eef4e0ff825332866674a23005807d6f988eeb566a",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "325760",
+            "knownAt": "2022-07-13T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=325760",
+            "sourceHash": "fd57a709a261c64590ba4c36aaf6c889c9e9fa1be1d314c08b63367ec1a4c96d",
+            "textHash": "f5f6958d5272e8ba7be4259c72a6b09f5e8b6ae7b709f3ae517795f29fae0ec0",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "332848",
+            "knownAt": "2022-08-02T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=332848",
+            "sourceHash": "5b0eb72fc55a238223571200d96269b340d175a301756a0ae4118753335f265c",
+            "textHash": "9ec00dfb086fea61c0f3cfbc421f331919175880746fb6692cfd473e5d02b406",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "398994",
+            "knownAt": "2023-01-06T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=398994",
+            "sourceHash": "24cd8e5a7b659d5e4769ac20ebe3557a4ea8a0af8b15c518f007be9cc11b91b3",
+            "textHash": "a5c4af7581adf365249f5d568583c36fd507804a8b3253098f18c6ff4616b6cf",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "595236",
+            "knownAt": "2024-02-02T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=595236",
+            "sourceHash": "b9d7fdefe77a0e1574dc3b1fcd999ebcedd1a972c41c0fb08211670fb00b5038",
+            "textHash": "7b144daf8c37eabb5adc8a5da27a749c384d5feaa32cd4cbf30fea968a3af95a",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "612913",
+            "knownAt": "2024-03-01T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=612913",
+            "sourceHash": "e1489f4538e64dfd6ad97333eeab5b85395b0c5ed47ed28b823ac79a278497c0",
+            "textHash": "521ba132b8e469fbb31f1bf6734c5669eab5aa5b55dac4a5decbd207b47a9143",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "690779",
+            "knownAt": "2024-07-02T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=690779",
+            "sourceHash": "1c6cc0c53b0e806ddbf8907211b158ce6c517eb7ce3faa707579db1a12119428",
+            "textHash": "18816e79e263298fc9a4d36264f9883dfdb442a9d9f2d3a1e3c4681e4fd5a45c",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "802386",
+            "knownAt": "2024-12-16T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=802386",
+            "sourceHash": "7f46e169d7c8f569dfda2072383aff5e95cb21deec8c62db5acabfa7927e7dc0",
+            "textHash": "f9a568d5ae6c9aebb1ee6e0006848b1d1db915d6cb177369bcb576e0f88425b9",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "critical_document",
+            "documentId": "1058416",
+            "knownAt": "2025-12-11T00:00:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/downloadDocumento?id=1058416",
+            "sourceHash": "20556196db372b0a61f9b826c70adf3d86b31b4bf2c204f6649c09e6ee8017dd",
+            "textHash": "1da56a8ac0406e2b791bb0417e52875081322e539b06c4dfa2661218e04ca42e",
+            "excerpt": "Documento crítico extraído sem termo material reconhecido."
+          },
+          {
+            "kind": "dividend_series",
+            "documentId": "RBRY11:DIVIDEND-SERIES",
+            "knownAt": "2025-12-09T18:14:00-03:00",
+            "sourceUrl": "https://fnet.bmfbovespa.com.br/fnet/publico/exibirDocumento?id=1057270&cvm=true",
+            "sourceHash": "7c7301d728f50fa9f8500ecdc2ec69f00f7434f1834046af703f8e27985b2060",
+            "textHash": null,
+            "excerpt": "47 observações mensais primárias congeladas."
+          }
+        ],
+        "blockers": [],
+        "verificationHash": "90433b97723430b4586b7e88b55baa9aba41659d53b5f7e43e990a09b44c9a86"
+      },
+      "outcome": "true_positive",
+      "leadTimeDays": 90.04,
+      "lookAheadDetected": false,
+      "blockers": [],
+      "premiumIntegrated": false,
+      "notificationsSent": false
+    }
+  ],
+  "metrics": {
+    "totalCases": 6,
+    "conclusiveCases": 5,
+    "truePositives": 3,
+    "trueNegatives": 1,
+    "falsePositives": 1,
+    "falseNegatives": 0,
+    "inconclusiveCases": 1,
+    "coveragePercent": 83.33,
+    "averageLeadTimeDays": 220.52,
+    "minimumLeadTimeDays": 90.04,
+    "maximumLeadTimeDays": 422.26
+  },
+  "methodologyChecks": [
+    {
+      "id": "cohort.identity",
+      "status": "passed",
+      "message": "A identidade pré-registrada da coorte deve permanecer imutável.",
+      "metadata": {
+        "identityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726"
+      }
+    },
+    {
+      "id": "cohort.six-cases",
+      "status": "passed",
+      "message": "Os seis fundos devem ser carregados do Git.",
+      "metadata": {
+        "total": 6
+      }
+    },
+    {
+      "id": "dataset.immutable",
+      "status": "passed",
+      "message": "O dataset consolidado deve possuir hash determinístico.",
+      "metadata": {
+        "observations": 318,
+        "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae"
+      }
+    },
+    {
+      "id": "source.catalogs",
+      "status": "passed",
+      "message": "Os catálogos anuais da CVM devem estar congelados.",
+      "metadata": {}
+    },
+    {
+      "id": "look-ahead.none",
+      "status": "passed",
+      "message": "Nenhuma observação posterior à data simulada pode influenciar o resultado.",
+      "metadata": {}
+    },
+    {
+      "id": "ruleset.frozen",
+      "status": "passed",
+      "message": "O ruleset v0.1.0 deve permanecer congelado.",
+      "metadata": {}
+    },
+    {
+      "id": "isolation.external-effects",
+      "status": "passed",
+      "message": "A 3.5-C não pode integrar Premium nem enviar notificações.",
+      "metadata": {}
+    },
+    {
+      "id": "metrics.measured",
+      "status": "passed",
+      "message": "Todos os resultados, inclusive inconclusivos, devem ser medidos.",
+      "metadata": {}
+    }
+  ],
+  "performanceFindings": [
+    "KNSC11: falso positivo.",
+    "MCCI11: inconclusivo — A série primária não confirmou estresse reversível segundo a definição pré-registrada."
+  ],
+  "methodologicalBlockers": [],
+  "calibrationRequired": true,
+  "homologationAllowed": false,
+  "premiumIntegrated": false,
+  "notificationsSent": false,
+  "evidenceHash": "4b0ced4e8ef662a23317e850353209b72804745be3afa7dc128e05356b2e7c6f"
+}

@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.5-C",
+  "status": "completed_requires_calibration",
+  "datasetId": "risk-lab-credit-oos-phase-c-v1",
+  "datasetVersion": "1.0.0",
+  "methodologyVersion": "3.5-C.1",
+  "rulesetVersion": "0.1.0",
+  "evaluatedAt": "2026-07-25T00:00:00-03:00",
+  "sourceArtifacts": {
+    "sourceCoverage": {
+      "workflowRunId": 30145144697,
+      "artifactId": 8615738454,
+      "artifactDigest": "sha256:f764a7b16465b50a4b00b8602aeeef0a71872388ba670f5d9160fba7d8d5faa9",
+      "artifactHash": "d5c905d97b77d9f3cca9ad760d50d6f5557db1c3c4011b251b773656e3ce1683"
+    },
+    "dividendWindows": {
+      "workflowRunId": 30144937254,
+      "artifactId": 8615667982,
+      "artifactDigest": "sha256:9f8e6944961ee0a4e5d8ec91eadea77bd843ec5befa43b122ee43ab96725b63b",
+      "artifactHash": "3a1af24025fc7598c569569784a1eb6b0f35f7b91ea64635b633a6d0d8b77c44"
+    },
+    "criticalPdfs": {
+      "artifacts": [
+        {
+          "workflowRunId": 30145411147,
+          "artifactId": 8615844301,
+          "artifactDigest": "sha256:2c3f11cf888484e11047a3907dafb85b5f429cfb4544b50695fe9fff0a71d2b4",
+          "artifactHash": "fa64f3b48554286752b383b385b778bba1f5690a1b8db9e1235b58aadd75144c"
+        },
+        {
+          "workflowRunId": 30145542189,
+          "artifactId": 8615865190,
+          "artifactDigest": "sha256:ef1ac71db36877251332dfc8315df7271217cea3b5aa281ebc1797c9b666dd5c",
+          "artifactHash": "3028151b793650daa0de8a79ea65a0be1efc9cc2954258ca8fcb323f7e3574ff"
+        }
+      ]
+    }
+  },
+  "execution": {
+    "runs": 2,
+    "run1": {
+      "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+      "evidenceHash": "4b0ced4e8ef662a23317e850353209b72804745be3afa7dc128e05356b2e7c6f",
+      "reportFileHash": "2d0eedbde1afe8ede7903f7b8b487e1c53adc57fb56ca172a1865bba950e1bbc"
+    },
+    "run2": {
+      "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+      "evidenceHash": "4b0ced4e8ef662a23317e850353209b72804745be3afa7dc128e05356b2e7c6f",
+      "reportFileHash": "2d0eedbde1afe8ede7903f7b8b487e1c53adc57fb56ca172a1865bba950e1bbc"
+    },
+    "hashesMatch": true
+  },
+  "result": {
+    "observationCount": 318,
+    "cohortIdentityHash": "97a3fc3bea0adde463ee3a8d06a9e40a6e90dc0f22303bad85e3dd488bfb7726",
+    "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+    "metrics": {
+      "totalCases": 6,
+      "conclusiveCases": 5,
+      "truePositives": 3,
+      "trueNegatives": 1,
+      "falsePositives": 1,
+      "falseNegatives": 0,
+      "inconclusiveCases": 1,
+      "coveragePercent": 83.33,
+      "averageLeadTimeDays": 220.52,
+      "minimumLeadTimeDays": 90.04,
+      "maximumLeadTimeDays": 422.26
+    },
+    "performanceFindings": [
+      "KNSC11: falso positivo.",
+      "MCCI11: inconclusivo — A série primária não confirmou estresse reversível segundo a definição pré-registrada."
+    ],
+    "methodologicalBlockers": [],
+    "calibrationRequired": true,
+    "homologationAllowed": false,
+    "premiumIntegrated": false,
+    "notificationsSent": false
+  },
+  "files": {
+    "registry": {
+      "file": "docs/production-evidence/risk-lab/cohort-phase-c/registry.json",
+      "hash": "a4648fd3c2136d5c5025ce0a6e2e46ac5765c004bbf840db2efa17a24cc0a8f5"
+    },
+    "dataset": {
+      "file": "docs/production-evidence/risk-lab/cohort-phase-c/dataset-index.json",
+      "hash": "0fcc5e4e5a7963f48076b0a34dd0a6836477f806bd1a9bbe0dd3d7b00c21078e"
+    },
+    "backtest": {
+      "file": "docs/production-evidence/risk-lab/cohort-phase-c/backtest-report.json",
+      "hash": "2d0eedbde1afe8ede7903f7b8b487e1c53adc57fb56ca172a1865bba950e1bbc"
+    }
+  },
+  "evidenceHash": "edb90face1dddff390dcbf260cf60dc0bb3c053f20ea4ea5a17a0788b98c308e"
+}
