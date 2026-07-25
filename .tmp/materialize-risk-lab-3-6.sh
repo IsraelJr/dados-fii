@@ -137,4 +137,24 @@ git add \
 
 git diff --cached --check
 git commit -m 'feat: homologa ruleset v0.2.0 do Risk Lab'
-git push origin HEAD:agent/sprint-3-6-calibration
+
+if ! git push origin HEAD:agent/sprint-3-6-calibration; then
+  tar -czf .tmp/cal36-final-output.tar.gz \
+    .github/workflows/risk-lab.yml \
+    src/lib/risk-lab/RiskLabRulesetV020.ts \
+    src/lib/risk-lab/FrozenCalibrationPhase36.ts \
+    src/lib/risk-lab/risk-lab-ruleset-v0.2.0.json \
+    scripts/build-risk-lab-calibration-phase-3-6.ts \
+    tests/risk-lab-calibration-phase-3-6.test.ts \
+    tests/risk-lab-calibration-phase-3-6-evidence.test.mjs \
+    docs/production-evidence/risk-lab/calibration-phase-3-6 \
+    docs/production-evidence/risk-lab/calibration-phase-3-6-manifest.json \
+    docs/risk-lab/sprint-3-6-calibration.md
+  echo '__CAL36_FINAL_SHA256__'
+  sha256sum .tmp/cal36-final-output.tar.gz
+  echo '__CAL36_FINAL_B64_BEGIN__'
+  base64 -w0 .tmp/cal36-final-output.tar.gz
+  echo
+  echo '__CAL36_FINAL_B64_END__'
+  exit 1
+fi
