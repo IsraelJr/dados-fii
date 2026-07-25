@@ -24,6 +24,29 @@ function signedCurrency(number: number | null) {
   return `${number > 0 ? "+" : ""}${currency(number)}`;
 }
 
+function riskLabAvailabilityLabel(availability: PremiumFundReport["riskLab"]["availability"]) {
+  return {
+    disabled: "Desabilitado",
+    available: "Disponível",
+    outside_verified_cohort: "Fora da coorte verificada",
+    inconclusive: "Inconclusivo",
+  }[availability];
+}
+
+function riskLabDispositionLabel(disposition: PremiumFundReport["riskLab"]["disposition"]) {
+  if (disposition === null) return "-";
+  return {
+    none: "Sem estresse qualificante",
+    informational_recovery: "Recuperação informativa",
+    elevated_risk: "Risco histórico elevado",
+    inconclusive: "Inconclusivo",
+  }[disposition];
+}
+
+function dataQualityLevelLabel(level: PremiumFundReport["managerMode"]["dataQualityLevel"]) {
+  return { high: "Alta", medium: "Média", low: "Baixa" }[level];
+}
+
 function wallet() {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(WALLET_STORAGE_KEY) || "[]") as WalletItem[];
@@ -88,7 +111,7 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
             <PremiumMetric label="P/VP" content={value(report.valuation.pvp)} description="Preço da cota dividido pelo valor patrimonial por cota." />
             <PremiumMetric label="Ágio/desconto" content={value(report.valuation.premiumDiscountPercent, "%")} description="Positivo indica preço acima do VP; negativo indica preço abaixo do VP." />
             <PremiumMetric label="Percentil entre pares" content={report.comparative.percentile === null ? "Amostra insuficiente" : value(report.comparative.percentile, "%")} description="Posição da nota composta diante de fundos comparáveis; não mede retorno futuro." />
-            <PremiumMetric label="Risk Lab" content={report.riskLab.availability === "available" ? (report.riskLab.disposition || "Disponível") : report.riskLab.availability === "inconclusive" ? "Inconclusivo" : "Indisponível"} description="Leitura histórica homologada e read-only; não envia alertas nem recomenda operações." />
+            <PremiumMetric label="Risk Lab" content={report.riskLab.availability === "available" || report.riskLab.availability === "inconclusive" ? riskLabDispositionLabel(report.riskLab.disposition) : riskLabAvailabilityLabel(report.riskLab.availability)} description="Leitura histórica homologada e somente para consulta; não envia alertas nem recomenda operações." />
           </div>
 
           <PremiumSection title="Leitura de valuation"><p>{report.valuation.explanation}</p><p className="mt-2 text-xs text-slate-500">VP/cota estimado: {value(report.valuation.estimatedNavPerShare)}</p><p className="mt-3"><strong>Na prática:</strong> ágio ou desconto não muda o valor da carteira sozinho; mostra quanto o preço se afastou do patrimônio contábil. O peso da posição indica quanto essa avaliação merece atenção.</p></PremiumSection>
@@ -101,13 +124,13 @@ export default function PremiumReportPanel({ ticker }: { ticker: string }) {
 
           <PremiumSection title="Risk Lab — leitura histórica homologada">
             <p>{report.riskLab.summary}</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><PortfolioMetric label="Disponibilidade" content={report.riskLab.availability} /><PortfolioMetric label="Disposição" content={report.riskLab.disposition || "-"} /><PortfolioMetric label="Ruleset" content={report.riskLab.rulesetVersion} /><PortfolioMetric label="Modo" content="Somente leitura" /></div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><PortfolioMetric label="Disponibilidade" content={riskLabAvailabilityLabel(report.riskLab.availability)} /><PortfolioMetric label="Leitura" content={riskLabDispositionLabel(report.riskLab.disposition)} /><PortfolioMetric label="Versão das regras" content={report.riskLab.rulesetVersion} /><PortfolioMetric label="Modo" content="Somente leitura" /></div>
             {report.riskLab.stressDetectedAt && <p className="mt-3 text-xs text-slate-500">Estresse conhecido em {new Date(report.riskLab.stressDetectedAt).toLocaleDateString("pt-BR")}{report.riskLab.recoveryDetectedAt ? ` · recuperação conhecida em ${new Date(report.riskLab.recoveryDetectedAt).toLocaleDateString("pt-BR")}` : ""}.</p>}
             <ul className="mt-3 space-y-1 text-xs text-slate-500">{report.riskLab.limitations.map((item) => <li key={item}>• {item}</li>)}</ul>
           </PremiumSection>
 
           <PremiumSection title="Modo Gestor — qualidade e limites da decisão">
-            <div className="grid gap-3 sm:grid-cols-3"><PortfolioMetric label="Qualidade dos dados" content={`${report.managerMode.dataQualityScore}/100`} /><PortfolioMetric label="Nível" content={report.managerMode.dataQualityLevel} /><PortfolioMetric label="Ação permitida" content="Monitoramento" /></div>
+            <div className="grid gap-3 sm:grid-cols-3"><PortfolioMetric label="Qualidade dos dados" content={`${report.managerMode.dataQualityScore}/100`} /><PortfolioMetric label="Nível" content={dataQualityLevelLabel(report.managerMode.dataQualityLevel)} /><PortfolioMetric label="Ação permitida" content="Monitoramento" /></div>
             <p className="mt-4 font-bold text-slate-900">Leitura objetiva</p>
             <ul className="mt-1 space-y-1">{report.managerMode.objectiveReading.map((item) => <li key={item}>• {item}</li>)}</ul>
             <p className="mt-4 font-bold text-slate-900">Dados ainda indisponíveis para uma decisão de aporte</p>
