@@ -9,6 +9,7 @@ tar -xzf .tmp/cal36-permanent.tar.gz -C .
 
 python - <<'PY'
 from pathlib import Path
+import json
 
 source_path = Path('src/lib/risk-lab/RiskLabRulesetV020.ts')
 source = source_path.read_text()
@@ -17,6 +18,36 @@ new_constructor = 'export class RiskLabRulesetV020 {\n  private readonly config:
 if source.count(old_constructor) != 1:
     raise SystemExit('Construtor esperado do ruleset não foi encontrado de forma única.')
 source_path.write_text(source.replace(old_constructor, new_constructor, 1))
+
+config_path = Path('src/lib/risk-lab/risk-lab-ruleset-v0.2.0.json')
+config = json.loads(config_path.read_text())
+config['candidateSpace']['recoveryThresholds'] = [round(value / 100, 2) for value in range(81, 91)]
+config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + '\n')
+
+replacements = {
+  'src/lib/risk-lab/FrozenCalibrationPhase36.ts': [
+    ('config.candidateSpace.recoveryThresholds.length === 21', 'config.candidateSpace.recoveryThresholds.length === 10'),
+  ],
+  'tests/risk-lab-calibration-phase-3-6.test.ts': [
+    ('config.candidateSpace.recoveryThresholds.length, 21', 'config.candidateSpace.recoveryThresholds.length, 10'),
+  ],
+  'tests/risk-lab-calibration-phase-3-6-evidence.test.mjs': [
+    ('ruleset.candidateSpace.recoveryThresholds.length, 21', 'ruleset.candidateSpace.recoveryThresholds.length, 10'),
+    ('ruleset.candidateSpace.recoveryThresholds[0], 0.7', 'ruleset.candidateSpace.recoveryThresholds[0], 0.81'),
+    ('candidateSpace.candidates.length, 21', 'candidateSpace.candidates.length, 10'),
+  ],
+  'scripts/build-risk-lab-calibration-phase-3-6.ts': [
+    ('espaço de busca limitado a 21 candidatos de recuperação', 'espaço de busca limitado a 10 candidatos de recuperação'),
+  ],
+}
+for filename, pairs in replacements.items():
+    file_path = Path(filename)
+    text_value = file_path.read_text()
+    for old, new in pairs:
+        if text_value.count(old) != 1:
+            raise SystemExit(f'Trecho esperado ausente ou duplicado em {filename}: {old}')
+        text_value = text_value.replace(old, new, 1)
+    file_path.write_text(text_value)
 
 path = Path('.github/workflows/risk-lab.yml')
 text = path.read_text()
