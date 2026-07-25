@@ -56,7 +56,7 @@ for filename, pairs in replacements.items():
         if text_value.count(old) != 1:
             raise SystemExit(f'Trecho esperado ausente ou duplicado em {filename}: {old}')
         text_value = text_value.replace(old, new, 1)
-    file_path.write_text(text_value)
+    file_path.write_text('\n'.join(line.rstrip() for line in text_value.splitlines()) + '\n')
 
 path = Path('.github/workflows/risk-lab.yml')
 text = path.read_text()
