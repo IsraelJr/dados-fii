@@ -36,9 +36,9 @@
   },
   "files": {
     "src/lib/risk-lab/risk-lab-premium-readonly-v1.json": "982b1c9911610eb58ad6e0af5ea6ed801063c2b9f80783a5ee9c0b45b6de9ac9",
-    "src/lib/risk-lab/RiskLabPremiumReadModel.ts": "cc5c8cca383519bba348ce97d29988a47c1959cdeba2e7636d4c677e00f23270",
+    "src/lib/risk-lab/RiskLabPremiumReadModel.ts": "325e5b41f7c63663b031feef3b18480fcbde267110b62e7e67684d0b7317f176",
     "src/lib/ai/PremiumPromptV3.ts": "d5f09eff972161eda45b0cc79045239f8a861c37ec1ad3c0bac6d3005412875e",
     "docs/premium/PROMPT_PREMIUM_V3.md": "63c237b601f6e2b143b396a23ce354b9313f9bb607884a323a36ff4fd7250eeb"
   },
-  "evidenceHash": "4fd469a865a1020c719a59d7609326b84d792693721db51f52bebfb11b896471"
+  "evidenceHash": "4c5e498a7e9d33c1f8e2c958cb1d08532fd6b773e6bd460cad03e8cdba7d8c0f"
 }
