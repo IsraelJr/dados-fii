@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "phase": "3.7",
+  "status": "implemented_pending_ci_and_deployment",
+  "formalCompletion": false,
+  "issue": 133,
+  "baseCommit": "902ea56dfa4a440c8b331d03a322028873ca9c59",
+  "rulesetVersion": "0.2.0",
+  "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+  "calibrationReportHash": "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a",
+  "managerModeSourceSha256": "420eb6c2ac23ab0b0daa331ffd54cdb7215f688f38c5b628c57eabccbcc25a59",
+  "registryHash": "982b1c9911610eb58ad6e0af5ea6ed801063c2b9f80783a5ee9c0b45b6de9ac9",
+  "invariants": {
+    "readOnly": true,
+    "notificationsAllowed": false,
+    "externalEffectsAllowed": false,
+    "featureFlagDefault": false,
+    "aiMayOverrideDeterministicResult": false,
+    "investmentRecommendationAllowed": false
+  },
+  "verifiedCases": {
+    "elevatedRisk": [
+      "DEVA11",
+      "VSLH11"
+    ],
+    "none": [
+      "KNCR11"
+    ],
+    "informationalRecovery": [
+      "KNSC11",
+      "RBRY11"
+    ],
+    "inconclusiveUnscored": [
+      "MCCI11"
+    ]
+  },
+  "files": {
+    "src/lib/risk-lab/risk-lab-premium-readonly-v1.json": "982b1c9911610eb58ad6e0af5ea6ed801063c2b9f80783a5ee9c0b45b6de9ac9",
+    "src/lib/risk-lab/RiskLabPremiumReadModel.ts": "cc5c8cca383519bba348ce97d29988a47c1959cdeba2e7636d4c677e00f23270",
+    "src/lib/ai/PremiumPromptV3.ts": "d5f09eff972161eda45b0cc79045239f8a861c37ec1ad3c0bac6d3005412875e",
+    "docs/premium/PROMPT_PREMIUM_V3.md": "63c237b601f6e2b143b396a23ce354b9313f9bb607884a323a36ff4fd7250eeb"
+  },
+  "evidenceHash": "4fd469a865a1020c719a59d7609326b84d792693721db51f52bebfb11b896471"
+}

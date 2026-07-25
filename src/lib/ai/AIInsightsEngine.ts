@@ -11,10 +11,11 @@ import type {
 } from "@/types/ai-insights";
 import type { FreeFundReport } from "@/types/reports";
 import type { PremiumReportDraft } from "@/lib/reports/PremiumReportEngine";
+import { PREMIUM_INSIGHTS_PROMPT_VERSION, premiumPromptV3System } from "@/lib/ai/PremiumPromptV3";
+export { PREMIUM_INSIGHTS_PROMPT_VERSION } from "@/lib/ai/PremiumPromptV3";
 
-export const AI_INSIGHTS_ENGINE_VERSION = "2.2.0";
+export const AI_INSIGHTS_ENGINE_VERSION = "2.3.0";
 export const FUND_INSIGHTS_PROMPT_VERSION = "fund-insights-v4";
-export const PREMIUM_INSIGHTS_PROMPT_VERSION = "premium-fund-analysis-v1";
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const CACHE_TTL_MS = positiveInt(process.env.AI_INSIGHTS_CACHE_TTL_MS, 6 * 60 * 60_000);
@@ -44,10 +45,15 @@ const PREMIUM_INSIGHTS_SCHEMA = {
     differentiatedInsight: { type: "string", minLength: 1, maxLength: 1600 },
     portfolioReading: { type: "string", minLength: 1, maxLength: 1200 },
     peerReading: { type: "string", minLength: 1, maxLength: 1200 },
+    riskLabReading: { type: "string", minLength: 1, maxLength: 1200 },
+    dataQualityReading: { type: "string", minLength: 1, maxLength: 1200 },
+    managerModeConclusion: { type: "string", minLength: 1, maxLength: 1600 },
+    positiveTriggers: { type: "array", maxItems: 6, items: { type: "string", minLength: 1, maxLength: 500 } },
+    negativeTriggers: { type: "array", maxItems: 6, items: { type: "string", minLength: 1, maxLength: 500 } },
     monitoringTriggers: { type: "array", minItems: 1, maxItems: 6, items: { type: "string", minLength: 1, maxLength: 500 } },
     plainLanguage: { type: "string", minLength: 1, maxLength: 1200 },
   },
-  required: ["executiveSummary", "differentiatedInsight", "portfolioReading", "peerReading", "monitoringTriggers", "plainLanguage"],
+  required: ["executiveSummary", "differentiatedInsight", "portfolioReading", "peerReading", "riskLabReading", "dataQualityReading", "managerModeConclusion", "positiveTriggers", "negativeTriggers", "monitoringTriggers", "plainLanguage"],
 } as const;
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -160,12 +166,17 @@ function normalizePremiumContent(value: unknown) {
   const differentiatedInsight = narrative(data.differentiatedInsight, 1600);
   const portfolioReading = narrative(data.portfolioReading, 1200);
   const peerReading = narrative(data.peerReading, 1200);
+  const riskLabReading = narrative(data.riskLabReading, 1200);
+  const dataQualityReading = narrative(data.dataQualityReading, 1200);
+  const managerModeConclusion = narrative(data.managerModeConclusion, 1600);
+  const positiveTriggers = stringList(data.positiveTriggers);
+  const negativeTriggers = stringList(data.negativeTriggers);
   const plainLanguage = narrative(data.plainLanguage, 1200);
   const monitoringTriggers = stringList(data.monitoringTriggers);
-  if (!executiveSummary || !differentiatedInsight || !portfolioReading || !peerReading || !plainLanguage || !monitoringTriggers.length) {
+  if (!executiveSummary || !differentiatedInsight || !portfolioReading || !peerReading || !riskLabReading || !dataQualityReading || !managerModeConclusion || !plainLanguage || !monitoringTriggers.length) {
     throw new AIInsightsError("A IA retornou a análise Premium incompleta.", "PREMIUM_AI_INVALID_OUTPUT", 502);
   }
-  return { executiveSummary, differentiatedInsight, portfolioReading, peerReading, monitoringTriggers, plainLanguage };
+  return { executiveSummary, differentiatedInsight, portfolioReading, peerReading, riskLabReading, dataQualityReading, managerModeConclusion, positiveTriggers, negativeTriggers, monitoringTriggers, plainLanguage };
 }
 
 function outputText(payload: ResponsesPayload) {
@@ -272,6 +283,9 @@ function safePremiumInput(report: PremiumReportDraft) {
     scenarios: report.scenarios,
     comparative: report.comparative,
     portfolioImpact: report.portfolioImpact,
+    riskLab: report.riskLab,
+    managerMode: report.managerMode,
+    deterministicFieldsAreImmutable: true,
     monitoringPlan: report.recommendations,
     fundEvidence: {
       identity: report.freeReport.identity,
@@ -471,26 +485,12 @@ export class AIInsightsEngine {
     const promise = (async () => {
       const response = await this.callResponses({
         model,
-        maxOutputTokens: positiveInt(process.env.OPENAI_PREMIUM_MAX_OUTPUT_TOKENS, 2200),
+        maxOutputTokens: positiveInt(process.env.OPENAI_PREMIUM_MAX_OUTPUT_TOKENS, 3000),
         schema: PREMIUM_INSIGHTS_SCHEMA,
         schemaName: "dados_fii_premium_analysis",
         input: [
-          {
-            role: "system",
-            content: [
-              "Você é a camada analítica Premium do Dados FII.",
-              "Use somente o JSON fornecido e escreva em português brasileiro simples.",
-              "Esta análise deve acrescentar interpretação, não repetir o resumo gratuito nem listar métricas isoladas.",
-              "Combine pelo menos dois indicadores ao formular cada conclusão e explique a relação entre eles.",
-              "Interprete valuation, cenário de estresse, posição entre pares e impacto financeiro na carteira do usuário.",
-              "Se a posição não estiver na carteira, deixe isso claro e explique o efeito por cota; não invente patrimônio nem quantidade.",
-              "Nunca use a sigla NAV; escreva VP por cota. Diferencie dividend yield de 12 meses, yield na data-com e yield sobre o preço atual.",
-              "Percentil contextualiza a nota da amostra e não mede retorno futuro.",
-              "Os gatilhos de monitoramento devem ser objetivos, mensuráveis e não podem repetir a mesma frase.",
-              "Não use ausência cadastral como risco do fundo e não recomende compra, venda ou manutenção.",
-            ].join(" "),
-          },
-          { role: "user", content: `Produza a análise exclusiva do relatório Premium a partir deste JSON:\n${JSON.stringify(input)}` },
+          { role: "system", content: premiumPromptV3System() },
+          { role: "user", content: `Produza a análise exclusiva do Relatório Premium v3, preservando os campos determinísticos deste JSON:\n${JSON.stringify(input)}` },
         ],
       });
       let parsed: unknown;

@@ -1,10 +1,10 @@
 import type { PremiumAIInsights } from "../../types/ai-insights";
-import type { PremiumFundReport, PremiumPortfolioImpact, PremiumPortfolioProjection, PremiumRecommendation, PremiumScenario, PremiumStressCase } from "../../types/premium-report";
+import type { PremiumFundReport, PremiumManagerMode, PremiumPortfolioImpact, PremiumPortfolioProjection, PremiumRecommendation, PremiumRiskLabReadOnly, PremiumScenario, PremiumStressCase } from "../../types/premium-report";
 import type { PublicFundData } from "../../types/regulatory";
 import type { FreeFundReport } from "../../types/reports";
 import type { FundScores } from "../../types/scores";
 
-export const PREMIUM_REPORT_VERSION = "1.2.0";
+export const PREMIUM_REPORT_VERSION = "2.0.0";
 
 export type PremiumReportDraft = Omit<PremiumFundReport, "aiAnalysis">;
 
@@ -246,11 +246,120 @@ function portfolioImpact(report: FreeFundReport, holdings: PremiumPortfolioHoldi
   };
 }
 
+function unavailableRiskLab(): PremiumRiskLabReadOnly {
+  return {
+    schemaVersion: 1,
+    mode: "read_only",
+    registryVersion: "premium-readonly-v1",
+    rulesetVersion: "0.2.0",
+    datasetId: "risk-lab-credit-oos-phase-c-v1",
+    datasetHash: "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+    evidenceHash: "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81",
+    availability: "disabled",
+    groundTruthStatus: null,
+    outcome: null,
+    status: null,
+    disposition: null,
+    riskAlert: null,
+    stressDetectedAt: null,
+    recoveryDetectedAt: null,
+    recoveryPercentOfBaseline: null,
+    summary: "A leitura read-only do Risk Lab não foi fornecida ao motor Premium.",
+    limitations: ["Nenhuma conclusão do Risk Lab foi inferida."],
+    readOnly: true,
+    notificationsAllowed: false,
+    externalEffectsAllowed: false,
+  };
+}
+
+function managerMode(
+  report: FreeFundReport,
+  comparativeResult: ReturnType<typeof comparative>,
+  portfolioResult: PremiumPortfolioImpact,
+  riskLab: PremiumRiskLabReadOnly,
+): PremiumManagerMode {
+  let score = 0;
+  const availableInputs: string[] = [];
+  const missingInputs: string[] = [];
+  const objectiveReading: string[] = [];
+
+  if (numberValue(report.market.price) !== null && report.market.pvp !== null) {
+    score += 20;
+    availableInputs.push("cotação e P/VP");
+    objectiveReading.push(`P/VP de ${report.market.pvp} e ágio/desconto determinístico de ${report.analysis.valuation.premiumDiscountPercent ?? "indisponível"}%.`);
+  } else missingInputs.push("cotação e/ou P/VP confiável");
+
+  if (report.analysis.income.observations >= 6) {
+    score += 20;
+    availableInputs.push("histórico de rendimentos");
+    objectiveReading.push(`${report.analysis.income.observations} observações de rendimentos sustentam a leitura de tendência ${report.analysis.income.trend}.`);
+  } else missingInputs.push("histórico mínimo de seis rendimentos");
+
+  if (report.scores?.premium && report.scores.premium.confidence >= 35) {
+    score += 20;
+    availableInputs.push("scores determinísticos confiáveis");
+    objectiveReading.push(`Nota composta de ${report.scores.premium.score}/100 com confiança de ${report.scores.premium.confidence}%.`);
+  } else missingInputs.push("score composto com confiança mínima");
+
+  if (report.sources.length > 0) {
+    score += 10;
+    availableInputs.push("fontes rastreáveis");
+  } else missingInputs.push("fontes rastreáveis");
+
+  if (report.recentEvents.length > 0) {
+    score += 10;
+    availableInputs.push("eventos regulatórios recentes");
+  } else missingInputs.push("eventos regulatórios recentes");
+
+  if (comparativeResult.sampleReliable) {
+    score += 10;
+    availableInputs.push("amostra confiável de pares");
+  } else missingInputs.push("amostra mínima de cinco pares confiáveis");
+
+  if (portfolioResult.available) {
+    score += 5;
+    availableInputs.push("quantidade atual e peso estimado na carteira");
+    objectiveReading.push(`Peso estimado de ${portfolioResult.portfolioWeightPercent ?? "indisponível"}% entre posições cobertas por cotação.`);
+  } else missingInputs.push("posição atual calculável na carteira");
+
+  if (riskLab.availability === "available" || riskLab.availability === "inconclusive") {
+    score += 5;
+    availableInputs.push("Risk Lab homologado");
+    objectiveReading.push(`Risk Lab: ${riskLab.disposition ?? "inconclusivo"}; modo read-only e sem efeitos externos.`);
+  } else missingInputs.push("caso pertencente à coorte homologada do Risk Lab");
+
+  missingInputs.push("quantidade planejada por ativo", "preço médio do usuário", "aporte mensal disponível", "meta percentual por ativo");
+  const dataQualityLevel = score >= 75 ? "high" as const : score >= 50 ? "medium" as const : "low" as const;
+  return {
+    version: "premium-manager-mode-v3",
+    dataQualityScore: score,
+    dataQualityLevel,
+    availableInputs: Array.from(new Set(availableInputs)),
+    missingInputs: Array.from(new Set(missingInputs)),
+    objectiveReading,
+    limitations: [
+      "Sem quantidade planejada, preço médio, aporte e meta, o relatório não calcula ranking de compra nem próxima ordem.",
+      "Os cenários medem sensibilidade e não representam previsão de preço ou renda.",
+      "O Risk Lab usa uma coorte histórica homologada e não substitui diligência atual do fundo.",
+    ],
+    actionability: "monitoring_only",
+    controlPrinciple: "Maior desconto para a meta ou para o VP não implica automaticamente melhor compra; qualidade, risco, valuation e gatilho devem ser avaliados em conjunto.",
+  };
+}
+
 export class PremiumReportEngine {
-  prepare(freeReport: FreeFundReport, peers: PublicFundData[], generatedAt = new Date().toISOString(), holdings: PremiumPortfolioHolding[] = []): PremiumReportDraft {
+  prepare(
+    freeReport: FreeFundReport,
+    peers: PublicFundData[],
+    generatedAt = new Date().toISOString(),
+    holdings: PremiumPortfolioHolding[] = [],
+    riskLab: PremiumRiskLabReadOnly = unavailableRiskLab(),
+  ): PremiumReportDraft {
     const valuationResult = valuation(freeReport);
     const stressCases = stressTest(freeReport);
     const scenarioCases = scenarios(freeReport);
+    const comparativeResult = comparative(freeReport, peers);
+    const portfolioResult = portfolioImpact(freeReport, holdings, stressCases, scenarioCases);
     return {
       reportVersion: PREMIUM_REPORT_VERSION,
       ticker: freeReport.ticker,
@@ -259,18 +368,22 @@ export class PremiumReportEngine {
       valuation: valuationResult,
       stressTest: stressCases,
       scenarios: scenarioCases,
-      comparative: comparative(freeReport, peers),
-      portfolioImpact: portfolioImpact(freeReport, holdings, stressCases, scenarioCases),
+      comparative: comparativeResult,
+      portfolioImpact: portfolioResult,
+      riskLab,
+      managerMode: managerMode(freeReport, comparativeResult, portfolioResult, riskLab),
       recommendations: recommendations(freeReport, valuationResult),
       methodology: [
         "Valuation limitado à relação entre cotação e valor patrimonial estimado; não calcula preço-alvo.",
         "Stress tests e cenários são sensibilidades matemáticas, não previsões de mercado.",
         "Comparativos utilizam fundos da mesma categoria e, quando possível, do mesmo segmento.",
-        "Toda análise textual de IA é produzida pelo AI Insights Engine sobre dados estruturados.",
+        "Risk Lab é consumido somente como leitura histórica homologada, sem notificações ou efeitos externos.",
+        "Toda análise textual de IA é produzida depois dos cálculos determinísticos e não pode alterá-los.",
       ],
       disclaimer: [
         "Relatório informativo e educacional; não constitui recomendação individualizada de investimento.",
         "As recomendações são ações de monitoramento e diligência, não ordens de compra ou venda.",
+        "Ausência de sinal do Risk Lab não significa ausência de risco, e recuperação informativa não significa oportunidade de compra.",
         "Cenários hipotéticos podem divergir materialmente dos resultados futuros.",
       ],
     };

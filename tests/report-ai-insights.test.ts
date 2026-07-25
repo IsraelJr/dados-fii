@@ -182,15 +182,22 @@ test("Premium analysis uses a distinct prompt and interprets portfolio plus peer
       differentiatedInsight: "O valuation foi combinado ao cenário adverso.",
       portfolioReading: "A posição teria impacto financeiro mensurável.",
       peerReading: "A amostra contextualiza a nota sem prever retorno.",
+      riskLabReading: "O Risk Lab foi lido como dado histórico imutável.",
+      dataQualityReading: "A qualidade dos dados foi informada com suas limitações.",
+      managerModeConclusion: "A conclusão permite somente monitoramento, sem ordem de compra.",
+      positiveTriggers: ["Recuperação sustentada dos rendimentos por três meses."],
+      negativeTriggers: ["Nova queda de 15% na média trimestral de rendimentos."],
       monitoringTriggers: ["Reavaliar se o rendimento mensal cair 15%."],
       plainLanguage: "O relatório testa o efeito dos números sobre a carteira.",
     }) }), { status: 200 });
   });
   const draft = new PremiumReportEngine().prepare(report(), [fund()], generatedAt, [{ ticker: "TGAR11", quotas: 10, fund: fund() }]);
   const result = await engine.generatePremiumInsights(draft);
-  assert.equal(result.metadata.promptVersion, "premium-fund-analysis-v1");
-  assert.match(body, /portfolioImpact|comparative|stressTest/);
-  assert.match(body, /não repetir o resumo gratuito/i);
+  assert.equal(result.metadata.promptVersion, "premium-fund-analysis-v3");
+  assert.match(body, /portfolioImpact|comparative|stressTest|riskLab|managerMode/);
+  assert.match(body, /sem repetir o resumo gratuito/i);
   assert.doesNotMatch(body, /estimatedNavPerShare|annualizedDistributionOnNavPercent/);
   assert.equal(result.monitoringTriggers.length, 1);
+  assert.equal(result.positiveTriggers.length, 1);
+  assert.match(result.riskLabReading, /Risk Lab/i);
 });

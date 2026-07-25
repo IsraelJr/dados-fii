@@ -73,6 +73,42 @@ export type PremiumRecommendation = {
   rationale: string;
 };
 
+export type PremiumRiskLabReadOnly = {
+  schemaVersion: 1;
+  mode: "read_only";
+  registryVersion: "premium-readonly-v1";
+  rulesetVersion: "0.2.0";
+  datasetId: string;
+  datasetHash: string;
+  evidenceHash: string;
+  availability: "disabled" | "available" | "outside_verified_cohort" | "inconclusive";
+  groundTruthStatus: "verified" | "blocked" | null;
+  outcome: "verified_correct" | "inconclusive_unscored" | null;
+  status: "no_qualifying_stress" | "stress_without_recovery" | "reversible_stress_confirmed" | "inconclusive_unscored" | null;
+  disposition: "none" | "informational_recovery" | "elevated_risk" | "inconclusive" | null;
+  riskAlert: boolean | null;
+  stressDetectedAt: string | null;
+  recoveryDetectedAt: string | null;
+  recoveryPercentOfBaseline: number | null;
+  summary: string;
+  limitations: string[];
+  readOnly: true;
+  notificationsAllowed: false;
+  externalEffectsAllowed: false;
+};
+
+export type PremiumManagerMode = {
+  version: "premium-manager-mode-v3";
+  dataQualityScore: number;
+  dataQualityLevel: "high" | "medium" | "low";
+  availableInputs: string[];
+  missingInputs: string[];
+  objectiveReading: string[];
+  limitations: string[];
+  actionability: "monitoring_only";
+  controlPrinciple: string;
+};
+
 export type PremiumFundReport = {
   reportVersion: string;
   ticker: string;
@@ -83,6 +119,8 @@ export type PremiumFundReport = {
   scenarios: PremiumScenario[];
   comparative: PremiumComparative;
   portfolioImpact: PremiumPortfolioImpact;
+  riskLab: PremiumRiskLabReadOnly;
+  managerMode: PremiumManagerMode;
   recommendations: PremiumRecommendation[];
   aiAnalysis: PremiumAIInsights;
   methodology: string[];

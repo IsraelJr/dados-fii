@@ -33,3 +33,16 @@ Consumir o ruleset homologado `0.2.0` no Relatório Premium exclusivamente como 
 ## Critérios de encerramento
 
 A Sprint só pode ser encerrada após CI completa no SHA final, Preview real, zero review threads, merge exato, auditoria pós-merge, Handoff atualizado em PR separada e issue #133 fechada com evidências.
+
+## Implementação materializada
+
+- registro read-only: `src/lib/risk-lab/risk-lab-premium-readonly-v1.json`;
+- SHA-256 do registro: `982b1c9911610eb58ad6e0af5ea6ed801063c2b9f80783a5ee9c0b45b6de9ac9`;
+- adaptador: `RiskLabPremiumReadModel`;
+- Prompt Premium: `premium-fund-analysis-v3`;
+- versão do relatório: `2.0.0`;
+- auditoria: ação `premium-read`;
+- feature flag: `ENABLE_RISK_LAB_PREMIUM_READONLY`, consumida com padrão `false`;
+- testes: unidade, adulteração, Prompt v3, arquitetura e integração do relatório.
+
+O manifesto permanece como `implemented_pending_ci_and_deployment` até a validação no SHA final.
