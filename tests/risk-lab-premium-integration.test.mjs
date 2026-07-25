@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const sha256 = (value) => createHash("sha256").update(value, "utf8").digest("hex");
 
 test("integração 3.7 é protegida, desligada por padrão e auditada no servidor", () => {
   const flags = read("src/lib/featureFlags.ts");
@@ -23,6 +25,7 @@ test("read model não importa notificações nem permite efeitos externos", () =
   assert.doesNotMatch(model, /AlertDispatcher|AutomaticMonitor|nodemailer|twilio|telegram|sendEmail|fetch\(/i);
   assert.match(model, /notificationsAllowed: false/);
   assert.match(model, /externalEffectsAllowed: false/);
+  assert.match(model, /RISK_LAB_PREMIUM_REGISTRY_SHA256/);
   assert.doesNotMatch(model, /if\s*\([^)]*(DEVA11|VSLH11|KNCR11|KNSC11|MCCI11|RBRY11)/);
 });
 
@@ -48,4 +51,20 @@ test("Premium v3 passa Risk Lab e Modo Gestor à IA como dados imutáveis", () =
   assert.match(ai, /deterministicFieldsAreImmutable: true/);
   assert.match(panel, /Risk Lab — leitura histórica homologada/);
   assert.match(panel, /Modo Gestor — qualidade e limites da decisão/);
+  assert.match(panel, /Risco histórico elevado/);
+  assert.match(panel, /Recuperação informativa/);
+  assert.doesNotMatch(panel, />\{report\.riskLab\.(availability|disposition)\}</);
+});
+
+test("manifesto 3.7 confere hashes dos artefatos centrais e da própria evidência", () => {
+  const manifest = JSON.parse(read("docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json"));
+  for (const [file, expectedHash] of Object.entries(manifest.files)) {
+    assert.equal(sha256(read(file)), expectedHash, file);
+  }
+  const { evidenceHash, ...withoutEvidenceHash } = manifest;
+  assert.equal(sha256(`${JSON.stringify(withoutEvidenceHash, null, 2)}\n`), evidenceHash);
+  assert.equal(manifest.invariants.readOnly, true);
+  assert.equal(manifest.invariants.notificationsAllowed, false);
+  assert.equal(manifest.invariants.externalEffectsAllowed, false);
+  assert.equal(manifest.invariants.featureFlagDefault, false);
 });
