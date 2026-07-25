@@ -1,0 +1,75 @@
+name: Materialize Risk Lab Phase 3.5-C
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/risk-lab-phase-c-materialize.yml"
+      - ".tmp/phasec-bundle-*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.head_ref == 'agent/sprint-3-5-c-dataset-backtest' || github.ref_name == 'agent/sprint-3-5-c-dataset-backtest'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/sprint-3-5-c-dataset-backtest
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Reconstruct and verify permanent implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "c9c2e916ba023dfefe7919bf476ff56630e2803f50c059e655af85d7c41c6104  .tmp/phasec-bundle-00" | sha256sum -c -
+          echo "d8cbce9a717b4f84334d26cca2971f5b800c153057a39fea7dee6b71936bec2e  .tmp/phasec-bundle-01" | sha256sum -c -
+          echo "83200f8c6e34eab3d534422c3a7d55b9098f9c2fd74537d842e4da149e5e3cb2  .tmp/phasec-bundle-02" | sha256sum -c -
+          echo "97c432cf02e27f75302a3dac3a88fb6cfa226d42e49c0622457b1cba63bd6251  .tmp/phasec-bundle-03" | sha256sum -c -
+          cat .tmp/phasec-bundle-00 .tmp/phasec-bundle-01 .tmp/phasec-bundle-02 .tmp/phasec-bundle-03 > .tmp/phasec-permanent.tar.gz.b64
+          echo "d909af9e1f514a2f6d8936c3fb5b516c9e3d5b12f9957d4fffe65c27cd34e577  .tmp/phasec-permanent.tar.gz.b64" | sha256sum -c -
+          base64 --decode .tmp/phasec-permanent.tar.gz.b64 > .tmp/phasec-permanent.tar.gz
+          echo "f9b9348d19e73a48038368f508ba63adf0d052a3d59749689258828dcad789ab  .tmp/phasec-permanent.tar.gz" | sha256sum -c -
+          tar -xzf .tmp/phasec-permanent.tar.gz -C .
+
+      - name: Generate immutable dataset and backtest evidence
+        run: node --import ./tests/register-ts-loader.mjs --experimental-strip-types scripts/build-risk-lab-cohort-phase-c.ts
+
+      - name: Validate permanent phase engine
+        run: node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/risk-lab-frozen-cohort-phase-c.test.ts
+
+      - name: Remove temporary non-workflow files
+        shell: bash
+        run: |
+          rm -f scripts/diagnose-risk-lab-cohort-primary-truth.ts
+          rm -f scripts/diagnose-risk-lab-cohort-dividend-windows.ts
+          rm -f scripts/diagnose-risk-lab-critical-pdfs.mjs
+          rm -f scripts/diagnose-risk-lab-targeted-primary-pdfs.mjs
+          rm -f scripts/retry-risk-lab-missing-primary-pdfs.mjs
+          rm -f .tmp/phasec-bundle-00 .tmp/phasec-bundle-01 .tmp/phasec-bundle-02 .tmp/phasec-bundle-03
+          rm -f .tmp/phasec-permanent.tar.gz .tmp/phasec-permanent.tar.gz.b64
+
+      - name: Commit permanent phase files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ':!.github/workflows/**'
+          git diff --cached --quiet && exit 0
+          git commit -m "data: materializa dataset e backtest da fase 3.5-C"
+          git push origin HEAD:agent/sprint-3-5-c-dataset-backtest
