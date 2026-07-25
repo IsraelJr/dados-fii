@@ -46,10 +46,11 @@ test("fundo fora da coorte recebe fallback explícito e não classificação por
   assert.match(result.limitations.join(" "), /não significa ausência de risco/i);
 });
 
-test("registro adulterado falha fechado antes da leitura", () => {
-  const source = JSON.parse(readFileSync("src/lib/risk-lab/risk-lab-premium-readonly-v1.json", "utf8"));
-  source.dataset.hash = "0".repeat(64);
+test("qualquer adulteração do registro falha fechado antes da leitura", () => {
+  const original = readFileSync("src/lib/risk-lab/risk-lab-premium-readonly-v1.json", "utf8");
+  const tampered = original.replace('"recoveryPercentOfBaseline": 89.97', '"recoveryPercentOfBaseline": 89.98');
+  assert.notEqual(tampered, original);
   const root = mkdtempSync(path.join(tmpdir(), "risk-lab-premium-"));
-  writeFileSync(path.join(root, "registry.json"), JSON.stringify(source));
-  assert.throws(() => loadRiskLabPremiumRegistry(root, "registry.json"), /Hash do dataset Premium/);
+  writeFileSync(path.join(root, "registry.json"), tampered);
+  assert.throws(() => loadRiskLabPremiumRegistry(root, "registry.json"), /SHA-256 integral do registro Premium/);
 });
