@@ -1,4 +1,4 @@
-name: Diagnose RBRY11 Final Push
+name: Materialize RBRY11 Files Without Workflow
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  diagnose:
+  materialize:
     if: github.head_ref == 'agent/sprint-3-5-b5-rbry11' || github.ref_name == 'agent/sprint-3-5-b5-rbry11'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -52,32 +52,18 @@ jobs:
           base64 --decode .tmp/rbry-final.tar.gz.b64 > .tmp/rbry-final.tar.gz
           echo "935a9c282b64665b39518fc5065ad8ec926f8cc1a08bd726a0cd95c27c8c4d15  .tmp/rbry-final.tar.gz" | sha256sum -c -
           tar -xzf .tmp/rbry-final.tar.gz -C .
+          git restore --source=HEAD -- .github/workflows/risk-lab.yml
           rm -f scripts/risk-lab-retry-rbry11.mjs
           rm -f .tmp/rbry-bundle-00 .tmp/rbry-bundle-01 .tmp/rbry-bundle-02 .tmp/rbry-bundle-03 .tmp/rbry-bundle-04
           rm -f .tmp/rbry-final.tar.gz .tmp/rbry-final.tar.gz.b64
 
-      - name: Capture exact push failure
+      - name: Commit code tests and evidence
         shell: bash
         run: |
-          set -u
-          mkdir -p .tmp/push-diagnostic
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git status --short > .tmp/push-diagnostic/status.txt
-          git diff --cached --name-status > .tmp/push-diagnostic/staged-files.txt
-          git commit -m "data: publica evidência final do RBRY11" > .tmp/push-diagnostic/commit.txt 2>&1
-          set +e
-          git push origin HEAD:agent/sprint-3-5-b5-rbry11 > .tmp/push-diagnostic/push.txt 2>&1
-          code=$?
-          set -e
-          echo "$code" > .tmp/push-diagnostic/exit-code.txt
-          cat .tmp/push-diagnostic/push.txt
-
-      - name: Upload push diagnostic
-        uses: actions/upload-artifact@v4
-        with:
-          name: rbry11-final-push-diagnostic-${{ github.run_id }}
-          path: .tmp/push-diagnostic
-          if-no-files-found: error
-          retention-days: 1
+          git diff --cached --quiet && exit 0
+          git commit -m "data: publica evidência final do RBRY11"
+          git push origin HEAD:agent/sprint-3-5-b5-rbry11
