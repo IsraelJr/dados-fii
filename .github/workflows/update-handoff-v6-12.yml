@@ -1,0 +1,67 @@
+name: Update Canonical Handoff v6.12
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-handoff-v6-12.yml"
+      - ".tmp/update-handoff-v6-12.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.head_ref == 'docs/handoff-v6-12-phase-3-6' || github.ref_name == 'docs/handoff-v6-12-phase-3-6'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/handoff-v6-12-phase-3-6
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Generate canonical Handoff and test
+        id: generate
+        shell: bash
+        run: |
+          set +e
+          python .tmp/update-handoff-v6-12.py > .tmp/update-handoff-v6-12.log 2>&1
+          status=$?
+          cat .tmp/update-handoff-v6-12.log
+          if [ "$status" -eq 0 ]; then
+            npm run test:handoff >> .tmp/update-handoff-v6-12.log 2>&1
+            status=$?
+            cat .tmp/update-handoff-v6-12.log
+          fi
+          exit "$status"
+
+      - name: Upload generation diagnostic
+        if: failure() && steps.generate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: handoff-v6-12-generation-failure-${{ github.run_id }}
+          path: .tmp/update-handoff-v6-12.log
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Commit canonical files only
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add DADOS_FII_HANDOFF.md tests/canonical-handoff.test.mjs
+          git diff --cached --check
+          git commit -m "docs: atualiza Handoff canônico para v6.12.0"
+          git push origin HEAD:docs/handoff-v6-12-phase-3-6
