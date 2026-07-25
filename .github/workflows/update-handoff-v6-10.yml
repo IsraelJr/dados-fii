@@ -1,0 +1,38 @@
+name: Update Canonical Handoff v6.10
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/update-handoff-v6-10.yml"
+      - ".tmp/update-handoff-v6-10.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.head_ref == 'docs/handoff-v6-10-rbry11' || github.ref_name == 'docs/handoff-v6-10-rbry11'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          ref: docs/handoff-v6-10-rbry11
+          fetch-depth: 0
+
+      - name: Generate canonical Handoff
+        run: node .tmp/update-handoff-v6-10.mjs
+
+      - name: Commit Handoff only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add DADOS_FII_HANDOFF.md
+          git diff --cached --quiet && exit 0
+          git commit -m "docs: atualiza Handoff canônico para v6.10.0"
+          git push origin HEAD:docs/handoff-v6-10-rbry11
