@@ -72,14 +72,18 @@ jobs:
           replacements = {
               'tests/premium-prompt-v3.test.ts': ('"campos determinísticos"', '"cálculos determinísticos"'),
               'tests/report-ai-insights.test.ts': ('/não repetir o resumo gratuito/i', '/sem repetir o resumo gratuito/i'),
+              'tests/phase-2-completion.test.ts': (
+                  '    peerReading: "Contexto da amostra.",\n    monitoringTriggers:',
+                  '    peerReading: "Contexto da amostra.",\n    riskLabReading: "Leitura histórica indisponível nesta fixture.",\n    dataQualityReading: "Qualidade suficiente para o teste.",\n    managerModeConclusion: "Ação restrita a monitoramento.",\n    positiveTriggers: [],\n    negativeTriggers: [],\n    monitoringTriggers:',
+              ),
           }
           for filename, (old, new) in replacements.items():
               path = Path(filename)
               text = path.read_text()
               if text.count(old) != 1:
-                  raise SystemExit(f'Expectativa textual divergente em {filename}: {old}')
+                  raise SystemExit(f'Expectativa ou fixture divergente em {filename}: {old}')
               path.write_text(text.replace(old, new, 1))
-          print('Expectativas textuais alinhadas ao Prompt Premium v3.')
+          print('Expectativas e fixture Premium alinhadas ao contrato v3.')
           PY
           npm run test:sprint3.7 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
           npm run typecheck 2>&1 | tee -a .tmp/materialize-sprint-3-7.log
@@ -115,6 +119,7 @@ jobs:
             src/types/ai-insights.ts \
             src/types/premium-report.ts \
             tests/report-ai-insights.test.ts \
+            tests/phase-2-completion.test.ts \
             tests/risk-lab-premium-readonly.test.ts \
             tests/premium-prompt-v3.test.ts \
             tests/risk-lab-premium-integration.test.mjs \
