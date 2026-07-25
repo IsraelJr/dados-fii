@@ -4,6 +4,7 @@ import { CvmEventualDocumentDiscovery } from "@/lib/risk-lab/CvmEventualDocument
 import { AutomaticCreditEventScreeningService } from "@/lib/risk-lab/AutomaticCreditEventScreeningService";
 import type { AutomaticDocumentEvidence, AutomaticSourceSummary } from "@/types/riskLabAutomatic";
 
+// Sonda temporária e determinística da verdade-terreno primária da coorte 3.5-C.
 const cases = [
   { ticker: "DEVA11", cnpj: "37087810000137", from: "2021-01-01T00:00:00-03:00", until: "2026-07-22T23:59:59-03:00" },
   { ticker: "VSLH11", cnpj: "36244015000142", from: "2021-01-01T00:00:00-03:00", until: "2026-07-22T23:59:59-03:00" },
