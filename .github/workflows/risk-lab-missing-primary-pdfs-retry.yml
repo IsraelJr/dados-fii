@@ -1,0 +1,30 @@
+name: Risk Lab 3.5-C Missing Primary PDF Retry
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/risk-lab-missing-primary-pdfs-retry.yml"
+      - "scripts/retry-risk-lab-missing-primary-pdfs.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deterministic PDF text extractor
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/retry-risk-lab-missing-primary-pdfs.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: risk-lab-missing-primary-pdfs-retry-${{ github.run_id }}
+          path: risk-lab-missing-primary-pdfs-retry.json
+          if-no-files-found: error
+          retention-days: 3
