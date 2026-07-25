@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/update-handoff-v6-12.yml"
       - ".tmp/update-handoff-v6-12.py"
+      - ".tmp/fix-update-handoff-v6-12.py"
   workflow_dispatch:
 
 permissions:
@@ -35,8 +36,12 @@ jobs:
         shell: bash
         run: |
           set +e
-          python .tmp/update-handoff-v6-12.py > .tmp/update-handoff-v6-12.log 2>&1
+          python .tmp/fix-update-handoff-v6-12.py > .tmp/update-handoff-v6-12.log 2>&1
           status=$?
+          if [ "$status" -eq 0 ]; then
+            python .tmp/update-handoff-v6-12.py >> .tmp/update-handoff-v6-12.log 2>&1
+            status=$?
+          fi
           cat .tmp/update-handoff-v6-12.log
           if [ "$status" -eq 0 ]; then
             npm run test:handoff >> .tmp/update-handoff-v6-12.log 2>&1
