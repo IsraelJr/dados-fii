@@ -68,3 +68,35 @@ test("manifesto 3.7 confere hashes dos artefatos centrais e da própria evidênc
   assert.equal(manifest.invariants.externalEffectsAllowed, false);
   assert.equal(manifest.invariants.featureFlagDefault, false);
 });
+
+test("health check expõe somente estado operacional seguro e imutável", () => {
+  const route = read("src/app/api/health/risk-lab-premium/route.ts");
+  assert.match(route, /featureEnabled\("ENABLE_RISK_LAB_PREMIUM_READONLY", false\)/);
+  assert.match(route, /mode: "read_only"/);
+  assert.match(route, /notificationsAllowed: false/);
+  assert.match(route, /externalEffectsAllowed: false/);
+  assert.match(route, /VERCEL_GIT_COMMIT_SHA/);
+  assert.match(route, /status: enabled \? 200 : 503/);
+  assert.doesNotMatch(route, /datasetHash|evidenceHash|calibrationReportHash|privateKey|token/i);
+});
+
+test("gate de produção reage ao Vercel sem polling e exige política read-only", () => {
+  const workflow = read(".github/workflows/risk-lab-premium-production-gate.yml");
+  for (const required of [
+    "github.event.context == 'Vercel'",
+    "github.event.state == 'success'",
+    "contains(github.event.branches.*.name, 'main')",
+    "payload.deploymentCommit === expectedCommit",
+    "payload.enabled === true",
+    "payload.mode === \"read_only\"",
+    "payload.rulesetVersion === \"0.2.0\"",
+    "payload.notificationsAllowed === false",
+    "payload.externalEffectsAllowed === false",
+  ]) {
+    assert.ok(workflow.includes(required), required);
+  }
+  assert.match(workflow, /^\s{2}status:\s*$/m);
+  assert.match(workflow, /timeout-minutes: 3/);
+  assert.match(workflow, /curl --location --silent --show-error/);
+  assert.doesNotMatch(workflow, /\bsleep\s+\d+|\$\(seq\b|while\s+(true|:)/i);
+});
