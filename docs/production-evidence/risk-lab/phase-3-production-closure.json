@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "3",
+  "status": "formally_completed",
+  "recordedDate": "2026-07-26",
+  "repository": "IsraelJr/dados-fii",
+  "auditedRuntimeCommit": "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2",
+  "functionalIntegrationCommit": "7391791b09b1615a86e29c2002b74f95f55e833e",
+  "controlledRolloutCommit": "3062d8c5b568af90733451d1fe973a99637b1a58",
+  "productionHealthCommit": "b19b6dda25142814d4e0e0ac72c65a733f8ab3e0",
+  "production": {
+    "provider": "Vercel",
+    "state": "success",
+    "deploymentTarget": "https://vercel.com/israel-alves-projects-aee7aa56/dados-fii/EbYVEjxwAhka4hLQadUoMQjNbGoK"
+  },
+  "productionGate": {
+    "context": "Risk Lab Premium Production Gate",
+    "state": "success",
+    "workflowRunId": 30219287742,
+    "workflowRunUrl": "https://github.com/IsraelJr/dados-fii/actions/runs/30219287742",
+    "validatedCommit": "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2"
+  },
+  "invariants": {
+    "enabled": true,
+    "mode": "read_only",
+    "registryVersion": "premium-readonly-v1",
+    "rulesetVersion": "0.2.0",
+    "notificationsAllowed": false,
+    "externalEffectsAllowed": false,
+    "featureFlagDefaultInSource": false,
+    "featureFlagEnabledInDeployment": true
+  },
+  "cohort": [
+    {
+      "ticker": "DEVA11",
+      "disposition": "elevated_risk"
+    },
+    {
+      "ticker": "VSLH11",
+      "disposition": "elevated_risk"
+    },
+    {
+      "ticker": "KNCR11",
+      "disposition": "none"
+    },
+    {
+      "ticker": "KNSC11",
+      "disposition": "informational_recovery"
+    },
+    {
+      "ticker": "MCCI11",
+      "disposition": "inconclusive_unscored"
+    },
+    {
+      "ticker": "RBRY11",
+      "disposition": "informational_recovery"
+    }
+  ],
+  "pullRequests": {
+    "functionalIntegration": 134,
+    "pendingProductionDocumentation": 135,
+    "controlledRollout": 136,
+    "productionDoubleCheck": 137,
+    "auditableGateStatus": 138
+  },
+  "issueToCloseAfterHandoffMerge": 133,
+  "evidenceHash": "d9df630cb471c9d2eb6a0d0de5cfc890c0c79fe3f0e89e9e6884c1904f1d9800"
+}
