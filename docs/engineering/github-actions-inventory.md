@@ -14,6 +14,7 @@
 - Todo job declara `concurrency` cancelável, timeout econômico e permissões mínimas.
 - Dependências são instaladas com `npm ci` e lockfile quando instalação é necessária.
 - Artefatos operacionais possuem retenção máxima de sete dias.
+- A única escrita permitida ao gate Premium é publicar o próprio resultado como commit status; conteúdo, branches, PRs e Actions permanecem somente leitura.
 
 ## 2. Workflows ativos
 
@@ -24,7 +25,7 @@
 | `risk-lab.yml` | Suíte completa e especializada do Risk Lab | PR do domínio e execução manual | 20 min | nenhuma | Essencial |
 | `risk-lab-cohort-backtest.yml` | Kickoff curto de tentativa vinculada a SHA | `workflow_dispatch` | 5 min | nenhuma | Processamento no backend |
 | `risk-lab-frozen-dividend-notices.yml` | Coleta FNET congelada e controlada | `workflow_dispatch` | 30 min, exceção documentada | nenhuma | Temporário e manual |
-| `risk-lab-premium-production-gate.yml` | Double check pós-deploy da integração Premium read-only | evento `status` do Vercel bem-sucedido para commit presente em `main` | 3 min | nenhuma | Gate permanente da Fase 3 |
+| `risk-lab-premium-production-gate.yml` | Double check pós-deploy da integração Premium read-only | evento `status` do Vercel bem-sucedido para commit presente em `main` | 3 min | somente commit status | Gate permanente da Fase 3 |
 
 ## 3. Gate Premium de produção
 
@@ -38,7 +39,10 @@ Regras:
 4. confirma que o SHA retornado é o mesmo SHA implantado;
 5. exige `enabled=true`, `mode=read_only` e ruleset `0.2.0`;
 6. exige `notificationsAllowed=false` e `externalEffectsAllowed=false`;
-7. falha imediatamente em divergência, sem polling, `sleep` ou commit operacional.
+7. falha imediatamente em divergência, sem polling, `sleep` ou commit operacional;
+8. publica `Risk Lab Premium Production Gate = success|failure` no SHA validado, com link para a execução.
+
+A permissão `statuses: write` é estritamente limitada à publicação dessa evidência. O workflow não possui permissão de escrita em conteúdo, Actions ou pull requests.
 
 ## 4. Orçamento mensal de referência
 
@@ -74,11 +78,11 @@ Devem permanecer ausentes:
 | Tema | Regra atual |
 |---|---|
 | Deploy ainda não concluído | o gate só inicia após status de sucesso do Vercel |
-| SHA incorreto em produção | falha imediata |
+| SHA incorreto em produção | falha imediata e commit status de falha |
 | Lock de processamento | backend/Firestore |
 | Retomada de backtest | mesma tentativa e mesmo SHA no backend |
 | Cron de aplicação | Vercel/backend |
-| Evidência de CI | status checks e logs nativos |
+| Evidência de CI | status checks, commit status e logs nativos |
 
 ## 7. Criticidade
 
@@ -92,13 +96,13 @@ Devem permanecer ausentes:
 
 - workflow não inventariado;
 - retorno de workflow legado;
-- escrita no repositório;
+- escrita em conteúdo, branches ou PRs;
 - `gh workflow run` como retry;
 - polling, `sleep` ou retry ilimitado;
 - timeout fora do orçamento;
 - instalação mutável;
 - falta de `concurrency` cancelável;
 - schedule de aplicação;
-- permissões de escrita;
+- permissões excessivas de escrita;
 - retenção excessiva de artefatos;
 - gatilho automático em workflows pesados.
