@@ -1,0 +1,90 @@
+name: Risk Lab Premium Production Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/risk-lab-premium-production-gate.yml"
+      - "src/app/api/health/risk-lab-premium/**"
+      - "src/app/api/fii/[ticker]/report/premium/**"
+      - "src/lib/risk-lab/**"
+      - "src/lib/regulatoryDataService.ts"
+      - "src/lib/featureFlags.ts"
+      - "vercel.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: risk-lab-premium-production-gate
+  cancel-in-progress: true
+
+jobs:
+  validate-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Validate deployed SHA and read-only policy
+        shell: bash
+        env:
+          CONFIGURED_BASE_URL: ${{ vars.PRODUCTION_BASE_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${CONFIGURED_BASE_URL}" ]]; then
+            BASE_URLS=("${CONFIGURED_BASE_URL%/}")
+          else
+            BASE_URLS=("https://www.dadosfii.com.br" "https://dadosfii.com.br")
+          fi
+
+          rm -f response.json
+          for attempt in $(seq 1 36); do
+            for base_url in "${BASE_URLS[@]}"; do
+              endpoint="${base_url}/api/health/risk-lab-premium"
+              http_code=$(curl --location --silent --show-error \
+                --connect-timeout 8 --max-time 20 \
+                --output response.json --write-out "%{http_code}" \
+                "${endpoint}" || true)
+
+              if [[ "${http_code}" == "200" ]] && node --input-type=module - "${GITHUB_SHA}" response.json <<'NODE'
+          import { readFileSync } from "node:fs";
+          import process from "node:process";
+
+          const expectedCommit = process.argv[2];
+          const responsePath = process.argv[3];
+          let payload;
+          try {
+            payload = JSON.parse(readFileSync(responsePath, "utf8"));
+          } catch {
+            process.exit(1);
+          }
+
+          const valid = payload.ok === true
+            && payload.enabled === true
+            && payload.mode === "read_only"
+            && payload.registryVersion === "premium-readonly-v1"
+            && payload.rulesetVersion === "0.2.0"
+            && payload.notificationsAllowed === false
+            && payload.externalEffectsAllowed === false
+            && payload.deploymentCommit === expectedCommit;
+
+          if (!valid) {
+            console.error(JSON.stringify(payload));
+            process.exit(1);
+          }
+          NODE
+              then
+                echo "Produção validada em ${endpoint} no commit ${GITHUB_SHA}."
+                cat response.json
+                exit 0
+              fi
+            done
+
+            echo "Tentativa ${attempt}/36 ainda não encontrou o deployment ${GITHUB_SHA}."
+            sleep 10
+          done
+
+          echo "Gate de produção não confirmou o SHA esperado."
+          [[ -f response.json ]] && cat response.json
+          exit 1
