@@ -1,185 +1,104 @@
 # Inventário e orçamento do GitHub Actions
 
-**Baseline auditado:** `main` em `fb926f241a57a3d1c0f1a701f82701f302fece1a`  
-**Branch de otimização:** `agent/github-actions-cost-architecture`  
-**Método:** comparação completa do commit inicial com o baseline, leitura integral dos sete workflows ativos e auditoria das PRs temporárias da Sprint 3.5.
+**Atualizado em:** 26/07/2026  
+**Política associada:** `docs/engineering/github-actions-policy.md`  
+**Gate automatizado:** `tests/github-actions-governance.test.mjs`
 
-## 1. Resumo executivo
+## 1. Princípios vigentes
 
-| Métrica | Antes | Depois desta branch |
-|---|---:|---:|
-| Workflows ativos no `main` | 7 | 5 |
-| Workflows removidos | 0 | 2 |
-| Workflows com escrita no repositório | 3 | 0 |
-| Workflows pesados automáticos por `push` | 2 | 0 |
-| Workflows com polling/sleep | 2 | 0 |
-| Workflows com timeout acima de 30 min | 2 | 0 |
-| Workflows com `npm install` | 4 | 0 |
-| Workflows sem `concurrency` cancelável | 2 | 0 |
-| Artefatos com retenção acima de 7 dias | 3 | 0 |
-| Estado operacional salvo em marcador Git | 1 | 0 |
+- GitHub Actions valida código e executa gates curtos; não funciona como fila, banco, scheduler ou worker persistente.
+- Workflows não criam commits, não fazem push, não abrem ou mesclam PRs e não acionam cadeias artificiais de workflows.
+- Polling, `sleep` e retries prolongados permanecem proibidos.
+- Estado operacional, locks e retomadas pertencem ao backend e ao Firestore.
+- Cron de negócio permanece no `vercel.json` ou em scheduler próprio da aplicação.
+- Todo job declara `concurrency` cancelável, timeout econômico e permissões mínimas.
+- Dependências são instaladas com `npm ci` e lockfile quando instalação é necessária.
+- Artefatos operacionais possuem retenção máxima de sete dias.
 
-Classificação das mudanças:
+## 2. Workflows ativos
 
-- **removidos:** 2;
-- **processamento migrado para backend/Firestore:** 1 fluxo principal de backtest;
-- **tornados exclusivamente manuais:** 2 fluxos pesados;
-- **otimizados:** 3 workflows de CI;
-- **suítes essenciais removidas:** 0.
+| Workflow | Finalidade oficial | Gatilho | Timeout | Escrita | Classificação |
+|---|---|---|---:|---|---|
+| `phase-2-closure.yml` | CI central, governança, Handoff, typecheck e regressão da Fase 2 | PRs relevantes e configuração em `main` | 20 min | nenhuma | Essencial |
+| `portfolio-notifications-ci.yml` | Regressões específicas de notificações | PR do domínio e execução manual | 8 min | nenhuma | Essencial |
+| `risk-lab.yml` | Suíte completa e especializada do Risk Lab | PR do domínio e execução manual | 20 min | nenhuma | Essencial |
+| `risk-lab-cohort-backtest.yml` | Kickoff curto de tentativa vinculada a SHA | `workflow_dispatch` | 5 min | nenhuma | Processamento no backend |
+| `risk-lab-frozen-dividend-notices.yml` | Coleta FNET congelada e controlada | `workflow_dispatch` | 30 min, exceção documentada | nenhuma | Temporário e manual |
+| `risk-lab-premium-production-gate.yml` | Double check pós-deploy da integração Premium read-only | evento `status` do Vercel bem-sucedido para commit presente em `main` | 3 min | nenhuma | Gate permanente da Fase 3 |
 
-## 2. Inventário anterior completo
+## 3. Gate Premium de produção
 
-| Workflow | Finalidade anterior | Eventos/filtros | Timeout/jobs | Dependências/cache | Artefatos/retenção | Sleep/retry/escrita | Frequência projetada | Classificação anterior |
-|---|---|---|---|---|---|---|---:|---|
-| `patch-portfolio-notification-types.yml` | Patch pontual de TypeScript | `push` em `feature/portfolio-notifications`, apenas o próprio YAML | sem timeout; 1 job | nenhuma | nenhum | alterava código, removia a si próprio, commit e push na branch | ~0/mês | **LEGADO OU SEM USO** |
-| `phase-2-closure.yml` | Encerramento/regressão da Fase 2 | `pull_request` e `push main` para quase todo `src/**` e `tests/**` | 30 min; 1 job | `npm install`; cache npm | nenhum | repetia typecheck, Sprint 2 e Risk Lab | ~60/mês no cenário | **ÚTIL, MAS PODE SER OTIMIZADO** |
-| `portfolio-notifications-ci.yml` | Typecheck de notificações | todo PR para `main` e manual; sem `paths` | 15 min; 1 job | `npm install`; cache npm | nenhum | duplicava typecheck da CI geral; sem concurrency | ~30/mês | **ÚTIL, MAS PODE SER OTIMIZADO** |
-| `risk-lab.yml` | CI do Risk Lab | PR e push `main`, inclusive documentação/evidência | 10 min; 1 job | `npm install`; cache npm | logs, 14 dias | repetia typecheck e gerava artefato em toda execução | ~16/mês no cenário | **ESSENCIAL NO GITHUB ACTIONS**, mas superdimensionado |
-| `risk-lab-cohort-backtest.yml` | Backtest de Produção e publicação de evidência | `push main` em área ampla, inclusive marcador, e manual | 90 min; 1 job | instalava dependências novamente quando aprovado | evidência, 30 dias | até 12 inicializações com sleep; 6 fundos sequenciais; sleep de 430 s; testes completos; branch, PR e merge automáticos | até 6 execuções/release | **DEVE SER MOVIDO PARA OUTRA CAMADA** |
-| `risk-lab-cohort-deploy-recovery.yml` | Recuperar deploy/backtest | manual no baseline, anteriormente periódico | 10 min; 1 job | nenhuma | nenhum | alterava marcador, commitava em `main`, fazia push e acionava outro workflow; até 6 tentativas | até 6/release | **TEMPORÁRIO E DEVE SER REMOVIDO** |
-| `risk-lab-frozen-dividend-notices.yml` | Coleta FNET congelada | `push main` em arquivos do Risk Lab e manual | 120 min; 1 job | `npm install`; cache npm | checkpoint/evidência, 30 dias | até 20 esperas de deploy; coleta sequencial; testes completos; branch e PR em tentativa | ~1/mês | **DEVE SER MOVIDO PARA OUTRA CAMADA** |
+O workflow `risk-lab-premium-production-gate.yml` substitui qualquer necessidade de validação manual do rollout da Sprint 3.7.
 
-### Workflows temporários fora do `main`
+Regras:
 
-| Origem | Arquivos | Situação |
-|---|---|---|
-| PR #96 | `sprint-3-5-batched-resume-fix.yml`, `sprint-3-5-batched-resume-fix-v2.yml` | retomadas automáticas de até 12 lotes; não devem ser mescladas |
-| PR #100 | `risk-lab-deva11-phase-a.yml` | workflow temporário de evidência; deve ser removido da branch antes de eventual merge |
+1. reage somente a status `Vercel = success`;
+2. exige que o SHA pertença à branch `main`;
+3. realiza uma única rodada de consulta ao endpoint `/api/health/risk-lab-premium`;
+4. confirma que o SHA retornado é o mesmo SHA implantado;
+5. exige `enabled=true`, `mode=read_only` e ruleset `0.2.0`;
+6. exige `notificationsAllowed=false` e `externalEffectsAllowed=false`;
+7. falha imediatamente em divergência, sem polling, `sleep` ou commit operacional.
 
-## 3. Inventário posterior
+## 4. Orçamento mensal de referência
 
-| Workflow | Finalidade oficial | Novos gatilhos | Timeout | Instalação/testes | Escrita/artefato | Classificação final | Orçamento mensal |
-|---|---|---|---:|---|---|---|---:|
-| `phase-2-closure.yml` | CI central rápida; nome preservado por compatibilidade de status check | PR de código/configuração; push `main` somente para governança/configuração | 20 min | `npm ci`; governança; typecheck e Sprint 2 apenas no PR | somente leitura; sem artefato | **ESSENCIAL NO GITHUB ACTIONS** | 420 min |
-| `portfolio-notifications-ci.yml` | Regressões específicas de notificações | PR apenas quando o domínio muda; manual | 8 min | `npm ci`; 2 testes específicos; sem typecheck duplicado | somente leitura | **ESSENCIAL NO GITHUB ACTIONS** | 18 min |
-| `risk-lab.yml` | Suíte especializada do Risk Lab | PR apenas para código/testes do domínio; manual | 15 min | `npm ci`; somente `test:risk-lab` | somente leitura; logs nativos | **ESSENCIAL NO GITHUB ACTIONS** | 64 min |
-| `risk-lab-cohort-backtest.yml` | Kickoff de tentativa vinculada a SHA | somente `workflow_dispatch` com SHA explícito | 5 min | sem checkout, sem Node, sem instalação; 1 chamada HTTP | resposta curta, 3 dias | **ÚTIL, PROCESSAMENTO MOVIDO AO BACKEND** | 2 min |
-| `risk-lab-frozen-dividend-notices.yml` | Exceção manual temporária do coletor | somente `workflow_dispatch` com SHA explícito | 30 min | `npm ci`; coleta/checkpoint; sem suítes completas | somente artefato de 3 dias; sem Git/PR | **TEMPORÁRIO, MANUAL E LIMITADO** | 25 min |
+A projeção é comparativa e deve ser recalibrada com uso real:
 
-## 4. Fluxo anterior
+| Workflow | Referência mensal |
+|---|---:|
+| CI central | 420 min |
+| Notificações | 18 min |
+| Risk Lab | 64 min |
+| Backtest kickoff | 2 min |
+| Coleta FNET manual | 25 min |
+| Gate Premium pós-deploy | até 3 min por release elegível |
 
-```mermaid
-flowchart LR
-  P[Push] --> C1[CI ampla]
-  P --> V[Build/deploy Vercel]
-  P --> B[Backtest 90 min]
-  B --> W[Polling e sleeps]
-  W --> X[Commit marcador em main]
-  X --> P
-  B --> T[Testes completos repetidos]
-  B --> R[Branch + PR + merge automáticos]
-  P --> F[Coleta FNET 120 min]
-  F --> W2[Espera deploy + checkpoint]
-  F --> R2[Branch/PR intermediária]
-```
+O gate Premium adiciona custo marginal baixo porque não instala dependências, não faz checkout e executa uma única validação HTTP.
 
-## 5. Fluxo posterior
+## 5. Workflows e mecanismos removidos
 
-```mermaid
-flowchart LR
-  PR[Pull request] --> Q[CI específica e cancelável]
-  Q --> M[Merge]
-  M --> D[Deploy único]
-  D --> K[Kickoff manual de até 5 min]
-  K --> DB[(Firestore: run, locks, casos, auditoria)]
-  DB --> A[Endpoint admin advance]
-  A --> DB
-  DB --> E[Evidência final]
-  E --> FP[PR final opcional]
-```
+Devem permanecer ausentes:
 
-O Actions não acompanha locks, não espera o deploy, não executa os seis fundos e não armazena progresso em commits.
+- `patch-portfolio-notification-types.yml`;
+- `risk-lab-cohort-deploy-recovery.yml`;
+- `risk-lab-production-smoke.yml`;
+- `risk-lab-production-smoke-release.yml`;
+- `risk-lab-closure.yml`;
+- `risk-lab-3-4-finalize-pr59.yml`;
+- marcadores Git de deploy ou retomada;
+- scripts que criam branch, PR ou merge automaticamente;
+- runners que aguardam lock ou deployment com polling.
 
-## 6. Projeção mensal antes e depois
+## 6. Estado e retries
 
-A projeção não substitui a fatura do GitHub. É um cenário reproduzível para comparar arquiteturas:
+| Tema | Regra atual |
+|---|---|
+| Deploy ainda não concluído | o gate só inicia após status de sucesso do Vercel |
+| SHA incorreto em produção | falha imediata |
+| Lock de processamento | backend/Firestore |
+| Retomada de backtest | mesma tentativa e mesmo SHA no backend |
+| Cron de aplicação | Vercel/backend |
+| Evidência de CI | status checks e logs nativos |
 
-- 30 PRs de código e 30 merges em `main` por mês;
-- 8 PRs com alterações do Risk Lab;
-- 6 PRs com alterações de notificações;
-- 1 release elegível da Sprint 3.5;
-- cadeia anterior de até 6 tentativas do backtest;
-- 1 coleta FNET mensal.
+## 7. Criticidade
 
-### Antes
+- `phase-2-closure.yml`, `portfolio-notifications-ci.yml`, `risk-lab.yml` e `risk-lab-premium-production-gate.yml` são gates essenciais.
+- `risk-lab-cohort-backtest.yml` apenas inicia processamento idempotente no backend.
+- `risk-lab-frozen-dividend-notices.yml` é exceção temporária até existir worker persistente.
 
-| Workflow | Fórmula | Minutos |
-|---|---:|---:|
-| Phase 2 Closure | 60 execuções × 20 min médios | 1.200 |
-| Portfolio Notifications | 30 × 3 min | 90 |
-| Risk Lab CI | 16 × 10 min | 160 |
-| Production Backtest | 6 × 90 min máximos | 540 |
-| Deployment Recovery | 6 × 5 min médios | 30 |
-| Frozen Dividend Notices | 1 × 120 min | 120 |
-| Patch legado | sem uso esperado | 0 |
-| **Total projetado** |  | **2.140 min/mês** |
-
-### Depois
-
-| Workflow | Fórmula | Minutos |
-|---|---:|---:|
-| CI central | 30 PRs × 12 min + 30 pós-merge × 2 min | 420 |
-| Portfolio Notifications | 6 × 3 min | 18 |
-| Risk Lab CI | 8 × 8 min | 64 |
-| Backtest Kickoff | 1 × 2 min | 2 |
-| Coleta FNET manual | 1 × 25 min médios | 25 |
-| **Total projetado** |  | **529 min/mês** |
-
-**Redução projetada:** `1.611 min/mês`, ou **75,3%**.
-
-Quando a coleta FNET também migrar para fila/worker, a projeção cai para aproximadamente **504 min/mês**, redução de **76,4%** sobre o baseline.
-
-## 7. Alterações de gatilho e timeout
-
-| Workflow | Gatilho anterior | Gatilho novo | Timeout anterior | Timeout novo |
-|---|---|---|---:|---:|
-| Patch legado | push em branch antiga | removido | ausente | n/a |
-| Phase 2 Closure | PR + todo push relevante em main | PR amplo + pós-merge apenas de configuração/governança | 30 | 20 |
-| Portfolio Notifications | todo PR | PR do domínio | 15 | 8 |
-| Risk Lab CI | PR + push, inclusive docs/evidência | PR do domínio + manual | 10 | 15, sem typecheck duplicado |
-| Production Backtest | push amplo + manual | manual com SHA explícito | 90 | 5 |
-| Deployment Recovery | manual/periódico e commit em main | removido | 10 | n/a |
-| Frozen Dividend Notices | push amplo + manual | manual com SHA explícito | 120 | 30 |
-
-## 8. Retries e estado
-
-| Tema | Antes | Depois |
-|---|---|---|
-| Deploy não pronto | 12 ou 20 tentativas com sleep | falha imediata; nova execução explícita depois do deploy |
-| Lock de fundo | sleep de ~430 s no runner | lock e recuperação no Firestore/backend |
-| Retry de release | commit marcador e novo push | mesma tentativa/mesmo SHA no banco |
-| Progresso | artifacts + marcador Git | `RiskLabCohortBacktestRuns`, attempts, audit e locks |
-| Evidência intermediária | branch/PR por tentativa | logs, summary, Firestore e artefato de 3 dias |
-
-## 9. Criticidade e alternativas
-
-- CI central, Risk Lab e notificações: permanecem no GitHub porque produzem status checks ligados ao código.
-- Backtest: o GitHub só inicia a tentativa; casos e locks já pertencem ao backend/Firestore.
-- Coleta FNET: permanece como exceção manual limitada; solução definitiva é fila persistente e worker da aplicação.
-- Cron de negócio: deve permanecer no `vercel.json`/backend, nunca em `.github/workflows`.
-
-## 10. Limitações conhecidas e dívida técnica
-
-1. A frequência definitiva do worker FNET depende da confirmação dos limites/custo do plano Vercel; não foi criado cron agressivo por precaução.
-2. Até existir scheduler, o endpoint administrativo `advance` executa uma etapa idempotente por chamada e escolhe automaticamente inicialização, próximo fundo ou finalização.
-3. O nome `Phase 2 Closure CI` foi preservado temporariamente para reduzir risco de quebrar proteção de branch; sua função agora é CI central.
-4. Falhas históricas de runner antes de qualquer step não são atribuídas ao código; devem ser diferenciadas de falha de teste.
-5. A estimativa mensal deve ser recalibrada com dados reais de uso após 30 dias.
-
-## 11. Controle de recorrência
+## 8. Controle de recorrência
 
 `tests/github-actions-governance.test.mjs` impede:
 
 - workflow não inventariado;
-- retorno dos arquivos legados;
-- commit/push/PR/merge automáticos;
+- retorno de workflow legado;
+- escrita no repositório;
 - `gh workflow run` como retry;
-- marcador da Sprint 3.5;
-- sleep, polling ou retry ilimitado;
-- timeout acima do orçamento;
-- `npm install`;
-- falta de cache/concurrency;
+- polling, `sleep` ou retry ilimitado;
+- timeout fora do orçamento;
+- instalação mutável;
+- falta de `concurrency` cancelável;
 - schedule de aplicação;
-- permissão de escrita;
-- gatilho automático nos workflows pesados;
-- retenção de artefato acima de 7 dias.
+- permissões de escrita;
+- retenção excessiva de artefatos;
+- gatilho automático em workflows pesados.
