@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "phase": "3",
+  "sprint": "3.7",
+  "status": "formally_completed",
+  "closedAt": "2026-07-26T20:35:00-03:00",
+  "repository": "IsraelJr/dados-fii",
+  "releaseCommit": "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2",
+  "functionalMerge": "7391791b09b1615a86e29c2002b74f95f55e833e",
+  "rolloutMerge": "3062d8c5b568af90733451d1fe973a99637b1a58",
+  "productionSmokeMerge": "b19b6dda25142814d4e0e0ac72c65a733f8ab3e0",
+  "auditableGateMerge": "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2",
+  "pullRequests": [
+    134,
+    135,
+    136,
+    137,
+    138
+  ],
+  "issue": 133,
+  "deployment": {
+    "provider": "Vercel",
+    "context": "Vercel",
+    "state": "success",
+    "releaseCommit": "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2"
+  },
+  "productionGate": {
+    "context": "Risk Lab Premium Production Gate",
+    "state": "success",
+    "runId": 30219287742,
+    "releaseCommit": "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2"
+  },
+  "ruleset": {
+    "version": "0.2.0",
+    "registryVersion": "premium-readonly-v1",
+    "datasetHash": "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
+    "calibrationReportHash": "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a",
+    "calibrationEvidenceHash": "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81",
+    "calibrationIndexHash": "35dd492e433855e50849cba05990bb9c5255be6f209fbcce5d5a9cb832ef0017"
+  },
+  "invariants": {
+    "readOnly": true,
+    "notificationsAllowed": false,
+    "externalEffectsAllowed": false,
+    "serverAuthorizationRequired": true,
+    "serverAuditRequired": true,
+    "outsideCohort": "explicit_unavailable",
+    "inconclusive": "preserve_unscored"
+  },
+  "cohort": {
+    "verifiedCases": [
+      "DEVA11",
+      "VSLH11",
+      "KNCR11",
+      "KNSC11",
+      "RBRY11"
+    ],
+    "inconclusiveUnscored": [
+      "MCCI11"
+    ],
+    "accuracyVerifiedCasesPercent": 100,
+    "coveragePercent": 83.33,
+    "falsePositives": 0,
+    "falseNegatives": 0
+  },
+  "gates": {
+    "phase2Regression": "success",
+    "portfolioNotifications": "success",
+    "riskLab": "success",
+    "sprint37": "success",
+    "typecheck": "success",
+    "productionBuild": "success",
+    "preview": "success",
+    "production": "success",
+    "productionSmoke": "success",
+    "reviewThreadsOpen": 0
+  },
+  "rollback": {
+    "featureFlag": "ENABLE_RISK_LAB_PREMIUM_READONLY",
+    "disableValue": "false",
+    "codeDefault": false,
+    "commitRevertSupported": true
+  },
+  "evidenceHash": "656a51c2c59a0f43dd839e41314b1a70beedd6ce128ce9e63ff74d55b2a61303"
+}
