@@ -80,8 +80,8 @@ test("health check expõe somente estado operacional seguro e imutável", () => 
   assert.doesNotMatch(route, /datasetHash|evidenceHash|calibrationReportHash|privateKey|token/i);
 });
 
-test("smoke test exige o SHA implantado e a política read-only completa", () => {
-  const workflow = read(".github/workflows/risk-lab-production-smoke.yml");
+test("gate de produção exige o SHA implantado e a política read-only completa", () => {
+  const workflow = read(".github/workflows/risk-lab-premium-production-gate.yml");
   for (const required of [
     "payload.deploymentCommit === expectedCommit",
     "payload.enabled === true",
