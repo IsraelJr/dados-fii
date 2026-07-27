@@ -4,7 +4,7 @@ import { BookOpen, Database, FileCheck2, ShieldCheck } from "lucide-react";
 const trustLinks = [
   { href: "/fontes-dos-dados", title: "Fontes dos dados", description: "Origem, data-base, frequência e limitações dos indicadores usados no site.", icon: Database },
   { href: "/metodologia", title: "Metodologia", description: "Regras de cálculo, validação e descarte para renda, liquidez, valuation e risco.", icon: ShieldCheck },
-  { href: "/politica-editorial", title: "Política editorial", description: "Como separamos dados, fatos, cálculos, inferências e conteúdo auxiliado por IA.", icon: FileCheck2 },
+  { href: "/politica-de-correcoes", title: "Política de correções", description: "Como divergências são identificadas, corrigidas, reprocessadas e prevenidas.", icon: FileCheck2 },
   { href: "/guias", title: "Guias práticos", description: "Conteúdo aprofundado sobre análise, dividendos, risco e carteira de FIIs.", icon: BookOpen },
 ];
 
@@ -15,7 +15,7 @@ export default function TrustLinksPanel() {
         <div>
           <p className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700">Transparência e confiança</p>
           <h2 className="mt-3 text-xl font-extrabold text-slate-800">Entenda os dados antes de usar a análise</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">O Dados FII publica fontes, metodologia, autoria, política editorial e regras de correção para que o leitor saiba o que é dado, cálculo e interpretação.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">O Dados FII publica fontes, metodologia e regras de correção para que o leitor saiba o que é dado, cálculo e interpretação.</p>
         </div>
         <Link href="/sobre" className="inline-flex justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-extrabold text-white hover:bg-slate-800">Conhecer o projeto</Link>
       </div>
