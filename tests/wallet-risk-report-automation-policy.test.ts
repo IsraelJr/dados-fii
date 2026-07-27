@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+// @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
 import {
   buildRiskReportRepairInstruction,
   canReuseAutomaticReport,
@@ -7,8 +8,9 @@ import {
   validateAutomaticRiskReportMarkdown,
   walletRiskReportAutomaticEnabled,
   walletRiskReportManualFallbackEnabled,
-} from "../src/lib/reports/WalletRiskReportAutomationPolicy";
-import { FII_RISK_REPORT_PROMPT_VERSION } from "../src/lib/prompts/fiiRiskReport";
+} from "../src/lib/reports/WalletRiskReportAutomationPolicy.ts";
+// @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
+import { FII_RISK_REPORT_PROMPT_VERSION } from "../src/lib/prompts/fiiRiskReport.ts";
 
 const REQUIRED_REPORT = `
 # Relatório de Risco da Carteira de FIIs
