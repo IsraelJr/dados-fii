@@ -58,6 +58,17 @@ function numberOf(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function textOf(value: unknown, fallback?: string) {
+  const text = typeof value === "string" || typeof value === "number"
+    ? String(value).trim()
+    : "";
+  return text || fallback;
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
 function normalizeRiskTolerance(value: unknown): RiskReportClientProfile["riskTolerance"] {
   const text = String(value || "").trim().toLowerCase();
   if (text.includes("conserv")) return "conservador";
@@ -221,6 +232,16 @@ export async function buildWalletRiskReportInput(args: BuildInputArgs) {
   const cleanSnapshot = snapshot as unknown as Record<string, unknown>;
   const portfolio = toRiskPortfolio(cleanSnapshot);
   const profile = (args.userData.profile || {}) as Record<string, unknown>;
+  const clientProfile: RiskReportClientProfile = {
+    investorType: "PF",
+    objective: textOf(args.userData.objective ?? profile.objective, "renda passiva com FIIs"),
+    horizon: textOf(args.userData.horizon ?? profile.horizon, "longo prazo"),
+    riskTolerance: normalizeRiskTolerance(args.userData.riskTolerance ?? profile.riskTolerance),
+    dependsOnDividends: optionalBoolean(args.userData.dependsOnDividends ?? profile.dependsOnDividends),
+    hasEmergencyReserve: optionalBoolean(args.userData.hasEmergencyReserve ?? profile.hasEmergencyReserve),
+    monthlyContribution: numberOf(args.userData.monthlyContribution ?? profile.monthlyContribution) || undefined,
+    notes: textOf(args.userData.profileNotes ?? profile.notes),
+  };
 
   const input: RiskReportInput = removeUndefinedFields({
     portfolio,
@@ -228,16 +249,7 @@ export async function buildWalletRiskReportInput(args: BuildInputArgs) {
     generatedAt: new Date().toISOString(),
     benchmarkData: benchmarkData as unknown as Record<string, unknown>,
     dataQualitySummary: buildPortfolioDataQuality(portfolio),
-    clientProfile: {
-      investorType: "PF",
-      objective: args.userData.objective || profile.objective || "renda passiva com FIIs",
-      horizon: args.userData.horizon || profile.horizon || "longo prazo",
-      riskTolerance: normalizeRiskTolerance(args.userData.riskTolerance || profile.riskTolerance),
-      dependsOnDividends: args.userData.dependsOnDividends ?? profile.dependsOnDividends,
-      hasEmergencyReserve: args.userData.hasEmergencyReserve ?? profile.hasEmergencyReserve,
-      monthlyContribution: numberOf(args.userData.monthlyContribution || profile.monthlyContribution) || undefined,
-      notes: String(args.userData.profileNotes || profile.notes || "").trim() || undefined,
-    },
+    clientProfile,
     dataSources: [
       "Carteira salva do usuário no Dados FII",
       "Base de FIIs do Dados FII enriquecida com indicadores derivados",
