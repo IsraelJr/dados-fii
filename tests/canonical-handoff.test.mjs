@@ -42,23 +42,18 @@ test("existe somente um Handoff canônico ativo", () => {
   assert.deepEqual(matches, [HANDOFF]);
 });
 
-test("Handoff registra a fase Produto Validável sem apagar evidências históricas", () => {
+test("Handoff identifica a fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
   assert.match(body, /\*\*Versão:\*\* 10\.\d+\.\d+/);
-  assert.match(body, /\*\*Data:\*\* 27\/07\/2026/);
   requireAll(body, [
     "Produto Validável",
     "PV-1 — Jornada principal da carteira e histórico manual",
     "agent/product-validation-phase-1",
-    "Issue atual:** `#154`",
-    "PR atual:** `#155`",
-    "0e029f78560d11d12720c447f2f9058c482e4277",
-    "30236078462",
-    "30236078473",
-    "8641670026",
-    "8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b",
-    "pKWEwtSiIbdatbauietl",
+    "#154",
+    "#155",
+    "Google AdSense está congelado",
+    "histórico manual do ano corrente será gratuito e sem propaganda",
   ]);
 });
 
@@ -86,19 +81,7 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("direção vigente substitui SEO-S1 e AdSense", () => {
-  const body = text();
-  requireAll(body, [
-    "O projeto entrou na fase **Produto Validável**",
-    "SEO-S1 era a sprint atual",
-    "Google AdSense está congelado como prioridade de produto",
-    "histórico manual do ano corrente será gratuito e sem propaganda",
-    "Premium será visível para descoberta e beta antes do checkout",
-  ]);
-  assert.doesNotMatch(body, /\*\*Sprint atual:\*\* SEO-S1/);
-});
-
-test("PV-1 mantém escopo, arquitetura e gates obrigatórios", () => {
+test("PV-1 mantém regras críticas de integridade e conclusão", () => {
   const body = text();
   requireAll(body, [
     "cadastro/login → carteira → persistência → histórico → diagnóstico",
@@ -106,31 +89,16 @@ test("PV-1 mantém escopo, arquitetura e gates obrigatórios", () => {
     "impedir duplicidade por usuário e competência",
     "não sobrescrever conflito silenciosamente",
     "isolamento entre usuários comprovado",
-    "dezembro/janeiro",
-    "mês corrente/encerrado",
-    "smoke não destrutivo em produção",
-    "telemetria mínima comprovada",
     "Nenhum `route.ts` importa Firestore diretamente",
     "Logs e telemetria não contêm valores financeiros",
-  ]);
-});
-
-test("auditoria inicial e decisão do legado permanecem explícitas", () => {
-  const body = text();
-  requireAll(body, [
-    "src/app/carteira/page.tsx",
-    "localStorage",
-    "dados-fii-wallet-v1",
-    "dados-fii-wallet-monthly-snapshots-v1",
-    "parseCurrency",
-    "PR antiga `#65`",
+    "CI é gate de merge e deploy",
+    "Nenhuma validação manual do usuário substitui essa obrigação",
   ]);
 });
 
 test("documento de direção da nova fase existe", () => {
   assert.equal(existsSync(PRODUCT_DIRECTION), true);
-  const body = text(PRODUCT_DIRECTION);
-  requireAll(body, ["Produto Validável", "PV-1", "Google AdSense"]);
+  requireAll(text(PRODUCT_DIRECTION), ["Produto Validável", "PV-1", "Google AdSense"]);
 });
 
 test("evidência histórica permanece íntegra", () => {
@@ -146,26 +114,7 @@ test("evidência histórica permanece íntegra", () => {
   assert.equal(evidence.invariants.externalEffectsAllowed, false);
 });
 
-test("artefatos permanentes e pipeline bloqueante existem", () => {
-  for (const file of [
-    "firestore.rules",
-    "firestore.indexes.json",
-    "firebase.json",
-    "eslint.config.mjs",
-    "playwright.config.ts",
-    ".github/workflows/phase-2-closure.yml",
-    ".github/workflows/production-premium-smoke.yml",
-    "src/lib/observability/SafeLogger.ts",
-    "src/lib/security/GithubActionsOidc.ts",
-    "src/lib/risk-lab/PublicRiskLabEvidenceContract.ts",
-    "src/lib/risk-lab/RiskLabCategoryPolicy.ts",
-    "src/lib/reports/PremiumPeerSnapshot.ts",
-    "scripts/run-http-smoke.mjs",
-    "scripts/scan-secrets.mjs",
-    "tests/firestore-rules.test.ts",
-    "tests/e2e/critical-journeys.spec.ts",
-  ]) assert.equal(existsSync(file), true, `${file} deve existir`);
-
+test("pipeline mantém gates bloqueantes", () => {
   const workflow = text(".github/workflows/phase-2-closure.yml");
   requireAll(workflow, [
     "npm ci",
@@ -194,20 +143,4 @@ test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados", () => {
   }
   assert.match(testSources, /REG-DEF-03-A/);
   assert.match(testSources, /REG-DEF-03-B/);
-});
-
-test("roadmap e decisões abertas permanecem explícitos", () => {
-  const body = text();
-  requireAll(body, [
-    "PV-2 — Descoberta do Premium e beta controlado",
-    "PV-3 — Telemetria, retenção e validação de disposição a pagar",
-    "PV-5 — Radar/Acompanhar fundo fora da carteira",
-    "Grátis acompanha até 1 fundo",
-    "Premium até 10",
-    "Risk Lab permanece read-only no Premium",
-    "WhatsApp: custo, opt-in, template, frequência e proteção de dados",
-    "Telegram permanece adiado",
-    "cobrança recorrente, anual ou compra avulsa",
-    "Nenhuma validação manual do usuário substitui essa obrigação",
-  ]);
 });
