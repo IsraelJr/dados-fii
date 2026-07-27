@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InMemoryPortfolioHistoryRepository } from "../src/lib/portfolio/InMemoryPortfolioHistoryRepository.ts";
-import { PortfolioHistoryService } from "../src/lib/portfolio/PortfolioHistoryService.ts";
-import type { PortfolioHistoryEntry } from "../src/lib/portfolio/PortfolioHistory.ts";
+import { InMemoryPortfolioHistoryRepository } from "../src/lib/portfolio/InMemoryPortfolioHistoryRepository";
+import { PortfolioHistoryService } from "../src/lib/portfolio/PortfolioHistoryService";
+import type { PortfolioHistoryEntry } from "../src/lib/portfolio/PortfolioHistory";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
 
