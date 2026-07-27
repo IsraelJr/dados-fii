@@ -9,7 +9,7 @@ import {
   parseOptionalMoney,
   PortfolioHistoryValidationError,
   type PortfolioHistoryEntry,
-} from "../src/lib/portfolio/PortfolioHistory.ts";
+} from "../src/lib/portfolio/PortfolioHistory";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
 
