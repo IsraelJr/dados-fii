@@ -209,7 +209,7 @@ test("roadmap e decisões abertas permanecem explícitos", () => {
     "Grátis acompanha até 1 fundo",
     "Premium até 10",
     "Risk Lab permanece read-only no Premium",
-    "nenhum `route.ts` importa Firestore",
+    "Nenhum `route.ts` importa Firestore",
     "WhatsApp: custo, opt-in, template, frequência e proteção de dados",
     "Telegram permanece adiado",
     "cobrança recorrente, anual ou compra avulsa",
