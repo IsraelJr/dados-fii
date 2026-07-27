@@ -16,7 +16,6 @@ const ROUTES = [
   { path: "/fontes-dos-dados", changeFrequency: "monthly" as const, priority: 0.7 },
   { path: "/metodologia", changeFrequency: "monthly" as const, priority: 0.7 },
   { path: "/sobre", changeFrequency: "monthly" as const, priority: 0.65 },
-  { path: "/politica-editorial", changeFrequency: "yearly" as const, priority: 0.55 },
   { path: "/politica-de-correcoes", changeFrequency: "yearly" as const, priority: 0.55 },
   { path: "/como-usamos-ia", changeFrequency: "monthly" as const, priority: 0.55 },
   { path: "/termos-de-uso", changeFrequency: "yearly" as const, priority: 0.3 },
