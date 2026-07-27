@@ -4,7 +4,7 @@ import {
   parseOptionalMoney,
   PORTFOLIO_HISTORY_SCHEMA_VERSION,
   type PortfolioHistoryEntry,
-} from "./PortfolioHistory.ts";
+} from "./PortfolioHistory";
 
 export type LegacyWalletSnapshot = Readonly<{
   monthKey?: unknown;
