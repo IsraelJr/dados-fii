@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { logObservabilityEvent } from "@/lib/observability";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
 import { encodeFiiCursor, parseFiiQuery } from "@/lib/http/FiiQueryContract";
+import {
+  calculateIntradayVariationPercent,
+  formatMarketVariation,
+} from "@/lib/market/MarketQuoteNormalization";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,13 +30,19 @@ export async function GET(req: Request) {
     if (query.mode === "list") {
       const quotes = await regulatoryDataService.getMarketQuotes();
       const page = quotes.slice(query.offset, query.offset + query.limit);
-      const items = page.map((quote) => ({
-        ...quote,
-        dataSources: { price: PRICE_SOURCE_LABEL, fund: "Dados cadastrais/dividendos não carregados nesta listagem" },
-        marketDataSource: PRICE_SOURCE_LABEL,
-        fundDataSource: null,
-        marketDataUpdatedAt: new Date().toISOString(),
-      }));
+      const items = page.map((quote) => {
+        const calculatedVariation = calculateIntradayVariationPercent(quote.price, quote.opening);
+        return {
+          ...quote,
+          variation: formatMarketVariation(calculatedVariation),
+          variationValid: calculatedVariation !== null,
+          variationSource: calculatedVariation !== null ? "calculated_price_opening" : "unavailable",
+          dataSources: { price: PRICE_SOURCE_LABEL, fund: "Dados cadastrais/dividendos não carregados nesta listagem" },
+          marketDataSource: PRICE_SOURCE_LABEL,
+          fundDataSource: null,
+          marketDataUpdatedAt: new Date().toISOString(),
+        };
+      });
       const nextOffset = query.offset + page.length;
       return NextResponse.json({
         items,
