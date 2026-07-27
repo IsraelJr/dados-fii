@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import { aiInsightsEngine } from "@/lib/ai/AIInsightsEngine";
@@ -6,6 +7,7 @@ import {
   buildFiiRiskReportMessages,
   FII_RISK_REPORT_PROMPT_VERSION,
 } from "@/lib/prompts/fiiRiskReport";
+import { regulatoryDataService } from "@/lib/regulatoryDataService";
 import {
   buildWalletRiskReportInput,
   removeUndefinedFields,
@@ -33,6 +35,7 @@ type LoadedUser = {
   docId: string;
   data: Record<string, unknown>;
   email: string;
+  authMode: "email-session" | "anon-cookie";
 };
 
 function sha256(value: string) {
@@ -111,6 +114,7 @@ async function findUserByEmail(email: string): Promise<LoadedUser | null> {
       docId: direct.id,
       data: direct.data() || {},
       email,
+      authMode: "email-session",
     };
   }
 
@@ -123,27 +127,53 @@ async function findUserByEmail(email: string): Promise<LoadedUser | null> {
     docId: doc.id,
     data: doc.data() || {},
     email,
+    authMode: "email-session",
   };
 }
 
-async function loadUser(body: Record<string, unknown>) {
+async function findUserByAnonId(anonId: string): Promise<LoadedUser | null> {
+  const snap = await adminDb.collection(USER_COLLECTION).doc(anonId).get();
+  if (!snap.exists) return null;
+
+  const data = snap.data() || {};
+  return {
+    ref: snap.ref,
+    docId: snap.id,
+    data,
+    email: emailOf(data.email),
+    authMode: "anon-cookie",
+  };
+}
+
+async function loadUser(body: Record<string, unknown>): Promise<LoadedUser> {
   const email = emailOf(body.email);
-  if (!isEmail(email)) {
-    throw Object.assign(new Error("Informe um e-mail válido."), { status: 400, code: "INVALID_EMAIL" });
+  const sessionToken = body.sessionToken;
+
+  if (isEmail(email) && sessionToken) {
+    if (!(await hasSession(email, sessionToken))) {
+      throw Object.assign(new Error("Confirme o código da carteira antes de gerar o relatório."), {
+        status: 401,
+        code: "WALLET_SESSION_REQUIRED",
+      });
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user) {
+      throw Object.assign(new Error("Usuário não encontrado."), { status: 404, code: "USER_NOT_FOUND" });
+    }
+    return user;
   }
 
-  if (!(await hasSession(email, body.sessionToken))) {
-    throw Object.assign(new Error("Confirme o código da carteira antes de gerar o relatório."), {
-      status: 401,
-      code: "WALLET_SESSION_REQUIRED",
-    });
+  const cookieStore = await cookies();
+  const anonId = cookieStore.get("anonId")?.value;
+  if (!anonId) {
+    throw Object.assign(new Error("Usuário não identificado."), { status: 401, code: "USER_NOT_IDENTIFIED" });
   }
 
-  const user = await findUserByEmail(email);
+  const user = await findUserByAnonId(anonId);
   if (!user) {
     throw Object.assign(new Error("Usuário não encontrado."), { status: 404, code: "USER_NOT_FOUND" });
   }
-
   return user;
 }
 
@@ -151,7 +181,7 @@ function publicGenerationError(error: { code?: string; message?: string }) {
   if (error.code === "OPENAI_INSUFFICIENT_QUOTA") {
     return "A geração automática está temporariamente sem créditos na OpenAI.";
   }
-  if (error.code === "OPENAI_API_KEY_MISSING") {
+  if (error.code?.endsWith("API_KEY_MISSING")) {
     return "A geração automática ainda não está configurada no servidor.";
   }
   if (error.code === "OPENAI_RATE_LIMIT") {
@@ -287,8 +317,8 @@ export async function POST(req: Request) {
       forceNew,
       metadata: {
         userDocId: user.docId,
-        email: user.email,
-        authMode: "email-session",
+        email: user.email || emailOf(user.data.email),
+        authMode: user.authMode,
         month,
         reportDate: currentDateKey(),
         billingSource,
@@ -298,8 +328,12 @@ export async function POST(req: Request) {
 
     const built = await buildWalletRiskReportInput({
       userDocId: user.docId,
-      email: user.email,
+      email: user.email || emailOf(user.data.email),
       userData: user.data,
+      fundLoader: async (ticker) => {
+        const fund = await regulatoryDataService.getByTicker(ticker);
+        return fund as unknown as Record<string, unknown> | null;
+      },
     });
     const portfolioHash = sha256(JSON.stringify(built.wallet));
     const result = await generateValidatedReport(built.input);
