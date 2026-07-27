@@ -33,20 +33,22 @@ export type PortfolioHistoryConflict = Readonly<{
   resolution: "reject_duplicate" | "require_explicit_resolution";
 }>;
 
+export type PortfolioHistoryValidationCode =
+  | "INVALID_PORTFOLIO_ID"
+  | "INVALID_YEAR"
+  | "INVALID_MONTH"
+  | "FUTURE_COMPETENCE"
+  | "INVALID_MONEY"
+  | "EMPTY_ENTRY"
+  | "DUPLICATE_COMPETENCE"
+  | "IMMUTABLE_SNAPSHOT";
+
 export class PortfolioHistoryValidationError extends Error {
-  constructor(
-    readonly code:
-      | "INVALID_PORTFOLIO_ID"
-      | "INVALID_YEAR"
-      | "INVALID_MONTH"
-      | "FUTURE_COMPETENCE"
-      | "INVALID_MONEY"
-      | "EMPTY_ENTRY"
-      | "DUPLICATE_COMPETENCE"
-      | "IMMUTABLE_SNAPSHOT",
-    message: string,
-  ) {
+  readonly code: PortfolioHistoryValidationCode;
+
+  constructor(code: PortfolioHistoryValidationCode, message: string) {
     super(message);
+    this.code = code;
     this.name = "PortfolioHistoryValidationError";
   }
 }
