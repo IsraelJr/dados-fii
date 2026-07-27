@@ -55,9 +55,10 @@ function credentials() {
   return { email, token };
 }
 
-function authHeaders() {
+function authHeaders(): Record<string, string> {
   const { email, token } = credentials();
-  return email && token ? { "x-wallet-email": email, "x-wallet-session": token } : {};
+  if (!email || !token) return {};
+  return { "x-wallet-email": email, "x-wallet-session": token };
 }
 
 async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>) {
@@ -73,7 +74,7 @@ async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<st
 
 function track(name: ProductEventName) {
   const headers = authHeaders();
-  if (!("x-wallet-email" in headers) || !("x-wallet-session" in headers)) return;
+  if (!headers["x-wallet-email"] || !headers["x-wallet-session"]) return;
   void fetch("/api/product/events", {
     method: "POST",
     keepalive: true,
