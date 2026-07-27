@@ -4,8 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminDb } from "@/lib/firebaseAdmin";
 import {
-  legacyWalletSnapshots,
-  mergeWalletSnapshots,
   walletSnapshotNumber,
   type WalletSnapshotRecord,
 } from "@/lib/walletHistory";
@@ -50,11 +48,8 @@ async function findUserByEmail(email: string) {
   return query.empty ? null : query.docs[0].ref;
 }
 
-async function readSnapshotsFromUserRef(userRef: FirebaseFirestore.DocumentReference) {
-  const [snapshot, userDoc] = await Promise.all([
-    userRef.collection("WalletSnapshots").orderBy("monthKey", "asc").limit(120).get(),
-    userRef.get(),
-  ]);
+async function readPersistedSnapshots(userRef: FirebaseFirestore.DocumentReference) {
+  const snapshot = await userRef.collection("WalletSnapshots").orderBy("monthKey", "asc").limit(120).get();
   const persisted: WalletSnapshotRecord[] = snapshot.docs.map((doc) => {
     const data = doc.data();
     return {
@@ -74,8 +69,8 @@ async function readSnapshotsFromUserRef(userRef: FirebaseFirestore.DocumentRefer
       closedAt: data.closedAt || "",
     };
   });
-  const legacy = userDoc.exists ? legacyWalletSnapshots(userDoc.data() as Record<string, unknown>) : [];
-  return mergeWalletSnapshots(legacy, persisted);
+
+  return Object.freeze(persisted.sort((left, right) => left.monthKey.localeCompare(right.monthKey)));
 }
 
 export async function GET() {
@@ -84,9 +79,9 @@ export async function GET() {
     const anonId = cookieStore.get("anonId")?.value;
     if (!anonId) return NextResponse.json({ ok: true, snapshots: [] });
     const userRef = adminDb.collection("User").doc(anonId);
-    const snapshots = await readSnapshotsFromUserRef(userRef);
+    const snapshots = await readPersistedSnapshots(userRef);
     return NextResponse.json({ ok: true, source: "anonId", snapshots });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ ok: false, error: "Erro ao buscar snapshots." }, { status: 500 });
   }
 }
@@ -101,9 +96,9 @@ export async function POST(req: NextRequest) {
     }
     const userRef = await findUserByEmail(email);
     if (!userRef) return NextResponse.json({ ok: true, source: "email", snapshots: [] });
-    const snapshots = await readSnapshotsFromUserRef(userRef);
+    const snapshots = await readPersistedSnapshots(userRef);
     return NextResponse.json({ ok: true, source: "email", snapshots });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ ok: false, error: "Erro ao buscar snapshots." }, { status: 500 });
   }
 }
