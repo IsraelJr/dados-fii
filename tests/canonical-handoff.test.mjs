@@ -8,6 +8,7 @@ const ROOT = process.cwd();
 const HANDOFF = "DADOS_FII_HANDOFF.md";
 const HISTORICAL_EVIDENCE = "docs/production-evidence/risk-lab/phase-3-final-closure.json";
 const PRODUCT_DIRECTION = "docs/product/product-validation-phase-1.md";
+const ENV_INVENTORY = "docs/operations/runtime-environment-inventory.md";
 const EXACT_FIRST_LINE = "Este documento substitui todos os planejamentos anteriores quando houver divergência.";
 
 function walk(directory, output = []) {
@@ -41,7 +42,7 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.\d+\.\d+/);
+  assert.match(body, /\*\*Versão:\*\* 10\.2\.0/);
   assert.match(body, /Produto Validável/);
   assert.match(body, /PV-1 — Jornada principal da carteira e histórico manual/);
   assert.match(body, /Google AdSense está congelado/);
@@ -76,14 +77,13 @@ test("regras críticas de arquitetura e conclusão permanecem explícitas", () =
   assert.match(body, /Nenhum `route\.ts` importa Firestore diretamente/);
   assert.match(body, /Logs e telemetria não contêm valores financeiros/);
   assert.match(body, /CI é gate de merge e deploy/);
-  assert.match(body, /Nenhuma validação manual do usuário substitui essa obrigação/);
+  assert.match(body, /Nenhuma validação manual substitui esses gates/);
 });
 
-test("documento de direção da nova fase existe", () => {
-  assert.equal(existsSync(PRODUCT_DIRECTION), true);
-  const body = text(PRODUCT_DIRECTION);
-  assert.match(body, /Produto Validável/);
-  assert.match(body, /PV-1/);
+test("documentos auxiliares canônicos existem", () => {
+  for (const file of [PRODUCT_DIRECTION, ENV_INVENTORY]) assert.equal(existsSync(file), true, file);
+  assert.match(text(PRODUCT_DIRECTION), /Produto Validável/);
+  assert.match(text(ENV_INVENTORY), /Inventário de variáveis de ambiente/);
 });
 
 test("evidência histórica permanece íntegra", () => {
