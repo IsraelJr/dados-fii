@@ -27,7 +27,7 @@ test("AdSense carrega apenas no host de produção e em páginas públicas eleg�
   for (const prefix of ["/admin", "/api", "/carteira", "/fii", "/login", "/configuracoes"]) assert.ok(loader.includes(`"${prefix}"`), `rota bloqueada ausente: ${prefix}`);
   assert.match(loader, /ELIGIBLE_EXACT_PATHS/);
   assert.match(loader, /ELIGIBLE_PREFIXES/);
-  assert.doesNotMatch(loader, /\/autores\/|\/politica-editorial/);
+  assert.doesNotMatch(loader, /\/autores\/|\/politica-editorial|\/politica-de-privacidade/);
 });
 
 test("consentimento oferece aceitar, recusar e reabrir preferências", () => {
