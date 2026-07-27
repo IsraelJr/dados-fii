@@ -1,13 +1,13 @@
 import {
   assertCanEditPortfolioHistory,
   type PortfolioHistoryEntry,
-} from "./PortfolioHistory.ts";
+} from "./PortfolioHistory";
 import {
   portfolioHistoryDocumentId,
   type PortfolioHistoryKey,
   type PortfolioHistoryRepository,
   type PortfolioOwnerId,
-} from "./PortfolioHistoryRepository.ts";
+} from "./PortfolioHistoryRepository";
 
 export class InMemoryPortfolioHistoryRepository implements PortfolioHistoryRepository {
   private readonly records = new Map<string, PortfolioHistoryEntry>();
