@@ -1,0 +1,13 @@
+import type { Metadata } from "next";
+import InstitutionalPage from "../components/InstitutionalPage";
+
+export const metadata: Metadata = { title: "Sobre o Dados FII", description: "Conheça a missão, o responsável, os limites e o processo de qualidade do Dados FII.", alternates: { canonical: "/sobre" } };
+
+export default function AboutPage() {
+  return <InstitutionalPage eyebrow="Quem somos" title="Sobre o Dados FII" description="O Dados FII é uma ferramenta independente criada para transformar dados públicos, documentos regulatórios e informações de carteira em explicações verificáveis sobre renda, risco, valuation e liquidez de fundos imobiliários." sections={[
+    { title: "Por que o projeto existe", paragraphs: ["Investidores encontram cotações e indicadores com facilidade, mas frequentemente precisam cruzar planilhas, comunicados, relatórios gerenciais e conceitos técnicos para entender o que realmente mudou. O Dados FII organiza essa informação e procura explicá-la sem esconder incertezas.", "A proposta não é apontar uma compra ou venda automática. É ajudar o leitor a verificar fontes, reconhecer limitações e tomar decisões com mais contexto."] },
+    { title: "Responsabilidade e independência", paragraphs: ["O projeto é criado e mantido por Israel Alves, Analista de Sistemas e responsável pela arquitetura, produto, automação e qualidade técnica. Essa experiência é apresentada sem inventar credenciais financeiras ou substituir profissionais habilitados.", "Publicidade, quando exibida, não interfere na metodologia, no resultado de cálculos, na escolha de fontes ou na conclusão editorial. Conteúdo patrocinado deve ser identificado de forma explícita."] },
+    { title: "Como construímos confiança", paragraphs: ["As páginas públicas são avaliadas por utilidade, profundidade, originalidade, fontes, atualização, acessibilidade e integração com ferramentas do produto."], items: ["Dados críticos passam por funções determinísticas e testes automatizados.", "Fonte, data-base e limitações acompanham indicadores relevantes.", "Erros materiais geram correção, reprocessamento e teste de regressão.", "Páginas incompletas, privadas ou repetitivas não recebem anúncios nem indexação."] },
+    { title: "Limites do serviço", paragraphs: ["O Dados FII oferece conteúdo informativo e educacional. Não conhece integralmente objetivos, renda, patrimônio, horizonte ou tolerância a risco de cada leitor e, por isso, não presta recomendação individual de investimento.", "FIIs podem sofrer perda de valor, baixa liquidez, inadimplência, vacância, alavancagem, mudanças regulatórias e cortes de dividendos. A leitura de documentos oficiais continua sendo parte essencial da análise."] },
+  ]} />;
+}

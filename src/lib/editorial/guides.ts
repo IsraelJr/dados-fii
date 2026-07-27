@@ -1,0 +1,78 @@
+export type GuideSection = {
+  title: string;
+  paragraphs: string[];
+  checklist?: string[];
+  example?: string;
+};
+
+export type Guide = {
+  slug: "fundos-imobiliarios" | "dividendos-de-fiis" | "risco-em-fiis" | "carteira-de-fiis";
+  title: string;
+  description: string;
+  answer: string;
+  sections: GuideSection[];
+  related: Array<{ href: string; label: string }>;
+};
+
+export const GUIDES: Guide[] = [
+  {
+    slug: "fundos-imobiliarios",
+    title: "Guia de fundos imobiliários para iniciantes",
+    description: "Entenda como FIIs funcionam, de onde vem a renda, quais indicadores observar e quais riscos não podem ser ignorados.",
+    answer: "Um fundo imobiliário reúne recursos de vários investidores para aplicar em imóveis, recebíveis ou outros ativos ligados ao mercado imobiliário. O cotista compra uma participação negociada em bolsa e pode receber rendimentos, mas continua exposto a oscilações de preço, liquidez e qualidade dos ativos.",
+    sections: [
+      { title: "O que você realmente compra", paragraphs: ["Ao comprar uma cota, você não adquire diretamente um imóvel específico. Você passa a deter uma fração do patrimônio do fundo, administrado conforme regulamento e mandato. Os ativos podem incluir galpões, shoppings, escritórios, imóveis alugados, CRIs, cotas de outros fundos, caixa e operações de desenvolvimento.", "A categoria altera completamente a origem da renda e os riscos. Um fundo de crédito depende da qualidade dos devedores e garantias; um fundo de tijolo depende de ocupação, contratos, localização e capacidade de manter aluguel; um fundo de desenvolvimento depende de execução, vendas e necessidade de capital."], checklist: ["Confirme categoria, estratégia, gestor, administrador e CNPJ.", "Leia o regulamento e o relatório gerencial mais recente.", "Entenda como o fundo gera caixa antes de olhar o dividend yield."] },
+      { title: "Como a renda chega ao cotista", paragraphs: ["O fundo recebe aluguéis, juros, amortizações, ganhos de venda ou outras receitas previstas em sua estratégia. Depois de despesas, provisões e ajustes, pode distribuir parte do resultado aos cotistas.", "Rendimento pago não é sinônimo de lucro recorrente. A distribuição pode incluir reserva acumulada, ganho não recorrente ou caixa de venda de ativo. Por isso, a análise precisa comparar o valor distribuído com a geração de caixa e com os eventos que sustentaram o pagamento."], example: "Um fundo paga R$ 1,00 por cota em um mês. Se R$ 0,70 vieram da operação recorrente e R$ 0,30 de uma venda pontual, usar R$ 1,00 como renda permanente superestima a capacidade futura." },
+      { title: "Indicadores que ajudam — e os atalhos que enganam", paragraphs: ["Preço, P/VP, dividend yield, liquidez, vacância e patrimônio ajudam quando são lidos em conjunto e dentro da categoria correta. Nenhum deles resolve sozinho a decisão.", "P/VP abaixo de 1 pode refletir desconto, mas também pode sinalizar ativos avaliados acima do mercado, risco de crédito, baixa liquidez, alavancagem ou perda de confiança. DY elevado pode decorrer de rendimento extraordinário ou queda acentuada da cota."], checklist: ["Compare fundos de mandato semelhante.", "Use a mesma data-base para preço e patrimônio.", "Investigue mudanças no resultado, não apenas o valor distribuído.", "Observe concentração por ativo, locatário, devedor, indexador e gestor."] },
+      { title: "Principais riscos", paragraphs: ["FIIs não têm garantia de rentabilidade, proteção contra perda ou recompra obrigatória. A cota pode cair e o rendimento pode ser reduzido.", "Os riscos mais comuns são mercado, liquidez, crédito, vacância, concentração, alavancagem, execução, conflito de interesses, reavaliação patrimonial e mudança regulatória. O peso de cada risco varia por categoria."] },
+      { title: "Um processo simples para começar", paragraphs: ["A primeira análise deve responder perguntas objetivas antes de qualquer tentativa de estimar retorno."], checklist: ["Qual problema econômico o fundo resolve e como cobra por isso?", "A renda vem de operação recorrente ou eventos extraordinários?", "Quais três riscos podem reduzir caixa ou valor patrimonial?", "Os dados são recentes, rastreáveis e comparáveis?", "Qual seria o impacto desse fundo na concentração da carteira?"] },
+    ],
+    related: [{ href: "/guias/dividendos-de-fiis", label: "Como analisar dividendos" }, { href: "/guias/risco-em-fiis", label: "Como avaliar riscos" }, { href: "/glossario", label: "Abrir glossário" }],
+  },
+  {
+    slug: "dividendos-de-fiis",
+    title: "Como analisar dividendos de FIIs sem cair em armadilhas",
+    description: "Aprenda a diferenciar valor pago, yield, recorrência e sustentabilidade dos rendimentos de fundos imobiliários.",
+    answer: "O dividendo de um FII deve ser analisado pela origem do caixa, recorrência, cobertura, reservas e riscos da carteira. O maior pagamento ou o maior DY do mês não é necessariamente o mais sustentável.",
+    sections: [
+      { title: "Valor pago, DY e renda sustentável são coisas diferentes", paragraphs: ["O valor por cota mostra quanto foi distribuído. O dividend yield relaciona esse valor a um preço. A sustentabilidade pergunta se o fundo consegue continuar gerando caixa suficiente sem depender de eventos excepcionais.", "Usar preço atual para calcular DY responde uma pergunta diferente de usar a cotação da data-com. O primeiro mostra o rendimento passado em relação ao preço de hoje; o segundo registra a relação existente quando o direito ao pagamento foi definido. A página deve deixar a base explícita."], example: "Se um fundo pagou R$ 0,80 e a cota valia R$ 80,00 na data-com, o DY daquele evento foi 1,00%. Se a cota depois caiu para R$ 64,00, dividir o mesmo R$ 0,80 pelo preço atual produz 1,25%, mas não aumenta o caixa que o fundo gerou." },
+      { title: "De onde veio o dinheiro", paragraphs: ["Em fundos de tijolo, procure aluguel, NOI, ocupação, revisões contratuais, multas, vendas e despesas não recorrentes. Em fundos de papel, procure juros recebidos, amortizações, inadimplência, provisões, carências e mudanças na carteira. Em desenvolvimento, separe valor econômico reconhecido de caixa efetivamente recebido.", "Uma distribuição apoiada por reserva pode ser legítima, mas reduz a margem de segurança. Uma venda pontual pode elevar o pagamento sem representar o novo nível normal de renda."], checklist: ["Resultado caixa do período cobre a distribuição?", "A reserva aumentou ou diminuiu?", "Houve venda, multa, correção ou recebimento extraordinário?", "Existe atraso, inadimplência, vacância ou carência relevante?"] },
+      { title: "Data-com e data de pagamento", paragraphs: ["A data-com identifica quem terá direito ao evento. A data de pagamento informa quando o crédito está previsto. Comprar apenas para receber o próximo rendimento não cria ganho automático, porque a cotação pode ajustar, os custos existem e a tese do fundo continua sendo o que determina o risco.", "Datas anunciadas podem ser corrigidas. Para valores materiais, confira o comunicado do administrador ou a fonte oficial indicada pelo site."] },
+      { title: "Sinais de atenção", paragraphs: ["Nenhum sinal isolado prova deterioração, mas combinações repetidas merecem investigação."], checklist: ["Distribuição acima do caixa por vários meses.", "Reserva curta enquanto o rendimento permanece elevado.", "DY aumenta apenas porque o preço caiu.", "Rendimento depende de venda ainda não liquidada.", "Inadimplência ou vacância sobem sem ajuste na distribuição.", "Relatório deixa de explicar a origem do resultado."] },
+      { title: "Como comparar fundos", paragraphs: ["Compare fundos da mesma categoria e período, usando a mesma base de preço. Observe estabilidade, cobertura, risco dos ativos, despesas, concentração e liquidez.", "Um fundo que paga menos, mas cobre a distribuição com caixa recorrente e mantém reserva, pode oferecer perfil de renda mais previsível do que outro com DY maior e resultado frágil."] },
+    ],
+    related: [{ href: "/calendario-dividendos-fiis", label: "Consultar calendário" }, { href: "/guias/risco-em-fiis", label: "Avaliar riscos" }, { href: "/metodologia", label: "Ver metodologia" }],
+  },
+  {
+    slug: "risco-em-fiis",
+    title: "Como avaliar risco em fundos imobiliários",
+    description: "Um processo prático para analisar concentração, liquidez, crédito, vacância, alavancagem e mudança de tese em FIIs.",
+    answer: "Risco em FIIs não é apenas volatilidade da cota. É a possibilidade de perda permanente, corte de renda ou dificuldade de saída causada por crédito, vacância, concentração, liquidez, alavancagem, execução e qualidade dos dados.",
+    sections: [
+      { title: "Comece pelo mecanismo de perda", paragraphs: ["Cada categoria perde dinheiro de forma diferente. Um fundo de CRI pode sofrer inadimplência e recuperação abaixo do esperado. Um shopping pode perder vendas, ocupação e poder de reajuste. Um galpão pode depender demais de um locatário. Um desenvolvimento pode atrasar, consumir capital e vender abaixo da premissa.", "A análise deve mapear como um problema chega ao caixa, ao patrimônio, ao dividendo e à cotação."] },
+      { title: "Concentração", paragraphs: ["Diversidade de tickers não garante diversidade econômica. Vários fundos podem depender do mesmo indexador, gestor, devedor, locatário, região ou cenário de juros.", "Meça concentração por valor investido e por participação na renda. Uma posição pequena em patrimônio pode responder por parcela grande dos dividendos e aumentar a sensibilidade a corte."], example: "Cinco FIIs de papel high yield podem parecer cinco ativos, mas continuar concentrando o risco em crédito imobiliário de maior retorno e menor margem de segurança." },
+      { title: "Liquidez e capacidade de saída", paragraphs: ["Liquidez indica quanto o mercado negocia, não a garantia de vender sem impacto. Compare o tamanho da posição com uma fração prudente do volume médio diário, especialmente em fundos menores.", "Dados de liquidez implausíveis ou ausentes não devem gerar estimativa de dias para saída. A resposta correta é sinalizar que o risco não pôde ser quantificado."] },
+      { title: "Riscos por categoria", paragraphs: ["Use indicadores adequados à estratégia; comparar tudo apenas por DY e P/VP elimina justamente as diferenças importantes."], checklist: ["Papel e FIAGRO: devedores, garantias, LTV, senioridade, inadimplência, provisões, indexadores e duration.", "Shopping e renda urbana: vendas, NOI, ocupação, contratos, concentração e qualidade dos locatários.", "Logística e lajes: vacância física e financeira, prazo, revisional, localização e concentração por inquilino.", "Desenvolvimento: cronograma, licenças, vendas, custo, necessidade de capital e conversão em caixa.", "FoF: desconto da carteira, taxas em camadas, giro e exposição indireta."] },
+      { title: "Stress test sem falsa precisão", paragraphs: ["Um stress test útil altera premissas observáveis: corte de renda, aumento de vacância, perda de crédito, juros elevados e redução de liquidez. O objetivo é identificar vulnerabilidades e ordem de grandeza, não prever exatamente o futuro.", "Probabilidades arbitrárias devem ser evitadas. Quando uma estimativa é usada, a metodologia e a incerteza precisam aparecer."], checklist: ["Quanto da renda cairia com corte de 10% no maior pagador?", "Qual posição ficaria difícil de reduzir em mercado adverso?", "Quais fundos sofrem simultaneamente com juros altos e crédito pior?", "A carteira suporta meses de renda menor sem forçar venda?"] },
+    ],
+    related: [{ href: "/guias/carteira-de-fiis", label: "Reduzir concentração" }, { href: "/guias/dividendos-de-fiis", label: "Analisar sustentabilidade" }, { href: "/fontes-dos-dados", label: "Ver fontes" }],
+  },
+  {
+    slug: "carteira-de-fiis",
+    title: "Como montar uma carteira de FIIs com menos concentração",
+    description: "Aprenda a organizar posições por risco econômico, renda, liquidez e objetivo, sem depender de rankings genéricos.",
+    answer: "Uma carteira de FIIs fica mais robusta quando limita dependências excessivas de um único fundo, segmento, gestor, devedor, locatário, indexador ou fonte de renda. A quantidade de tickers é secundária à diversidade de riscos.",
+    sections: [
+      { title: "Defina o papel da carteira", paragraphs: ["Antes de escolher ativos, defina horizonte, necessidade de renda, capacidade de suportar queda e frequência de aportes. Uma carteira usada para complementar renda no curto prazo exige cuidado diferente de uma carteira em acumulação.", "O Dados FII não conhece toda a situação financeira do usuário. As ferramentas mostram concentração e cenários, mas não substituem planejamento individual."] },
+      { title: "Classifique por risco econômico", paragraphs: ["Organize os fundos por categoria, estratégia, indexador, gestor, devedor, locatário e região. Isso revela exposições escondidas que uma lista de tickers não mostra.", "Também separe núcleo e satélite. O núcleo tende a concentrar ativos com maior previsibilidade, qualidade e liquidez; posições satélite podem assumir teses mais específicas, desde que tenham limite explícito."], checklist: ["Peso por fundo e por segmento.", "Participação de cada fundo na renda mensal.", "Exposição a CDI, inflação, imóveis e crédito.", "Concentração por gestor, devedor, locatário e região.", "Liquidez da posição em relação ao volume negociado."] },
+      { title: "Use novos aportes antes de vender", paragraphs: ["Quando a tese continua válida, novos aportes podem reduzir concentração sem custos e riscos de uma venda precipitada. O aporte deve ser convertido em cotas inteiras e seu efeito precisa ser simulado antes da execução.", "Não faz sentido diluir uma posição problemática apenas porque caiu. Rebalanceamento pressupõe que o ativo que receberá capital ainda passa pelos critérios de qualidade e risco."], example: "Se um fundo representa 30% da carteira, aportar em outros ativos pode reduzir gradualmente esse peso. A decisão muda quando os 30% também respondem por quase metade da renda ou quando o fundo perdeu fundamento." },
+      { title: "Limites e regras de revisão", paragraphs: ["Limites devem ser definidos antes do estresse. Eles podem variar por qualidade, categoria e liquidez, mas precisam ser consistentes e verificáveis.", "Revise a carteira por evento material e em ciclos regulares. Oscilação intradiária isolada não exige rebalanceamento; mudança em caixa, crédito, vacância, alavancagem ou estratégia pode exigir."], checklist: ["Defina limite por ativo, segmento e fonte de renda.", "Registre gatilhos que suspendem novos aportes.", "Diferencie queda de preço de deterioração real.", "Reavalie fundos após emissão, venda relevante, inadimplência, vacância ou corte de dividendos."] },
+      { title: "Erros comuns", paragraphs: ["Uma carteira pode parecer diversificada e ainda carregar riscos repetidos."], checklist: ["Escolher fundos apenas pelo maior DY.", "Contar tickers sem olhar exposições comuns.", "Usar P/VP baixo como motivo suficiente para aumentar posição.", "Ignorar liquidez porque o objetivo declarado é longo prazo.", "Rebalancear com percentuais abstratos que não viram cotas inteiras.", "Manter limite apenas na interface, sem validação de dados e regras consistentes."] },
+    ],
+    related: [{ href: "/carteira", label: "Abrir minha carteira" }, { href: "/guias/risco-em-fiis", label: "Mapear riscos" }, { href: "/guias/fundos-imobiliarios", label: "Rever fundamentos" }],
+  },
+];
+
+export function getGuide(slug: string) {
+  return GUIDES.find((guide) => guide.slug === slug);
+}

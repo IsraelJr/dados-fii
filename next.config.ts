@@ -9,12 +9,12 @@ const securityHeaders = [
       "object-src 'none'",
       "frame-ancestors 'none'",
       "form-action 'self'",
-      "script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://unpkg.com",
+      "script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://*.googlesyndication.com https://unpkg.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.google.com https://pagead2.googlesyndication.com",
-      "frame-src 'self' https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
+      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://*.google.com https://*.googlesyndication.com https://pagead2.googlesyndication.com",
+      "frame-src 'self' https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.googlesyndication.com",
       "upgrade-insecure-requests",
     ].join("; "),
   },
@@ -26,10 +26,19 @@ const securityHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ] as const;
 
+const noIndexHeaders = [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }];
+const noIndexFollowHeaders = [{ key: "X-Robots-Tag", value: "noindex, follow, noarchive" }];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/(.*)", headers: [...securityHeaders] }];
+    return [
+      { source: "/(.*)", headers: [...securityHeaders] },
+      { source: "/admin/:path*", headers: noIndexHeaders },
+      { source: "/api/:path*", headers: noIndexHeaders },
+      { source: "/carteira/:path*", headers: noIndexHeaders },
+      { source: "/fii/:path*", headers: noIndexFollowHeaders },
+    ];
   },
 };
 
