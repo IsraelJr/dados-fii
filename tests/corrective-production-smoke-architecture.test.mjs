@@ -44,3 +44,13 @@ test("[REG-DEF-21] resultado funcional publica status auditável no mesmo releas
   assert.match(workflow, /context "Production Premium Smoke"/);
   assert.match(workflow, /statuses\/\$\{TARGET_SHA\}/);
 });
+
+test("[REG-DEF-22] POST OIDC usa origem canônica sem redirecionar a autorização", () => {
+  assert.match(workflow, /PRODUCTION_ORIGIN: https:\/\/www\.dadosfii\.com\.br/);
+  assert.doesNotMatch(workflow, /curl[^\n]*--location/);
+  assert.match(workflow, /\{ok, error, evidence:/);
+  assert.match(
+    workflow,
+    /name: premium-production-smoke-\$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.release_sha \|\| github\.event\.sha \}\}/,
+  );
+});
