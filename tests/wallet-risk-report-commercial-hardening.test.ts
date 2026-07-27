@@ -32,7 +32,7 @@ test("renda mensal e participação na renda são determinísticas", () => {
   assert.equal(diagnostics.incomeCoverage, 100);
 });
 
-test("liquidez implausível é bloqueada e risco de saída usa 20% do volume", () => {
+test("liquidez inválida falha fechado e não gera derivados de saída", () => {
   const prepared = prepareFiiRiskReportInput({
     portfolio: [
       { ticker: "BODB11", currentValue: 535.5, dailyLiquidity: 585 },
@@ -43,10 +43,19 @@ test("liquidez implausível é bloqueada e risco de saída usa 20% do volume", (
   const byTicker = Object.fromEntries(prepared.portfolio.map((asset) => [asset.ticker, asset]));
 
   assert.equal(byTicker.BODB11.liquidityDataQuality?.status, "invalid");
-  assert.equal(byTicker.BODB11.positionToDailyLiquidityPercent, 91.54);
-  assert.equal(byTicker.BODB11.exitDaysAt20PctAdv, 4.58);
+  assert.equal(byTicker.BODB11.positionToDailyLiquidityPercent, undefined);
+  assert.equal(byTicker.BODB11.exitDaysAt20PctAdv, undefined);
   assert.equal(byTicker.MXRF11.liquidityDataQuality?.status, "valid");
+  assert.equal(byTicker.MXRF11.positionToDailyLiquidityPercent, 0);
+  assert.equal(byTicker.MXRF11.exitDaysAt20PctAdv, 0);
   assert.equal(byTicker.SEM11.liquidityDataQuality?.status, "missing");
+  assert.equal(byTicker.SEM11.positionToDailyLiquidityPercent, undefined);
+  assert.equal(byTicker.SEM11.exitDaysAt20PctAdv, undefined);
+
+  const diagnostics = prepared.dataQualitySummary?.deterministicDiagnostics as Record<string, unknown>;
+  assert.deepEqual(diagnostics.invalidLiquidityTickers, ["BODB11"]);
+  assert.deepEqual(diagnostics.missingLiquidityTickers, ["SEM11"]);
+  assert.match(String(diagnostics.calculationPolicy), /não produz percentual da posição nem estimativa de dias para saída/i);
 });
 
 test("fonte pública do IFIX é Dados FII e provedor técnico não chega ao prompt", () => {
@@ -79,11 +88,12 @@ test("fonte pública do IFIX é Dados FII e provedor técnico não chega ao prom
   assert.match(prompt, /"source": "Dados FII"/);
 });
 
-test("prompt v2.3 aplica Modo Gestor sem nota arbitrária e sem P\/VP como compra", () => {
-  assert.equal(FII_RISK_REPORT_PROMPT_VERSION, "v2.3.0");
+test("prompt v2.3.1 aplica Modo Gestor e bloqueia derivados inválidos", () => {
+  assert.equal(FII_RISK_REPORT_PROMPT_VERSION, "v2.3.1");
   const prompt = buildFiiRiskReportUserPrompt({ portfolio: [] });
   assert.match(prompt, /Modo Gestor — decisões e prioridades/);
   assert.match(prompt, /Não use nota de 0 a 10/);
   assert.match(prompt, /sem converter desconto em recomendação/i);
+  assert.match(prompt, /não é possível estimar o risco de saída/i);
   assert.match(prompt, /Conteúdo informativo, sem recomendação de investimento/);
 });
