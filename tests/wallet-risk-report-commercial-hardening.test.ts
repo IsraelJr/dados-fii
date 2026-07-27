@@ -84,6 +84,6 @@ test("prompt v2.3 aplica Modo Gestor sem nota arbitrária e sem P\/VP como compr
   const prompt = buildFiiRiskReportUserPrompt({ portfolio: [] });
   assert.match(prompt, /Modo Gestor — decisões e prioridades/);
   assert.match(prompt, /Não use nota de 0 a 10/);
-  assert.match(prompt, /não converter desconto em recomendação/i);
+  assert.match(prompt, /sem converter desconto em recomendação/i);
   assert.match(prompt, /Conteúdo informativo, sem recomendação de investimento/);
 });
