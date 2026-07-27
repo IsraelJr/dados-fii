@@ -14,6 +14,11 @@ export type PortfolioActor = Readonly<{
   ownerId: PortfolioOwnerId;
 }>;
 
+export type PortfolioHistoryImportResult = Readonly<{
+  imported: number;
+  skipped: number;
+}>;
+
 export class PortfolioHistoryService {
   constructor(
     private readonly repository: PortfolioHistoryRepository,
@@ -47,6 +52,32 @@ export class PortfolioHistoryService {
 
     await this.repository.create(key, entry);
     return entry;
+  }
+
+  async importLegacy(
+    actor: PortfolioActor,
+    entries: readonly PortfolioHistoryEntry[],
+  ): Promise<PortfolioHistoryImportResult> {
+    let imported = 0;
+    let skipped = 0;
+
+    for (const entry of entries) {
+      if (entry.source !== "legacy") throw new Error("INVALID_LEGACY_SOURCE");
+      const key = {
+        ownerId: actor.ownerId,
+        portfolioId: entry.portfolioId,
+        competence: entry.competence,
+      } as const;
+      const existing = await this.repository.findByCompetence(key);
+      if (existing) {
+        skipped += 1;
+        continue;
+      }
+      await this.repository.create(key, entry);
+      imported += 1;
+    }
+
+    return Object.freeze({ imported, skipped });
   }
 
   async updateManual(
