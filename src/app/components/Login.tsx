@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import { usePathname } from "next/navigation";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { app } from "@/lib/firebase"; // inicialização do firebase
+import { app } from "@/lib/firebase";
 import { X } from "lucide-react";
 
 const auth = getAuth(app);
 
 export default function LoginButton() {
+    const pathname = usePathname();
     const [showModal, setShowModal] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -20,9 +22,7 @@ export default function LoginButton() {
     const triggerRef = useRef<HTMLButtonElement>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
 
-    // regex senha média
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
-    // regex email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     useEffect(() => {
@@ -140,6 +140,8 @@ export default function LoginButton() {
         }
     };
 
+    if (pathname === "/") return null;
+
     return (
         <div className="relative">
             <button
@@ -170,7 +172,6 @@ export default function LoginButton() {
                         onKeyDown={handleDialogKeyboard}
                         className="bg-gray-900 rounded-xl p-6 w-80 shadow-lg text-white relative"
                     >
-                        {/* Botão fechar */}
                         <button
                             type="button"
                             onClick={closeModal}
@@ -242,7 +243,6 @@ export default function LoginButton() {
                             </button>
                         </form>
 
-                        {/* CSS para vibração */}
                         <style jsx>{`
                             @keyframes shake {
                                 0% { transform: translateX(0); }
