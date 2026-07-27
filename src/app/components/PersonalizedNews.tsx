@@ -287,7 +287,7 @@ export default function PersonalizedNews() {
                 {mode === "fallback" && <p className="text-sm text-gray-500">Resumo indisponível no momento. Consulte as fontes oficiais.</p>}
             </div>
 
-            {error && <p className="mb-3 text-sm text-yellow-600">{error}</p>}
+            {error && <p className="mb-3 text-sm font-medium text-amber-800">{error}</p>}
             {news.length === 0 && (
                 <p className="text-center text-gray-500">
                     {walletTickers.length ? "Nenhum FII pesquisado fora da sua carteira ainda." : "Nenhuma pesquisa registrada ainda."}

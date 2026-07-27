@@ -21,7 +21,7 @@ export default function CookieBanner() {
             <p>Usamos cookies para melhorar sua experiência no site.</p>
             <button
                 onClick={acceptCookies}
-                className="bg-blue-500 px-4 py-2 rounded text-sm"
+                className="rounded bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
             >
                 Aceitar
             </button>

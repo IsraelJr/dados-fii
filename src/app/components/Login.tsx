@@ -149,7 +149,7 @@ export default function LoginButton() {
                 aria-haspopup="dialog"
                 aria-expanded={showModal}
                 aria-controls="login-dialog"
-                className="absolute top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-600"
+                className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
             >
                 Login
             </button>
@@ -228,7 +228,7 @@ export default function LoginButton() {
 
                             <button
                                 type="submit"
-                                className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600"
+                                className="w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800"
                             >
                                 {isRegister ? "Cadastrar" : "Entrar"}
                             </button>
