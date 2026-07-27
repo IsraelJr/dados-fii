@@ -10,13 +10,19 @@ export type WalletIdentity = Readonly<{
   authMode: "email-session" | "anon-cookie";
 }>;
 
+export type WalletIdentityErrorCode =
+  | "WALLET_SESSION_REQUIRED"
+  | "USER_NOT_IDENTIFIED"
+  | "USER_NOT_FOUND";
+
 export class WalletIdentityError extends Error {
-  constructor(
-    readonly status: 401 | 404,
-    readonly code: "WALLET_SESSION_REQUIRED" | "USER_NOT_IDENTIFIED" | "USER_NOT_FOUND",
-    message: string,
-  ) {
+  readonly status: 401 | 404;
+  readonly code: WalletIdentityErrorCode;
+
+  constructor(status: 401 | 404, code: WalletIdentityErrorCode, message: string) {
     super(message);
+    this.status = status;
+    this.code = code;
     this.name = "WalletIdentityError";
   }
 }
