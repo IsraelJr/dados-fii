@@ -56,10 +56,9 @@ test("carteira adiciona um fundo, persiste localmente e permanece acessível", a
   });
 
   await page.goto("/carteira");
-  const fundForm = page.locator("form").filter({ has: page.getByLabel("Ticker do fundo") });
-  await fundForm.getByLabel("Ticker do fundo").fill("TGAR11");
-  await fundForm.getByLabel("Quantidade de cotas", { exact: true }).fill("10");
-  await fundForm.getByRole("button", { name: "Adicionar" }).click();
+  await page.getByLabel("Ticker do fundo").fill("TGAR11");
+  await page.getByLabel("Quantidade de cotas", { exact: true }).fill("10");
+  await page.getByRole("button", { name: "Adicionar" }).last().click();
   await expect(page.getByRole("link", { name: "TGAR11" }).first()).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem("dados-fii-wallet-v1"))).toContain("TGAR11");
   await expectNoHighImpactAccessibilityViolations(page);
