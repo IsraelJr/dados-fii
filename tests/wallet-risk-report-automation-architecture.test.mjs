@@ -28,10 +28,12 @@ test("gerador automático usa prompt canônico, snapshot rico e OpenAI", () => {
   assert.match(controller, /buildRiskReportRepairInstruction/);
   assert.match(controller, /repairAttempted/);
   assert.match(controller, /riskReportCredits: Math\.max\(credits - 1, 0\)/);
-  assert.match(input, /buildPortfolioSnapshot/);
+  assert.match(controller, /regulatoryDataService\.getByTicker/);
+  assert.match(input, /fundLoader/);
+  assert.match(input, /deriveFiiRiskData/);
   assert.match(input, /getMarketBenchmarks/);
   assert.match(input, /buildPortfolioDataQuality/);
-  assert.match(input, /saveMonthlyPortfolioSnapshot/);
+  assert.doesNotMatch(input, /adminDb|\.collection\(["']Fiis["']\)/);
 });
 
 test("placeholder manual é migrado, mas não reutilizado nem convertido em PDF", () => {
