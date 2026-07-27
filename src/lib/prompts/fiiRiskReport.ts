@@ -1,4 +1,4 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v2.3.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v2.3.1";
 
 const MIN_VALID_DAILY_LIQUIDITY_BRL = 1_000;
 const EXIT_ADV_PARTICIPATION = 0.2;
@@ -165,10 +165,11 @@ export function prepareFiiRiskReportInput(input: RiskReportInput): RiskReportInp
     const dailyLiquidity = positiveNumber(asset.dailyLiquidity) || positiveNumber(asset.liquidity);
     const estimatedMonthlyIncome = incomeByTicker.get(asset.ticker);
     const quality = liquidityQuality(dailyLiquidity);
-    const positionToDailyLiquidityPercent = currentValue && dailyLiquidity
+    const liquidityUsable = quality.status === "valid";
+    const positionToDailyLiquidityPercent = liquidityUsable && currentValue && dailyLiquidity
       ? round((currentValue / dailyLiquidity) * 100)
       : undefined;
-    const exitDaysAt20PctAdv = currentValue && dailyLiquidity
+    const exitDaysAt20PctAdv = liquidityUsable && currentValue && dailyLiquidity
       ? round(currentValue / (dailyLiquidity * EXIT_ADV_PARTICIPATION))
       : undefined;
     const incomeWeight = estimatedMonthlyIncome && totalEstimatedMonthlyIncome > 0
@@ -190,7 +191,9 @@ export function prepareFiiRiskReportInput(input: RiskReportInput): RiskReportInp
         incomeWeight,
         positionToDailyLiquidityPercent,
         exitDaysAt20PctAdv,
-        exitMethod: "posição dividida por 20% da liquidez média diária",
+        exitMethod: liquidityUsable
+          ? "posição dividida por 20% da liquidez média diária"
+          : undefined,
         liquidityDataQuality: quality,
       },
     } satisfies RiskReportPortfolioItem;
@@ -229,7 +232,7 @@ export function prepareFiiRiskReportInput(input: RiskReportInput): RiskReportInp
         missingLiquidityTickers,
         minimumPlausibleDailyLiquidity: MIN_VALID_DAILY_LIQUIDITY_BRL,
         exitLiquidityParticipation: EXIT_ADV_PARTICIPATION,
-        calculationPolicy: "Pesos, renda estimada e risco de saída são calculados antes da IA e não podem ser recalculados pelo modelo.",
+        calculationPolicy: "Pesos e renda estimada são calculados antes da IA. Liquidez inválida ou ausente não produz percentual da posição nem estimativa de dias para saída.",
       },
     },
     dataSources: [
@@ -247,6 +250,7 @@ Objetivo: transformar dados da carteira em um memorando útil para preservação
 Princípios obrigatórios:
 - Use somente os dados preparados pelo Dados FII. Não use memória, conhecimento externo ou suposições sobre os fundos.
 - Os campos weight, currentValue, estimatedMonthlyIncome, incomeWeight, positionToDailyLiquidityPercent, exitDaysAt20PctAdv e liquidityDataQuality são cálculos determinísticos imutáveis. Nunca os recalcule nem substitua por percentuais próprios.
+- Se liquidityDataQuality for invalid ou missing, positionToDailyLiquidityPercent e exitDaysAt20PctAdv permanecem indisponíveis. Não derive métricas de saída a partir do valor rejeitado.
 - Diferencie fato, cálculo, inferência condicionada, informação indisponível e conclusão inconclusiva.
 - Não invente vacância, inadimplência, LTV, devedores, garantias, rating, contratos, imóveis, cobertura de dividendos, reservas, preço justo, pares, eventos ou histórico.
 - Gestor e administrador identificados significam apenas estrutura institucional identificada. Isso não comprova governança forte, alinhamento, transparência ou qualidade de execução.
@@ -303,7 +307,7 @@ Use valor financeiro e weight fornecidos. Mostre concentração por ativo, segme
 Use estimatedMonthlyIncome e incomeWeight sem recalcular. Mostre último dividendo, média 12m, recorrência, volatilidade/cortes, participação na renda, risco e confiança. Se a cobertura da renda estiver incompleta, deixe isso explícito.
 
 ## Liquidez e risco de saída
-Use dailyLiquidity, liquidityDataQuality, positionToDailyLiquidityPercent e exitDaysAt20PctAdv. Explique que os dias usam até 20% do volume médio diário. Dado inválido não pode receber risco baixo nem conclusão de saída em menos de um dia. Separe liquidez da posição atual de liquidez estrutural do fundo.
+Use dailyLiquidity, liquidityDataQuality, positionToDailyLiquidityPercent e exitDaysAt20PctAdv. Explique que os dias, quando disponíveis, usam até 20% do volume médio diário. Se liquidityDataQuality for invalid ou missing, escreva que o dado foi desconsiderado e que não é possível estimar o risco de saída; não calcule percentual da posição, dias para zerar ou classificação baixa. Separe liquidez da posição atual de liquidez estrutural do fundo.
 
 ## Valuation e leitura patrimonial
 Mostre preço, VP por cota, P/VP, valor de mercado calculado, patrimônio líquido, leitura patrimonial, confiança e dado faltante. Não use “margem positiva”, “preço atrativo” ou “margem de segurança” com base apenas no P/VP.
