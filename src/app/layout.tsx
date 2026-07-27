@@ -38,9 +38,9 @@ export const metadata: Metadata = {
     "rendimentos FIIs",
     "fundos imobiliários Brasil",
   ],
-  authors: [{ name: "Dados FII", url: "/autores/israel-alves" }],
-  creator: "Dados FII",
-  publisher: "Dados FII",
+  authors: [{ name: SITE_NAME, url: "/sobre" }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   alternates: { canonical: "./" },
   openGraph: {
     type: "website",
