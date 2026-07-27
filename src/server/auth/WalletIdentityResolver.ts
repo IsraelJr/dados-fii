@@ -62,10 +62,12 @@ async function resolveEmailSession(request: Request): Promise<WalletIdentity | n
   if (direct.exists) return Object.freeze({ ownerId: direct.id, authMode: "email-session" });
 
   const query = await users.where("email", "==", email).limit(1).get();
-  if (query.empty) {
+  const matchedUser = query.docs.at(0);
+  if (!matchedUser) {
     throw new WalletIdentityError(404, "USER_NOT_FOUND", "Usuário não encontrado.");
   }
-  return Object.freeze({ ownerId: query.docs[0].id, authMode: "email-session" });
+
+  return Object.freeze({ ownerId: matchedUser.id, authMode: "email-session" });
 }
 
 async function resolveAnonymousCookie(): Promise<WalletIdentity> {
