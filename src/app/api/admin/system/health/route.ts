@@ -13,6 +13,6 @@ export async function GET(req: NextRequest) {
   try {
     return adminJson({ ok: true, health: await regulatoryDataService.getSystemHealth() });
   } catch (error) {
-    return adminJson({ ok: false, error: error instanceof Error ? error.message : "Erro ao consultar a saúde regulatória." }, 500);
+    return adminJson({ ok: false, error: "Erro ao consultar a saúde regulatória." }, 500);
   }
 }

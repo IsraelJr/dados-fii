@@ -3,6 +3,7 @@ import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
 import { RiskLabAutomaticOrchestrator } from "@/lib/risk-lab/RiskLabAutomaticOrchestrator";
 import { RISK_LAB_AUTOMATIC_RATE_LIMIT } from "@/lib/risk-lab/RiskLabAutomaticRateLimit";
 import { riskLabAutomaticScanStore } from "@/lib/risk-lab/RiskLabAutomaticScanStore";
+import { pseudonymousLogId, safeLog } from "@/lib/observability/SafeLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,11 +42,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const orchestrator = new RiskLabAutomaticOrchestrator({ repository: riskLabAutomaticScanStore });
-    const scan = await orchestrator.scan(String(body?.ticker || ""), authorization.identity.email);
+    const scan = await orchestrator.scan(String(body?.ticker || ""), `admin:${authorization.identity.uid}`);
     return adminJson({ ok: true, scan });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida na pesquisa automática.";
-    console.error("Risk Lab automatic scan error", { actor: authorization.identity.email, message });
+    safeLog("error", "risk-lab.automatic.scan.failed", {
+      actorId: pseudonymousLogId(authorization.identity.uid),
+      correlationId: request.headers.get("x-correlation-id"),
+      message,
+    });
     const status = /desabilitada/i.test(message)
       ? 503
       : /inválido|não encontrado|CNPJ|catálogo|nenhum ano/i.test(message)

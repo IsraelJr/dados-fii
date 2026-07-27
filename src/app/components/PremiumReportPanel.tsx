@@ -30,6 +30,7 @@ function riskLabAvailabilityLabel(availability: PremiumFundReport["riskLab"]["av
     available: "Disponível",
     outside_verified_cohort: "Fora da coorte verificada",
     inconclusive: "Inconclusivo",
+    insufficient_data: "Sem calibração para a categoria",
   }[availability];
 }
 

@@ -1,15 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { v4 as uuidv4 } from "uuid";
+import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
-import Cookies from "js-cookie";
 import { app } from "@/lib/firebase"; // inicialização do firebase
 import { X } from "lucide-react";
 
 const auth = getAuth(app);
-const db = getFirestore(app);
 
 export default function LoginButton() {
     const [showModal, setShowModal] = useState(false);
@@ -21,20 +17,49 @@ export default function LoginButton() {
 
     const emailRef = useRef<HTMLInputElement>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const dialogRef = useRef<HTMLDivElement>(null);
 
     // regex senha média
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
     // regex email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    // pega ou cria anonId
     useEffect(() => {
-        if (!Cookies.get("anonId")) {
-            Cookies.set("anonId", uuidv4(), { expires: 365 });
-        }
-    }, []);
+        if (showModal) emailRef.current?.focus();
+    }, [showModal]);
 
-    const handleAuth = async () => {
+    const closeModal = () => {
+        setShowModal(false);
+        requestAnimationFrame(() => triggerRef.current?.focus());
+    };
+
+    const handleDialogKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeModal();
+            return;
+        }
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(
+            dialogRef.current?.querySelectorAll<HTMLElement>(
+                "button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
+            ) || [],
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
+
+    const handleAuth = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         if (!email || !emailRegex.test(email)) {
             setMessage("Por favor, informe um email válido.");
             if (emailRef.current) {
@@ -79,20 +104,19 @@ export default function LoginButton() {
                 userCred = await signInWithEmailAndPassword(auth, email, password);
             }
 
-            const anonId = Cookies.get("anonId") || uuidv4();
-            Cookies.set("anonId", anonId, { expires: 365 });
-
-            await setDoc(
-                doc(db, "User", anonId),
-                {
-                    email,
-                    createdAt: new Date(),
+            const idToken = await userCred.user.getIdToken();
+            const profileResponse = await fetch("/api/user-profile", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                    "Content-Type": "application/json",
                 },
-                { merge: true }
-            );
+                body: JSON.stringify({}),
+            });
+            if (!profileResponse.ok) throw new Error("Falha ao sincronizar o perfil autenticado.");
 
             setMessage("✅ Login realizado com sucesso!");
-            setShowModal(false);
+            closeModal();
         } catch (err: any) {
             console.error(err);
 
@@ -119,70 +143,104 @@ export default function LoginButton() {
     return (
         <div className="relative">
             <button
+                ref={triggerRef}
+                type="button"
                 onClick={() => setShowModal(true)}
-                className="absolute top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-600"
+                aria-haspopup="dialog"
+                aria-expanded={showModal}
+                aria-controls="login-dialog"
+                className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
             >
                 Login
             </button>
 
             {showModal && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-                    <div className="bg-gray-900 rounded-xl p-6 w-80 shadow-lg text-white relative">
+                <div
+                    className="fixed inset-0 flex items-center justify-center bg-black/40 z-50"
+                    onMouseDown={(event) => {
+                        if (event.currentTarget === event.target) closeModal();
+                    }}
+                >
+                    <div
+                        ref={dialogRef}
+                        id="login-dialog"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="login-dialog-title"
+                        onKeyDown={handleDialogKeyboard}
+                        className="bg-gray-900 rounded-xl p-6 w-80 shadow-lg text-white relative"
+                    >
                         {/* Botão fechar */}
                         <button
-                            onClick={() => setShowModal(false)}
+                            type="button"
+                            onClick={closeModal}
+                            aria-label="Fechar login"
                             className="absolute top-3 right-3 text-gray-400 hover:text-white"
                         >
                             <X size={20} />
                         </button>
 
-                        <h2 className="text-lg font-semibold mb-4">
+                        <h2 id="login-dialog-title" className="text-lg font-semibold mb-4">
                             {isRegister ? "Criar conta" : "Entrar"}
                         </h2>
 
-                        <input
-                            ref={emailRef}
-                            type="email"
-                            placeholder="Email"
-                            className="w-full border border-gray-700 p-2 mb-2 rounded bg-gray-800 text-white placeholder-gray-400"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                        />
-
-                        <input
-                            ref={passwordRef}
-                            type="password"
-                            placeholder="Senha"
-                            className="w-full border border-gray-700 p-2 mb-2 rounded bg-gray-800 text-white placeholder-gray-400"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-
-                        {isRegister && (
+                        <form onSubmit={handleAuth}>
+                            <label htmlFor="login-email" className="mb-1 block text-sm font-semibold text-gray-200">E-mail</label>
                             <input
-                                type="password"
-                                placeholder="Confirmar senha"
+                                id="login-email"
+                                ref={emailRef}
+                                type="email"
+                                autoComplete="email"
+                                placeholder="seu@email.com"
                                 className="w-full border border-gray-700 p-2 mb-2 rounded bg-gray-800 text-white placeholder-gray-400"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                             />
-                        )}
 
-                        {message && <p className="text-sm text-red-500 mb-2">{message}</p>}
+                            <label htmlFor="login-password" className="mb-1 block text-sm font-semibold text-gray-200">Senha</label>
+                            <input
+                                id="login-password"
+                                ref={passwordRef}
+                                type="password"
+                                autoComplete={isRegister ? "new-password" : "current-password"}
+                                placeholder="Senha"
+                                className="w-full border border-gray-700 p-2 mb-2 rounded bg-gray-800 text-white placeholder-gray-400"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                            />
 
-                        <button
-                            onClick={handleAuth}
-                            className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600"
-                        >
-                            {isRegister ? "Cadastrar" : "Entrar"}
-                        </button>
+                            {isRegister && (
+                                <>
+                                    <label htmlFor="login-password-confirmation" className="mb-1 block text-sm font-semibold text-gray-200">Confirmar senha</label>
+                                    <input
+                                        id="login-password-confirmation"
+                                        type="password"
+                                        autoComplete="new-password"
+                                        placeholder="Confirmar senha"
+                                        className="w-full border border-gray-700 p-2 mb-2 rounded bg-gray-800 text-white placeholder-gray-400"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                    />
+                                </>
+                            )}
 
-                        <button
-                            onClick={() => setIsRegister(!isRegister)}
-                            className="w-full mt-2 text-sm text-gray-400 hover:text-white"
-                        >
-                            {isRegister ? "Já tem conta? Entrar" : "Não tem conta? Cadastrar"}
-                        </button>
+                            {message && <p role="alert" className="text-sm text-red-400 mb-2">{message}</p>}
+
+                            <button
+                                type="submit"
+                                className="w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800"
+                            >
+                                {isRegister ? "Cadastrar" : "Entrar"}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setIsRegister(!isRegister)}
+                                className="w-full mt-2 text-sm text-gray-300 hover:text-white"
+                            >
+                                {isRegister ? "Já tem conta? Entrar" : "Não tem conta? Cadastrar"}
+                            </button>
+                        </form>
 
                         {/* CSS para vibração */}
                         <style jsx>{`

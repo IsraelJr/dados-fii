@@ -108,7 +108,7 @@ export default function MonitoredFiisPanel() {
             </h2>
 
             {fiis.length === 0 ? (
-                <p className="text-center text-gray-400">Nenhum FII sendo monitorado</p>
+                <p className="text-center text-gray-600">Nenhum FII sendo monitorado</p>
             ) : (
                 <div className="relative">
                     {/* Botão Esquerda (desktop apenas) */}

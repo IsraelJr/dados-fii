@@ -20,7 +20,6 @@ export default function CreateFiiAdminPage() {
   const [segmentNew, setSegmentNew] = useState("");
   const [cnpj, setCnpj] = useState("");
   const [modelTicker, setModelTicker] = useState("TGAR11");
-  const [secret, setSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
 
@@ -40,7 +39,6 @@ export default function CreateFiiAdminPage() {
           segmentNew,
           cnpj,
           modelTicker,
-          secret,
         }),
       });
 
@@ -70,7 +68,6 @@ export default function CreateFiiAdminPage() {
           <Field label="Segmento" value={segment} onChange={setSegment} placeholder="Ex: Papel, Tijolo, Fiagro" />
           <Field label="Segmento novo" value={segmentNew} onChange={setSegmentNew} placeholder="Pode repetir o segmento" />
           <Field label="CNPJ" value={cnpj} onChange={setCnpj} placeholder="00.000.000/0001-00" />
-          <Field label="Senha administrativa" value={secret} onChange={setSecret} placeholder="ADMIN_UPDATE_SECRET" type="password" />
         </div>
 
         <div className="mt-5 rounded-xl bg-gray-800 p-4 text-sm font-medium text-gray-300">
@@ -80,7 +77,7 @@ export default function CreateFiiAdminPage() {
         <button
           type="button"
           onClick={submit}
-          disabled={loading || !ticker.trim() || !secret.trim()}
+          disabled={loading || !ticker.trim()}
           className="mt-5 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
         >
           {loading ? "Criando..." : "Criar fundo"}

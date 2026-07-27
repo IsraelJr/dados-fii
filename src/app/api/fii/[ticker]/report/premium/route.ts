@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PremiumReportError } from "@/lib/reports/PremiumReportEngine";
+import { publicError } from "@/lib/http/PublicError";
 import { requirePremium } from "@/lib/premiumSecurity";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
 import { userWalletFrom } from "@/lib/userWallet";
@@ -32,9 +33,21 @@ async function generatePremium(request: NextRequest, context: RouteContext, hold
       accessPlan: authorization.identity.plan,
     });
     if (!report) return NextResponse.json({ ok: false, error: "Fundo não encontrado." }, { status: 404 });
-    return NextResponse.json({ ok: true, report, access: { plan: authorization.identity.plan } }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(
+      { ok: true, report, access: { plan: authorization.identity.plan } },
+      {
+        headers: {
+          "Cache-Control": "private, no-store",
+          "X-Audit-Event-Id": report.auditReceipt.eventId,
+          "X-Correlation-Id": report.auditReceipt.correlationId,
+        },
+      },
+    );
   } catch (error) {
-    if (error instanceof PremiumReportError) return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: error.status });
+    if (error instanceof PremiumReportError) {
+      const response = publicError(error, "Não foi possível gerar o relatório Premium.");
+      return NextResponse.json({ ok: false, error: response.message, code: response.code }, { status: response.status });
+    }
     console.error("Premium fund report error", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ ok: false, error: "Não foi possível gerar o relatório Premium." }, { status: 500 });
   }

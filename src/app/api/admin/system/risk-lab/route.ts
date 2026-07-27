@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
 import { riskLabService } from "@/lib/risk-lab/RiskLabService";
+import { pseudonymousLogId, safeLog } from "@/lib/observability/SafeLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,11 +30,16 @@ export async function POST(request: NextRequest) {
   if (action !== "generate") return adminJson({ ok: false, error: "Ação inválida. Use generate." }, 400);
 
   try {
-    const report = await riskLabService.generate(ticker, authorization.identity.email);
+    const report = await riskLabService.generate(ticker, `admin:${authorization.identity.uid}`);
     return adminJson({ ok: true, report });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida na execução do Risk Lab.";
-    console.error("Risk Lab generation error", { ticker, actor: authorization.identity.email, message });
+    safeLog("error", "risk-lab.generate.failed", {
+      ticker,
+      actorId: pseudonymousLogId(authorization.identity.uid),
+      correlationId: request.headers.get("x-correlation-id"),
+      message,
+    });
     const status = /em andamento|concorrente|lock/i.test(message)
       ? 409
       : /desabilitado/i.test(message)

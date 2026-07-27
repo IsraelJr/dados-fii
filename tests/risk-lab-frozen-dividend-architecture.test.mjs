@@ -10,6 +10,7 @@ const backtestService = readFileSync("src/lib/risk-lab/RiskLabCohortBacktestV2Se
 const script = readFileSync("scripts/collect-risk-lab-dividend-notices.ts", "utf8");
 const workflow = readFileSync(".github/workflows/risk-lab-frozen-dividend-notices.yml", "utf8");
 const route = readFileSync("src/app/api/system/risk-lab-cohort-backtest/route.ts", "utf8");
+const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/cohort-backtest/route.ts", "utf8");
 const dataset = JSON.parse(readFileSync("src/lib/risk-lab/frozen-dividend-notices-v0.1.json", "utf8"));
 
 const COHORT = ["DEVA11", "VSLH11", "KNCR11", "KNSC11", "MCCI11", "RBRY11"];
@@ -69,13 +70,16 @@ test("workflow e endpoint compartilham exatamente o mesmo identificador protegid
   const match = backtestService.match(/export const RISK_LAB_COHORT_BACKTEST_RUN_ID = "([^"]+)"/);
   assert.ok(match, "Constante protegida do backtest não encontrada.");
   assert.match(workflow, new RegExp(`RUN_ID:\\s*${escapeRegex(match[1])}`));
-  assert.match(route, /parameters\.runId === RISK_LAB_COHORT_BACKTEST_RUN_ID/);
+  assert.match(adminRoute, /RISK_LAB_COHORT_BACKTEST_RUN_ID/);
+  assert.match(workflow, /getIDToken\("dados-fii-risk-lab-operation"\)/);
 });
 
 test("endpoint de identidades continua protegido pelo SHA exato de Produção", () => {
-  assert.match(route, /parameters\.release === deployedRelease/);
-  assert.match(route, /parameters\.source === "github-actions"/);
-  assert.match(route, /action === "identities"/);
+  assert.match(adminRoute, /requireGithubActionsProductionIdentity/);
+  assert.match(adminRoute, /activeProductionRelease/);
+  assert.match(adminRoute, /view"\) === "identities"/);
+  assert.match(workflow, /Authorization: Bearer/);
+  assert.doesNotMatch(route, /identities|\.initialize\(\)|\.runTicker\(|\.finalize\(\)/);
 });
 
 test("backtest usa avisos congelados e CVM somente como reconciliação auxiliar", () => {

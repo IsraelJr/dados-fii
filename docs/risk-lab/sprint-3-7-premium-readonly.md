@@ -2,7 +2,7 @@
 
 ## Estado
 
-Implementação validada e pronta para merge na issue #133. A conclusão formal permanece bloqueada até merge, auditoria do `main`, atualização do Handoff em PR separada e encerramento da issue.
+Implementação histórica mesclada e implantada. A declaração anterior de encerramento foi substituída pelo Handoff v8.0.0 após a auditoria independente do SHA `607dafefefaba5c88f986236eb365440c6fb8c94`. A integração permanece funcionalmente read-only, mas a Fase 3 só volta a ser formalmente concluída quando o branch corretivo passar por CI, merge, deployment do mesmo SHA e pelo smoke Premium autenticado via OIDC.
 
 ## Objetivo
 
@@ -56,7 +56,8 @@ Consumir o ruleset homologado `0.2.0` no Relatório Premium exclusivamente como 
 
 - manifesto: `docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json`;
 - hash do manifesto validado por teste autoconsistente;
-- 15 testes específicos da Sprint 3.7;
+- 15 testes históricos específicos da Sprint 3.7, preservados;
+- regressões corretivas de contrato público, OIDC, snapshot de pares, audit receipt e isolamento read-only;
 - suíte integral do Risk Lab e gates dos seis fundos;
 - dataset 3.5-C e calibração 3.6 preservados;
 - regressão integral da Fase 2;
@@ -72,6 +73,15 @@ A integração está implantável atrás de feature flag desligada por padrão. 
 
 Nenhuma notificação é liberada por esta Sprint.
 
-## Critérios de encerramento
+## Critérios de encerramento vigentes
 
-A Sprint só pode ser marcada como formalmente concluída após merge exato, auditoria pós-merge do `main`, atualização do Handoff canônico em PR separada e issue #133 fechada com evidências.
+A Sprint só pode ser marcada como formalmente concluída após:
+
+1. CI corretivo integral no SHA do PR;
+2. merge sem bypass de gate;
+3. deployment do mesmo SHA em produção;
+4. geração Premium real por identidade OIDC autorizada;
+5. releitura do evento `premium-read` persistido;
+6. prova de ausência de notificação e mutação externa;
+7. evidência imutável do smoke;
+8. reconciliação do endpoint público, Handoff e SHA publicado.

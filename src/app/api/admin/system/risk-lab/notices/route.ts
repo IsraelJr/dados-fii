@@ -4,6 +4,7 @@ import { calculateDividendSeriesReadiness } from "@/lib/risk-lab/DividendSeriesR
 import { FnetDividendNoticeImportService } from "@/lib/risk-lab/FnetDividendNoticeImportService";
 import { fnetNoticeCandidateStore } from "@/lib/risk-lab/FnetNoticeCandidateStore";
 import { verifiedDividendNoticeStore } from "@/lib/risk-lab/VerifiedDividendNoticeStore";
+import { pseudonymousLogId, safeLog } from "@/lib/observability/SafeLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,8 +33,12 @@ export async function GET(request: NextRequest) {
     return adminJson({ ok: true, enabled: enabled(), candidates, series });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao carregar candidatos FNET.";
-    console.error("Risk Lab FNET list error", { actor: authorization.identity.email, message });
-    return adminJson({ ok: false, error: message }, 500);
+    safeLog("error", "risk-lab.fnet.list.failed", {
+      actorId: pseudonymousLogId(authorization.identity.uid),
+      correlationId: request.headers.get("x-correlation-id"),
+      message,
+    });
+    return adminJson({ ok: false, error: "Falha ao carregar os avisos regulatórios." }, 500);
   }
 }
 
@@ -44,20 +49,12 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const action = String(body?.action || "").trim().toLowerCase();
-  const actor = authorization.identity.email;
+  const actor = `admin:${authorization.identity.uid}`;
 
   try {
     if (action === "import") {
       const result = await service.importByDocumentId(String(body?.documentId || ""), actor);
       return adminJson({ ok: true, result });
-    }
-
-    if (action === "approve") {
-      if (body?.confirmed !== true) {
-        return adminJson({ ok: false, error: "A aprovação exige confirmação explícita da revisão humana." }, 400);
-      }
-      const candidate = await service.approve(String(body?.candidateId || ""), actor);
-      return adminJson({ ok: true, candidate });
     }
 
     if (action === "reject") {
@@ -69,10 +66,15 @@ export async function POST(request: NextRequest) {
       return adminJson({ ok: true, candidate });
     }
 
-    return adminJson({ ok: false, error: "Ação inválida. Use import, approve ou reject." }, 400);
+    return adminJson({ ok: false, error: "Ação inválida. Use import ou reject." }, 400);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida no fluxo FNET.";
-    console.error("Risk Lab FNET write error", { action, actor, message });
+    safeLog("error", "risk-lab.fnet.write.failed", {
+      action,
+      actorId: pseudonymousLogId(authorization.identity.uid),
+      correlationId: request.headers.get("x-correlation-id"),
+      message,
+    });
     const status = /desabilitada/i.test(message)
       ? 503
       : /já revisado|não encontrado|conflito/i.test(message)

@@ -1,15 +1,16 @@
 import type { MetadataRoute } from "next";
-import { adminDb } from "@/lib/firebaseAdmin";
+import { safeLog } from "@/lib/observability/SafeLogger";
+import { regulatoryDataService } from "@/lib/regulatoryDataService";
 
 export const runtime = "nodejs";
-export const revalidate = 86400;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const SITE_URL = "https://dadosfii.com.br";
 const now = new Date();
 
 const STATIC_ROUTES = [
   { path: "", changeFrequency: "daily" as const, priority: 1 },
-  { path: "/carteira", changeFrequency: "weekly" as const, priority: 0.8 },
   { path: "/calendario-dividendos-fiis", changeFrequency: "daily" as const, priority: 0.8 },
   { path: "/educacao", changeFrequency: "weekly" as const, priority: 0.75 },
   { path: "/glossario", changeFrequency: "weekly" as const, priority: 0.75 },
@@ -19,25 +20,6 @@ const STATIC_ROUTES = [
   { path: "/politica-de-privacidade", changeFrequency: "monthly" as const, priority: 0.4 },
 ];
 
-const FALLBACK_TICKERS = [
-  "TGAR11",
-  "VGIA11",
-  "MXRF11",
-  "VISC11",
-  "BODB11",
-  "BTLG11",
-  "HGLG11",
-  "KNRI11",
-  "XPLG11",
-  "XPML11",
-  "HGRU11",
-  "RBRR11",
-  "KNSC11",
-  "CPTS11",
-  "KNCR11",
-  "VGHF11",
-];
-
 function normalizeTicker(value: unknown) {
   const ticker = String(value || "").trim().toUpperCase();
   return /^[A-Z0-9]{4,8}$/.test(ticker) ? ticker : "";
@@ -45,15 +27,20 @@ function normalizeTicker(value: unknown) {
 
 async function getFiiTickers() {
   try {
-    const snapshot = await adminDb.collection("Fiis").limit(5000).get();
-    const tickers = snapshot.docs
-      .map((doc) => normalizeTicker(doc.data()?.code || doc.id))
+    const directory = await regulatoryDataService.getFundDirectory();
+    if (!directory?.items?.length) {
+      throw new Error("Diretório regulatório materializado ausente ou vazio.");
+    }
+    const tickers = directory.items
+      .filter((item) => item.status === "active")
+      .map((item) => normalizeTicker(item.ticker))
       .filter(Boolean);
-
-    return Array.from(new Set(tickers)).sort((a, b) => a.localeCompare(b));
-  } catch (err) {
-    console.error("Erro ao gerar sitemap dinamico de FIIs:", err);
-    return FALLBACK_TICKERS;
+    const unique = Array.from(new Set(tickers)).sort((a, b) => a.localeCompare(b));
+    if (!unique.length) throw new Error("Diretório regulatório não contém tickers ativos válidos.");
+    return unique;
+  } catch (error) {
+    safeLog("error", "seo.sitemap.directory.failed", { error });
+    throw new Error("Não foi possível gerar o sitemap dinâmico a partir do diretório regulatório.");
   }
 }
 

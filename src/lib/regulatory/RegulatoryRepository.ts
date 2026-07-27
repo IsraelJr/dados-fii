@@ -28,6 +28,8 @@ import type {
   FundCatalogRun,
 } from "@/types/fund-catalog";
 import type { Phase2ClosureState } from "@/types/phase2-closure";
+import type { PremiumPeerSnapshot } from "@/types/premium-peer-snapshot";
+import type { PremiumProductionSmokeEvidence } from "@/types/premium-production-smoke";
 
 type AuditAction = "publish" | "rollback" | "validation" | "monitor" | "index-sync" | "catalog-preview" | "catalog-apply" | "catalog-audit" | "phase2-closure" | "premium-read";
 
@@ -52,6 +54,55 @@ function assertApproval(authorization: PublicationAuthorization | RollbackAuthor
 }
 
 export class RegulatoryRepository {
+  async getPremiumPeerSnapshot(): Promise<PremiumPeerSnapshot | null> {
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.premiumPeerSnapshots).doc("current").get();
+    return snapshot.exists ? snapshot.data() as PremiumPeerSnapshot : null;
+  }
+
+  async savePremiumPeerSnapshot(snapshot: PremiumPeerSnapshot, actor: string) {
+    if (!actor.trim()) throw new Error("Ator do snapshot Premium obrigatório.");
+    const size = Buffer.byteLength(JSON.stringify(snapshot), "utf8");
+    if (size > 900_000) throw new Error("Snapshot de pares Premium excedeu o limite operacional seguro.");
+    await adminDb.collection(REGULATORY_COLLECTIONS.premiumPeerSnapshots).doc("current").set({
+      ...snapshot,
+      updatedAt: adminFieldValue.serverTimestamp(),
+      updatedBy: actor,
+    }, { merge: false });
+    return { ...snapshot, sizeBytes: size };
+  }
+
+  async getAuditEventById(eventId: string): Promise<RegulatoryAuditEvent | null> {
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(eventId)) return null;
+    const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc(eventId).get();
+    if (!snapshot.exists) return null;
+    const data = snapshot.data() as Record<string, unknown>;
+    return {
+      id: snapshot.id,
+      action: String(data.action || "unknown"),
+      actor: data.actor ? String(data.actor) : null,
+      ticker: data.ticker ? String(data.ticker) : null,
+      createdAt: toIso(data.createdAt) || toIso(data.createdAtIso),
+      metadata: data.metadata && typeof data.metadata === "object" ? data.metadata as Record<string, unknown> : {},
+    };
+  }
+
+  async savePremiumProductionSmoke(evidence: PremiumProductionSmokeEvidence) {
+    if (!/^[a-f0-9]{40}$/.test(evidence.releaseCommit)) throw new Error("Release da evidência Premium inválido.");
+    const reference = adminDb.collection(REGULATORY_COLLECTIONS.premiumProductionSmokeRuns).doc(evidence.releaseCommit);
+    return adminDb.runTransaction(async (transaction) => {
+      const current = await transaction.get(reference);
+      if (current.exists) {
+        const persisted = current.data() as PremiumProductionSmokeEvidence;
+        if (persisted.status === "passed") return persisted;
+      }
+      transaction.set(reference, {
+        ...evidence,
+        persistedAt: adminFieldValue.serverTimestamp(),
+      }, { merge: false });
+      return evidence;
+    });
+  }
+
   async getLegacyByTicker(ticker: string): Promise<LegacyFundRecord | null> {
     const direct = await adminDb.collection(REGULATORY_COLLECTIONS.legacyFunds).doc(ticker).get();
     if (direct.exists) return { id: direct.id, data: direct.data() as Record<string, unknown> };
@@ -701,14 +752,17 @@ export class RegulatoryRepository {
 
   async recordAuditEvent(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>) {
     if (!String(actor || "").trim()) throw new Error("Ator de auditoria obrigatório.");
-    await adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc().set(
-      this.auditPayload(action, actor, ticker, safeFirestoreDocument(metadata || {})),
+    const reference = adminDb.collection(REGULATORY_COLLECTIONS.auditLogs).doc();
+    const createdAt = nowIso();
+    await reference.set(
+      this.auditPayload(action, actor, ticker, safeFirestoreDocument(metadata || {}), createdAt),
       { merge: false },
     );
+    return { eventId: reference.id, action, createdAt };
   }
 
-  private auditPayload(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>) {
-    return { action, actor, ticker: ticker || null, metadata: metadata || {}, createdAt: adminFieldValue.serverTimestamp(), createdAtIso: nowIso() };
+  private auditPayload(action: AuditAction, actor: string, ticker?: string, metadata?: Record<string, unknown>, createdAtIso = nowIso()) {
+    return { action, actor, ticker: ticker || null, metadata: metadata || {}, createdAt: adminFieldValue.serverTimestamp(), createdAtIso };
   }
 }
 

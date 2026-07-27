@@ -30,6 +30,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
       },
     });
   } catch (error) {
-    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Erro ao carregar a timeline regulatória." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Erro ao carregar a timeline regulatória." }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@ import test from "node:test";
 
 const engine = readFileSync(new URL("../src/lib/portfolioNotificationEngine.ts", import.meta.url), "utf8");
 const preferencesRoute = readFileSync(new URL("../src/app/api/wallet/notification-preferences/route.ts", import.meta.url), "utf8");
+const preferencesController = readFileSync(new URL("../src/server/controllers/WalletNotificationPreferencesController.ts", import.meta.url), "utf8");
 const preferencesUi = readFileSync(new URL("../src/app/components/PortfolioNotificationPreferences.tsx", import.meta.url), "utf8");
 
 test("portfolio notifications consolidate every event from one run into one email", () => {
@@ -35,10 +36,11 @@ test("unchanged dividends suppress scheduled summaries and patrimony uses a stab
 });
 
 test("paid patrimony threshold is authenticated, resolved on the server and configurable in the wallet", () => {
-  assert.match(preferencesRoute, /WalletSessions/);
-  assert.match(preferencesRoute, /paidPlanFromRecord\(user\.data\)/);
-  assert.match(preferencesRoute, /notificationPreferences\.patrimonyChangeThresholdPercent/);
-  assert.doesNotMatch(preferencesRoute, /body\?\.(?:isPaid|isPremium|isVip)/);
+  const implementation = `${preferencesRoute}\n${preferencesController}`;
+  assert.match(implementation, /WalletSessions/);
+  assert.match(implementation, /paidPlanFromRecord\(user\.data\)/);
+  assert.match(implementation, /notificationPreferences\.patrimonyChangeThresholdPercent/);
+  assert.doesNotMatch(implementation, /body\?\.(?:isPaid|isPremium|isVip)/);
   assert.match(preferencesUi, /Variação patrimonial para notificar/);
   assert.match(preferencesUi, /plano Grátis/i);
 });

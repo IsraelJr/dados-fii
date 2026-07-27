@@ -1,12 +1,19 @@
 import type { PremiumAIInsights } from "../../types/ai-insights";
 import type { PremiumFundReport, PremiumManagerMode, PremiumPortfolioImpact, PremiumPortfolioProjection, PremiumRecommendation, PremiumRiskLabReadOnly, PremiumScenario, PremiumStressCase } from "../../types/premium-report";
 import type { PublicFundData } from "../../types/regulatory";
+import {
+  PREMIUM_PEER_SCORE_KEYS,
+  type PremiumPeerAggregate,
+  type PremiumPeerSnapshot,
+} from "@/types/premium-peer-snapshot";
+import { buildPremiumPeerSnapshot } from "@/lib/reports/PremiumPeerSnapshot";
 import type { FreeFundReport } from "../../types/reports";
 import type { FundScores } from "../../types/scores";
 
 export const PREMIUM_REPORT_VERSION = "2.0.0";
 
-export type PremiumReportDraft = Omit<PremiumFundReport, "aiAnalysis">;
+export type PremiumReportDraft = Omit<PremiumFundReport, "aiAnalysis" | "auditReceipt">;
+export type PremiumReportWithoutReceipt = Omit<PremiumFundReport, "auditReceipt">;
 
 export type PremiumPortfolioHolding = {
   ticker: string;
@@ -122,40 +129,48 @@ function emptyScores() {
   return Object.fromEntries(SCORE_KEYS.map((key) => [key, null])) as Record<ScoreKey, number | null>;
 }
 
-function comparablePeers(report: FreeFundReport, funds: PublicFundData[]) {
-  const segment = String(report.identity.segment || "").trim().toLowerCase();
-  const sameSegment = funds.filter((fund) => fund.ticker !== report.ticker
-    && fund.fundKind === report.identity.fundKind
-    && String(fund.segment_new || fund.segment || fund.segmento || "").trim().toLowerCase() === segment
-    && (fund.scores?.premium.confidence || 0) >= 25);
-  const sameKind = funds.filter((fund) => fund.ticker !== report.ticker && fund.fundKind === report.identity.fundKind && (fund.scores?.premium.confidence || 0) >= 25);
-  return (sameSegment.length >= 3 ? sameSegment : sameKind).slice(0, 100);
+function normalizeGroupValue(value: unknown) {
+  return String(value || "").trim().toLowerCase();
 }
 
-function comparative(report: FreeFundReport, funds: PublicFundData[]) {
-  const peers = comparablePeers(report, funds);
+function selectPeerAggregate(report: FreeFundReport, snapshot: PremiumPeerSnapshot): PremiumPeerAggregate | null {
+  const kind = report.identity.fundKind;
+  const segment = normalizeGroupValue(report.identity.segment);
+  const segmentGroup = segment
+    ? snapshot.groups.find((group) => group.fundKind === kind && group.segment === segment)
+    : null;
+  const targetInSegment = segmentGroup?.premiumScores.some((item) => item.ticker === report.ticker) ? 1 : 0;
+  if (segmentGroup && segmentGroup.memberCount - targetInSegment >= 3) return segmentGroup;
+  return snapshot.kindGroups.find((group) => group.fundKind === kind) || null;
+}
+
+function comparative(report: FreeFundReport, snapshot: PremiumPeerSnapshot) {
+  const aggregate = selectPeerAggregate(report, snapshot);
   const current = emptyScores();
   const peerAverage = emptyScores();
-  for (const key of SCORE_KEYS) {
+  const premiumPeers = aggregate?.premiumScores.filter((item) => item.ticker !== report.ticker).slice(0, 500) || [];
+  const targetInGroup = aggregate?.premiumScores.some((item) => item.ticker === report.ticker) || false;
+  for (const key of PREMIUM_PEER_SCORE_KEYS) {
     const currentScore = report.scores?.[key];
     const minimumConfidence = key === "premium" ? 25 : 35;
     current[key] = currentScore && currentScore.confidence >= minimumConfidence ? currentScore.score : null;
-    const values = peers.map((peer) => peer.scores?.[key])
-      .filter((score) => score && score.confidence >= minimumConfidence)
-      .map((score) => score!.score);
-    peerAverage[key] = values.length ? round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+    const stats = aggregate?.scoreStats[key];
+    const subtractCurrent = targetInGroup && currentScore && currentScore.confidence >= minimumConfidence;
+    const count = Math.max(0, (stats?.count || 0) - (subtractCurrent ? 1 : 0));
+    const sum = (stats?.sum || 0) - (subtractCurrent ? currentScore.score : 0);
+    peerAverage[key] = count ? round(sum / count) : null;
   }
   const currentPremium = current.premium;
-  const sampleReliable = currentPremium !== null && peers.length >= 5;
+  const sampleReliable = currentPremium !== null && premiumPeers.length >= 5;
   const percentile = !sampleReliable
     ? null
-    : Math.round((peers.filter((peer) => (peer.scores?.premium.score ?? -1) <= currentPremium).length / peers.length) * 100);
+    : Math.round((premiumPeers.filter((peer) => peer.score <= currentPremium).length / premiumPeers.length) * 100);
   const explanation = percentile === null
-    ? `Foram encontrados ${peers.length} fundo(s) comparável(is) com confiança suficiente. São necessários pelo menos 5 para uma leitura responsável do percentil.`
-    : `Percentil ${percentile}% significa que a nota composta ficou igual ou acima de ${percentile}% dos ${peers.length} pares analisados. Não mede rentabilidade futura nem garante que o fundo seja melhor investimento.`;
+    ? `Foram encontrados ${premiumPeers.length} fundo(s) comparável(is) com confiança suficiente. São necessários pelo menos 5 para uma leitura responsável do percentil.`
+    : `Percentil ${percentile}% significa que a nota composta ficou igual ou acima de ${percentile}% dos ${premiumPeers.length} pares analisados. Não mede rentabilidade futura nem garante que o fundo seja melhor investimento.`;
   return {
-    peerGroup: peers.length && report.identity.segment ? `${report.identity.fundKind} · ${report.identity.segment}` : report.identity.fundKind,
-    peerCount: peers.length,
+    peerGroup: aggregate?.segment ? `${report.identity.fundKind} · ${report.identity.segment}` : report.identity.fundKind,
+    peerCount: premiumPeers.length,
     percentile,
     sampleReliable,
     explanation,
@@ -256,6 +271,9 @@ function unavailableRiskLab(): PremiumRiskLabReadOnly {
     datasetHash: "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae",
     evidenceHash: "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81",
     availability: "disabled",
+    applicabilityCategory: "unknown",
+    categoryPolicyVersion: "risk-lab-category-policy-v1",
+    categoryCalibrated: false,
     groundTruthStatus: null,
     outcome: null,
     status: null,
@@ -350,15 +368,23 @@ function managerMode(
 export class PremiumReportEngine {
   prepare(
     freeReport: FreeFundReport,
-    peers: PublicFundData[],
+    peers: PremiumPeerSnapshot | PublicFundData[],
     generatedAt = new Date().toISOString(),
     holdings: PremiumPortfolioHolding[] = [],
     riskLab: PremiumRiskLabReadOnly = unavailableRiskLab(),
   ): PremiumReportDraft {
+    const peerSnapshot = Array.isArray(peers)
+      ? buildPremiumPeerSnapshot(peers.map((fund) => ({
+          ticker: fund.ticker,
+          fundKind: fund.fundKind,
+          segment: String(fund.segment_new || fund.segment || fund.segmento || "").trim() || null,
+          scores: fund.scores,
+        })), generatedAt)
+      : peers;
     const valuationResult = valuation(freeReport);
     const stressCases = stressTest(freeReport);
     const scenarioCases = scenarios(freeReport);
-    const comparativeResult = comparative(freeReport, peers);
+    const comparativeResult = comparative(freeReport, peerSnapshot);
     const portfolioResult = portfolioImpact(freeReport, holdings, stressCases, scenarioCases);
     return {
       reportVersion: PREMIUM_REPORT_VERSION,
@@ -389,11 +415,11 @@ export class PremiumReportEngine {
     };
   }
 
-  complete(draft: PremiumReportDraft, aiAnalysis: PremiumAIInsights): PremiumFundReport {
+  complete(draft: PremiumReportDraft, aiAnalysis: PremiumAIInsights): PremiumReportWithoutReceipt {
     return { ...draft, aiAnalysis };
   }
 
-  generate(freeReport: FreeFundReport, peers: PublicFundData[], aiAnalysis: PremiumAIInsights, generatedAt = new Date().toISOString(), holdings: PremiumPortfolioHolding[] = []): PremiumFundReport {
+  generate(freeReport: FreeFundReport, peers: PremiumPeerSnapshot | PublicFundData[], aiAnalysis: PremiumAIInsights, generatedAt = new Date().toISOString(), holdings: PremiumPortfolioHolding[] = []): PremiumReportWithoutReceipt {
     return this.complete(this.prepare(freeReport, peers, generatedAt, holdings), aiAnalysis);
   }
 }

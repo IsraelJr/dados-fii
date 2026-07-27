@@ -11,6 +11,10 @@ on:
       - "scripts/**"
       - "package.json"
       - "package-lock.json"
+      - "playwright.config.ts"
+      - "firebase.json"
+      - "firestore.rules"
+      - "firestore.indexes.json"
       - "vercel.json"
       - ".github/workflows/**"
       - "DADOS_FII_HANDOFF.md"
@@ -19,17 +23,6 @@ on:
       - "docs/engineering/github-actions-*.md"
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/**"
-      - "package.json"
-      - "package-lock.json"
-      - "vercel.json"
-      - "DADOS_FII_HANDOFF.md"
-      - "docs/strategy/**"
-      - "docs/sources/premium-prompt/**"
-      - "tests/github-actions-governance.test.mjs"
-      - "tests/canonical-handoff.test.mjs"
-      - "docs/engineering/github-actions-*.md"
 
 permissions:
   contents: read
@@ -41,7 +34,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30 # governance-exception: clean install, Emulator, build and E2E
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,10 +54,87 @@ jobs:
       - name: Validate canonical Handoff
         run: npm run test:handoff
 
+      - name: Audit production dependencies
+        run: npm run audit:production
+
+      - name: Detect committed secrets
+        run: npm run security:secrets
+
+      - name: Lint
+        run: npm run lint
+
       - name: Typecheck
-        if: github.event_name == 'pull_request'
         run: npm run typecheck
 
-      - name: Sprint 2 regression suite
-        if: github.event_name == 'pull_request'
-        run: npm run test:sprint2
+      - name: Complete unit, integration and contract suite
+        run: npm run test:all
+
+      - name: Firestore rules integration tests
+        run: npm run test:rules
+
+      - name: Critical financial coverage
+        run: npm run test:coverage:critical
+
+      - name: Mutation sanity
+        run: npm run test:mutation
+
+      - name: Prepare build-only Firebase credentials
+        shell: bash
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const { generateKeyPairSync } = require("node:crypto");
+          const { appendFileSync } = require("node:fs");
+          const { privateKey } = generateKeyPairSync("rsa", {
+            modulusLength: 2048,
+            privateKeyEncoding: { type: "pkcs8", format: "pem" },
+            publicKeyEncoding: { type: "spki", format: "pem" },
+          });
+          const serviceAccount = {
+            type: "service_account",
+            project_id: "dados-fii-build",
+            private_key_id: "build-only",
+            private_key: privateKey,
+            client_email: "build-only@dados-fii-build.iam.gserviceaccount.com",
+            client_id: "000000000000000000000",
+            auth_uri: "https://accounts.google.com/o/oauth2/auth",
+            token_uri: "https://oauth2.googleapis.com/token",
+            auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+            client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/build-only%40dados-fii-build.iam.gserviceaccount.com",
+          };
+          appendFileSync(
+            process.env.GITHUB_ENV,
+            `FIREBASE_SERVICE_ACCOUNT_KEY<<FIREBASE_BUILD_EOF\n${JSON.stringify(serviceAccount)}\nFIREBASE_BUILD_EOF\n`,
+          );
+          NODE
+
+      - name: Production build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dados-fii-build.firebaseapp.com"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dados-fii-build"
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "dados-fii-build.appspot.com"
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
+          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-0000000000"
+        run: npm run build
+
+      - name: Real HTTP contract smoke
+        run: npm run test:http
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Critical end-to-end journeys
+        run: npm run test:e2e
+
+      - name: Upload E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corrective-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+          if-no-files-found: ignore

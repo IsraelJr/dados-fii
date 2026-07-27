@@ -18,6 +18,8 @@ export const REGULATORY_COLLECTIONS = {
   catalogAudits: "RegulatoryCatalogAudits",
   catalogDirectory: "RegulatoryCatalogDirectory",
   phase2ClosureRuns: "RegulatoryPhase2ClosureRuns",
+  premiumPeerSnapshots: "RegulatoryPremiumPeerSnapshots",
+  premiumProductionSmokeRuns: "PremiumProductionSmokeRuns",
 } as const;
 
 export type LegacyFundRecord = {

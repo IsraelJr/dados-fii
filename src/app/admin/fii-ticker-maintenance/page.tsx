@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 export default function FiiTickerMaintenancePage() {
-    const [secret, setSecret] = useState("");
     const [ticker, setTicker] = useState("TGAR11");
     const [year, setYear] = useState("2026");
     const [loading, setLoading] = useState(false);
@@ -16,12 +15,8 @@ export default function FiiTickerMaintenancePage() {
         try {
             const res = await fetch("/api/admin/fii-maintenance", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-admin-secret": secret,
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    secret,
                     ticker: ticker.trim().toUpperCase(),
                     action: "both",
                     year: Number(year),
@@ -46,16 +41,6 @@ export default function FiiTickerMaintenancePage() {
             </p>
 
             <div className="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
-                <label className="block">
-                    <span className="text-sm font-semibold">Senha ADMIN_UPDATE_SECRET</span>
-                    <input
-                        type="password"
-                        value={secret}
-                        onChange={(e) => setSecret(e.target.value)}
-                        className="mt-1 w-full rounded-lg border p-2"
-                    />
-                </label>
-
                 <label className="block">
                     <span className="text-sm font-semibold">Ticker</span>
                     <input

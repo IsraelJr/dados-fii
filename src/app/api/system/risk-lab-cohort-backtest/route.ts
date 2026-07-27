@@ -2,15 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   RISK_LAB_COHORT_BACKTEST_RUN_ID,
 } from "@/lib/risk-lab/RiskLabCohortBacktestV2Service";
-import { riskLabCohortIdentityService } from "@/lib/risk-lab/RiskLabCohortIdentityService";
-import {
-  SEGMENTED_COHORT_TICKERS,
-  segmentedRiskLabCohortBacktestService,
-} from "@/lib/risk-lab/SegmentedRiskLabCohortBacktestService";
+import { decidePublicEvidenceStatus } from "@/lib/risk-lab/PublicRiskLabEvidenceContract";
+import { segmentedRiskLabCohortBacktestService } from "@/lib/risk-lab/SegmentedRiskLabCohortBacktestService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 30;
 
 function response(payload: unknown, status = 200) {
   return NextResponse.json(payload, {
@@ -24,96 +21,68 @@ function response(payload: unknown, status = 200) {
   });
 }
 
-function executionParameters(request: NextRequest) {
-  return {
-    source: request.nextUrl.searchParams.get("source"),
-    runId: request.nextUrl.searchParams.get("runId"),
-    release: request.nextUrl.searchParams.get("release"),
-    action: request.nextUrl.searchParams.get("action"),
-    ticker: request.nextUrl.searchParams.get("ticker")?.toUpperCase() || null,
-  };
-}
-
-function authorizedExecution(request: NextRequest) {
-  const parameters = executionParameters(request);
-  const deployedRelease = process.env.VERCEL_GIT_COMMIT_SHA || "";
-  return {
-    parameters,
-    authorized: process.env.VERCEL_ENV === "production"
-      && parameters.source === "github-actions"
-      && parameters.runId === RISK_LAB_COHORT_BACKTEST_RUN_ID
-      && /^[a-f0-9]{40}$/.test(parameters.release || "")
-      && parameters.release === deployedRelease,
-  };
+function deployedRelease() {
+  const release = process.env.VERCEL_GIT_COMMIT_SHA || "";
+  return /^[a-f0-9]{40}$/.test(release) ? release : null;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const execution = authorizedExecution(request);
-    const attemptedExecution = Boolean(execution.parameters.source || execution.parameters.action || execution.parameters.release);
-    if (attemptedExecution && !execution.authorized) {
-      return response({ ok: false, sprint: "3.5", status: "release-mismatch" }, 409);
-    }
-
-    if (execution.authorized) {
-      const { action, ticker } = execution.parameters;
-      if (action === "identities") {
-        const identities = await riskLabCohortIdentityService.list();
-        return response({
-          ok: true,
-          sprint: "3.5",
-          status: "ready",
-          releaseCommit: process.env.VERCEL_GIT_COMMIT_SHA,
-          identities,
-        });
-      }
-      if (action === "initialize") {
-        const evidence = await segmentedRiskLabCohortBacktestService.initialize();
-        return response({ ok: true, sprint: "3.5", status: evidence.status, evidence });
-      }
-      if (action === "case") {
-        if (!ticker || !SEGMENTED_COHORT_TICKERS.includes(ticker)) {
-          return response({ ok: false, sprint: "3.5", status: "invalid-ticker" }, 400);
-        }
-        const evidence = await segmentedRiskLabCohortBacktestService.runTicker(ticker);
-        const caseResult = evidence.cases.find((item) => item.ticker === ticker) || null;
-        return response({
-          ok: Boolean(caseResult),
-          sprint: "3.5",
-          status: evidence.status,
-          ticker,
-          case: caseResult,
-          persistedCases: evidence.cases.length,
-          evidence,
-        });
-      }
-      if (action === "finalize") {
-        const evidence = await segmentedRiskLabCohortBacktestService.finalize();
-        return response({
-          ok: evidence.status === "passed",
-          sprint: "3.5",
-          status: evidence.status,
-          evidence,
-        });
-      }
-      return response({ ok: false, sprint: "3.5", status: "invalid-action" }, 400);
+    const forbiddenMutation = ["source", "runId", "action", "ticker"]
+      .some((parameter) => request.nextUrl.searchParams.has(parameter));
+    if (forbiddenMutation) {
+      return response({
+        ok: false,
+        sprint: "3.5",
+        status: "read-only",
+        error: "Este endpoint publica evidências e não executa operações.",
+      }, 405);
     }
 
     const evidence = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
-    return response({
-      ok: evidence?.status === "passed",
-      sprint: "3.5",
-      status: evidence?.status || "pending",
+    if (!evidence) {
+      return response({ ok: false, sprint: "3.5", status: "not-found", evidence: null }, 404);
+    }
+
+    const activeRelease = deployedRelease();
+    const decision = decidePublicEvidenceStatus(
       evidence,
-    });
+      activeRelease,
+      RISK_LAB_COHORT_BACKTEST_RUN_ID,
+      request.nextUrl.searchParams.get("release"),
+    );
+    if (decision.status === "release-mismatch") {
+      return response({
+        ok: false,
+        sprint: "3.5",
+        status: "release-mismatch",
+        releaseCommit: evidence.releaseCommit,
+        activeRelease,
+        evidence,
+      }, 409);
+    }
+    if (decision.status === "superseded") {
+      return response({
+        ok: false,
+        sprint: "3.5",
+        status: "superseded",
+        evidence,
+      }, 409);
+    }
+    return response({
+      ok: decision.ok,
+      sprint: "3.5",
+      status: decision.status,
+      evidence,
+    }, decision.statusCode);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown";
-    console.error("Risk Lab segmented cohort error", message);
+    const message = error instanceof Error ? error.message : "Falha desconhecida.";
+    console.error("Risk Lab public evidence unavailable", { message });
     return response({
       ok: false,
       sprint: "3.5",
-      status: /execução|inicializado|inicializada/i.test(message) ? "busy" : "unavailable",
-      error: message.slice(0, 300),
-    }, /execução|inicializado|inicializada/i.test(message) ? 409 : 503);
+      status: "unavailable",
+      error: "Evidência temporariamente indisponível.",
+    }, 503);
   }
 }

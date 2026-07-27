@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dados FII
 
-## Getting Started
+Aplicação Next.js/TypeScript para dados regulatórios de FIIs, FIAGROs e FI-Infra, carteira, relatórios e Risk Lab.
 
-First, run the development server:
+O estado oficial, a ordem das Sprints e os gates de conclusão ficam em `DADOS_FII_HANDOFF.md`.
+
+## Requisitos
+
+- Node.js 22;
+- npm com lockfile;
+- Java compatível com o Firestore Emulator;
+- variáveis conforme `.env.example`.
+
+Nunca copie credenciais reais para arquivo versionado. Variáveis `NEXT_PUBLIC_*` não podem conceder plano, perfil administrativo ou qualquer privilégio.
+
+## Desenvolvimento
 
 ```bash
+npm ci
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+A aplicação local responde em `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Gates obrigatórios
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run audit:production
+npm run security:secrets
+npm run lint
+npm run typecheck
+npm run test:all
+npm run test:rules
+npm run test:coverage:critical
+npm run build
+npm run test:http
+npm run test:e2e
+```
 
-## Learn More
+`npm run verify` executa os gates sem browser. O E2E permanece separado porque exige Chromium instalado com `npx playwright install chromium`.
 
-To learn more about Next.js, take a look at the following resources:
+O CI executa instalação limpa, audit, detecção de segredos, lint, typecheck, testes, Firestore Emulator, cobertura crítica, build, smoke HTTP e Playwright desktop/mobile. Nenhum deploy corretivo é aceito sem todos os checks.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Arquitetura
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Fluxo obrigatório:
 
-## Deploy on Vercel
+```text
+Route Handler
+  → autenticação e schema HTTP
+  → controller/application service
+  → engine/RegulatoryDataService
+  → repository
+  → Firestore ou provedor externo
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Route Handlers não acessam Firestore;
+- UI não contém regra financeira;
+- repositories não conhecem UI ou `NextResponse`;
+- dados ausentes não viram zero;
+- Risk Lab é read-only no Premium;
+- correções devem ser gerais, sem exceção por ticker.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Produção
+
+O Vercel publica `main`. Após o deployment, o workflow `Production Premium Smoke` usa OIDC efêmero vinculado ao repositório, workflow, branch e SHA para gerar um relatório controlado, reler o evento `premium-read` e registrar evidência imutável.
+
+Um deployment verde ou o health check de flags, isoladamente, não conclui a Sprint.

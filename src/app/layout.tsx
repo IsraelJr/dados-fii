@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   creator: "Dados FII",
   publisher: "Dados FII",
   alternates: {
-    canonical: "/",
+    canonical: "./",
   },
   openGraph: {
     type: "website",

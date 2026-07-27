@@ -30,7 +30,10 @@ function numberValue(value: unknown): number | null {
 
 function firstNumber(data: NumericRecord, keys: string[]) {
   for (const key of keys) {
-    const value = numberValue(data[key]);
+    const value = numberValue(key.split(".").reduce<unknown>((current, part) => {
+      if (!current || typeof current !== "object" || Array.isArray(current)) return undefined;
+      return (current as NumericRecord)[part];
+    }, data));
     if (value !== null) return value;
   }
   return null;
@@ -108,7 +111,7 @@ function riskScore(data: NumericRecord): ScoreResult {
 }
 
 function dividendScore(data: NumericRecord): ScoreResult {
-  const dy = firstNumber(data, ["dividendYield12m", "dy12m", "dividendYield", "dy"]);
+  const dy = firstNumber(data, ["canonicalDividendMetrics.dy12mCurrentPrice.value"]);
   const history = annualDividends(data);
   const last = history.at(-1) || null;
   const previous = history.at(-2) || null;
@@ -191,6 +194,9 @@ function liquidityScore(data: NumericRecord): ScoreResult {
 }
 
 function qualityScore(data: NumericRecord): ScoreResult {
+  const assessmentStatus = data.regulatoryMeta && typeof data.regulatoryMeta === "object"
+    ? String((((data.regulatoryMeta as NumericRecord).validation as NumericRecord | undefined)?.assessment as NumericRecord | undefined)?.status || "")
+    : "";
   const checks = {
     name: Boolean(firstValue(data, ["name", "fundName", "fantasyName", "nome"])),
     cnpj: Boolean(firstValue(data, ["cnpj", "CNPJ"])),
@@ -202,7 +208,17 @@ function qualityScore(data: NumericRecord): ScoreResult {
     earnings: annualDividends(data).length > 0,
   };
   const complete = Object.values(checks).filter(Boolean).length;
-  const score = complete / Object.keys(checks).length * 100;
+  const rawScore = complete / Object.keys(checks).length * 100;
+  const statusCeiling = assessmentStatus === "valid"
+    ? 100
+    : assessmentStatus === "partial"
+      ? 70
+      : assessmentStatus === "stale"
+        ? 55
+        : assessmentStatus === "invalid" || assessmentStatus === "unavailable"
+          ? 25
+          : 80;
+  const score = Math.min(rawScore, statusCeiling);
   return result(score, complete, Object.keys(checks).length, [
     `${complete} de ${Object.keys(checks).length} grupos essenciais de dados estão preenchidos.`,
     checks.cnpj && checks.name ? "Identificação cadastral disponível." : "Identificação cadastral incompleta.",

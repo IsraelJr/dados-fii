@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: risk-lab-backtest-kickoff-${{ inputs.release_sha }}
@@ -22,7 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      RUN_ID: risk-lab-3-5-20260720-v2
       PRODUCTION_ORIGIN: https://dadosfii.com.br
       RELEASE_COMMIT: ${{ inputs.release_sha }}
     steps:
@@ -35,14 +35,30 @@ jobs:
             exit 1
           fi
 
+      - name: Obtain scoped GitHub OIDC token
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken("dados-fii-risk-lab-operation");
+            core.setSecret(token);
+            core.setOutput("token", token);
+
       - name: Initialize exactly one persisted attempt
         id: initialize
         shell: bash
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
-          endpoint="${PRODUCTION_ORIGIN}/api/system/risk-lab-cohort-backtest?source=github-actions&runId=${RUN_ID}&release=${RELEASE_COMMIT}&action=initialize"
+          test -n "$OIDC_TOKEN"
+          endpoint="${PRODUCTION_ORIGIN}/api/admin/system/risk-lab/cohort-backtest"
           http_code=$(curl --silent --show-error --location --max-time 75 \
             --output risk-lab-cohort-initialize.json --write-out "%{http_code}" \
+            --request POST \
+            --header "Authorization: Bearer ${OIDC_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data '{"action":"initialize"}' \
             "$endpoint")
 
           if [[ "$http_code" != "200" ]]; then
@@ -51,9 +67,9 @@ jobs:
             exit 1
           fi
 
-          jq -e --arg release "$RELEASE_COMMIT" --arg runId "$RUN_ID" '
+          jq -e --arg release "$RELEASE_COMMIT" '
             .evidence.releaseCommit == $release
-            and .evidence.runId == $runId
+            and .evidence.runId == "risk-lab-3-5-20260720-v2"
             and (.evidence.status == "running" or .evidence.status == "passed" or .evidence.status == "failed")
           ' risk-lab-cohort-initialize.json >/dev/null
 
@@ -63,7 +79,7 @@ jobs:
           {
             echo "## Sprint 3.5 — tentativa iniciada"
             echo "- Release: \`${RELEASE_COMMIT}\`"
-            echo "- Run ID: \`${RUN_ID}\`"
+            echo "- Run ID: \`risk-lab-3-5-20260720-v2\`"
             echo "- Attempt ID: \`${attempt_id}\`"
             echo "- Status: \`${status}\`"
             echo "- Casos já persistidos: \`${persisted}/6\`"

@@ -13,7 +13,6 @@ import {
   Minus,
   PieChart,
   Plus,
-  RefreshCw,
   Save,
   Trash2,
   TrendingDown,
@@ -315,7 +314,6 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [editingQuotas, setEditingQuotas] = useState<Record<string, string>>({});
-  const [updatingMissing, setUpdatingMissing] = useState(false);
   const [snapshots, setSnapshots] = useState<WalletSnapshot[]>([]);
   const quotasInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -497,26 +495,6 @@ export default function WalletPage() {
     setMessage("Carteira exportada em CSV.");
   }
 
-  async function updateMissingDividends() {
-    if (!insights.waiting.length) return;
-    setUpdatingMissing(true);
-    let updated = 0;
-    let failed = 0;
-    for (const item of insights.waiting) {
-      try {
-        const response = await fetch("/api/update-dividends", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker: item.ticker }) });
-        if (response.ok) updated += 1;
-        else failed += 1;
-      } catch {
-        failed += 1;
-      }
-    }
-    const tickers = items.map((item) => item.ticker);
-    setItems(tickers.map((code) => ({ ticker: code, quotas: items.find((item) => item.ticker === code)?.quotas || 0 })));
-    setUpdatingMissing(false);
-    setMessage(`Atualização concluída. Sucesso: ${updated}. Falhas ou limite diário: ${failed}.`);
-  }
-
   return (
     <main className="mx-auto w-full max-w-6xl overflow-x-hidden px-4 py-8">
       <AppToast message={message} variant={toastVariant(message)} onClose={() => setMessage("")} />
@@ -530,7 +508,7 @@ export default function WalletPage() {
       <PortfolioNotificationPreferences />
       <DailyWalletPanel insights={insights} firstPayment={firstPayment} />
       <WalletRiskReportCard walletCount={items.length} />
-      <AttentionSection insights={insights} updatingMissing={updatingMissing} updateMissingDividends={updateMissingDividends} />
+      <AttentionSection insights={insights} />
       <VisualHistorySection snapshots={snapshots} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
       <SimpleMonthlySummary insights={insights} topWeight={topWeight} topWeightPercent={topWeightPercent} />
@@ -577,7 +555,7 @@ function DailyWalletPanel({ insights, firstPayment }: { insights: WalletInsights
   );
 }
 
-function AttentionSection({ insights, updatingMissing, updateMissingDividends }: { insights: WalletInsights; updatingMissing: boolean; updateMissingDividends: () => void }) {
+function AttentionSection({ insights }: { insights: WalletInsights }) {
   const hasWaiting = insights.waiting.length > 0;
   return (
     <section className={`mt-6 rounded-2xl p-5 shadow-sm ring-1 ${hasWaiting ? "bg-yellow-50 text-yellow-950 ring-yellow-200" : "bg-white text-slate-800 ring-slate-200"}`}>
@@ -589,9 +567,11 @@ function AttentionSection({ insights, updatingMissing, updateMissingDividends }:
           </p>
           {hasWaiting && <p className="mt-2 text-sm font-extrabold text-yellow-900">{insights.waiting.map((item) => item.ticker).join(", ")}</p>}
         </div>
-        <button type="button" onClick={updateMissingDividends} disabled={!hasWaiting || updatingMissing} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
-          <RefreshCw size={16} className={updatingMissing ? "animate-spin" : ""} /> Atualizar pendentes
-        </button>
+        {hasWaiting && (
+          <p className="rounded-lg bg-yellow-100 px-4 py-2 text-sm font-bold text-yellow-900">
+            A atualização é automática após a publicação do comunicado oficial.
+          </p>
+        )}
       </div>
     </section>
   );
@@ -637,7 +617,7 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
           {years.map((year) => {
             const hasData = snapshots.some((item) => getSnapshotYear(item) === year && (item.totalValue > 0 || item.estimatedMonthlyIncome > 0));
             return (
-              <button key={year} type="button" onClick={() => setSelectedYear(year)} className={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ${selectedYear === year ? "bg-indigo-600 text-white ring-indigo-600" : hasData ? "bg-white text-slate-700 ring-slate-300 hover:bg-indigo-50" : "bg-slate-50 text-slate-400 ring-slate-200"}`}>{year}</button>
+              <button key={year} type="button" onClick={() => setSelectedYear(year)} className={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ${selectedYear === year ? "bg-indigo-600 text-white ring-indigo-600" : hasData ? "bg-white text-slate-700 ring-slate-300 hover:bg-indigo-50" : "bg-slate-50 text-slate-600 ring-slate-300 hover:bg-slate-100"}`}>{year}</button>
             );
           })}
         </div>
@@ -683,10 +663,10 @@ function WalletEditorSection({ ticker, setTicker, quotas, setQuotas, quotasInput
     <section className="mt-6 rounded-2xl bg-gray-900 p-5 text-gray-100 shadow-lg ring-1 ring-white/10">
       <h2 className="mb-4 text-xl font-extrabold text-white">Adicionar ou atualizar FII</h2>
       <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
-        <input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); quotasInputRef.current?.focus(); } }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
-        <input ref={quotasInputRef} value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
-        <button onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
-        <button onClick={exportCsv} disabled={!canExport} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
+        <input aria-label="Ticker do fundo" autoComplete="off" value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); quotasInputRef.current?.focus(); } }} placeholder="Ticker, ex: ABCD11" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+        <input aria-label="Quantidade de cotas" ref={quotasInputRef} value={quotas} onChange={(event) => setQuotas(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addItem(); }} placeholder="Quantidade de cotas" inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-800 p-3 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400" />
+        <button type="button" onClick={addItem} className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-3 font-bold text-white hover:bg-indigo-700"><Plus size={18} /> Adicionar</button>
+        <button type="button" onClick={exportCsv} disabled={!canExport} className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 px-5 py-3 font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-500"><Download size={18} /> Exportar CSV</button>
       </div>
     </section>
   );
@@ -733,13 +713,13 @@ function WalletTable({ items, insights, loading, editingQuotas, setEditingQuotas
                   return (
                     <tr key={item.ticker} className="border-b border-gray-800 text-gray-100">
                       <td className="py-3 font-bold"><div className="flex items-center gap-2"><FiiTickerLink ticker={item.ticker} /><DailyVariationBadge value={item.dailyVariation} /></div></td>
-                      <td><div className="flex items-center gap-2"><input value={draftQuotas} onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }} inputMode="decimal" className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button onClick={() => updateQuotas(item.ticker)} disabled={!changed} className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`} title="Salvar cotas"><Save size={17} /></button></div></td>
+                      <td><div className="flex items-center gap-2"><input aria-label={`Quantidade de cotas de ${item.ticker}`} value={draftQuotas} onChange={(event) => setEditingQuotas((current) => ({ ...current, [item.ticker]: event.target.value }))} onKeyDown={(event) => { if (event.key === "Enter") updateQuotas(item.ticker); }} inputMode="decimal" className="w-24 rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button type="button" onClick={() => updateQuotas(item.ticker)} disabled={!changed} className={`rounded-lg p-2 ${changed ? "text-green-300 hover:bg-green-950/40" : "cursor-not-allowed text-gray-600"}`} title="Salvar cotas"><Save size={17} /></button></div></td>
                       <td className="font-medium text-gray-200">{item.data?.price || "-"}</td>
                       <td className="font-medium text-gray-200">{item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"}</td>
                       <td className="font-medium text-gray-200">{item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"}</td>
                       <td className="font-bold text-green-300">{formatCurrency(item.estimatedIncome)}</td>
                       <td className="font-medium text-gray-200">{formatPaymentSummary(nextPayment)}</td>
-                      <td className="text-right"><button onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button></td>
+                      <td className="text-right"><button type="button" onClick={() => removeItem(item.ticker)} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title={`Remover ${item.ticker}`}><Trash2 size={18} /></button></td>
                     </tr>
                   );
                 })}
@@ -805,7 +785,12 @@ function HistoryLineChart({ snapshots, getValue, emptyText }: { snapshots: Walle
   }).join(" ");
   return (
     <>
-      <div className="max-w-full overflow-x-auto">
+      <div
+        role="region"
+        aria-label="Gráfico histórico com rolagem horizontal"
+        tabIndex={0}
+        className="max-w-full overflow-x-auto focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+      >
         <svg viewBox={`0 0 ${width} 180`} className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200" style={{ width }}>
           {snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}
           {snapshots.map((item, index) => {
@@ -835,7 +820,7 @@ function DailyVariationBadge({ value, labelPrefix }: { value?: number; labelPref
 }
 
 function WalletMobileCard({ item, nextPayment, draftQuotas, changed, onQuotaChange, onSave, onRemove }: { item: EnrichedFii; nextPayment?: Payment; draftQuotas: string; changed: boolean; onQuotaChange: (value: string) => void; onSave: () => void; onRemove: () => void }) {
-  return <article className="rounded-2xl bg-gray-800 p-4 text-gray-100 ring-1 ring-white/10"><div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="flex flex-wrap items-center gap-2 text-xl font-extrabold"><FiiTickerLink ticker={item.ticker} /><DailyVariationBadge value={item.dailyVariation} /></h3><p className="mt-1 text-sm font-medium text-gray-300">{item.quotas} cotas</p></div><button onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title="Remover"><Trash2 size={18} /></button></div><div className="grid gap-3"><InfoRow label="Preço atual" value={item.data?.price || "-"} /><InfoRow label="Último rendimento" value={item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"} /><InfoRow label="Anunciado no mês" value={item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"} /><InfoRow label="Renda estimada" value={formatCurrency(item.estimatedIncome)} highlight="green" /><InfoRow label="Próximo pagamento" value={formatPaymentSummary(nextPayment)} /></div><div className="mt-4 grid grid-cols-[1fr_auto] gap-2"><input value={draftQuotas} onChange={(event) => onQuotaChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSave(); }} inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button onClick={onSave} disabled={!changed} className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-bold ${changed ? "bg-indigo-600 text-white hover:bg-indigo-700" : "cursor-not-allowed bg-gray-700 text-gray-400"}`}><Save size={16} /> Salvar</button></div></article>;
+  return <article className="rounded-2xl bg-gray-800 p-4 text-gray-100 ring-1 ring-white/10"><div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="flex flex-wrap items-center gap-2 text-xl font-extrabold"><FiiTickerLink ticker={item.ticker} /><DailyVariationBadge value={item.dailyVariation} /></h3><p className="mt-1 text-sm font-medium text-gray-300">{item.quotas} cotas</p></div><button type="button" onClick={onRemove} className="rounded-lg p-2 text-red-300 hover:bg-red-950/40" title={`Remover ${item.ticker}`}><Trash2 size={18} /></button></div><div className="grid gap-3"><InfoRow label="Preço atual" value={item.data?.price || "-"} /><InfoRow label="Último rendimento" value={item.lastDividend ? `${MONTHS_PTBR[item.lastDividend.month] || item.lastDividend.month}: ${item.lastDividend.info.earnings}` : item.error || "-"} /><InfoRow label="Anunciado no mês" value={item.currentDividend ? item.currentDividend.info.earnings : "Aguardando"} /><InfoRow label="Renda estimada" value={formatCurrency(item.estimatedIncome)} highlight="green" /><InfoRow label="Próximo pagamento" value={formatPaymentSummary(nextPayment)} /></div><div className="mt-4 grid grid-cols-[1fr_auto] gap-2"><input aria-label={`Quantidade de cotas de ${item.ticker}`} value={draftQuotas} onChange={(event) => onQuotaChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onSave(); }} inputMode="decimal" className="rounded-lg border border-gray-700 bg-gray-950 p-2 text-white outline-none focus:border-indigo-400" /><button type="button" onClick={onSave} disabled={!changed} className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 font-bold ${changed ? "bg-indigo-600 text-white hover:bg-indigo-700" : "cursor-not-allowed bg-gray-700 text-gray-400"}`}><Save size={16} /> Salvar</button></div></article>;
 }
 
 function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" }) {

@@ -170,5 +170,5 @@ test("hash independe da ordem recebida e muda com o documento", () => {
 test("ticker e responsável inválidos são rejeitados", async () => {
   const { service } = serviceWith(notices(Array(9).fill(1)));
   await assert.rejects(service.execute("HCTR11", "admin@dadosfii.test"), /Ticker não suportado/);
-  await assert.rejects(service.execute("MCCI11", "admin-sem-email"), /Responsável administrativo inválido/);
+  await assert.rejects(service.execute("MCCI11", "admin com espaço"), /Responsável administrativo inválido/);
 });

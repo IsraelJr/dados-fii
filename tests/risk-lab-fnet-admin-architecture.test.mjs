@@ -20,7 +20,7 @@ test("rota FNET reutiliza autenticação Admin, mesma origem e rate limit", () =
   assert.match(route, /risk-lab-fnet-list/);
   assert.match(route, /risk-lab-fnet-write/);
   assert.match(route, /ENABLE_RISK_LAB_FNET_IMPORT/);
-  assert.match(route, /confirmed !== true/);
+  assert.doesNotMatch(route, /confirmed|action === "approve"/);
 });
 
 test("importador constrói URLs FNET internamente e não aceita URL do cliente", () => {
@@ -31,29 +31,30 @@ test("importador constrói URLs FNET internamente e não aceita URL do cliente",
   assert.doesNotMatch(route, /body\?\.sourceUrl|body\?\.url/);
 });
 
-test("escopo do importador permanece restrito a MCCI11 e RBRY11", () => {
-  assert.match(service, /new Set\(\["MCCI11", "RBRY11"\]\)/);
-  assert.match(service, /não pertence à coorte MCCI11\/RBRY11/);
+test("importador usa contrato estrutural de ticker, sem exceções por fundo", () => {
+  assert.match(service, /\/\^\[A-Z\]\{4\}11\$\/\.test/);
+  assert.doesNotMatch(service, /SUPPORTED_TICKERS|MCCI11.*RBRY11/);
 });
 
 test("aviso e protocolo são tratados como artefatos separados e auditáveis", () => {
-  assert.match(service, /sourceHash: sha256\(noticeHtml\)/);
-  assert.match(service, /protocolHash: sha256\(protocolHtml\)/);
+  assert.match(service, /const sourceHash = sha256\(noticeHtml\)/);
+  assert.match(service, /const protocolHash = sha256\(protocolHtml\)/);
   assert.match(parser, /parseFnetDividendNoticeHtml/);
   assert.match(parser, /parseFnetProtocolHtml/);
   assert.match(store, /RiskLabNoticeAudit/);
 });
 
-test("aprovação cria uma única observação verificada por fundo e competência", () => {
+test("validação automática cria uma única observação por fundo e competência", () => {
   assert.match(store, /RiskLabVerifiedDividendNotices/);
-  assert.match(store, /doc\(`\$\{current\.ticker\}_\$\{current\.competenceMonth\}`\)/);
-  assert.match(store, /Conflito:/);
-  assert.match(store, /manual_document_review/);
+  assert.match(store, /doc\(`\$\{candidate\.ticker\}_\$\{candidate\.competenceMonth\}`\)/);
+  assert.match(store, /competence_document_conflict/);
+  assert.match(store, /automatic_regulatory_validation/);
+  assert.match(store, /runTransaction/);
 });
 
-test("painel exige confirmação humana e informa que não executa detector", () => {
-  assert.match(panel, /Conferi ticker, competência, valor por cota/);
-  assert.match(panel, /confirmed: true/);
+test("painel não transfere validação técnica ao usuário", () => {
+  assert.doesNotMatch(panel, /confirmed|Aprovar observação|Conferi ticker/);
+  assert.match(panel, /validação automática/i);
   assert.match(panel, /não executa o detector/i);
   assert.match(page, /<FnetNoticeImportPanel \/>/);
 });

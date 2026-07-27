@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 export default function CleanFiiFieldsPage() {
-  const [secret, setSecret] = useState("");
   const [limit, setLimit] = useState("50");
   const [cursor, setCursor] = useState("");
   const [running, setRunning] = useState(false);
@@ -12,11 +11,8 @@ export default function CleanFiiFieldsPage() {
   async function runBatch(currentCursor: string) {
     const res = await fetch("/api/admin/clean-fii-fields", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secret": secret,
-      },
-      body: JSON.stringify({ secret, limit: Number(limit), cursor: currentCursor || undefined }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit: Number(limit), cursor: currentCursor || undefined }),
     });
 
     const data = await res.json();
@@ -65,11 +61,6 @@ export default function CleanFiiFieldsPage() {
       <h1 className="mb-4 text-2xl font-bold">Limpar campos técnicos dos FIIs</h1>
 
       <div className="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
-        <label className="block">
-          <span className="text-sm font-semibold">Senha ADMIN_UPDATE_SECRET</span>
-          <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} className="mt-1 w-full rounded-lg border p-2" />
-        </label>
-
         <label className="block">
           <span className="text-sm font-semibold">Tamanho do lote</span>
           <input value={limit} onChange={(e) => setLimit(e.target.value)} className="mt-1 w-full rounded-lg border p-2" />

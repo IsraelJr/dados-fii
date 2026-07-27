@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AIInsightsError } from "@/lib/ai/AIInsightsEngine";
+import { publicError } from "@/lib/http/PublicError";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
 
 export const runtime = "nodejs";
@@ -25,7 +26,8 @@ export async function GET(request: Request, context: RouteContext) {
     );
   } catch (error) {
     if (error instanceof AIInsightsError) {
-      return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: error.status });
+      const response = publicError(error, "Não foi possível gerar os insights.");
+      return NextResponse.json({ ok: false, error: response.message, code: response.code }, { status: response.status });
     }
     console.error("Fund insights error", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ ok: false, error: "Não foi possível gerar os insights." }, { status: 500 });

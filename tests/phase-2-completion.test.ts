@@ -108,7 +108,8 @@ test("Premium report contains valuation, stress, scenarios, peers, actions and A
 });
 
 test("Premium report translates scenarios and percentile into the user's portfolio", () => {
-  const peers = Array.from({ length: 5 }, (_, index) => publicFund(`PAR${index}11`, "Logística", 1));
+  const peers = ["PAAA11", "PAAB11", "PAAC11", "PAAD11", "PAAE11"]
+    .map((ticker) => publicFund(ticker, "Logística", 1));
   const target = publicFund();
   const other = { ...publicFund("OUTR11"), price: 20 };
   const report = new PremiumReportEngine().generate(freeReport(), peers, ai(), now, [

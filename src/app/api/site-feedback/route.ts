@@ -155,6 +155,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, saved: true });
   } catch (err: any) {
     console.error("site-feedback error", err);
-    return NextResponse.json({ ok: false, error: err.message || "Erro ao enviar feedback." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Erro ao enviar feedback." }, { status: 500 });
   }
 }

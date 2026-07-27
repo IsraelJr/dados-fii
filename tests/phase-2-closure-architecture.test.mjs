@@ -64,7 +64,8 @@ test("production schedule has no temporary Phase 2 closure cron and CI responsib
   assert.match(packageJson, /phase-2-closure\.test\.ts/);
   assert.match(packageJson, /phase-2-closure-architecture\.test\.mjs/);
   assert.match(coreWorkflow, /npm run typecheck/);
-  assert.match(coreWorkflow, /npm run test:sprint2/);
+  assert.match(coreWorkflow, /npm run test:all/);
+  assert.match(coreWorkflow, /npm run (?:lint|test:rules|test:e2e|audit:production|security:secrets)/);
   assert.doesNotMatch(coreWorkflow, /npm run test:risk-lab/);
   assert.match(riskLabWorkflow, /npm run test:risk-lab/);
 });

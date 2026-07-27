@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import type { MonitorAlert, MonitorDelivery } from "@/types/monitor";
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -36,53 +35,39 @@ export class AlertDispatcher {
 
   private async email(alerts: MonitorAlert[]): Promise<MonitorDelivery> {
     const recipients = emails();
-    const host = process.env.SMTP_HOST;
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    const from = process.env.SMTP_FROM || user;
-    if (!recipients.length || !host || !user || !pass || !from) return { channel: "email", status: "skipped", detail: "SMTP ou destinatários não configurados." };
-    try {
-      const transport = nodemailer.createTransport({
-        host,
-        port: Number(process.env.SMTP_PORT || 587),
-        secure: String(process.env.SMTP_SECURE || "").toLowerCase() === "true",
-        auth: { user, pass },
-      });
-      const content = plainMessage(alerts);
-      await transport.sendMail({
-        from,
-        to: recipients.join(","),
-        subject: `[Dados FII] ${alerts.some((alert) => alert.severity === "critical") ? "CRÍTICO" : "Alerta"} — Monitor sistêmico`,
-        text: content,
-        html: `<pre style="font-family:Arial,sans-serif;white-space:pre-wrap">${escapeHtml(content)}</pre>`,
-      });
-      return { channel: "email", status: "sent", detail: `${recipients.length} destinatário(s).` };
-    } catch (error) {
-      return { channel: "email", status: "failed", detail: error instanceof Error ? error.message.slice(0, 300) : "Falha desconhecida." };
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.MONITOR_EMAIL_FROM || process.env.WALLET_EMAIL_FROM || "Dados FII <no-reply@dadosfii.com.br>";
+    if (!recipients.length || !apiKey) {
+      return { channel: "email", status: "skipped", detail: "Resend ou destinatários não configurados." };
     }
-  }
 
-  private async telegram(alerts: MonitorAlert[]): Promise<MonitorDelivery> {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return { channel: "telegram", status: "skipped", detail: "Bot ou chat não configurado." };
     try {
-      const response = await this.fetcher(`https://api.telegram.org/bot${token}/sendMessage`, {
+      const content = plainMessage(alerts);
+      const response = await this.fetcher("https://api.resend.com/emails", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: plainMessage(alerts), disable_web_page_preview: true }),
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from,
+          to: recipients,
+          subject: `[Dados FII] ${alerts.some((alert) => alert.severity === "critical") ? "CRÍTICO" : "Alerta"} — Monitor sistêmico`,
+          text: content,
+          html: `<pre style="font-family:Arial,sans-serif;white-space:pre-wrap">${escapeHtml(content)}</pre>`,
+        }),
         signal: AbortSignal.timeout(15_000),
       });
-      if (!response.ok) throw new Error(`Telegram HTTP ${response.status}`);
-      return { channel: "telegram", status: "sent" };
-    } catch (error) {
-      return { channel: "telegram", status: "failed", detail: error instanceof Error ? error.message.slice(0, 300) : "Falha desconhecida." };
+      if (!response.ok) throw new Error(`Resend HTTP ${response.status}`);
+      return { channel: "email", status: "sent", detail: `${recipients.length} destinatário(s).` };
+    } catch {
+      return { channel: "email", status: "failed", detail: "Falha sanitizada no provedor de e-mail." };
     }
   }
 
   async dispatch(alerts: MonitorAlert[]) {
     if (!alerts.length) return [] as MonitorDelivery[];
-    return Promise.all([this.email(alerts), this.telegram(alerts)]);
+    return Promise.all([this.email(alerts)]);
   }
 }
 

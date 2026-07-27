@@ -1,6 +1,6 @@
 # Inventário e orçamento do GitHub Actions
 
-**Atualizado em:** 26/07/2026  
+**Atualizado em:** 27/07/2026
 **Política associada:** `docs/engineering/github-actions-policy.md`  
 **Gate automatizado:** `tests/github-actions-governance.test.mjs`
 
@@ -14,22 +14,23 @@
 - Todo job declara `concurrency` cancelável, timeout econômico e permissões mínimas.
 - Dependências são instaladas com `npm ci` e lockfile quando instalação é necessária.
 - Artefatos operacionais possuem retenção máxima de sete dias.
-- A única escrita permitida ao gate Premium é publicar o próprio resultado como commit status; conteúdo, branches, PRs e Actions permanecem somente leitura.
+- A única escrita GitHub permitida ao gate reativo é publicar o próprio commit status; o smoke OIDC grava somente evidência de auditoria no backend. Conteúdo, branches, PRs e Actions permanecem somente leitura.
 
 ## 2. Workflows ativos
 
 | Workflow | Finalidade oficial | Gatilho | Timeout | Escrita | Classificação |
 |---|---|---|---:|---|---|
-| `phase-2-closure.yml` | CI central, governança, Handoff, typecheck e regressão da Fase 2 | PRs relevantes e configuração em `main` | 20 min | nenhuma | Essencial |
+| `phase-2-closure.yml` | CI central completa: audit, segredos, lint, typecheck, suíte, Emulator, cobertura, build, HTTP e E2E | PRs relevantes e configuração em `main` | 30 min, exceção documentada | nenhuma | Essencial |
 | `portfolio-notifications-ci.yml` | Regressões específicas de notificações | PR do domínio e execução manual | 8 min | nenhuma | Essencial |
+| `production-premium-smoke.yml` | Geração Premium real e releitura da auditoria com identidade OIDC vinculada ao SHA publicado | `workflow_dispatch` após deploy | 10 min | somente evidência no backend | Gate pós-deploy |
 | `risk-lab.yml` | Suíte completa e especializada do Risk Lab | PR do domínio e execução manual | 20 min | nenhuma | Essencial |
 | `risk-lab-cohort-backtest.yml` | Kickoff curto de tentativa vinculada a SHA | `workflow_dispatch` | 5 min | nenhuma | Processamento no backend |
 | `risk-lab-frozen-dividend-notices.yml` | Coleta FNET congelada e controlada | `workflow_dispatch` | 30 min, exceção documentada | nenhuma | Temporário e manual |
 | `risk-lab-premium-production-gate.yml` | Double check pós-deploy da integração Premium read-only | evento `status` do Vercel bem-sucedido para commit presente em `main` | 3 min | somente commit status | Gate permanente da Fase 3 |
 
-## 3. Gate Premium de produção
+## 3. Gates Premium de produção
 
-O workflow `risk-lab-premium-production-gate.yml` substitui qualquer necessidade de validação manual do rollout da Sprint 3.7.
+O workflow `risk-lab-premium-production-gate.yml` valida flags e SHA sem ação manual. Ele não é prova funcional suficiente isoladamente.
 
 Regras:
 
@@ -41,6 +42,8 @@ Regras:
 6. exige `notificationsAllowed=false` e `externalEffectsAllowed=false`;
 7. falha imediatamente em divergência, sem polling, `sleep` ou commit operacional;
 8. publica `Risk Lab Premium Production Gate = success|failure` no SHA validado, com link para a execução.
+
+O workflow obrigatório `production-premium-smoke.yml` usa OIDC efêmero, sem segredo estático, e comprova a jornada que o health check não cobre: reconstrói o snapshot de pares, gera um relatório Premium sintético no backend, relê o evento `premium-read` persistido e grava evidência imutável para o SHA ativo.
 
 A permissão `statuses: write` é estritamente limitada à publicação dessa evidência. O workflow não possui permissão de escrita em conteúdo, Actions ou pull requests.
 
@@ -56,6 +59,7 @@ A projeção é comparativa e deve ser recalibrada com uso real:
 | Backtest kickoff | 2 min |
 | Coleta FNET manual | 25 min |
 | Gate Premium pós-deploy | até 3 min por release elegível |
+| Smoke Premium OIDC | até 10 min por release |
 
 O gate Premium adiciona custo marginal baixo porque não instala dependências, não faz checkout e executa uma única validação HTTP.
 
@@ -86,7 +90,7 @@ Devem permanecer ausentes:
 
 ## 7. Criticidade
 
-- `phase-2-closure.yml`, `portfolio-notifications-ci.yml`, `risk-lab.yml` e `risk-lab-premium-production-gate.yml` são gates essenciais.
+- `phase-2-closure.yml`, `portfolio-notifications-ci.yml`, `risk-lab.yml`, `risk-lab-premium-production-gate.yml` e `production-premium-smoke.yml` são gates essenciais.
 - `risk-lab-cohort-backtest.yml` apenas inicia processamento idempotente no backend.
 - `risk-lab-frozen-dividend-notices.yml` é exceção temporária até existir worker persistente.
 

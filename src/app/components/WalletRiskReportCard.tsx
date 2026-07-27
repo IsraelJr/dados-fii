@@ -21,18 +21,6 @@ type ReportStatus = {
 const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
 
-function allowedEmails() {
-  return String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function isAllowedPrivateEmail(email: string) {
-  const list = allowedEmails();
-  return Boolean(email) && list.includes(email.trim().toLowerCase());
-}
-
 function filenameFromDisposition(value: string | null) {
   const match = value?.match(/filename="?([^";]+)"?/i);
   return match?.[1] || "relatorio-risco-carteira.pdf";
@@ -77,16 +65,13 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
     const storedToken = window.localStorage.getItem(TOKEN_KEY) || "";
     const cleanEmail = storedEmail.trim().toLowerCase();
 
-    if (!isAllowedPrivateEmail(cleanEmail)) {
+    if (!cleanEmail || !storedToken) {
       setVisible(false);
       return;
     }
 
-    setVisible(true);
     setEmail(cleanEmail);
     setSessionToken(storedToken);
-
-    if (!storedToken) return;
 
     async function loadStatus() {
       setLoadingStatus(true);
@@ -102,9 +87,11 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
 
         if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível consultar o status do relatório.");
 
+        setVisible(Boolean(json.isVip || json.canGenerate));
         setStatus(json);
         if (json.reportMarkdown) setReportMarkdown(json.reportMarkdown);
       } catch (err: any) {
+        setVisible(false);
         setMessage(err.message || "Não foi possível consultar o status do relatório.");
       } finally {
         setLoadingStatus(false);

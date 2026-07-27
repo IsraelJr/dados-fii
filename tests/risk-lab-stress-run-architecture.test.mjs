@@ -15,7 +15,7 @@ const combined = `${route}\n${service}\n${store}`;
 
 test("execução manual exige feature flag e confirmação explícita", () => {
   assert.match(route, /ENABLE_RISK_LAB_STRESS_RUN/);
-  assert.match(route, /body\?\.confirmed !== true/);
+  assert.doesNotMatch(route, /confirmed/);
   assert.match(route, /action !== "execute"/);
   assert.match(route, /risk-lab-stress-run-execute/);
 });

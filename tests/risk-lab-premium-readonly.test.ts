@@ -38,7 +38,10 @@ test("coorte homologada preserva disposições e caso inconclusivo", () => {
 });
 
 test("fundo fora da coorte recebe fallback explícito e não classificação por semelhança", () => {
-  const result = model.read("MXRF11", { enabled: true });
+  const result = model.read("MXRF11", {
+    enabled: true,
+    category: { fundKind: "FII", segment: "Papel / Recebíveis" },
+  });
   assert.equal(result.availability, "outside_verified_cohort");
   assert.equal(result.status, null);
   assert.equal(result.riskAlert, null);

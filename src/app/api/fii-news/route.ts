@@ -100,7 +100,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: err.message || "Erro ao buscar notícias do FII.",
+        error: "Erro ao buscar notícias do FII.",
         news: [],
       },
       { status: 200 }

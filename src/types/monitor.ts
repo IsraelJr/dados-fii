@@ -14,7 +14,7 @@ export type MonitorAlert = {
 };
 
 export type MonitorDelivery = {
-  channel: "panel" | "firestore" | "email" | "telegram";
+  channel: "panel" | "firestore" | "email";
   status: "sent" | "stored" | "skipped" | "failed";
   detail?: string;
 };

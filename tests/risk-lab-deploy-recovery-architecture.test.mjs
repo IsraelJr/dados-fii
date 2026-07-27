@@ -23,7 +23,8 @@ test("backtest possui apenas kickoff manual e uma chamada limitada", () => {
   assert.match(productionWorkflow, /timeout-minutes:\s*5/);
   assert.equal((productionWorkflow.match(/curl\b/g) || []).length, 1);
   assert.match(productionWorkflow, /--max-time 75/);
-  assert.match(productionWorkflow, /action=initialize/);
+  assert.match(productionWorkflow, /"action":"initialize"/);
+  assert.match(productionWorkflow, /id-token:\s*write/);
 });
 
 test("workflow não espera deploy, não processa fundos e não cria eventos em cascata", () => {
@@ -35,12 +36,12 @@ test("workflow não espera deploy, não processa fundos e não cria eventos em c
 });
 
 test("kickoff permanece vinculado ao release exato de Produção", () => {
-  assert.match(route, /parameters\.source === "github-actions"/);
-  assert.match(route, /parameters\.runId === RISK_LAB_COHORT_BACKTEST_RUN_ID/);
-  assert.match(route, /parameters\.release === deployedRelease/);
-  assert.match(route, /VERCEL_ENV === "production"/);
+  const adminRoute = readFileSync("src/app/api/admin/system/risk-lab/cohort-backtest/route.ts", "utf8");
+  assert.match(route, /decidePublicEvidenceStatus/);
+  assert.match(adminRoute, /requireGithubActionsProductionIdentity/);
+  assert.match(adminRoute, /activeProductionRelease/);
   assert.match(productionWorkflow, /evidence\.releaseCommit == \$release/);
-  assert.match(productionWorkflow, /evidence\.runId == \$runId/);
+  assert.match(productionWorkflow, /evidence\.runId == "risk-lab-3-5-20260720-v2"/);
 });
 
 test("evidência intermediária é curta e não vira estado operacional", () => {

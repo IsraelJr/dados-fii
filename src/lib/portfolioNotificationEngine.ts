@@ -804,7 +804,7 @@ async function processUser(doc: any, now: LocalDateParts): Promise<UserProcessRe
   }
 }
 
-export async function processPortfolioNotifications(options?: { limit?: number }) {
+export async function processPortfolioNotifications(options?: { limit?: number; correlationId?: string }) {
   const startedAt = Date.now();
   if (!envBoolean("PORTFOLIO_NOTIFICATIONS_ENABLED", true)) {
     return { ok: true, disabled: true, message: "PORTFOLIO_NOTIFICATIONS_ENABLED=false" };
@@ -848,6 +848,7 @@ export async function processPortfolioNotifications(options?: { limit?: number }
     ok: runPayload.ok,
     statusCode: runPayload.ok ? 200 : 207,
     source: "vercel-cron",
+    correlationId: options?.correlationId,
     message: `Processamento de notificações: ${summary.processed || 0} processado(s), ${summary.emailsSent || 0} e-mail(s), ${summary.error || 0} erro(s).`,
     metadata: {
       dateKey: now.dateKey,
@@ -855,7 +856,7 @@ export async function processPortfolioNotifications(options?: { limit?: number }
       durationMs,
       summary,
     },
-  });
+  }, { required: true });
 
   return { ok: runPayload.ok, dateKey: now.dateKey, limit, totalUsersRead: snapshot.size, durationMs, summary, results };
 }

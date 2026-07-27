@@ -10,6 +10,6 @@ export async function GET() {
         return NextResponse.json({ hasCookie: !!anonId });
     } catch (err: any) {
         console.error("Erro ao verificar cookie:", err);
-        return NextResponse.json({ hasCookie: false, error: err.message }, { status: 500 });
+        return NextResponse.json({ hasCookie: false, error: "Não foi possível consultar a sessão." }, { status: 500 });
     }
 }

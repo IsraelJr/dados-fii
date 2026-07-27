@@ -81,7 +81,10 @@ export type PremiumRiskLabReadOnly = {
   datasetId: string;
   datasetHash: string;
   evidenceHash: string;
-  availability: "disabled" | "available" | "outside_verified_cohort" | "inconclusive";
+  availability: "disabled" | "available" | "outside_verified_cohort" | "inconclusive" | "insufficient_data";
+  applicabilityCategory: "paper_credit" | "development" | "brick" | "fiagro" | "fi_infra" | "fund_of_funds" | "hybrid" | "unknown";
+  categoryPolicyVersion: "risk-lab-category-policy-v1";
+  categoryCalibrated: boolean;
   groundTruthStatus: "verified" | "blocked" | null;
   outcome: "verified_correct" | "inconclusive_unscored" | null;
   status: "no_qualifying_stress" | "stress_without_recovery" | "reversible_stress_confirmed" | "inconclusive_unscored" | null;
@@ -123,6 +126,12 @@ export type PremiumFundReport = {
   managerMode: PremiumManagerMode;
   recommendations: PremiumRecommendation[];
   aiAnalysis: PremiumAIInsights;
+  auditReceipt: {
+    eventId: string;
+    action: "premium-read";
+    createdAt: string;
+    correlationId: string;
+  };
   methodology: string[];
   disclaimer: string[];
 };

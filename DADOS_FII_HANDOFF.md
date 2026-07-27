@@ -2,41 +2,53 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 6.14.0  
-**Data:** 26/07/2026  
+**Versão:** 8.3.0
+
+**Data:** 27/07/2026
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**Base funcional auditada:** `a3b4f2c010fba3e62e52ed50b8fcacf2706474d2`  
-**Estado da Fase 3:** formalmente concluída  
-**Próxima unidade de trabalho:** SEO-S1 — fundação técnica e páginas prioritárias; próxima fase funcional: 4.1 — Radar/Acompanhar fundo  
-**Política documental:** existe somente um Handoff canônico versionado: `DADOS_FII_HANDOFF.md`.
+**Último SHA de `main` auditado antes das correções:** `607dafefefaba5c88f986236eb365440c6fb8c94`
+
+**Branch corretiva:** `agent/corrective-sprints-r0-r5`
+**Draft PR corretiva:** `#141` — https://github.com/IsraelJr/dados-fii/pull/141
+**Commit remoto base das Sprints R0–R5:** `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`
+**Último commit corretivo de código aprovado no CI:** `c6af2a045da64c99b777f18ce4ea2536216d4dc9`
+
+**Sprint atual:** encerramento verificável das Sprints Corretivas R0–R5
+
+**Estado oficial:** implementação corretiva e todos os checks do PR aprovados no commit `c6af2a045da64c99b777f18ce4ea2536216d4dc9`; a draft PR #141 permanece aberta e merge, deployment e auditoria pós-deploy ainda são obrigatórios
+**Política documental:** este é o único Handoff corrente. Versões anteriores pertencem ao histórico do Git, não à árvore ativa.
 
 ## Como interpretar os status
 
-- **Planejada:** decisão registrada, sem implementação iniciada.
-- **Em implementação:** existe branch, issue ou PR ativa, mas os critérios ainda não foram integralmente atingidos.
-- **Implementada:** código ou evidência foi versionado.
-- **Testada:** testes automatizados foram executados no mesmo SHA aplicável.
-- **Implantada:** o commit exato possui deployment aplicável identificado e saudável.
-- **Formalmente concluída:** código, testes, cobertura, segurança, evidência, merge, produção, auditoria pós-merge e Handoff foram comprovados.
-- **Inconclusiva:** a evidência não permite afirmar sucesso ou falha sem inventar informação.
+- **Implementada no branch:** o código existe no branch corretivo, mas ainda não integra `main`.
+- **Testada localmente:** o gate foi reproduzido no checkout auditado.
+- **Aprovada no CI:** instalação limpa e todos os checks obrigatórios passaram no SHA do PR.
+- **Implantada:** o SHA exato foi publicado no ambiente de produção.
+- **Auditada em produção:** smoke e contratos não destrutivos comprovaram o comportamento no SHA publicado.
+- **Formalmente concluída:** todos os estados anteriores estão comprovados, sem pendência bloqueadora.
+- **Parcial:** parte do escopo existe, mas falta ao menos um gate.
+- **Inconclusiva:** a evidência não permite afirmar sucesso ou falha.
 
-Uma confirmação verbal, um workflow isolado ou testes em poucos tickers não concluem fase.
+Código, documento, teste unitário, HTTP 200, workflow ou deployment isolado não concluem uma Sprint.
 
 ## Decisões vigentes que substituem decisões anteriores
 
-| Decisão vigente | Decisão substituída | Estado | Evidência |
-|---|---|---|---|
-| Este Handoff v6.14.0 é a única referência canônica quando houver divergência. | Handoffs paralelos ou cópias antigas. | Vigente | Teste `canonical-handoff`. |
-| Fases 1, 2 e 3 estão formalmente concluídas. | Fase 3 pendente de produção/ativação. | Concluída | Release `a3b4f2c...`, Vercel `success` e gate de produção `success`. |
-| Risk Lab integra o Premium somente em modo read-only. | Risk Lab totalmente isolado do Premium. | Implantada | PRs #134, #136, #137 e #138. |
-| O ruleset vigente é `0.2.0`. | Ruleset `0.1.0` não homologado. | Homologada | Calibração 3.6 e registro `premium-readonly-v1`. |
-| Notificações e efeitos externos do Risk Lab permanecem proibidos. | Possível promoção automática a alertas. | Vigente | Contrato, testes e health check retornam `false`. |
-| Fundo fora da coorte recebe indisponibilidade explícita. | Inferência por semelhança. | Vigente | `outside_verified_cohort`. |
-| MCCI11 permanece inconclusivo e não pontuado. | Forçar classificação binária. | Vigente | `inconclusive_unscored`. |
-| Correções de parser/cálculo são gerais e testadas. | Patch por ticker. | Obrigatória | Gates de regressão e arquitetura. |
-| Radar/Acompanhar fundo pertence à Fase 4.1. | Antecipar Radar na Fase 3. | Planejada | Grátis até 1; Premium até 10; limite no servidor. |
-| Telegram permanece adiado; WhatsApp segue decisão aberta. | Multicanal imediato. | Vigente | Depende de custo, opt-in e templates. |
+| Decisão vigente | Decisão substituída | Efeito |
+|---|---|---|
+| A auditoria independente de 26/07/2026, executada no SHA `607dafe…`, prevalece sobre a declaração anterior de conclusão da Fase 3. | Handoff v6.14.0 declarava Fase 3 formalmente concluída. | A Fase 3 volta a estado parcial até que os defeitos corretivos sejam aceitos no Git, CI e produção. |
+| O Handoff v8.3.0 é a única fonte canônica ativa. | Handoff v7.0.0 externo, v6.14.0 do Git e arquivo `DADOS_FII_HANDOFF_SPRINT_3_5_CONTINUACAO.md`. | O arquivo de continuação foi removido; fontes antigas permanecem apenas como histórico. |
+| HTTP 200 só representa evidência Risk Lab aprovada, atual e compatível com release/ruleset/metodologia. | Endpoint podia responder 200 com `ok:false` ou execução reprovada/antiga. | Ausência usa 404, incompatibilidade 409, execução 202, reprovação 422 e sucesso real 200. |
+| Privilégio, plano, e-mail e identidade são resolvidos no servidor. | `isPremium`, e-mail ou segredo informado pelo cliente influenciavam autorização. | Mutação e entitlement falham fechado. |
+| Segredo administrativo não é aceito em query, body ou headers legados. | Segredo compartilhado e estático era usado por rotas legadas. | Admin humano usa sessão HttpOnly; cron usa Bearer; GitHub usa OIDC efêmero vinculado ao workflow/SHA. |
+| Firestore do cliente é fail-closed e nenhuma rota acessa a persistência diretamente. | Regras não versionadas e handlers com `adminDb`/`.collection()`. | Regras e índices estão no Git; handlers delegam à camada server. |
+| DY canônico é dividendos pagos em 12 meses dividido pela cotação atual, com fonte, data-base e versão. | Campo legado de DY podia prevalecer sem proveniência. | Conflito fica registrado; ausência de preço invalida derivados. |
+| Dados ausentes, inválidos, obsoletos e indisponíveis são estados diferentes. | Incompletude podia receber validação integral ou zero inventado. | Validator aplica invariantes, escala pt-BR, CNPJ, coerência e freshness. |
+| Categorias Risk Lab sem calibração suficiente retornam `insufficient_data`. | Extrapolação por semelhança ou regra especial por ticker. | Nenhum alerta é inventado fora do domínio homologado. |
+| Importação FNET válida é determinística, idempotente e automática; conflito é quarentena. | Aprovação técnica manual era parte do fluxo normal. | O proprietário não valida conteúdo técnico por fundo. |
+| Premium lê snapshot de pares materializado, não varre o catálogo a cada requisição. | Até 1.000 leituras de pares por relatório. | Custo passa a ser constante por relatório; snapshot vencido falha fechado. |
+| Carteira é privada, `noindex` e ausente do sitemap. Canonical raiz é relativo à rota. | `/carteira` aparecia no sitemap e páginas podiam herdar canonical da home. | SEO não indexa conteúdo privado nem consolida rotas distintas na raiz. |
+| Risk Lab permanece read-only no Premium. | Possível uso automático para notificações, compra ou venda. | `notificationsAllowed=false` e `externalEffectsAllowed=false`. |
 
 ---
 
@@ -44,39 +56,50 @@ Uma confirmação verbal, um workflow isolado ou testes em poucos tickers não c
 
 ### Resumo executivo
 
-- Fase 1 — Regulatory Engine: formalmente concluída.
-- Fase 2 — Core Intelligence & Product Foundation: formalmente concluída.
-- Fase 3 — Risk Lab: formalmente concluída em 26/07/2026.
-- Sprint 3.5: seis fundos, dataset e backtest concluídos.
-- Sprint 3.6: ruleset `0.2.0` homologado.
-- Sprint 3.7: integração Premium read-only, Prompt Premium v3, Modo Gestor, feature flag, autorização, auditoria, fallback, rollback, health check e gate pós-deploy concluídos.
-- Release funcional auditada: `a3b4f2c010fba3e62e52ed50b8fcacf2706474d2`.
-- Deployment Vercel do mesmo SHA: `success`.
-- Commit status `Risk Lab Premium Production Gate`: `success`.
-- Execução do gate: `30219287742`.
-- Evidência final: `docs/production-evidence/risk-lab/phase-3-final-closure.json`.
-- Notificações do Risk Lab continuam proibidas.
+- Fases 1 e 2 permanecem formalmente concluídas com evidências históricas preservadas.
+- Risk Lab 3.0–3.6 possui implementação e evidência metodológica no Git.
+- A integração 3.7 existe no `main` anterior, mas sua conclusão formal foi revogada pela auditoria independente por defeitos transversais de segurança, dados, CI, produção e generalização.
+- O SHA `607dafefefaba5c88f986236eb365440c6fb8c94` foi observado em produção antes das correções.
+- As correções DEF-01 a DEF-20 estão implementadas ou protegidas por estado fail-closed no branch `agent/corrective-sprints-r0-r5`.
+- A draft PR `#141` contém as correções. O commit remoto base é `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`; os follow-ups de Login, acessibilidade e contraste culminam em `c6af2a045da64c99b777f18ce4ea2536216d4dc9`.
+- No primeiro CI da PR, Risk Lab `#319` e Portfolio Notifications `#552` passaram. O gate central `#354` aprovou todos os passos até o E2E, que revelou Login oculto fora de `localhost`, contraste insuficiente e regiões roláveis sem foco.
+- O CI atuou como gate real: runs intermediários detectaram um locator ambíguo e quatro contrastes WCAG adicionais; nenhum achado foi ignorado ou convertido em exceção.
+- No commit `c6af2a0…`, Portfolio Notifications `#556`, Risk Lab `#323` e Phase 2 Closure `#358` passaram; o gate central encerrou com E2E 12/12 em desktop e mobile.
+- O branch ainda não pode ser chamado de formalmente concluído porque faltam merge, deployment do mesmo SHA e smoke autenticado de produção.
+- O browser E2E está versionado para desktop e mobile. A execução local ficou bloqueada pelo CDN do browser no sandbox; o runner do GitHub comprovou as correções Chromium.
+- Em 27/07/2026, a execução local aprovou 529 testes sem falha, skip ou pendência; Firestore Emulator, mutation sanity, build de 38 páginas e smoke HTTP 200/400/401/403/404/405/503 também passaram.
+- A cobertura crítica medida foi 100% de linhas, 93,66% de branches e 98,53% de funções; `npm audit --omit=dev --audit-level=high` retornou zero vulnerabilidades.
+- O endpoint interno de dividendos passou a exigir schema estrito, `Idempotency-Key`, lock distribuído e auditoria com ator pseudônimo, origem, correlation ID, quantidade e versão da regra.
+- Limites administrativos são distribuídos no Firestore e falham fechado; respostas 5xx não expõem mensagens internas.
 
-### Auditoria do estado
+### Matriz de estado
 
-| Área | Código | Testes | Produção | Status |
+| Área | Git corretivo | Teste local | Produção corretiva | Estado |
 |---|---:|---:|---:|---|
-| Fase 1 | Sim | Sim | Sim | **Formalmente concluída** |
-| Fase 2 | Sim | Sim | Sim | **Formalmente concluída** |
-| Risk Lab 3.0–3.4 | Sim | Sim | Sim | **Concluído** |
-| Sprint 3.5 | Sim | Sim | Sem integração de produto | **Formalmente concluída** |
-| Sprint 3.6 | Sim | Sim | Registro homologado | **Formalmente concluída** |
-| Sprint 3.7 | Sim | Sim | Vercel + gate pós-deploy verdes | **Formalmente concluída** |
-| Fase 3 completa | Sim | Sim | Sim | **Formalmente concluída** |
-| SEO-S1 | Plano | n/a | Não iniciado | **Próxima unidade** |
-| Fase 4.1 — Radar | Não | Não | Não | **Planejada** |
+| R0 — contenção | Sim | Sim | Não | CI verde; merge/produção pendentes |
+| R1 — dados/fórmulas | Sim | Sim | Não | CI verde; merge/produção pendentes |
+| R2 — CI/segurança | Sim | Sim; E2E CI 12/12 | Não | CI verde; merge/produção pendentes |
+| R3 — Premium/evidência | Sim | Sim, sem produção | Não | Aguardando smoke pós-deploy |
+| R4 — Risk Lab/FNET | Sim, fail-closed por categoria | Sim | Não | CI verde; merge/produção pendentes |
+| R5 — arquitetura/observabilidade/performance/UX | Sim | Sim; axe desktop/mobile aprovado | Não | CI verde; merge/produção pendentes |
+| Fase 3 completa | Código histórico + correções | Local | Não | Parcial |
+| SEO-S1 | Correções essenciais incluídas | Local | Não | Parcial |
+| Fase 4.1 — Radar | Não | Não | Não | Planejada |
 
-### Pendências de dados conhecidas
+### Defeitos cobertos
 
-- Lacuna externa permanece `null`, com fonte, data e aviso; nunca vira zero inventado.
-- Dados PF/PJ não publicados permanecem sinalizados como indisponíveis.
-- Divergências históricas de ISIN permanecem sob revisão quando documentadas.
-- Ativos inativados preservam histórico e evidência oficial.
+O branch cobre os vinte defeitos da auditoria:
+
+- DEF-01/13/17: contrato público de evidência, smoke Premium real e documentação reconciliada;
+- DEF-02: ticker inválido não vira listagem;
+- DEF-03/04/05: qualidade, DY e invalidação de derivados;
+- DEF-06/07/08/09/20: autorização, privilégio, admin, Firestore e headers;
+- DEF-10/11/12: dependências, lint, cobertura, Emulator, HTTP, E2E e CI;
+- DEF-14: política por categoria e automação FNET;
+- DEF-15: Route Handlers sem acesso direto à persistência;
+- DEF-16: logs sanitizados e correlation ID;
+- DEF-18: snapshot materializado de pares;
+- DEF-19: semântica, responsabilidade técnica, mobile e acessibilidade.
 
 ---
 
@@ -84,326 +107,405 @@ Uma confirmação verbal, um workflow isolado ou testes em poucos tickers não c
 
 ### Fase 1 — Regulatory Engine
 
-Concluída com parser CVM v2, suporte FII/FIAGRO, reconciliação, QA, publicação protegida, backup, hash, rollback e auditoria.
+**Estado:** formalmente concluída, sem reabertura identificada nesta rodada.
+
+Inclui parser regulatório, FII/FIAGRO/FI-Infra, normalização, reconciliação, QA, versionamento, publicação protegida, backup, rollback e auditoria.
 
 ### Fase 2 — Core Intelligence & Product Foundation
 
-Concluída com `RegulatoryDataService`, repositório, normalização, validação, cache, tipos, `ScoreEngine`, Health, Validation, Admin, Timeline, relatórios, AI Insights, observabilidade, monitor, catálogo, notificações e jobs.
+**Estado:** formalmente concluída quanto à entrega histórica; componentes transversais afetados pelos defeitos foram endurecidos no branch corretivo.
 
-A conclusão não depende apenas de TGAR11, VGIA11, MXRF11, KNCA11 ou BODB11; os gates cobrem o universo aplicável.
+Inclui `RegulatoryDataService`, repositórios, cache, Score, Health, Validation, Admin, Timeline, relatórios, AI Insights, monitor, catálogo, carteira e jobs.
 
 ### Fase 3 — Risk Lab
 
-Formalmente concluída:
+**Estado da fase completa:** parcial.
 
-- 3.0–3.4: infraestrutura, regras determinísticas, persistência, auditoria e produção.
-- 3.5-R: reorganização.
-- 3.5-A — DEVA11: 85/85 documentos.
-- 3.5-B1 — VSLH11: 79/79 documentos.
-- 3.5-B2 — KNCR11: 52/52 documentos e 48 competências.
-- 3.5-B3 — KNSC11: 52/52 documentos e 48 competências.
-- 3.5-B4 — MCCI11: 48/48 documentos; caso preservado como inconclusivo.
-- 3.5-B5 — RBRY11: 54/54 documentos e 47 competências contínuas.
-- 3.5-C: 318 observações, backtest sem look-ahead e evidência imutável.
-- 3.6: calibração leave-one-case-out e homologação do ruleset `0.2.0`.
-- 3.7: integração read-only no Premium e Prompt Premium v3 em produção.
+- 3.0–3.4: evidências históricas preservadas.
+- 3.5: dataset congelado e backtest metodológico preservados.
+- 3.6: ruleset `0.2.0` e calibração preservados.
+- 3.7: integração read-only existe, mas a aceitação completa depende do novo smoke Premium autenticado no SHA corretivo.
 
-Métricas homologadas da coorte verificável:
-
-- acurácia: `100%` em cinco casos verificáveis;
-- cobertura: `83,33%`;
-- falsos positivos: `0`;
-- falsos negativos: `0`;
-- MCCI11: `inconclusive_unscored`, fora da otimização e das métricas pontuadas.
+A evidência `docs/production-evidence/risk-lab/phase-3-final-closure.json` continua íntegra como registro histórico do release `a3b4f2c…`; ela não prova as correções posteriores nem substitui o gate do SHA atual.
 
 ---
 
 ## 3. Sprint atual
 
-Não existe Sprint da Fase 3 em aberto.
+**Nome:** encerramento verificável das Sprints Corretivas R0–R5.
 
-A Sprint 3.7 foi formalmente concluída com:
+### Escopo em execução
 
-1. ruleset `0.2.0` e hashes conferidos;
-2. cálculos determinísticos antes da IA;
-3. IA restrita a interpretação;
-4. feature flag `ENABLE_RISK_LAB_PREMIUM_READONLY`;
-5. código fail-closed, com padrão `false`;
-6. ativação explícita no deployment;
-7. autorização Premium no servidor;
-8. auditoria `premium-read`;
-9. fallback fora da coorte;
-10. MCCI11 inconclusivo;
-11. notificações e efeitos externos bloqueados;
-12. Preview, produção e smoke test no mesmo SHA;
-13. rollback por flag ou reversão de commit.
+1. congelar código e documentação;
+2. executar instalação limpa, audit, secret scan, lint e typecheck;
+3. executar testes completos, Firestore Emulator e cobertura crítica;
+4. executar build, smoke HTTP e E2E desktop/mobile;
+5. abrir PR corretiva com rastreabilidade DEF/COR;
+6. obter CI verde no SHA do PR;
+7. mesclar conforme proteção do repositório;
+8. identificar o SHA efetivamente publicado;
+9. executar smoke Premium via OIDC;
+10. reconciliar Handoff, evidência pública e produção.
+
+### Critério de encerramento
+
+Esta Sprint só termina quando o mesmo SHA estiver aprovado no CI e em produção. Falha ou ausência de E2E, deployment, audit receipt ou persistência `premium-read` mantém o estado parcial.
 
 ---
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **SEO-S1 — dias 1–15:** fundação técnica, indexação, metadados, sitemap, canonicals e páginas prioritárias.
-2. **Fase 4.1 — Radar/Acompanhar fundo:** acompanhamento fora da carteira.
-3. **Fase 4+:** inteligência documental, “o que mudou”, carteira histórica verdadeira, screener quantitativo, fair value e sustentabilidade da renda.
+1. **COR-CLOSE — PR, CI, merge, deploy e double check pós-deploy.**
+2. **SEO-S1 — baseline e indexação técnica completa**, preservando as correções de canonical/sitemap deste branch.
+3. **Fase 4.1 — Radar/Acompanhar fundo fora da carteira.**
+4. **Fase 4.2 — inteligência documental e “o que mudou”.**
+5. **Fase 4.3 — carteira histórica verdadeira, retorno total e atribuição.**
+6. **Fase 4.4 — screener, comparador e filtros salvos.**
+7. **Fase 4.5 — fair value e sustentabilidade de dividendos por categoria.**
 
-SEO-S1 pode avançar como trilha paralela sem alterar as regras de segurança ou a evidência congelada do Risk Lab.
+Cobrança, WhatsApp, Telegram e recomendações individualizadas não antecipam nem substituem os gates corretivos.
 
 ---
 
 ## 5. Escopo e critérios de aceite de cada sprint
 
-### Sprint 3.5 — concluída
+### R0 — Contenção de segurança e integridade
 
-- seis casos processados com regras gerais;
-- documentos classificados e conflitos explicados;
-- séries mensais com proveniência e hashes;
-- duas execuções reproduzíveis;
-- nenhum hardcode condicional por ticker;
-- dataset congelado e backtest sem informação futura;
-- evidência no Git e gates permanentes.
+Escopo: bloquear mutação anônima, ignorar privilégio do cliente, corrigir validação financeira e remover dependências vulneráveis/legadas.
 
-### Sprint 3.6 — concluída
+Aceite: zero vulnerabilidade crítica/alta de produção; mutação anônima 401/403; plano/e-mail no servidor; nenhum dado inválido publicado como válido.
 
-- espaço de candidatos limitado e pré-registrado;
-- calibração sem look-ahead;
-- folds leave-one-verified-case-out;
-- zero falso positivo e zero falso negativo nos casos verificáveis;
-- MCCI11 fora da otimização;
-- ruleset `0.2.0` homologado.
+### R1 — Dados e fórmulas canônicas
 
-### Sprint 3.7 — concluída
+Escopo: contrato de qualidade, CNPJ, escala, unidades, datas, freshness, DY, P/VP, ágio/desconto e cache.
 
-- cálculo determinístico antes da IA;
-- integração Premium read-only;
-- Prompt Premium v3;
-- Modo Gestor com limitações explícitas;
-- autorização e auditoria no servidor;
-- feature flag e rollback;
-- fallback fora da coorte;
-- health check operacional sem dados sensíveis;
-- gate pós-deploy no SHA exato;
-- nenhum alerta, e-mail, WhatsApp, Telegram ou alteração de carteira.
+Aceite: 100% de linhas dos módulos financeiros críticos; branches acima de 90%; regressões BODB11, RJDA11, TGAR11, VGIA11, MXRF11 e dados ausentes.
 
-### SEO-S1 — próxima
+### R2 — Qualidade e segurança operacional
 
-- indexação técnica saudável;
-- metadados e canonicals consistentes;
-- sitemap e páginas prioritárias;
-- medição em Search Console e analytics;
-- nenhum conflito com segurança, dados regulatórios ou Risk Lab.
+Escopo: ESLint, CI integral, Firestore Rules, Emulator, contratos HTTP, detecção de segredos, build e E2E.
+
+Aceite: instalação limpa Node 22; audit, lint, typecheck, suíte, Emulator, cobertura, build, smoke HTTP e E2E verdes, sem skip crítico.
+
+### R3 — Evidência e produção Premium
+
+Escopo: contrato do endpoint Risk Lab, snapshot Premium, audit receipt, OIDC, smoke real e evidência imutável vinculada ao SHA.
+
+Aceite: geração Premium autenticada, plano no servidor, `premium-read` relido, read-only comprovado, sem notificação/mutação e SHA igual ao Vercel.
+
+### R4 — Generalização Risk Lab
+
+Escopo: política por categoria, estado explícito sem calibração, FNET automático, idempotência, quarentena e ausência de aprovação técnica manual.
+
+Aceite: nenhum hardcode por ticker no runtime; casos de papel, desenvolvimento, tijolo, FIAGRO, FI-Infra, FoF e híbrido classificados ou recusados explicitamente; alerta apenas em categoria homologada.
+
+### R5 — Consolidação técnica
+
+Escopo: handlers finos, limites de camada, ciclo de dependências, SafeLogger, snapshot de pares, canonical, sitemap, `h1`, headers, teclado/mobile/axe.
+
+Aceite: nenhum `route.ts` importa Firestore; nenhum ciclo interno; repository sem UI; custo Premium constante; um `h1`; carteira `noindex`; headers globais.
+
+### COR-CLOSE
+
+Escopo: publicar e reauditar as Sprints R0–R5.
+
+Aceite: PR sem thread bloqueadora, checks verdes, deployment do SHA, smoke OIDC verde, endpoints coerentes e Handoff atualizado com IDs reais.
+
+### SEO-S1
+
+Escopo: host canônico, Search Console, sitemap de fundos ativos, robots, metadados, dados estruturados e baseline.
+
+Aceite: nenhuma rota privada indexada; canonical por rota; métricas registradas; erros de cobertura tratados.
 
 ### Fase 4.1 — Radar
 
-- Grátis acompanha até 1 fundo;
-- Premium acompanha até 10 fundos;
-- limite validado no backend;
-- acompanhamento fora da carteira;
-- notícias e relatório pré-compra;
-- alertas somente por mudança material.
+Escopo: acompanhar fundo fora da carteira, timeline, relatório pré-compra e mudança material.
+
+Aceite: Grátis acompanha até 1 fundo; Premium até 10; limite e plano no servidor; ausência de mudança não notifica; deduplicação e opt-out.
 
 ---
 
 ## 6. Regras arquiteturais obrigatórias
 
-1. APIs novas usam `RegulatoryDataService` ou serviço de domínio equivalente; não acessam Firestore diretamente.
-2. Correções de parser, normalização e cálculo são globais e testadas.
-3. Ausência de dado permanece `null`; não vira zero.
-4. Artefatos do Risk Lab são imutáveis, versionados e verificáveis por SHA-256.
-5. Reapresentações são selecionadas deterministicamente e conflitos econômicos falham fechado.
-6. GitHub Actions não é fila, banco, cron de aplicação ou mecanismo de polling.
-7. Estado operacional pertence ao backend/Firestore.
-8. Não existe exceção hardcoded por ticker sem regra geral comprovada.
-9. IA recebe fatos determinísticos e não recalcula score nem preenche lacunas.
-10. Segurança e entitlement são validados no servidor.
-11. Runtime alterado exige Preview e deployment real.
-12. Toda fase exige logs, métricas, evidência, rollback e gate automatizado aplicável.
-13. O Risk Lab Premium permanece read-only até uma futura fase aprovar outro contrato.
-14. Notificações do Risk Lab continuam proibidas até gate específico futuro.
+1. Fluxo: Route Handler → autenticação/schema HTTP → controller/application service → engine/`RegulatoryDataService` → repository → Firestore/provedor.
+2. Route Handler não importa `firebaseAdmin`, `adminDb` nem chama `.collection()`.
+3. Componente React não contém regra financeira nem depende de server/repository.
+4. Repository não importa React, componente, `NextResponse` ou regra de apresentação.
+5. Não há dependência circular.
+6. Normalização, unidade, data-base e proveniência ficam na camada regulatória.
+7. Ausência permanece `null`/estado explícito; zero válido é preservado.
+8. Falha externa é explícita; fallback não pode simular dado atual.
+9. Admin humano usa sessão Firebase HttpOnly/SameSite; cron usa Bearer; workflow usa OIDC.
+10. OIDC verifica issuer, audience, repositório, workflow, branch e SHA publicado.
+11. Risk Lab é read-only no Premium e não produz efeitos externos.
+12. Correção estrutural substitui exceção por ticker.
+13. Logs passam por sanitização, não contêm e-mail, OTP, token, cookie ou segredo e carregam correlation ID.
+14. Snapshot materializado tem schema, hash, freshness e limite de tamanho; vencido falha fechado.
+15. CI é gate de merge/deploy, não fila, cron de aplicação ou mecanismo de polling.
 
 ---
 
 ## 7. Arquivos, branches, commits e PRs existentes
 
-### Commits e PRs canônicos da Fase 3
+### Referências de estado
 
-- PR #105 — DEVA11; merge `498654f03ce66bd54598d5a4677c18bbe5bbdc86`.
-- PR #112 — VSLH11; merge `1c4c96e571b7daa80a56d9a5be35e2af050e6469`.
-- PR #115 — KNCR11; merge `52c02e41a64a09eaa6d6649c30cd6ddb8f9fb693`.
-- PR #118 — KNSC11; merge `1925b53a268f90b4c2f9a2733c4ac8df645a14ec`.
-- PR #122 — MCCI11; merge `d2000807cc51f66288491ccf715f7ed84ab63fb2`.
-- PR #125 — RBRY11; merge `c616437a0a44c1543015a709911c67f70f390b7d`.
-- PR #128 — dataset/backtest 3.5-C; merge `ef0c621f2f813009fdb3999b721e4f4a6568c134`.
-- PR #131 — calibração 3.6; merge `bfdc186057652a535025d19beae061856624d5c1`.
-- PR #134 — integração funcional 3.7; merge `7391791b09b1615a86e29c2002b74f95f55e833e`.
-- PR #135 — estado canônico pendente de produção; merge `4577ace58220e3ca800c3f1a89500ff31b7bfcd2`.
-- PR #136 — ativação controlada; merge `3062d8c5b568af90733451d1fe973a99637b1a58`.
-- PR #137 — health check e gate pós-deploy; merge `b19b6dda25142814d4e0e0ac72c65a733f8ab3e0`.
-- PR #138 — status auditável do gate; merge `a3b4f2c010fba3e62e52ed50b8fcacf2706474d2`.
-- Issue #133 — encerrada como `completed` após o merge da evidência final.
-- PR #65 — regra de mês corrente; permanece separada da Fase 3 e requer rebase/auditoria.
+- Repositório: `IsraelJr/dados-fii`.
+- `main` auditado antes das correções: `607dafefefaba5c88f986236eb365440c6fb8c94`.
+- Release histórico da Fase 3: `a3b4f2c010fba3e62e52ed50b8fcacf2706474d2`.
+- Branch corretiva: `agent/corrective-sprints-r0-r5`.
+- Commit local consolidado das Sprints R0–R5: `d07e65b`.
+- Commit remoto equivalente, com a mesma árvore Git: `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`.
+- Follow-up remoto de Login e acessibilidade: `fd0e0280ec4d8f4550be6227b98fd7854d218f23`.
+- Follow-up de precisão do E2E: `0447ee33072712462704c315df4c087c918f85b3`.
+- Commit corretivo de contraste aprovado no CI: `c6af2a045da64c99b777f18ce4ea2536216d4dc9`.
+- Draft PR corretiva: [#141 — fix: executar Sprints Corretivas R0–R5](https://github.com/IsraelJr/dados-fii/pull/141).
+- CI inicial: Portfolio Notifications run `30233676618` aprovado; Risk Lab run `30233676617` aprovado; Phase 2 Closure run `30233676643` reprovado exclusivamente no E2E.
+- CI aprovado no código final: Portfolio Notifications run `30234489574`; Risk Lab run `30234489557`; Phase 2 Closure run `30234489569`.
 
-### Evidências principais
+### Arquivos corretivos centrais
 
-- `docs/production-evidence/risk-lab/cohort-phase-c/`
-- `docs/production-evidence/risk-lab/calibration-phase-3-6/`
-- `docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json`
-- `docs/production-evidence/risk-lab/phase-3-final-closure.json`
-- `src/lib/risk-lab/RiskLabRulesetV020.ts`
-- `src/lib/risk-lab/RiskLabPremiumReadModel.ts`
-- `src/lib/risk-lab/risk-lab-premium-readonly-v1.json`
-- `src/app/api/health/risk-lab-premium/route.ts`
-- `.github/workflows/risk-lab-premium-production-gate.yml`
+- `firestore.rules`, `firestore.indexes.json`, `firebase.json`;
+- `eslint.config.mjs`, `playwright.config.ts`;
+- `.github/workflows/phase-2-closure.yml`;
+- `.github/workflows/production-premium-smoke.yml`;
+- `src/lib/regulatory/RegulatoryValidator.ts`;
+- `src/lib/fiiDerivedData.ts`;
+- `src/lib/security/InternalRequestAuth.ts`;
+- `src/lib/security/GithubActionsOidc.ts`;
+- `src/lib/observability/SafeLogger.ts`;
+- `src/lib/risk-lab/PublicRiskLabEvidenceContract.ts`;
+- `src/lib/risk-lab/RiskLabCategoryPolicy.ts`;
+- `src/lib/reports/PremiumPeerSnapshot.ts`;
+- `src/app/api/internal/production-premium-smoke/route.ts`;
+- `scripts/run-http-smoke.mjs`;
+- `scripts/scan-secrets.mjs`;
+- `tests/corrective-*.test.ts`, `tests/corrective-*.test.mjs`;
+- `tests/firestore-rules.test.ts`;
+- `tests/e2e/critical-journeys.spec.ts`.
+
+### Arquivos removidos
+
+- `monitor.js`: script legado com contrato inseguro;
+- `src/app/_document.tsx`: convenção inválida para App Router;
+- `DADOS_FII_HANDOFF_SPRINT_3_5_CONTINUACAO.md`: fonte canônica duplicada.
 
 ---
 
 ## 8. Funcionalidades concluídas, parciais e pendentes
 
-### Concluídas
+### Concluídas historicamente
 
-- Regulatory Engine e publicação protegida.
-- Core Intelligence e serviços de dados.
-- Relatório gratuito e Premium.
-- AI Insights e Prompt Premium v3.
-- Modo Gestor determinístico.
-- Risk Lab 3.0–3.7.
-- Integração Premium read-only do Risk Lab.
-- Health check e gate automatizado pós-deploy.
-- Autorização, auditoria, fallback e rollback da integração.
+- consulta e catálogo de FII/FIAGRO/FI-Infra;
+- carteira atual e snapshots;
+- relatórios Free, AI Insights e Premium base;
+- dados regulatórios, score, health, validation, timeline e observabilidade;
+- Risk Lab 3.0–3.6 metodológico;
+- integração Premium read-only implementada.
+
+### Implementadas no branch, não comprovadas em produção
+
+- contrato financeiro e qualidade fail-closed;
+- autorização de alertas, dividendos, Admin, cron e OIDC;
+- regras Firestore deny-all para cliente;
+- evidência pública Risk Lab com status HTTP correto;
+- smoke Premium real com recibo e releitura;
+- snapshot de pares;
+- FNET automático e política por categoria;
+- SafeLogger/correlation ID;
+- CI completo, HTTP smoke e E2E;
+- canonical, sitemap, headers, um `h1` e responsabilidade técnica.
 
 ### Parciais
 
-- Alertas: mudança material implementada parcialmente; digest unificado ainda é dívida.
-- IFIX: calendário oficial e execução manual parcialmente implantados.
-- Regra de meses encerrados: PR #65 não integrada.
-- Worker persistente FNET: arquitetura definida, implementação pendente.
+- Fase 3: falta prova corretiva pós-deploy.
+- Risk Lab: apenas domínios com evidência suficiente podem alertar; demais retornam `insufficient_data`.
+- SEO-S1: correções essenciais existem, mas faltam baseline e validação em produção.
+- observabilidade: estrutura sanitizada existe; métricas externas/alertas operacionais dependem do ambiente.
 
-### Pendentes
+### Pendentes de produto
 
-- SEO-S1.
-- Radar/Acompanhar fundo.
-- Inteligência documental e “o que mudou”.
-- Carteira histórica verdadeira.
-- Screener quantitativo.
-- Fair value e sustentabilidade da renda.
-- Forma final de cobrança e escopo do Super Premium.
+- Radar/Acompanhar fundo fora da carteira para decidir comprar ou não;
+- carteira histórica verdadeira e atribuição de retorno;
+- inteligência documental oficial e resumo “o que mudou”;
+- screener, comparador, filtros salvos e ranking explicável;
+- fair value e sustentabilidade de dividendos por categoria;
+- calendário anúncio → data-com → pagamento com posição histórica;
+- benchmark/retorno total e simuladores.
+
+Esses itens trazem ganhos competitivos, mas não substituem segurança, integridade de dados nem prova de produção.
 
 ---
 
 ## 9. Decisões de segurança
 
-- Admin exige autenticação, e-mail verificado e autorização no servidor.
-- `ADMIN` é papel de autorização, não plano comercial.
-- Segredos nunca usam prefixo `NEXT_PUBLIC_`.
-- Endpoints administrativos são autenticados, auditáveis e protegidos contra abuso.
-- Jobs automáticos usam segredo próprio.
-- Logs não expõem tokens, cookies ou dados pessoais.
-- Carteiras são segregadas por usuário.
-- Entitlements são validados no backend.
-- Relatórios são informativos e não prometem retorno.
-- Risk Lab não envia notificações nem altera carteira.
-- Health check expõe somente estado operacional não sensível.
-- O gate de produção possui apenas `statuses: write`; não escreve conteúdo nem cria PR.
-- Rollback imediato: `ENABLE_RISK_LAB_PREMIUM_READONLY=false`.
+- `FIREBASE_SERVICE_ACCOUNT_KEY`, `CRON_SECRET`, `RESEND_API_KEY` e `OPENAI_API_KEY` são secretos e server-only.
+- Variável `NEXT_PUBLIC_*` nunca concede plano, admin ou privilégio.
+- Plano comercial vem do perfil persistido no servidor.
+- Admin é allowlist server-side + e-mail verificado + cookie de sessão HttpOnly/Secure/SameSite.
+- Cron aceita somente `Authorization: Bearer <CRON_SECRET>`.
+- Workflows operacionais usam OIDC efêmero quando precisam chamar produção.
+- Segredo em URL, query, body ou header legado não autentica.
+- Firestore cliente é deny-all; acesso ocorre pelo backend autorizado.
+- Mutações possuem limite, idempotência, transação/lock e auditoria conforme o domínio.
+- OTP nunca é logado; ausência do provedor de e-mail falha fechado.
+- Logs são sanitizados e IDs sensíveis são pseudonimizados.
+- CSP, HSTS, frame denial, nosniff, referrer, permissions e COOP são globais.
+- Evidência publicada não contém credencial, token, e-mail ou payload de usuário real.
+- Produção nunca é usada para teste destrutivo.
 
 ---
 
 ## 10. Variáveis de ambiente
 
-### Confirmadas ou usadas
+### Públicas e não autorizativas
 
 - `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
 - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
+- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_BASE_URL`
+- `NEXT_PUBLIC_ADSENSE_CLIENT`, `NEXT_PUBLIC_ADSENSE_SLOT`, `NEXT_PUBLIC_ADS_OPEN`
+- `NEXT_PUBLIC_BASIC_SALARY`, `NEXT_PUBLIC_DEFAULT_ALERT_VALUE`
+
+### Secretas/server-only
+
+- `FIREBASE_SERVICE_ACCOUNT_KEY`
+- `CRON_SECRET`
 - `ADMIN_EMAILS`
-- `ENABLE_AUTOMATIC_MONITOR`
-- `ENABLE_REPORT_PREMIUM`
+- `OPENAI_API_KEY`
+- `RESEND_API_KEY`
+- `BRAPI_TOKEN`
+- `BRAPI_API_TOKEN` (alias legado controlado)
+- `GOOGLE_SHEETS_API_KEY`, `GOOGLE_SERVICE_ACCOUNT_KEY`
+- `SHEET_ID`, `FEEDBACK_SHEET_ID`, `FEEDBACK_SHEET_NAME`
+- `WALLET_EMAIL_FROM`
+- `MONITOR_ALERT_EMAILS`, `MONITOR_EMAIL_FROM`
+- `PREMIUM_PREVIEW_EMAILS`
+
+### Configuração operacional
+
+- `OPENAI_MODEL`
+- `OPENAI_INSIGHTS_MODEL`, `OPENAI_RISK_REPORT_MODEL`, `OPENAI_SEARCH_MODEL`
+- `OPENAI_TIMEOUT_MS`
+- `OPENAI_INSIGHTS_MAX_OUTPUT_TOKENS`
+- `OPENAI_PREMIUM_MAX_OUTPUT_TOKENS`
+- `OPENAI_RISK_REPORT_MAX_OUTPUT_TOKENS`
+- `OPENAI_PROMPT_ABOUT_FII`
+- `AI_INSIGHTS_CACHE_MAX_ENTRIES`, `AI_INSIGHTS_CACHE_TTL_MS`
+- `AI_INSIGHTS_RATE_MAX_REQUESTS`, `AI_INSIGHTS_RATE_WINDOW_MS`
+- `REGULATORY_CACHE_MAX_ENTRIES`, `REGULATORY_CACHE_TTL_MS`, `REGULATORY_MARKET_CACHE_TTL_MS`
+- `MONITOR_ALERT_COOLDOWN_MS`
+- `PORTFOLIO_NOTIFICATION_USER_LIMIT`
+- `ENABLE_RISK_LAB_AUTOMATIC_DISCOVERY`
+- `ENABLE_RISK_LAB_FNET_IMPORT`
+- `ENABLE_RISK_LAB_STRESS_RUN`
 - `ENABLE_RISK_LAB_PREMIUM_READONLY`
-- credenciais Firebase Admin no servidor
-- chave do provedor de IA no servidor
-- segredos de jobs/cron no servidor
+- `ENABLE_SYSTEM_VALIDATION`, `ENABLE_HEALTH_MONITOR`
+- `ENABLE_AI_INSIGHTS`, `ENABLE_REPORT_PREMIUM`
+- `ENABLE_AUTOMATIC_MONITOR`, `ENABLE_SCORE_ENGINE`, `ENABLE_RISK_LAB_ADMIN`
+- `SITE_URL`, `VERCEL_URL`, `VERCEL_ENV`, `VERCEL_GIT_COMMIT_SHA`, `VERCEL_PROJECT_PRODUCTION_URL`, `NODE_ENV`, `CI`
 
-### Regras
-
-- Preview e Produção são validados separadamente quando há runtime.
-- `ENABLE_RISK_LAB_PREMIUM_READONLY` tem padrão de código `false`.
-- A ativação em produção é explícita e versionada.
-- Variável ausente produz fallback seguro e observável.
-- Valores secretos não são registrados neste documento.
-- Credenciais sintéticas de CI não são usadas em deployment real.
-
-### Pendentes de decisão
-
-- provedor e variáveis de cobrança;
-- WhatsApp e templates;
-- worker persistente FNET;
-- retenção de artefatos operacionais fora do Git.
+Valores nunca são registrados no Handoff, log ou evidência.
 
 ---
 
 ## 11. Testes obrigatórios
 
-### Gates permanentes
+### Gate de PR
 
-- `npm run test:risk-lab`
-- testes determinísticos de DEVA11, VSLH11, KNCR11, KNSC11, MCCI11 e RBRY11
-- testes do dataset/backtest 3.5-C
-- testes de calibração 3.6
-- `npm run test:sprint3.7`
-- teste de configuração de rollout
-- teste do health check
-- teste do gate de produção
-- `npm run test:workflow-governance`
-- `npm run test:handoff`
-- `npm run typecheck`
-- `npm run test:sprint2`
-- `next build`
-- Preview Vercel quando há runtime
-- Vercel de produção no SHA final
-- commit status `Risk Lab Premium Production Gate = success`
+1. `npm ci`
+2. `npm run audit:production`
+3. `npm run security:secrets`
+4. `npm run lint`
+5. `npm run typecheck`
+6. `npm run test:workflow-governance`
+7. `npm run test:handoff`
+8. `npm run test:all`
+9. `npm run test:rules`
+10. `npm run test:coverage:critical`
+11. `npm run test:mutation`
+12. `npm run build`
+13. `npm run test:http`
+14. `npm run test:e2e`
 
-### Regra de conclusão
+### Última evidência local reproduzível — 27/07/2026
 
-Uma fase só pode ser concluída quando:
+- instalação limpa do lockfile: aprovada;
+- audit de produção: zero vulnerabilidades;
+- secret scan: aprovado em 577 arquivos versionados;
+- lint e TypeScript: aprovados, sem warning ou erro;
+- suíte completa: 529 aprovados, zero falhos, zero ignorados, zero pendentes;
+- Firestore Emulator: regras deny-all aprovadas para usuário anônimo e autenticado;
+- cobertura crítica: linhas 100%, branches 93,66%, funções 98,53%;
+- mutation sanity: mutação central detectada, restauração byte a byte e reexecução aprovadas;
+- build Next.js 16.2.12: aprovado, 38 páginas geradas;
+- HTTP real local: 200, 400, 401, 403, 404, 405 e 503 aprovados;
+- E2E Chromium inicial no CI: 8 cenários aprovados e 4 combinações projeto/jornada reprovadas; o runner comprovou Login oculto fora de `localhost`, contraste de 2,51:1 nos anos sem dados e duas regiões de gráfico roláveis sem foco.
+- Regressão aplicada: Login deixou de depender do hostname; controles sem dados usam contraste AA; regiões roláveis receberam nome, foco por teclado e indicador visual.
+- E2E intermediário: locator de alerta passou a ser escopado ao diálogo sem reduzir a asserção semântica; axe revelou e bloqueou contrastes de 2,6:1, 2,93:1 e 3,76:1.
+- E2E Chromium definitivo no run `30234489569`: 12/12 aprovados em desktop e mobile, incluindo axe sem violação séria/crítica.
 
-- código está em `main`;
-- CI obrigatória está verde;
-- universo aplicável foi coberto;
-- correções são gerais e testadas;
-- evidência final está no Git;
-- deployment aplicável está saudável;
-- review threads abertas são zero;
-- auditoria pós-merge confirmou o conteúdo;
-- issue foi encerrada após auditoria;
-- Handoff foi atualizado e protegido por teste.
+### Regressões obrigatórias
 
-Testes manuais podem complementar, mas não substituir gates automatizados.
+- REG-DEF-01 a REG-DEF-20;
+- ticker `ABC`, duplicidade e paginação inválida;
+- BODB11/RJDA11 incompletos;
+- DY legado divergente e ausência de cotação;
+- P/VP, ágio/desconto, escala pt-BR e data impossível;
+- anônimo sem mutação e payload malformado sem autenticação;
+- plano/e-mail do body ignorados;
+- segredo legado rejeitado;
+- regras Firestore no Emulator;
+- endpoint Risk Lab 404/409/202/422/200;
+- Premium 401/403/404/429/erro tratado/sucesso auditado;
+- TGAR11, VGIA11, MXRF11, KNCA11, BODB11 e categorias diversas;
+- nenhum `route.ts` com Firestore;
+- nenhum ciclo;
+- SafeLogger sem e-mail, OTP, JWT ou Bearer;
+- um `h1`, teclado, desktop/mobile e axe sem violação séria/crítica;
+- build sem fallback silencioso de sitemap.
+
+### Gate pós-deploy
+
+- SHA Git = SHA Vercel = SHA do token OIDC;
+- geração Premium real com conta sintética controlada;
+- audit receipt persistido e relido;
+- snapshot de pares atual;
+- read-only e ausência de efeitos externos;
+- evidência de smoke imutável;
+- endpoint público coerente com ruleset/release;
+- smoke público de UI/APIs, cache e headers.
 
 ---
 
 ## 12. Pendências e decisões ainda abertas
 
-### Próxima execução
+### Bloqueadoras para concluir as correções
 
-- iniciar SEO-S1 conforme o plano de 90 dias;
-- depois iniciar Fase 4.1 — Radar/Acompanhar fundo;
-- não modificar dataset, verdade-terreno ou hashes históricos da Fase 3;
-- qualquer expansão da coorte exige nova evidência e nova fase.
+- resolver qualquer thread de revisão;
+- mesclar sem bypass de gate;
+- publicar o mesmo SHA;
+- executar o workflow `Production Premium Smoke`;
+- registrar o SHA mesclado, deployment e execução pós-deploy neste Handoff;
+- repetir a auditoria adversarial pós-deploy.
 
-### Decisões de produto
+### Decisões de produto abertas
 
-- forma de cobrança e nomes finais dos planos;
-- escopo do Super Premium;
-- WhatsApp: custo, opt-in, templates e limites;
-- política de retenção de relatórios e dados históricos;
-- Telegram permanece adiado.
+- cobrança recorrente, anual ou compra avulsa;
+- PSP, emissão fiscal, cancelamento, reembolso e inadimplência;
+- WhatsApp: custo, opt-in, template, frequência e proteção de dados;
+- Telegram permanece adiado;
+- limites finais de relatórios Premium e IA;
+- composição exata de planos além do Radar 1/10;
+- quais categorias Risk Lab receberão próxima calibração;
+- política jurídica final de alertas e linguagem informativa;
+- estratégia de Search Console e host canônico definitivo entre apex e `www`;
+- retenção e exclusão de dados de carteira/alertas.
 
-### Dívidas técnicas e operacionais
+### Regra de conclusão
 
-- rebase e auditoria da PR #65;
-- worker persistente FNET;
-- digest unificado de alertas;
-- completar dados abertos quando novas fontes oficiais existirem;
-- executar SEO-S1 sem reabrir ou reescrever a evidência da Fase 3.
-
-### Regra de parada
-
-A Fase 3 está formalmente concluída. O Risk Lab `0.2.0` está em produção no Relatório Premium exclusivamente em modo read-only, com autorização e auditoria no servidor, fallback explícito, rollback, notificações bloqueadas e gate pós-deploy verde no SHA `a3b4f2c010fba3e62e52ed50b8fcacf2706474d2`.
+Enquanto qualquer bloqueador acima existir, as Sprints Corretivas não são formalmente concluídas, o sistema ainda exige prova técnica automatizada pós-deploy e nenhuma validação manual do usuário substitui essa obrigação.

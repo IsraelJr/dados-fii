@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, ExternalLink, FileDown, Loader2, ShieldAlert, XCircle } from "lucide-react";
+import { ExternalLink, FileDown, Loader2, ShieldCheck, XCircle } from "lucide-react";
 import type { FnetDividendNoticePreview } from "@/types/riskLabFnetNotice";
 import type { DividendSeriesReadiness } from "@/types/riskLabSeriesReadiness";
 
@@ -39,7 +39,7 @@ function dateTime(value: string) {
 }
 
 function reviewStyle(status: FnetDividendNoticePreview["reviewStatus"]) {
-  if (status === "approved") return "bg-emerald-100 text-emerald-900 ring-emerald-300";
+  if (status === "verified_automatic") return "bg-emerald-100 text-emerald-900 ring-emerald-300";
   if (status === "rejected") return "bg-red-100 text-red-900 ring-red-300";
   return "bg-amber-100 text-amber-900 ring-amber-300";
 }
@@ -55,7 +55,6 @@ export default function FnetNoticeImportPanel() {
   const [candidates, setCandidates] = useState<FnetDividendNoticePreview[]>([]);
   const [series, setSeries] = useState<DividendSeriesReadiness[]>([]);
   const [documentId, setDocumentId] = useState("");
-  const [confirmations, setConfirmations] = useState<Record<string, boolean>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -77,7 +76,7 @@ export default function FnetNoticeImportPanel() {
     }
   }
 
-  async function write(action: "import" | "approve" | "reject", payload: Record<string, unknown>) {
+  async function write(action: "import" | "reject", payload: Record<string, unknown>) {
     setBusy(action === "import" ? "import" : String(payload.candidateId || action));
     setError("");
     try {
@@ -89,7 +88,7 @@ export default function FnetNoticeImportPanel() {
       if (action === "import") setDocumentId("");
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Falha no fluxo de revisão FNET.");
+      setError(caught instanceof Error ? caught.message : "Falha no fluxo de validação FNET.");
     } finally {
       setBusy("");
     }
@@ -106,7 +105,7 @@ export default function FnetNoticeImportPanel() {
           <p className="text-xs font-extrabold uppercase tracking-widest text-indigo-700">Coleta documental controlada</p>
           <h2 className="mt-2 text-2xl font-black text-slate-900">Avisos mensais do FNET</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Importe um ID oficial de aviso estruturado de rendimentos de MCCI11 ou RBRY11. O sistema lê o aviso e o protocolo, mas nenhum dado entra na série verificada antes da sua aprovação manual.
+            Informe o ID oficial do aviso estruturado. O sistema cruza aviso e protocolo, valida datas, ticker, valor, hashes e versão, e publica a observação de forma atômica. Conflitos ficam em quarentena.
           </p>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${enabled ? "bg-emerald-100 text-emerald-900 ring-emerald-300" : "bg-slate-100 text-slate-700 ring-slate-300"}`}>
@@ -114,8 +113,8 @@ export default function FnetNoticeImportPanel() {
         </span>
       </div>
 
-      <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950 ring-1 ring-amber-200">
-        <ShieldAlert className="mr-2 inline" size={18} /> Aprovar um aviso não executa o detector, não altera alertas e não libera o backtest externo.
+      <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-950 ring-1 ring-emerald-200">
+        <ShieldCheck className="mr-2 inline" size={18} /> A validação automática não executa o detector, não altera alertas e não libera o backtest externo.
       </div>
 
       {!loading && (
@@ -133,19 +132,19 @@ export default function FnetNoticeImportPanel() {
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <SeriesMetric label="Meses aprovados" value={String(item.approvedObservations)} />
+                <SeriesMetric label="Meses verificados" value={String(item.approvedObservations)} />
                 <SeriesMetric label="Maior sequência" value={`${item.longestContiguousCount}/${item.requiredContiguousCount}`} />
                 <SeriesMetric label="Detector" value={item.detectorExecuted ? "Executado" : "Não executado"} />
               </div>
 
               <div className="mt-4 space-y-2 text-sm text-slate-300">
-                <p><strong className="text-white">Intervalo aprovado:</strong> {item.firstCompetence && item.lastCompetence ? `${item.firstCompetence} a ${item.lastCompetence}` : "nenhum mês aprovado"}</p>
+                <p><strong className="text-white">Intervalo verificado:</strong> {item.firstCompetence && item.lastCompetence ? `${item.firstCompetence} a ${item.lastCompetence}` : "nenhum mês verificado"}</p>
                 <p><strong className="text-white">Maior sequência contínua:</strong> {item.longestContiguousMonths.length ? item.longestContiguousMonths.join(", ") : "nenhuma"}</p>
                 <p><strong className="text-white">Lacunas:</strong> {missingLabel(item.missingMonths)}</p>
               </div>
 
               <p className="mt-4 rounded-xl bg-white/10 p-3 text-xs font-bold leading-5 text-slate-200">
-                “Série suficiente” significa apenas que existem nove competências consecutivas aprovadas para alimentar o detector. Nenhum resultado analítico foi calculado nesta etapa.
+                “Série suficiente” significa apenas que existem nove competências consecutivas verificadas para alimentar o detector. Nenhum resultado analítico foi calculado nesta etapa.
               </p>
             </article>
           ))}
@@ -167,7 +166,7 @@ export default function FnetNoticeImportPanel() {
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy === "import" ? <Loader2 className="animate-spin" size={17} /> : <FileDown size={17} />}
-          Importar e pré-visualizar
+          Importar e validar
         </button>
       </div>
 
@@ -203,26 +202,12 @@ export default function FnetNoticeImportPanel() {
                 aviso {candidate.sourceHash}<br />protocolo {candidate.protocolHash}
               </div>
 
-              {candidate.reviewStatus === "pending_manual_review" && (
+              {candidate.reviewStatus === "quarantined" && (
                 <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                  <label className="flex items-start gap-3 text-sm font-bold text-slate-800">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(confirmations[candidate.candidateId])}
-                      onChange={(event) => setConfirmations((current) => ({ ...current, [candidate.candidateId]: event.target.checked }))}
-                      className="mt-1 h-4 w-4"
-                    />
-                    Conferi ticker, competência, valor por cota, data-base, pagamento e horário de entrega nos dois documentos oficiais.
-                  </label>
+                  <p className="text-sm font-bold text-amber-900">
+                    O item não foi publicado porque a validação automática encontrou: {candidate.validationReasons.join(", ")}.
+                  </p>
                   <div className="flex flex-col gap-3 lg:flex-row">
-                    <button
-                      type="button"
-                      disabled={!confirmations[candidate.candidateId] || busy === candidate.candidateId}
-                      onClick={() => void write("approve", { candidateId: candidate.candidateId, confirmed: true })}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
-                    >
-                      <CheckCircle2 size={16} /> Aprovar observação
-                    </button>
                     <input
                       value={reasons[candidate.candidateId] || ""}
                       onChange={(event) => setReasons((current) => ({ ...current, [candidate.candidateId]: event.target.value.slice(0, 500) }))}

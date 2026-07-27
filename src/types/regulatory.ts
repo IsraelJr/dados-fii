@@ -7,12 +7,51 @@ export type FundKind = "FII" | "FIAGRO" | "FI_INFRA" | "UNKNOWN";
 export type ValidationSeverity = "error" | "warning";
 export type ParserStatus = "healthy" | "degraded" | "down" | "unknown";
 export type HealthStatus = ParserStatus | "disabled";
+export type DataQualityStatus = "valid" | "partial" | "stale" | "invalid" | "unavailable";
 
 export type ValidationIssue = {
   code: string;
   field?: string;
   message: string;
   severity: ValidationSeverity;
+};
+
+export type DataQualityAssessment = {
+  status: DataQualityStatus;
+  valid: boolean;
+  confidence: number;
+  reasons: string[];
+  missingFields: string[];
+  invalidFields: string[];
+  freshness: {
+    status: "current" | "stale" | "unknown";
+    asOf: string | null;
+    ageDays: number | null;
+    maxAgeDays: number;
+  };
+};
+
+export type CanonicalFinancialMetric = {
+  value: number | null;
+  unit: "percent";
+  numerator: { field: string; value: number | null; unit: "BRL_per_share" };
+  denominator: { field: string; value: number | null; unit: "BRL_per_share"; asOf: string | null };
+  formulaVersion: string;
+  source: string;
+  asOf: string | null;
+  reason?: string;
+};
+
+export type CanonicalDividendMetrics = {
+  dy12mCurrentPrice: CanonicalFinancialMetric;
+  lastDividendYieldAtBaseDate: CanonicalFinancialMetric;
+  distributionOnNav12m: CanonicalFinancialMetric;
+  legacyConflict: {
+    detected: boolean;
+    legacyValue: number | null;
+    canonicalValue: number | null;
+    absoluteDifferencePercentagePoints: number | null;
+  };
 };
 
 export type RegulatorySource = {
@@ -60,8 +99,14 @@ export type PublicFundData = Record<string, unknown> & {
     currentVersion: number;
     cache: "hit" | "miss";
     sources: RegulatorySource[];
-    validation: { valid: boolean; issues: ValidationIssue[] };
+    validation: {
+      valid: boolean;
+      status?: DataQualityStatus;
+      issues: ValidationIssue[];
+      assessment?: DataQualityAssessment;
+    };
   };
+  canonicalDividendMetrics?: CanonicalDividendMetrics;
   scores?: FundScores;
 };
 

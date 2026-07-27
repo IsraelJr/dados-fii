@@ -509,6 +509,8 @@ export default function WalletEmailVerifiedSync() {
           <div className="grid min-w-0 w-full max-w-full gap-2 lg:max-w-md">
             <input
               type="email"
+              aria-label="E-mail para salvar e recuperar a carteira"
+              autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="seu@email.com"
@@ -517,6 +519,8 @@ export default function WalletEmailVerifiedSync() {
 
             <div className="grid min-w-0 w-full gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <input
+                aria-label="Código de verificação recebido por e-mail"
+                autoComplete="one-time-code"
                 value={pin}
                 onChange={(event) => setPin(event.target.value)}
                 placeholder="Código recebido"
@@ -555,7 +559,7 @@ export default function WalletEmailVerifiedSync() {
             </div>
 
             {message && (
-              <p className="min-w-0 max-w-full whitespace-pre-wrap break-words rounded-lg bg-gray-950/60 p-3 text-xs font-medium leading-5 text-yellow-200 sm:text-sm">
+              <p role="status" className="min-w-0 max-w-full whitespace-pre-wrap break-words rounded-lg bg-gray-950/60 p-3 text-xs font-medium leading-5 text-yellow-200 sm:text-sm">
                 {message}
               </p>
             )}

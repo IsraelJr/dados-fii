@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  classifyRiskLabCategory,
+  type RiskLabCategoryContext,
+} from "@/lib/risk-lab/RiskLabCategoryPolicy";
 import type { PremiumRiskLabReadOnly } from "../../types/premium-report";
 
 export const RISK_LAB_PREMIUM_REGISTRY_VERSION = "premium-readonly-v1" as const;
@@ -83,8 +87,11 @@ export function loadRiskLabPremiumRegistry(root = process.cwd(), registryPath = 
   return registry;
 }
 
-function base(registry: RiskLabPremiumRegistry): Pick<PremiumRiskLabReadOnly,
-  "schemaVersion" | "mode" | "registryVersion" | "rulesetVersion" | "datasetId" | "datasetHash" | "evidenceHash" | "readOnly" | "notificationsAllowed" | "externalEffectsAllowed"> {
+function base(
+  registry: RiskLabPremiumRegistry,
+  category: ReturnType<typeof classifyRiskLabCategory>,
+): Pick<PremiumRiskLabReadOnly,
+  "schemaVersion" | "mode" | "registryVersion" | "rulesetVersion" | "datasetId" | "datasetHash" | "evidenceHash" | "applicabilityCategory" | "categoryPolicyVersion" | "categoryCalibrated" | "readOnly" | "notificationsAllowed" | "externalEffectsAllowed"> {
   return {
     schemaVersion: 1,
     mode: "read_only",
@@ -93,6 +100,9 @@ function base(registry: RiskLabPremiumRegistry): Pick<PremiumRiskLabReadOnly,
     datasetId: registry.dataset.id,
     datasetHash: registry.dataset.hash,
     evidenceHash: registry.evidence.calibrationEvidenceHash,
+    applicabilityCategory: category.category,
+    categoryPolicyVersion: category.policyVersion,
+    categoryCalibrated: category.calibrated,
     readOnly: true,
     notificationsAllowed: false,
     externalEffectsAllowed: false,
@@ -115,9 +125,12 @@ export class RiskLabPremiumReadModel {
     this.byTicker = new Map(registry.cases.map((item) => [item.ticker, item]));
   }
 
-  read(value: unknown, options?: { enabled?: boolean }): PremiumRiskLabReadOnly {
+  read(value: unknown, options?: { enabled?: boolean; category?: RiskLabCategoryContext }): PremiumRiskLabReadOnly {
     const ticker = normalizedTicker(value);
-    const common = base(this.registry);
+    const category = this.byTicker.has(ticker)
+      ? classifyRiskLabCategory({ fundKind: "fundo de papel/credito" })
+      : classifyRiskLabCategory(options?.category);
+    const common = base(this.registry, category);
     if (options?.enabled !== true) {
       return {
         ...common,
@@ -136,6 +149,25 @@ export class RiskLabPremiumReadModel {
     }
     const item = this.byTicker.get(ticker);
     if (!item) {
+      if (!category.calibrated) {
+        return {
+          ...common,
+          availability: "insufficient_data",
+          groundTruthStatus: null,
+          outcome: null,
+          status: null,
+          disposition: null,
+          riskAlert: null,
+          stressDetectedAt: null,
+          recoveryDetectedAt: null,
+          recoveryPercentOfBaseline: null,
+          summary: `O Risk Lab não possui calibração homologada para esta categoria. ${category.reason}`,
+          limitations: [
+            "Nenhum resultado de uma categoria diferente foi extrapolado para este fundo.",
+            "Indisponibilidade metodológica não significa ausência de risco.",
+          ],
+        };
+      }
       return {
         ...common,
         availability: "outside_verified_cohort",

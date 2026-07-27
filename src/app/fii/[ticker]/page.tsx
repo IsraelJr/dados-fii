@@ -296,7 +296,7 @@ export default async function FiiPage({ params }: PageProps) {
       />
 
       <section className="mb-6 rounded-2xl bg-white p-5 text-left shadow-sm ring-1 ring-slate-200">
-        <h1 className="text-2xl font-extrabold text-slate-800">{ticker}: preço, dividendos, DY e P/VP</h1>
+        <h2 className="text-2xl font-extrabold text-slate-800">{ticker}: preço, dividendos, DY e P/VP</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           A página do {ticker} reúne informações para acompanhamento do fundo imobiliário, incluindo cotação,
           abertura, variação do dia, mínima, máxima, dividend yield, P/VP, ágio ou desconto, último rendimento,

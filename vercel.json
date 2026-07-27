@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/fund-catalog",
       "schedule": "0 9 * * 2"
+    },
+    {
+      "path": "/api/cron/premium-peer-snapshot",
+      "schedule": "30 9 * * *"
     }
   ]
 }

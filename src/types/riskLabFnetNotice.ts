@@ -1,4 +1,4 @@
-export type FnetNoticeReviewStatus = "pending_manual_review" | "approved" | "rejected";
+export type FnetNoticeReviewStatus = "verified_automatic" | "quarantined" | "rejected";
 
 export interface FnetDividendNoticePreview {
   candidateId: string;
@@ -22,6 +22,9 @@ export interface FnetDividendNoticePreview {
   incomeTaxExempt: boolean | null;
 
   reviewStatus: FnetNoticeReviewStatus;
+  validationVersion: "fnet-notice-validation-v1";
+  validationHash: string;
+  validationReasons: string[];
   importedBy: string;
   importedAt: string;
   reviewedBy: string | null;
@@ -37,6 +40,5 @@ export interface FnetNoticeImportResult {
 export interface FnetNoticeCandidateRepository {
   saveImported(candidate: FnetDividendNoticePreview): Promise<FnetNoticeImportResult>;
   listRecent(limit?: number): Promise<FnetDividendNoticePreview[]>;
-  approve(candidateId: string, actor: string): Promise<FnetDividendNoticePreview>;
   reject(candidateId: string, actor: string, reason: string): Promise<FnetDividendNoticePreview>;
 }
