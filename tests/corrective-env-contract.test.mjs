@@ -3,6 +3,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+const INVENTORY = "docs/operations/runtime-environment-inventory.md";
+
 function filesBelow(directory) {
   return readdirSync(directory).flatMap((entry) => {
     const target = path.join(directory, entry);
@@ -26,7 +28,7 @@ test("inventário versionado cobre todas as variáveis de runtime sem tornar seg
   flags.forEach((flag) => used.add(flag));
 
   const example = readFileSync(".env.example", "utf8");
-  const handoff = readFileSync("DADOS_FII_HANDOFF.md", "utf8");
+  const inventory = readFileSync(INVENTORY, "utf8");
   const documented = new Set(
     example
       .split(/\r?\n/)
@@ -35,9 +37,10 @@ test("inventário versionado cobre todas as variáveis de runtime sem tornar seg
   );
 
   const missingFromExample = [...used].filter((name) => name !== "CI" && !documented.has(name)).sort();
-  const missingFromHandoff = [...used].filter((name) => !handoff.includes(`\`${name}\``)).sort();
+  const missingFromInventory = [...used].filter((name) => !inventory.includes(`\`${name}\``)).sort();
   assert.deepEqual(missingFromExample, []);
-  assert.deepEqual(missingFromHandoff, []);
+  assert.deepEqual(missingFromInventory, []);
   assert.doesNotMatch(example, /NEXT_PUBLIC_[A-Z0-9_]*(?:SECRET|PASSWORD|ADMIN_EMAILS|PRIVATE_KEY|CRON_TOKEN)/);
   assert.doesNotMatch(example, /(?:FIREBASE_SERVICE_ACCOUNT_KEY|CRON_SECRET|OPENAI_API_KEY|RESEND_API_KEY)=.+/);
+  assert.doesNotMatch(inventory, /(?:FIREBASE_SERVICE_ACCOUNT_KEY|CRON_SECRET|OPENAI_API_KEY|RESEND_API_KEY)\s*=\s*\S+/);
 });
