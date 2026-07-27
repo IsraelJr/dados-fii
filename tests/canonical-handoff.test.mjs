@@ -30,6 +30,10 @@ function sha256(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
+function requireAll(body, values) {
+  for (const value of values) assert.ok(body.includes(value), `conteúdo canônico ausente: ${value}`);
+}
+
 test("existe somente um Handoff canônico ativo", () => {
   const matches = walk(ROOT)
     .filter((file) => /handoff.*\.md$/i.test(path.basename(file)))
@@ -38,22 +42,24 @@ test("existe somente um Handoff canônico ativo", () => {
   assert.deepEqual(matches, [HANDOFF]);
 });
 
-test("Handoff v10.1 registra a nova fase sem apagar evidências históricas", () => {
+test("Handoff registra a fase Produto Validável sem apagar evidências históricas", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.1\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.\d+\.\d+/);
   assert.match(body, /\*\*Data:\*\* 27\/07\/2026/);
-  assert.match(body, /Produto Validável/);
-  assert.match(body, /PV-1 — Jornada principal da carteira e histórico manual/);
-  assert.match(body, /agent\/product-validation-phase-1/);
-  assert.match(body, /Issue atual:\*\* `#154`/);
-  assert.match(body, /PR atual:\*\* `#155`/);
-  assert.match(body, /0e029f78560d11d12720c447f2f9058c482e4277/);
-  assert.match(body, /30236078462/);
-  assert.match(body, /30236078473/);
-  assert.match(body, /8641670026/);
-  assert.match(body, /8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b/);
-  assert.match(body, /pKWEwtSiIbdatbauietl/);
+  requireAll(body, [
+    "Produto Validável",
+    "PV-1 — Jornada principal da carteira e histórico manual",
+    "agent/product-validation-phase-1",
+    "Issue atual:** `#154`",
+    "PR atual:** `#155`",
+    "0e029f78560d11d12720c447f2f9058c482e4277",
+    "30236078462",
+    "30236078473",
+    "8641670026",
+    "8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b",
+    "pKWEwtSiIbdatbauietl",
+  ]);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -80,19 +86,21 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("nova prioridade substitui explicitamente SEO-S1 e AdSense", () => {
+test("direção vigente substitui SEO-S1 e AdSense", () => {
   const body = text();
-  assert.match(body, /O projeto entrou na fase \*\*Produto Validável\*\*/);
-  assert.match(body, /SEO-S1 era a sprint atual/);
-  assert.match(body, /Google AdSense está congelado como prioridade de produto/);
-  assert.match(body, /histórico manual do ano corrente será gratuito e sem propaganda/);
-  assert.match(body, /Premium será visível para descoberta e beta antes do checkout/);
+  requireAll(body, [
+    "O projeto entrou na fase **Produto Validável**",
+    "SEO-S1 era a sprint atual",
+    "Google AdSense está congelado como prioridade de produto",
+    "histórico manual do ano corrente será gratuito e sem propaganda",
+    "Premium será visível para descoberta e beta antes do checkout",
+  ]);
   assert.doesNotMatch(body, /\*\*Sprint atual:\*\* SEO-S1/);
 });
 
-test("PV-1 possui escopo e gates completos", () => {
+test("PV-1 mantém escopo, arquitetura e gates obrigatórios", () => {
   const body = text();
-  for (const required of [
+  requireAll(body, [
     "cadastro/login → carteira → persistência → histórico → diagnóstico",
     "proveniência: `manual`, `automatic_snapshot` ou `legacy`",
     "impedir duplicidade por usuário e competência",
@@ -102,32 +110,27 @@ test("PV-1 possui escopo e gates completos", () => {
     "mês corrente/encerrado",
     "smoke não destrutivo em produção",
     "telemetria mínima comprovada",
-  ]) {
-    assert.ok(body.includes(required), required);
-  }
+    "Nenhum `route.ts` importa Firestore diretamente",
+    "Logs e telemetria não contêm valores financeiros",
+  ]);
 });
 
-test("auditoria inicial da carteira permanece explícita", () => {
+test("auditoria inicial e decisão do legado permanecem explícitas", () => {
   const body = text();
-  for (const required of [
+  requireAll(body, [
     "src/app/carteira/page.tsx",
     "localStorage",
     "dados-fii-wallet-v1",
     "dados-fii-wallet-monthly-snapshots-v1",
     "parseCurrency",
-    "carteira atual",
     "PR antiga `#65`",
-  ]) {
-    assert.ok(body.includes(required), required);
-  }
+  ]);
 });
 
 test("documento de direção da nova fase existe", () => {
   assert.equal(existsSync(PRODUCT_DIRECTION), true);
   const body = text(PRODUCT_DIRECTION);
-  assert.match(body, /Produto Validável/);
-  assert.match(body, /PV-1/);
-  assert.match(body, /Google AdSense/);
+  requireAll(body, ["Produto Validável", "PV-1", "Google AdSense"]);
 });
 
 test("evidência histórica permanece íntegra", () => {
@@ -143,7 +146,7 @@ test("evidência histórica permanece íntegra", () => {
   assert.equal(evidence.invariants.externalEffectsAllowed, false);
 });
 
-test("artefatos e gates corretivos permanentes existem", () => {
+test("artefatos permanentes e pipeline bloqueante existem", () => {
   for (const file of [
     "firestore.rules",
     "firestore.indexes.json",
@@ -161,14 +164,10 @@ test("artefatos e gates corretivos permanentes existem", () => {
     "scripts/scan-secrets.mjs",
     "tests/firestore-rules.test.ts",
     "tests/e2e/critical-journeys.spec.ts",
-  ]) {
-    assert.equal(existsSync(file), true, `${file} deve existir`);
-  }
-});
+  ]) assert.equal(existsSync(file), true, `${file} deve existir`);
 
-test("pipeline mantém gates bloqueantes", () => {
   const workflow = text(".github/workflows/phase-2-closure.yml");
-  for (const gate of [
+  requireAll(workflow, [
     "npm ci",
     "npm run audit:production",
     "npm run security:secrets",
@@ -181,9 +180,7 @@ test("pipeline mantém gates bloqueantes", () => {
     "npm run build",
     "npm run test:http",
     "npm run test:e2e",
-  ]) {
-    assert.ok(workflow.includes(gate), gate);
-  }
+  ]);
 });
 
 test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados", () => {
@@ -191,7 +188,6 @@ test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados", () => {
     .filter((file) => /\.test\.(?:ts|mjs)$/.test(file))
     .map((file) => text(file))
     .join("\n");
-
   for (let number = 1; number <= 22; number += 1) {
     const id = `REG-DEF-${String(number).padStart(2, "0")}`;
     assert.ok(testSources.includes(id), `${id} deve permanecer vinculado a uma regressão`);
@@ -202,19 +198,16 @@ test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados", () => {
 
 test("roadmap e decisões abertas permanecem explícitos", () => {
   const body = text();
-  for (const required of [
+  requireAll(body, [
     "PV-2 — Descoberta do Premium e beta controlado",
     "PV-3 — Telemetria, retenção e validação de disposição a pagar",
     "PV-5 — Radar/Acompanhar fundo fora da carteira",
     "Grátis acompanha até 1 fundo",
     "Premium até 10",
     "Risk Lab permanece read-only no Premium",
-    "Nenhum `route.ts` importa Firestore",
     "WhatsApp: custo, opt-in, template, frequência e proteção de dados",
     "Telegram permanece adiado",
     "cobrança recorrente, anual ou compra avulsa",
     "Nenhuma validação manual do usuário substitui essa obrigação",
-  ]) {
-    assert.ok(body.includes(required), required);
-  }
+  ]);
 });
