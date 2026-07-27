@@ -6,7 +6,7 @@ import CookieBanner from "./components/CookieBanner";
 import SiteFooter from "./components/SiteFooter";
 import SiteNav from "./components/SiteNav";
 import UserNotificationCenter from "./components/UserNotificationCenter";
-import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { ADSENSE_PUBLISHER_ID, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -74,6 +74,9 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
     apple: "/logo.png",
+  },
+  other: {
+    "google-adsense-account": ADSENSE_PUBLISHER_ID,
   },
 };
 
