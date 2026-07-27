@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Guide } from "@/lib/editorial/guides";
-import { EDITORIAL_REVIEW_DATE, SITE_URL } from "@/lib/site";
+import { EDITORIAL_REVIEW_DATE, SITE_NAME, SITE_URL } from "@/lib/site";
 
 export default function GuideArticle({ guide }: { guide: Guide }) {
   const schema = {
@@ -12,8 +12,8 @@ export default function GuideArticle({ guide }: { guide: Guide }) {
     datePublished: "2026-07-27",
     dateModified: "2026-07-27",
     mainEntityOfPage: `${SITE_URL}/guias/${guide.slug}`,
-    author: { "@type": "Person", name: "Israel Alves", url: `${SITE_URL}/autores/israel-alves` },
-    publisher: { "@type": "Organization", name: "Dados FII", url: SITE_URL },
+    author: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+    publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
   };
   const breadcrumb = {
     "@context": "https://schema.org",
@@ -35,7 +35,7 @@ export default function GuideArticle({ guide }: { guide: Guide }) {
           <p className="text-xs font-extrabold uppercase tracking-wide text-indigo-700">Guia Dados FII</p>
           <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-5xl">{guide.title}</h1>
           <p className="mt-4 text-lg leading-8 text-slate-600">{guide.description}</p>
-          <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600"><Link href="/autores/israel-alves" className="rounded-full bg-indigo-50 px-3 py-2 text-indigo-700">Por Israel Alves</Link><span className="rounded-full bg-slate-100 px-3 py-2">Revisado em {EDITORIAL_REVIEW_DATE}</span><span className="rounded-full bg-slate-100 px-3 py-2">Conteúdo informativo</span></div>
+          <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600"><span className="rounded-full bg-indigo-50 px-3 py-2 text-indigo-700">Por Dados FII</span><span className="rounded-full bg-slate-100 px-3 py-2">Revisado em {EDITORIAL_REVIEW_DATE}</span><span className="rounded-full bg-slate-100 px-3 py-2">Conteúdo informativo</span></div>
         </header>
         <section className="mt-6 rounded-2xl bg-indigo-50 p-6 ring-1 ring-indigo-100"><h2 className="text-xl font-black text-slate-900">Resposta direta</h2><p className="mt-3 text-base leading-8 text-slate-700">{guide.answer}</p></section>
         <div className="mt-8 space-y-6">

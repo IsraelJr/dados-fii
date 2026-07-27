@@ -77,7 +77,7 @@ const articles = [
 const books = [
   {
     title: "A Moedinha de Léo",
-    author: "Israel Alves",
+    publisher: "Dados FII",
     category: "Educação financeira infantil",
     status: "Disponível na Amazon",
     description:
@@ -149,7 +149,7 @@ export default function EducationPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-green-300">{book.category}</p>
                 <h3 className="mt-1 text-2xl font-extrabold text-white">{book.title}</h3>
-                <p className="mt-1 text-sm font-medium text-gray-300">Autor: {book.author}</p>
+                <p className="mt-1 text-sm font-medium text-gray-300">Publicado por: {book.publisher}</p>
               </div>
             </div>
 
