@@ -7,6 +7,7 @@ import test from "node:test";
 const ROOT = process.cwd();
 const HANDOFF = "DADOS_FII_HANDOFF.md";
 const HISTORICAL_EVIDENCE = "docs/production-evidence/risk-lab/phase-3-final-closure.json";
+const PRODUCT_DIRECTION = "docs/product/product-validation-phase-1.md";
 const EXACT_FIRST_LINE = "Este documento substitui todos os planejamentos anteriores quando houver divergência.";
 
 function walk(directory, output = []) {
@@ -37,25 +38,22 @@ test("existe somente um Handoff canônico ativo", () => {
   assert.deepEqual(matches, [HANDOFF]);
 });
 
-test("[REG-DEF-17] Handoff só conclui correções com evidência real de produção", () => {
+test("Handoff v10 registra a nova fase sem apagar evidências históricas", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 9\.0\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.0\.0/);
   assert.match(body, /\*\*Data:\*\* 27\/07\/2026/);
-  assert.match(body, /607dafefefaba5c88f986236eb365440c6fb8c94/);
+  assert.match(body, /Produto Validável/);
+  assert.match(body, /PV-1 — Jornada principal da carteira e histórico manual/);
+  assert.match(body, /agent\/product-validation-phase-1/);
+  assert.match(body, /Issue atual:\*\* `#154`/);
+  assert.match(body, /PR atual:\*\* `#155`/);
   assert.match(body, /0e029f78560d11d12720c447f2f9058c482e4277/);
-  assert.match(body, /PRs corretivas mescladas:\*\* `#141`, `#142` e `#143`/);
   assert.match(body, /30236078462/);
   assert.match(body, /30236078473/);
   assert.match(body, /8641670026/);
   assert.match(body, /8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b/);
   assert.match(body, /pKWEwtSiIbdatbauietl/);
-  assert.match(body, /\*\*Estado oficial:\*\* Sprints Corretivas R0–R5 e Fase 3 formalmente concluídas/);
-  assert.match(body, /E2E Chromium definitivo.*12\/12 aprovados/is);
-  assert.match(body, /529 aprovados, zero falhos, zero ignorados, zero pendentes/);
-  assert.match(body, /Fase 3 completa \| Sim \| Sim \| Sim \| Formalmente concluída/);
-  assert.match(body, /Nenhuma\. As PRs foram mescladas sem bypass/);
-  assert.doesNotMatch(body, /merge\/produção pendentes|aguardando smoke pós-deploy/i);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -82,15 +80,57 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("decisão nova substitui explicitamente a conclusão anterior", () => {
+test("nova prioridade substitui explicitamente SEO-S1 e AdSense", () => {
   const body = text();
-  assert.match(body, /auditoria independente de 26\/07\/2026.*prevalece.*declaração anterior de conclusão da Fase 3/is);
-  assert.match(body, /Handoff v6\.14\.0 declarava Fase 3 concluída sem os gates corretivos posteriores/);
-  assert.match(body, /A Fase 3 volta a estar formalmente concluída com nova cadeia de evidências/);
-  assert.match(body, /arquivo de continuação foi removido/);
+  assert.match(body, /O projeto entrou na fase \*\*Produto Validável\*\*/);
+  assert.match(body, /SEO-S1 era a sprint atual/);
+  assert.match(body, /Google AdSense está congelado como prioridade de produto/);
+  assert.match(body, /histórico manual do ano corrente será gratuito e sem propaganda/);
+  assert.match(body, /Premium será visível para descoberta e beta antes do checkout/);
+  assert.doesNotMatch(body, /\*\*Sprint atual:\*\* SEO-S1/);
 });
 
-test("evidência histórica permanece íntegra e a aprovação corretiva usa nova cadeia", () => {
+test("PV-1 possui escopo e gates completos", () => {
+  const body = text();
+  for (const required of [
+    "cadastro/login → carteira → persistência → histórico → diagnóstico",
+    "proveniência: `manual`, `automatic_snapshot` ou `legacy`",
+    "impedir duplicidade por usuário e competência",
+    "não sobrescrever conflito silenciosamente",
+    "isolamento entre usuários comprovado",
+    "dezembro/janeiro",
+    "mês corrente/encerrado",
+    "smoke não destrutivo em produção",
+    "telemetria mínima comprovada",
+  ]) {
+    assert.ok(body.includes(required), required);
+  }
+});
+
+test("auditoria inicial da carteira permanece explícita", () => {
+  const body = text();
+  for (const required of [
+    "src/app/carteira/page.tsx",
+    "localStorage",
+    "dados-fii-wallet-v1",
+    "dados-fii-wallet-monthly-snapshots-v1",
+    "parseCurrency",
+    "carteira atual",
+    "PR antiga `#65`",
+  ]) {
+    assert.ok(body.includes(required), required);
+  }
+});
+
+test("documento de direção da nova fase existe", () => {
+  assert.equal(existsSync(PRODUCT_DIRECTION), true);
+  const body = text(PRODUCT_DIRECTION);
+  assert.match(body, /Produto Validável/);
+  assert.match(body, /PV-1/);
+  assert.match(body, /Google AdSense/);
+});
+
+test("evidência histórica permanece íntegra", () => {
   assert.equal(existsSync(HISTORICAL_EVIDENCE), true);
   const evidence = JSON.parse(text(HISTORICAL_EVIDENCE));
   const evidenceHash = evidence.evidenceHash;
@@ -101,8 +141,6 @@ test("evidência histórica permanece íntegra e a aprovação corretiva usa nov
   assert.equal(evidence.invariants.readOnly, true);
   assert.equal(evidence.invariants.notificationsAllowed, false);
   assert.equal(evidence.invariants.externalEffectsAllowed, false);
-  assert.match(text(), /aprovação corretiva posterior está nos runs `30236078462` e `30236078473`/);
-  assert.match(text(), /evidência persistida de hash `8a970905…`/);
 });
 
 test("artefatos e gates corretivos permanentes existem", () => {
@@ -128,35 +166,19 @@ test("artefatos e gates corretivos permanentes existem", () => {
   }
 });
 
-test("[REG-DEF-10] pipeline bloqueia instalação inconsistente e vulnerabilidades de produção", () => {
+test("pipeline mantém gates bloqueantes", () => {
   const workflow = text(".github/workflows/phase-2-closure.yml");
   for (const gate of [
     "npm ci",
     "npm run audit:production",
     "npm run security:secrets",
-  ]) {
-    assert.ok(workflow.includes(gate), gate);
-  }
-});
-
-test("[REG-DEF-11] lint, TypeScript e build são gates bloqueantes", () => {
-  const workflow = text(".github/workflows/phase-2-closure.yml");
-  for (const gate of [
     "npm run lint",
     "npm run typecheck",
-    "npm run build",
-  ]) {
-    assert.ok(workflow.includes(gate), gate);
-  }
-});
-
-test("[REG-DEF-12] regressão, Emulator, cobertura, HTTP e E2E são obrigatórios", () => {
-  const workflow = text(".github/workflows/phase-2-closure.yml");
-  for (const gate of [
     "npm run test:all",
     "npm run test:rules",
     "npm run test:coverage:critical",
     "npm run test:mutation",
+    "npm run build",
     "npm run test:http",
     "npm run test:e2e",
   ]) {
@@ -164,7 +186,7 @@ test("[REG-DEF-12] regressão, Emulator, cobertura, HTTP e E2E são obrigatório
   }
 });
 
-test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados a testes executáveis", () => {
+test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados", () => {
   const testSources = walk(path.join(ROOT, "tests"))
     .filter((file) => /\.test\.(?:ts|mjs)$/.test(file))
     .map((file) => text(file))
@@ -178,13 +200,14 @@ test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados a testes execut
   assert.match(testSources, /REG-DEF-03-B/);
 });
 
-test("roadmap, segurança, generalização e decisões abertas permanecem explícitos", () => {
+test("roadmap e decisões abertas permanecem explícitos", () => {
   const body = text();
   for (const required of [
-    "Fase 4.1 — Radar/Acompanhar fundo fora da carteira",
+    "PV-2 — Descoberta do Premium e beta controlado",
+    "PV-3 — Telemetria, retenção e validação de disposição a pagar",
+    "PV-5 — Radar/Acompanhar fundo fora da carteira",
     "Grátis acompanha até 1 fundo",
     "Premium até 10",
-    "insufficient_data",
     "Risk Lab permanece read-only no Premium",
     "nenhum `route.ts` importa Firestore",
     "WhatsApp: custo, opt-in, template, frequência e proteção de dados",
