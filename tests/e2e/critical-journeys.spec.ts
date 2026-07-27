@@ -21,10 +21,8 @@ test("página pública possui estrutura, navegação e acessibilidade essenciais
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Fontes dos dados");
   await expect(page.getByRole("link", { name: "Dados FII - Início" })).toBeVisible();
-
   await page.keyboard.press("Tab");
   await expect(page.locator(":focus")).not.toHaveCount(0);
-
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
@@ -74,8 +72,7 @@ test("carteira adiciona um fundo, persiste localmente e permanece acessível", a
   await page.goto("/carteira");
   await page.getByLabel("Ticker do fundo").fill("TGAR11");
   await page.getByLabel("Quantidade de cotas", { exact: true }).fill("10");
-  await page.getByRole("button", { name: "Adicionar" }).click();
-
+  await page.getByRole("button", { name: "Adicionar" }).first().click();
   await expect(page.getByRole("link", { name: "TGAR11" }).first()).toBeVisible();
   await expect.poll(() => page.evaluate(() =>
     window.localStorage.getItem("dados-fii-wallet-v1"),
@@ -133,25 +130,26 @@ test("histórico manual permite incluir, editar e excluir sem enviar dados finan
   });
 
   await page.goto("/carteira");
-  await expect(page.getByRole("heading", { name: "Complete seu histórico" })).toBeVisible();
-  await page.getByLabel("Ano do histórico").fill(String(currentYear));
-  await page.getByLabel("Mês do histórico").selectOption("1");
-  await page.getByLabel("Patrimônio do mês").fill("10.000,00");
-  await page.getByLabel("Dividendos do mês").fill("120,00");
-  await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByText("Mês adicionado ao histórico.")).toBeVisible();
-  await expect(page.getByText("R$ 10.000,00")).toBeVisible();
+  const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
+  await expect(history.getByRole("heading", { name: "Complete seu histórico" })).toBeVisible();
+  await history.getByLabel("Ano do histórico").fill(String(currentYear));
+  await history.getByLabel("Mês do histórico").selectOption("1");
+  await history.getByLabel("Patrimônio do mês").fill("10.000,00");
+  await history.getByLabel("Dividendos do mês").fill("120,00");
+  await history.getByRole("button", { name: "Adicionar" }).click();
+  await expect(history.getByText("Mês adicionado ao histórico.")).toBeVisible();
+  await expect(history.getByText("R$ 10.000,00")).toBeVisible();
 
-  await page.getByRole("button", { name: /Editar/ }).click();
-  await page.getByLabel("Patrimônio do mês").fill("11.000,00");
-  await page.getByLabel("Dividendos do mês").fill("130,00");
-  await page.getByRole("button", { name: "Salvar" }).click();
-  await expect(page.getByText("Mês atualizado com sucesso.")).toBeVisible();
+  await history.getByRole("button", { name: /Editar/ }).click();
+  await history.getByLabel("Patrimônio do mês").fill("11.000,00");
+  await history.getByLabel("Dividendos do mês").fill("130,00");
+  await history.getByRole("button", { name: "Salvar" }).click();
+  await expect(history.getByText("Mês atualizado com sucesso.")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: /Excluir/ }).click();
-  await expect(page.getByText("Mês excluído do histórico.")).toBeVisible();
-  await expect(page.getByText("Nenhum mês informado no ano corrente.")).toBeVisible();
+  await history.getByRole("button", { name: /Excluir/ }).click();
+  await expect(history.getByText("Mês excluído do histórico.")).toBeVisible();
+  await expect(history.getByText("Nenhum mês informado no ano corrente.")).toBeVisible();
 
   expect(trackedBodies.length).toBeGreaterThanOrEqual(4);
   for (const body of trackedBodies) {
@@ -163,9 +161,7 @@ test("histórico manual permite incluir, editar e excluir sem enviar dados finan
 test("área administrativa permanece fechada sem sessão", async ({ page }) => {
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/sistema$/);
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Acesso administrativo" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Acesso administrativo" })).toBeVisible();
   await expect(page.getByLabel("E-mail")).toBeVisible();
   await expect(page.getByLabel("Senha")).toBeVisible();
   await expectNoHighImpactAccessibilityViolations(page);
@@ -175,7 +171,6 @@ test("respostas públicas recebem headers defensivos e correlação", async ({ r
   const response = await request.get("/");
   expect(response.status()).toBe(200);
   const headers = response.headers();
-
   expect(headers["content-security-policy"]).toContain("default-src 'self'");
   expect(headers["strict-transport-security"]).toContain("max-age=");
   expect(headers["x-frame-options"]).toBe("DENY");
@@ -195,9 +190,7 @@ test("contratos HTTP rejeitam ticker inválido, duplicidade e mutação anônima
   expect(duplicateTicker.status()).toBe(400);
   await expect(duplicateTicker.json()).resolves.toMatchObject({ code: "duplicate_ticker" });
 
-  const anonymousMutation = await request.post("/api/admin/create-fii", {
-    data: { ticker: "TGAR11" },
-  });
+  const anonymousMutation = await request.post("/api/admin/create-fii", { data: { ticker: "TGAR11" } });
   expect(anonymousMutation.status()).toBe(401);
   await expect(anonymousMutation.json()).resolves.toMatchObject({
     error: expect.stringMatching(/sessão|autentica|credencial/i),
@@ -215,13 +208,9 @@ test("contratos HTTP rejeitam ticker inválido, duplicidade e mutação anônima
   const missing = await request.get("/recurso-que-nao-existe-corrective");
   expect(missing.status()).toBe(404);
 
-  const forbiddenEvidenceMutation = await request.get(
-    "/api/system/risk-lab-cohort-backtest?action=run",
-  );
+  const forbiddenEvidenceMutation = await request.get("/api/system/risk-lab-cohort-backtest?action=run");
   expect(forbiddenEvidenceMutation.status()).toBe(405);
 
-  const disabledPremiumHealth = await request.get(
-    "/api/health/risk-lab-premium",
-  );
+  const disabledPremiumHealth = await request.get("/api/health/risk-lab-premium");
   expect(disabledPremiumHealth.status()).toBe(503);
 });
