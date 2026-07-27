@@ -1,6 +1,7 @@
 name: Production Premium Smoke
 
 on:
+  status:
   workflow_dispatch:
     inputs:
       release_sha:
@@ -11,19 +12,27 @@ on:
 permissions:
   contents: read
   id-token: write
+  statuses: write
 
 concurrency:
-  group: production-premium-smoke-${{ inputs.release_sha }}
+  group: production-premium-smoke-${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.event.sha }}
   cancel-in-progress: true
 
 jobs:
   verify:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.context == 'Vercel' &&
+        github.event.state == 'success' &&
+        contains(github.event.branches.*.name, 'main')
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
     env:
       PRODUCTION_ORIGIN: https://dadosfii.com.br
-      RELEASE_COMMIT: ${{ inputs.release_sha }}
+      RELEASE_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.event.sha }}
     steps:
       - name: Validate release identifier
         shell: bash
@@ -44,6 +53,7 @@ jobs:
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
       - name: Generate and verify real Premium report
+        id: smoke
         shell: bash
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
@@ -68,6 +78,31 @@ jobs:
             and (.evidence.auditEventId | length) > 7
             and (.evidence.evidenceHash | test("^[a-f0-9]{64}$"))
           ' premium-production-smoke.json >/dev/null
+
+      - name: Publish auditable commit status
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ env.RELEASE_COMMIT }}
+          SMOKE_STATE: ${{ steps.smoke.outcome == 'success' && 'success' || 'failure' }}
+          SMOKE_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -nc \
+            --arg state "${SMOKE_STATE}" \
+            --arg context "Production Premium Smoke" \
+            --arg description "Premium real, auditoria persistida e isolamento read-only" \
+            --arg target_url "${SMOKE_URL}" \
+            '{state: $state, context: $context, description: $description, target_url: $target_url}')
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" \
+            --data "${payload}"
 
       - name: Publish sanitized summary
         if: always()

@@ -22,7 +22,7 @@
 |---|---|---|---:|---|---|
 | `phase-2-closure.yml` | CI central completa: audit, segredos, lint, typecheck, suíte, Emulator, cobertura, build, HTTP e E2E | PRs relevantes e configuração em `main` | 30 min, exceção documentada | nenhuma | Essencial |
 | `portfolio-notifications-ci.yml` | Regressões específicas de notificações | PR do domínio e execução manual | 8 min | nenhuma | Essencial |
-| `production-premium-smoke.yml` | Geração Premium real e releitura da auditoria com identidade OIDC vinculada ao SHA publicado | `workflow_dispatch` após deploy | 10 min | somente evidência no backend | Gate pós-deploy |
+| `production-premium-smoke.yml` | Geração Premium real e releitura da auditoria com identidade OIDC vinculada ao SHA publicado | evento único `status` do Vercel bem-sucedido em `main`; `workflow_dispatch` como fallback | 10 min | evidência no backend e commit status auditável | Gate pós-deploy |
 | `risk-lab.yml` | Suíte completa e especializada do Risk Lab | PR do domínio e execução manual | 20 min | nenhuma | Essencial |
 | `risk-lab-cohort-backtest.yml` | Kickoff curto de tentativa vinculada a SHA | `workflow_dispatch` | 5 min | nenhuma | Processamento no backend |
 | `risk-lab-frozen-dividend-notices.yml` | Coleta FNET congelada e controlada | `workflow_dispatch` | 30 min, exceção documentada | nenhuma | Temporário e manual |
@@ -43,7 +43,7 @@ Regras:
 7. falha imediatamente em divergência, sem polling, `sleep` ou commit operacional;
 8. publica `Risk Lab Premium Production Gate = success|failure` no SHA validado, com link para a execução.
 
-O workflow obrigatório `production-premium-smoke.yml` usa OIDC efêmero, sem segredo estático, e comprova a jornada que o health check não cobre: reconstrói o snapshot de pares, gera um relatório Premium sintético no backend, relê o evento `premium-read` persistido e grava evidência imutável para o SHA ativo.
+O workflow obrigatório `production-premium-smoke.yml` usa OIDC efêmero, sem segredo estático, e comprova a jornada que o health check não cobre: reconstrói o snapshot de pares, gera um relatório Premium sintético no backend, relê o evento `premium-read` persistido e grava evidência imutável para o SHA ativo. Ele inicia automaticamente uma única vez após o status Vercel `success` do `main`, publica o contexto `Production Premium Smoke` no mesmo SHA e mantém `workflow_dispatch` apenas como fallback operacional.
 
 A permissão `statuses: write` é estritamente limitada à publicação dessa evidência. O workflow não possui permissão de escrita em conteúdo, Actions ou pull requests.
 
