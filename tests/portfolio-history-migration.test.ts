@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeLegacyWalletSnapshots } from "../src/lib/portfolio/LegacyPortfolioHistoryMigration.ts";
-import { InMemoryPortfolioHistoryRepository } from "../src/lib/portfolio/InMemoryPortfolioHistoryRepository.ts";
-import { PortfolioHistoryService } from "../src/lib/portfolio/PortfolioHistoryService.ts";
+import { normalizeLegacyWalletSnapshots } from "../src/lib/portfolio/LegacyPortfolioHistoryMigration";
+import { InMemoryPortfolioHistoryRepository } from "../src/lib/portfolio/InMemoryPortfolioHistoryRepository";
+import { PortfolioHistoryService } from "../src/lib/portfolio/PortfolioHistoryService";
 
 const NOW = new Date("2026-07-27T12:00:00.000Z");
 
