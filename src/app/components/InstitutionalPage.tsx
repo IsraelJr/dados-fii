@@ -16,7 +16,7 @@ export default function InstitutionalPage({ eyebrow, title, description, section
         <p className="mt-4 max-w-4xl text-base leading-7 text-slate-600">{description}</p>
         <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
           <span className="rounded-full bg-slate-100 px-3 py-2">Última revisão: {EDITORIAL_REVIEW_DATE}</span>
-          <Link href="/autores/israel-alves" className="rounded-full bg-indigo-50 px-3 py-2 text-indigo-700 hover:bg-indigo-100">Responsável editorial: Israel Alves</Link>
+          <span className="rounded-full bg-indigo-50 px-3 py-2 text-indigo-700">Responsável editorial: Dados FII</span>
         </div>
       </header>
       <div className="mt-8 space-y-5">
