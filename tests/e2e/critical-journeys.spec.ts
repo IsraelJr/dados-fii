@@ -83,6 +83,83 @@ test("carteira adiciona um fundo, persiste localmente e permanece acessível", a
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
+test("histórico manual permite incluir, editar e excluir sem enviar dados financeiros à telemetria", async ({ page }) => {
+  const currentYear = new Date().getFullYear();
+  const entries: Array<Record<string, unknown>> = [];
+  const trackedBodies: unknown[] = [];
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("dados-fii-wallet-email", "e2e@example.com");
+    window.localStorage.setItem("dados-fii-wallet-session", "session-e2e");
+  });
+
+  await page.route("**/api/product/events", async (route) => {
+    trackedBodies.push(route.request().postDataJSON());
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+
+  await page.route("**/api/portfolio/history?portfolioId=default", async (route) => {
+    const method = route.request().method();
+    if (method === "GET") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entries }) });
+      return;
+    }
+
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    if (method === "POST") {
+      const competence = `${body.year}-${String(body.month).padStart(2, "0")}`;
+      entries.splice(0, entries.length, {
+        schemaVersion: 1,
+        portfolioId: "default",
+        competence,
+        totalValue: 10000,
+        dividends: 120,
+        source: "manual",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, entry: entries[0] }) });
+      return;
+    }
+
+    if (method === "PATCH") {
+      entries[0] = { ...entries[0], totalValue: 11000, dividends: 130, updatedAt: new Date().toISOString() };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entry: entries[0] }) });
+      return;
+    }
+
+    entries.splice(0, entries.length);
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+
+  await page.goto("/carteira");
+  await expect(page.getByRole("heading", { name: "Complete seu histórico" })).toBeVisible();
+  await page.getByLabel("Ano do histórico").fill(String(currentYear));
+  await page.getByLabel("Mês do histórico").selectOption("1");
+  await page.getByLabel("Patrimônio do mês").fill("10.000,00");
+  await page.getByLabel("Dividendos do mês").fill("120,00");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.getByText("Mês adicionado ao histórico.")).toBeVisible();
+  await expect(page.getByText("R$ 10.000,00")).toBeVisible();
+
+  await page.getByRole("button", { name: /Editar/ }).click();
+  await page.getByLabel("Patrimônio do mês").fill("11.000,00");
+  await page.getByLabel("Dividendos do mês").fill("130,00");
+  await page.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.getByText("Mês atualizado com sucesso.")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: /Excluir/ }).click();
+  await expect(page.getByText("Mês excluído do histórico.")).toBeVisible();
+  await expect(page.getByText("Nenhum mês informado no ano corrente.")).toBeVisible();
+
+  expect(trackedBodies.length).toBeGreaterThanOrEqual(4);
+  for (const body of trackedBodies) {
+    expect(Object.keys(body as Record<string, unknown>)).toEqual(["name"]);
+  }
+  await expectNoHighImpactAccessibilityViolations(page);
+});
+
 test("área administrativa permanece fechada sem sessão", async ({ page }) => {
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/sistema$/);
