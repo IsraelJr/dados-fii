@@ -2,7 +2,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 8.2.0
+**Versão:** 8.3.0
 
 **Data:** 27/07/2026
 **Repositório:** `IsraelJr/dados-fii`  
@@ -12,11 +12,11 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 **Branch corretiva:** `agent/corrective-sprints-r0-r5`
 **Draft PR corretiva:** `#141` — https://github.com/IsraelJr/dados-fii/pull/141
 **Commit remoto base das Sprints R0–R5:** `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`
-**Último commit corretivo de código antes desta reconciliação:** `fd0e0280ec4d8f4550be6227b98fd7854d218f23`
+**Último commit corretivo de código aprovado no CI:** `c6af2a045da64c99b777f18ce4ea2536216d4dc9`
 
 **Sprint atual:** encerramento verificável das Sprints Corretivas R0–R5
 
-**Estado oficial:** implementação corretiva e gates locais concluídos; a draft PR #141 está aberta e o CI revalida a correção das falhas E2E encontradas no primeiro run; merge, deployment e auditoria pós-deploy ainda são obrigatórios
+**Estado oficial:** implementação corretiva e todos os checks do PR aprovados no commit `c6af2a045da64c99b777f18ce4ea2536216d4dc9`; a draft PR #141 permanece aberta e merge, deployment e auditoria pós-deploy ainda são obrigatórios
 **Política documental:** este é o único Handoff corrente. Versões anteriores pertencem ao histórico do Git, não à árvore ativa.
 
 ## Como interpretar os status
@@ -37,7 +37,7 @@ Código, documento, teste unitário, HTTP 200, workflow ou deployment isolado n�
 | Decisão vigente | Decisão substituída | Efeito |
 |---|---|---|
 | A auditoria independente de 26/07/2026, executada no SHA `607dafe…`, prevalece sobre a declaração anterior de conclusão da Fase 3. | Handoff v6.14.0 declarava Fase 3 formalmente concluída. | A Fase 3 volta a estado parcial até que os defeitos corretivos sejam aceitos no Git, CI e produção. |
-| O Handoff v8.2.0 é a única fonte canônica ativa. | Handoff v7.0.0 externo, v6.14.0 do Git e arquivo `DADOS_FII_HANDOFF_SPRINT_3_5_CONTINUACAO.md`. | O arquivo de continuação foi removido; fontes antigas permanecem apenas como histórico. |
+| O Handoff v8.3.0 é a única fonte canônica ativa. | Handoff v7.0.0 externo, v6.14.0 do Git e arquivo `DADOS_FII_HANDOFF_SPRINT_3_5_CONTINUACAO.md`. | O arquivo de continuação foi removido; fontes antigas permanecem apenas como histórico. |
 | HTTP 200 só representa evidência Risk Lab aprovada, atual e compatível com release/ruleset/metodologia. | Endpoint podia responder 200 com `ok:false` ou execução reprovada/antiga. | Ausência usa 404, incompatibilidade 409, execução 202, reprovação 422 e sucesso real 200. |
 | Privilégio, plano, e-mail e identidade são resolvidos no servidor. | `isPremium`, e-mail ou segredo informado pelo cliente influenciavam autorização. | Mutação e entitlement falham fechado. |
 | Segredo administrativo não é aceito em query, body ou headers legados. | Segredo compartilhado e estático era usado por rotas legadas. | Admin humano usa sessão HttpOnly; cron usa Bearer; GitHub usa OIDC efêmero vinculado ao workflow/SHA. |
@@ -61,11 +61,12 @@ Código, documento, teste unitário, HTTP 200, workflow ou deployment isolado n�
 - A integração 3.7 existe no `main` anterior, mas sua conclusão formal foi revogada pela auditoria independente por defeitos transversais de segurança, dados, CI, produção e generalização.
 - O SHA `607dafefefaba5c88f986236eb365440c6fb8c94` foi observado em produção antes das correções.
 - As correções DEF-01 a DEF-20 estão implementadas ou protegidas por estado fail-closed no branch `agent/corrective-sprints-r0-r5`.
-- A draft PR `#141` contém as correções. O commit remoto base é `434eda8ebffe603bbc6e0a63a5c95beb4e72441e` e o follow-up de acessibilidade/login é `fd0e0280ec4d8f4550be6227b98fd7854d218f23`.
+- A draft PR `#141` contém as correções. O commit remoto base é `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`; os follow-ups de Login, acessibilidade e contraste culminam em `c6af2a045da64c99b777f18ce4ea2536216d4dc9`.
 - No primeiro CI da PR, Risk Lab `#319` e Portfolio Notifications `#552` passaram. O gate central `#354` aprovou todos os passos até o E2E, que revelou Login oculto fora de `localhost`, contraste insuficiente e regiões roláveis sem foco.
-- Os defeitos E2E foram corrigidos estruturalmente no commit `fd0e028…`; a reexecução no head da PR é obrigatória e ainda não autoriza merge ou conclusão.
-- O branch ainda não pode ser chamado de concluído porque faltam CI integral verde no head, merge, deployment do mesmo SHA e smoke autenticado de produção.
-- O browser E2E está versionado para desktop e mobile. A execução local ficou bloqueada pelo CDN do browser no sandbox; o runner do GitHub reproduziu os defeitos e permanece a fonte obrigatória para a revalidação Chromium.
+- O CI atuou como gate real: runs intermediários detectaram um locator ambíguo e quatro contrastes WCAG adicionais; nenhum achado foi ignorado ou convertido em exceção.
+- No commit `c6af2a0…`, Portfolio Notifications `#556`, Risk Lab `#323` e Phase 2 Closure `#358` passaram; o gate central encerrou com E2E 12/12 em desktop e mobile.
+- O branch ainda não pode ser chamado de formalmente concluído porque faltam merge, deployment do mesmo SHA e smoke autenticado de produção.
+- O browser E2E está versionado para desktop e mobile. A execução local ficou bloqueada pelo CDN do browser no sandbox; o runner do GitHub comprovou as correções Chromium.
 - Em 27/07/2026, a execução local aprovou 529 testes sem falha, skip ou pendência; Firestore Emulator, mutation sanity, build de 38 páginas e smoke HTTP 200/400/401/403/404/405/503 também passaram.
 - A cobertura crítica medida foi 100% de linhas, 93,66% de branches e 98,53% de funções; `npm audit --omit=dev --audit-level=high` retornou zero vulnerabilidades.
 - O endpoint interno de dividendos passou a exigir schema estrito, `Idempotency-Key`, lock distribuído e auditoria com ator pseudônimo, origem, correlation ID, quantidade e versão da regra.
@@ -75,12 +76,12 @@ Código, documento, teste unitário, HTTP 200, workflow ou deployment isolado n�
 
 | Área | Git corretivo | Teste local | Produção corretiva | Estado |
 |---|---:|---:|---:|---|
-| R0 — contenção | Sim | Sim | Não | CI do head e produção pendentes |
-| R1 — dados/fórmulas | Sim | Sim | Não | CI do head e produção pendentes |
-| R2 — CI/segurança | Sim | Parcial: primeiro E2E detectou regressões já corrigidas | Não | Revalidação do head em andamento |
+| R0 — contenção | Sim | Sim | Não | CI verde; merge/produção pendentes |
+| R1 — dados/fórmulas | Sim | Sim | Não | CI verde; merge/produção pendentes |
+| R2 — CI/segurança | Sim | Sim; E2E CI 12/12 | Não | CI verde; merge/produção pendentes |
 | R3 — Premium/evidência | Sim | Sim, sem produção | Não | Aguardando smoke pós-deploy |
-| R4 — Risk Lab/FNET | Sim, fail-closed por categoria | Sim | Não | CI do head e produção pendentes |
-| R5 — arquitetura/observabilidade/performance/UX | Sim | Sim; E2E gerou follow-up | Não | Revalidação do head em andamento |
+| R4 — Risk Lab/FNET | Sim, fail-closed por categoria | Sim | Não | CI verde; merge/produção pendentes |
+| R5 — arquitetura/observabilidade/performance/UX | Sim | Sim; axe desktop/mobile aprovado | Não | CI verde; merge/produção pendentes |
 | Fase 3 completa | Código histórico + correções | Local | Não | Parcial |
 | SEO-S1 | Correções essenciais incluídas | Local | Não | Parcial |
 | Fase 4.1 — Radar | Não | Não | Não | Planejada |
@@ -255,9 +256,11 @@ Aceite: Grátis acompanha até 1 fundo; Premium até 10; limite e plano no servi
 - Commit local consolidado das Sprints R0–R5: `d07e65b`.
 - Commit remoto equivalente, com a mesma árvore Git: `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`.
 - Follow-up remoto de Login e acessibilidade: `fd0e0280ec4d8f4550be6227b98fd7854d218f23`.
+- Follow-up de precisão do E2E: `0447ee33072712462704c315df4c087c918f85b3`.
+- Commit corretivo de contraste aprovado no CI: `c6af2a045da64c99b777f18ce4ea2536216d4dc9`.
 - Draft PR corretiva: [#141 — fix: executar Sprints Corretivas R0–R5](https://github.com/IsraelJr/dados-fii/pull/141).
 - CI inicial: Portfolio Notifications run `30233676618` aprovado; Risk Lab run `30233676617` aprovado; Phase 2 Closure run `30233676643` reprovado exclusivamente no E2E.
-- Reexecuções do head corretivo: Phase 2 Closure `30233983932`, Risk Lab `30233983885` e Portfolio Notifications `30233983875`; seus resultados devem ser consultados no PR porque ainda estavam em execução durante esta reconciliação.
+- CI aprovado no código final: Portfolio Notifications run `30234489574`; Risk Lab run `30234489557`; Phase 2 Closure run `30234489569`.
 
 ### Arquivos corretivos centrais
 
@@ -443,7 +446,8 @@ Valores nunca são registrados no Handoff, log ou evidência.
 - HTTP real local: 200, 400, 401, 403, 404, 405 e 503 aprovados;
 - E2E Chromium inicial no CI: 8 cenários aprovados e 4 combinações projeto/jornada reprovadas; o runner comprovou Login oculto fora de `localhost`, contraste de 2,51:1 nos anos sem dados e duas regiões de gráfico roláveis sem foco.
 - Regressão aplicada: Login deixou de depender do hostname; controles sem dados usam contraste AA; regiões roláveis receberam nome, foco por teclado e indicador visual.
-- E2E Chromium definitivo: precisa passar em desktop e mobile no head da PR; a correção não é aceita apenas pelos testes locais.
+- E2E intermediário: locator de alerta passou a ser escopado ao diálogo sem reduzir a asserção semântica; axe revelou e bloqueou contrastes de 2,6:1, 2,93:1 e 3,76:1.
+- E2E Chromium definitivo no run `30234489569`: 12/12 aprovados em desktop e mobile, incluindo axe sem violação séria/crítica.
 
 ### Regressões obrigatórias
 
@@ -482,7 +486,6 @@ Valores nunca são registrados no Handoff, log ou evidência.
 
 ### Bloqueadoras para concluir as correções
 
-- obter todos os checks verdes no head da draft PR `#141`, incluindo Chromium desktop/mobile;
 - resolver qualquer thread de revisão;
 - mesclar sem bypass de gate;
 - publicar o mesmo SHA;

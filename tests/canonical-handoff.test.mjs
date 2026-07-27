@@ -40,14 +40,18 @@ test("existe somente um Handoff canônico ativo", () => {
 test("[REG-DEF-17] Handoff registra o estado corretivo sem antecipar produção", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 8\.2\.0/);
+  assert.match(body, /\*\*Versão:\*\* 8\.3\.0/);
   assert.match(body, /\*\*Data:\*\* 27\/07\/2026/);
   assert.match(body, /607dafefefaba5c88f986236eb365440c6fb8c94/);
   assert.match(body, /agent\/corrective-sprints-r0-r5/);
   assert.match(body, /Draft PR corretiva:\*\* `#141`/);
   assert.match(body, /434eda8ebffe603bbc6e0a63a5c95beb4e72441e/);
-  assert.match(body, /fd0e0280ec4d8f4550be6227b98fd7854d218f23/);
-  assert.match(body, /\*\*Estado oficial:\*\* implementação corretiva e gates locais concluídos; a draft PR #141 está aberta/);
+  assert.match(body, /c6af2a045da64c99b777f18ce4ea2536216d4dc9/);
+  assert.match(body, /30234489574/);
+  assert.match(body, /30234489557/);
+  assert.match(body, /30234489569/);
+  assert.match(body, /\*\*Estado oficial:\*\* implementação corretiva e todos os checks do PR aprovados/);
+  assert.match(body, /E2E Chromium definitivo.*12\/12 aprovados/is);
   assert.match(body, /529 aprovados, zero falhos, zero ignorados, zero pendentes/);
   assert.match(body, /Fase 3 completa \| Código histórico \+ correções \| Local \| Não \| Parcial/);
   assert.doesNotMatch(body, /correções formalmente concluídas|produção corretiva aprovada/i);
