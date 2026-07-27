@@ -4,11 +4,11 @@ import {
   detectPortfolioHistoryConflict,
   type ManualPortfolioHistoryInput,
   type PortfolioHistoryEntry,
-} from "./PortfolioHistory.ts";
+} from "./PortfolioHistory";
 import type {
   PortfolioHistoryRepository,
   PortfolioOwnerId,
-} from "./PortfolioHistoryRepository.ts";
+} from "./PortfolioHistoryRepository";
 
 export type PortfolioActor = Readonly<{
   ownerId: PortfolioOwnerId;
