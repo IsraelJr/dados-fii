@@ -12,10 +12,22 @@ type ReportStatus = {
   credits?: number;
   walletCount?: number;
   canGenerate?: boolean;
+  automaticEnabled?: boolean;
+  manualFallbackEnabled?: boolean;
   hasCurrentReport?: boolean;
   currentReportStatus?: string;
+  generationMode?: string;
   reportMarkdown?: string;
   error?: string;
+};
+
+type GeneratedReport = {
+  mode?: string;
+  vip?: boolean;
+  remainingCredits?: number;
+  generationMode?: string;
+  reportMarkdown?: string;
+  report?: { reportMarkdown?: string };
 };
 
 const EMAIL_KEY = "dados-fii-wallet-email";
@@ -28,15 +40,15 @@ function filenameFromDisposition(value: string | null) {
 
 function ReportLoadingState({ mode, isVip }: { mode: "generating" | "pdf" | "status"; isVip: boolean }) {
   const text = mode === "pdf"
-    ? "Preparando o PDF do relatório..."
+    ? "Gerando o relatório e preparando o PDF..."
     : mode === "status"
       ? "Consultando seu relatório..."
       : "Analisando riscos da carteira...";
   const detail = mode === "pdf"
-    ? "Isso normalmente é rápido, mas pode variar conforme a conexão."
+    ? "Se o relatório deste mês ainda não existir, ele será criado automaticamente antes do download."
     : mode === "status"
       ? "Verificando se já existe relatório disponível para este mês."
-      : "Concentração, dividendos, liquidez, valuation e cenário macro em processamento.";
+      : "Concentração, dividendos, liquidez, valuation e cenário macro em processamento pela análise automática.";
 
   return (
     <div className={`rounded-2xl p-4 text-center ring-1 ${isVip ? "bg-gray-950/70 ring-white/10" : "bg-white/80 ring-indigo-100"}`}>
@@ -90,9 +102,10 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
         setVisible(Boolean(json.isVip || json.canGenerate));
         setStatus(json);
         if (json.reportMarkdown) setReportMarkdown(json.reportMarkdown);
-      } catch (err: any) {
+      } catch (error: unknown) {
+        const reason = error instanceof Error ? error.message : "Não foi possível consultar o status do relatório.";
         setVisible(false);
-        setMessage(err.message || "Não foi possível consultar o status do relatório.");
+        setMessage(reason);
       } finally {
         setLoadingStatus(false);
       }
@@ -100,6 +113,34 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
 
     loadStatus();
   }, []);
+
+  function applyGeneratedReport(json: GeneratedReport) {
+    const markdown = json.reportMarkdown || json.report?.reportMarkdown || "";
+    setReportMarkdown(markdown);
+    setStatus((current) => ({
+      ...(current || { ok: true }),
+      isVip: json.vip ?? current?.isVip,
+      credits: json.remainingCredits ?? current?.credits,
+      hasCurrentReport: true,
+      currentReportStatus: "done",
+      generationMode: json.generationMode || "automatic_openai",
+      reportMarkdown: markdown || current?.reportMarkdown || "",
+    }));
+    return markdown;
+  }
+
+  async function requestAutomaticReport(forceNew = false) {
+    const response = await fetch("/api/wallet-risk-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, sessionToken, forceNew }),
+    });
+    const json = await response.json().catch(() => ({}));
+
+    if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível gerar o relatório.");
+    applyGeneratedReport(json);
+    return json as GeneratedReport;
+  }
 
   async function generateReport(forceNew = false) {
     if (!email || !sessionToken) {
@@ -111,27 +152,12 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
     setMessage("");
 
     try {
-      const response = await fetch("/api/wallet-risk-report/manual-prompt-v2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, sessionToken, forceNew }),
-      });
-      const json = await response.json().catch(() => ({}));
-
-      if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível gerar o relatório.");
-
-      setReportMarkdown(json.reportMarkdown || json.report?.reportMarkdown || "");
-      setStatus((current) => ({
-        ...(current || { ok: true }),
-        isVip: json.vip ?? current?.isVip,
-        credits: json.remainingCredits ?? current?.credits,
-        hasCurrentReport: true,
-        currentReportStatus: "done",
-        reportMarkdown: json.reportMarkdown || json.report?.reportMarkdown || current?.reportMarkdown || "",
-      }));
-      setMessage(json.mode === "cached" ? "Relatório carregado do histórico." : "Relatório gerado e salvo com sucesso.");
-    } catch (err: any) {
-      setMessage(err.message || "Não foi possível gerar o relatório.");
+      const json = await requestAutomaticReport(forceNew);
+      setMessage(json.mode === "cached"
+        ? "Relatório automático carregado do histórico."
+        : "Relatório automático gerado e salvo com sucesso.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível gerar o relatório.");
     } finally {
       setGenerating(false);
     }
@@ -147,6 +173,10 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
     setMessage("");
 
     try {
+      if (status?.hasCurrentReport !== true || status?.generationMode !== "automatic_openai") {
+        await requestAutomaticReport(false);
+      }
+
       const response = await fetch("/api/wallet-risk-report/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -167,9 +197,9 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      setMessage("PDF gerado com sucesso.");
-    } catch (err: any) {
-      setMessage(err.message || "Não foi possível gerar o PDF.");
+      setMessage("Relatório automático e PDF concluídos com sucesso.");
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível gerar o PDF.");
     } finally {
       setDownloadingPdf(false);
     }
@@ -182,7 +212,6 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
   const hasCurrentReport = status?.hasCurrentReport === true;
   const canGenerate = isVip || credits > 0;
   const hasWallet = walletCount > 0 || Number(status?.walletCount || 0) > 0;
-  const canDownloadPdf = hasCurrentReport || Boolean(reportMarkdown);
   const loadingReportAction = loadingStatus || generating || downloadingPdf;
   const loadingMode = downloadingPdf ? "pdf" : loadingStatus ? "status" : "generating";
 
@@ -200,7 +229,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
           </h2>
 
           <p className={`mt-2 text-sm font-medium leading-6 ${isVip ? "text-gray-300" : "text-slate-700"}`}>
-            Uma análise completa dos seus FIIs com concentração, sustentabilidade dos dividendos, sensibilidade a juros, stress test, riscos por ativo e plano de ação.
+            Uma análise automática completa dos seus FIIs com concentração, sustentabilidade dos dividendos, sensibilidade a juros, stress test, riscos por ativo e plano de ação.
           </p>
 
           {!isVip && (
@@ -211,7 +240,7 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
 
           {isVip && hasCurrentReport && (
             <p className="mt-3 rounded-xl bg-emerald-500/10 p-3 text-sm font-bold text-emerald-100 ring-1 ring-emerald-400/20">
-              Seu relatório deste mês já está disponível.
+              Seu relatório automático deste mês já está disponível.
             </p>
           )}
         </div>
@@ -231,23 +260,21 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
                   }`}
               >
                 <FileText size={18} />
-                {hasCurrentReport ? "Abrir relatório do mês" : "Gerar relatório"}
+                {hasCurrentReport ? "Abrir relatório do mês" : "Gerar relatório automático"}
               </button>
 
-              {canDownloadPdf && (
-                <button
-                  type="button"
-                  onClick={downloadPdf}
-                  disabled={downloadingPdf}
-                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold shadow-sm transition ${isVip
-                    ? "bg-gray-800 text-gray-100 hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
-                    : "bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                    }`}
-                >
-                  <Download size={18} />
-                  Baixar PDF
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={downloadPdf}
+                disabled={!hasWallet || !canGenerate || downloadingPdf}
+                className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold shadow-sm transition ${isVip
+                  ? "bg-gray-800 text-gray-100 hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                  : "bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                  }`}
+              >
+                <Download size={18} />
+                {hasCurrentReport ? "Baixar PDF" : "Gerar e baixar PDF"}
+              </button>
 
               {!isVip && (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
