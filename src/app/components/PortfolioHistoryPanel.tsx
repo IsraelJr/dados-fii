@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 
 type HistorySource = "manual" | "automatic_snapshot" | "legacy";
+type ProductEventName = "portfolio_viewed" | "history_month_added" | "history_month_updated" | "history_month_deleted";
 
 type HistoryEntry = Readonly<{
   schemaVersion: 1;
@@ -34,16 +35,12 @@ const EMPTY_FORM: FormState = {
 };
 
 function currency(value: number | null) {
-  return value === null
-    ? "Não informado"
-    : value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return value === null ? "Não informado" : value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function monthLabel(competence: string) {
   const [year, month] = competence.split("-").map(Number);
-  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(
-    new Date(year, month - 1, 1),
-  );
+  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
 }
 
 function sourceLabel(source: HistorySource) {
@@ -52,12 +49,15 @@ function sourceLabel(source: HistorySource) {
   return "Registro legado";
 }
 
-function authHeaders() {
+function credentials() {
   const email = window.localStorage.getItem(EMAIL_KEY)?.trim().toLowerCase() ?? "";
   const token = window.localStorage.getItem(TOKEN_KEY) ?? "";
-  return email && token
-    ? { "x-wallet-email": email, "x-wallet-session": token }
-    : {};
+  return { email, token };
+}
+
+function authHeaders() {
+  const { email, token } = credentials();
+  return email && token ? { "x-wallet-email": email, "x-wallet-session": token } : {};
 }
 
 async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>) {
@@ -67,10 +67,19 @@ async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<st
     body: method === "GET" ? undefined : JSON.stringify({ portfolioId: PORTFOLIO_ID, ...body }),
   });
   const json = await response.json().catch(() => ({}));
-  if (!response.ok || !json?.ok) {
-    throw new Error(json?.error || "Não foi possível processar o histórico.");
-  }
+  if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível processar o histórico.");
   return json;
+}
+
+function track(name: ProductEventName) {
+  const headers = authHeaders();
+  if (!("x-wallet-email" in headers) || !("x-wallet-session" in headers)) return;
+  void fetch("/api/product/events", {
+    method: "POST",
+    keepalive: true,
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify({ name }),
+  }).catch(() => undefined);
 }
 
 export default function PortfolioHistoryPanel() {
@@ -80,6 +89,7 @@ export default function PortfolioHistoryPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const viewedTracked = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,6 +97,10 @@ export default function PortfolioHistoryPanel() {
     try {
       const json = await api("GET");
       setEntries(Array.isArray(json.entries) ? json.entries : []);
+      if (!viewedTracked.current) {
+        viewedTracked.current = true;
+        track("portfolio_viewed");
+      }
     } catch (error) {
       setEntries([]);
       setMessage(error instanceof Error ? error.message : "Não foi possível carregar o histórico.");
@@ -130,19 +144,12 @@ export default function PortfolioHistoryPanel() {
     setMessage("");
     try {
       if (editing) {
-        await api("PATCH", {
-          competence: editing,
-          totalValue: form.totalValue,
-          dividends: form.dividends,
-        });
+        await api("PATCH", { competence: editing, totalValue: form.totalValue, dividends: form.dividends });
+        track("history_month_updated");
         setMessage("Mês atualizado com sucesso.");
       } else {
-        await api("POST", {
-          year: form.year,
-          month: form.month,
-          totalValue: form.totalValue,
-          dividends: form.dividends,
-        });
+        await api("POST", { year: form.year, month: form.month, totalValue: form.totalValue, dividends: form.dividends });
+        track("history_month_added");
         setMessage("Mês adicionado ao histórico.");
       }
       resetForm();
@@ -161,6 +168,7 @@ export default function PortfolioHistoryPanel() {
     setMessage("");
     try {
       await api("DELETE", { competence: entry.competence });
+      track("history_month_deleted");
       if (editing === entry.competence) resetForm();
       setMessage("Mês excluído do histórico.");
       await load();
@@ -176,9 +184,7 @@ export default function PortfolioHistoryPanel() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 id="portfolio-history-title" className="text-xl font-extrabold text-gray-950 dark:text-white">Complete seu histórico</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">
-            Adicione patrimônio e dividendos dos meses do ano corrente. O histórico é gratuito e registros automáticos não podem ser alterados manualmente.
-          </p>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">Adicione patrimônio e dividendos dos meses do ano corrente. O histórico é gratuito e registros automáticos não podem ser alterados manualmente.</p>
         </div>
         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Grátis</span>
       </div>
