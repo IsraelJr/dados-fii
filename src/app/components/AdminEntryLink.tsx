@@ -2,27 +2,8 @@
 
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
-
-const EMAIL_KEY = "dados-fii-wallet-email";
-
-function allowedAdminEmails() {
-  return String(process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 export default function AdminEntryLink() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const email = String(window.localStorage.getItem(EMAIL_KEY) || "").trim().toLowerCase();
-    setVisible(Boolean(email && allowedAdminEmails().includes(email)));
-  }, []);
-
-  if (!visible) return null;
-
   return (
     <Link
       href="/admin/observabilidade"

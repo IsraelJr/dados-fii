@@ -6,13 +6,12 @@ import test from "node:test";
 
 const ROOT = process.cwd();
 const HANDOFF = "DADOS_FII_HANDOFF.md";
-const FINAL_EVIDENCE = "docs/production-evidence/risk-lab/phase-3-final-closure.json";
-const RELEASE_COMMIT = "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2";
+const HISTORICAL_EVIDENCE = "docs/production-evidence/risk-lab/phase-3-final-closure.json";
 const EXACT_FIRST_LINE = "Este documento substitui todos os planejamentos anteriores quando houver divergência.";
 
 function walk(directory, output = []) {
   for (const entry of readdirSync(directory)) {
-    if ([".git", "node_modules", ".next", ".vercel"].includes(entry)) continue;
+    if ([".git", "node_modules", ".next", ".vercel", "playwright-report", "test-results"].includes(entry)) continue;
     const absolute = path.join(directory, entry);
     const relative = path.relative(ROOT, absolute).replaceAll(path.sep, "/");
     const info = statSync(absolute);
@@ -30,23 +29,25 @@ function sha256(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-test("existe somente um Handoff canônico", () => {
+test("existe somente um Handoff canônico ativo", () => {
   const matches = walk(ROOT)
-    .filter((file) => /(?:^|\/)DADOS_FII_HANDOFF(?:_v[^/]*)?\.md$/i.test(file))
+    .filter((file) => /handoff.*\.md$/i.test(path.basename(file)))
+    .filter((file) => !file.startsWith("tests/fixtures/"))
     .sort();
   assert.deepEqual(matches, [HANDOFF]);
 });
 
-test("Handoff registra a conclusão formal da Fase 3 e a próxima unidade", () => {
+test("[REG-DEF-17] Handoff registra o estado corretivo sem antecipar produção", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 6\.14\.0/);
-  assert.match(body, /\*\*Data:\*\* 26\/07\/2026/);
-  assert.match(body, new RegExp(`\\*\\*Base funcional auditada:\\*\\* \`${RELEASE_COMMIT}\``));
-  assert.match(body, /\*\*Estado da Fase 3:\*\* formalmente concluída/);
-  assert.match(body, /Próxima unidade de trabalho:\*\* SEO-S1/);
-  assert.match(body, /próxima fase funcional: 4\.1 — Radar\/Acompanhar fundo/);
-  assert.doesNotMatch(body, /aguardando deployment|bloqueada por quota|conclusão formal pendente/i);
+  assert.match(body, /\*\*Versão:\*\* 8\.1\.0/);
+  assert.match(body, /\*\*Data:\*\* 27\/07\/2026/);
+  assert.match(body, /607dafefefaba5c88f986236eb365440c6fb8c94/);
+  assert.match(body, /agent\/corrective-sprints-r0-r5/);
+  assert.match(body, /\*\*Estado oficial:\*\* implementação corretiva e gates locais concluídos, exceto browser E2E indisponível no sandbox/);
+  assert.match(body, /529 aprovados, zero falhos, zero ignorados, zero pendentes/);
+  assert.match(body, /Fase 3 completa \| Código histórico \+ correções \| Local \| Não \| Parcial/);
+  assert.doesNotMatch(body, /correções formalmente concluídas|produção corretiva aprovada/i);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -73,126 +74,114 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("evidência final da Fase 3 é íntegra, completa e conservadora", () => {
-  assert.equal(existsSync(FINAL_EVIDENCE), true);
-  const evidence = JSON.parse(text(FINAL_EVIDENCE));
+test("decisão nova substitui explicitamente a conclusão anterior", () => {
+  const body = text();
+  assert.match(body, /auditoria independente de 26\/07\/2026.*prevalece.*declaração anterior de conclusão da Fase 3/is);
+  assert.match(body, /Handoff v6\.14\.0 declarava Fase 3 formalmente concluída/);
+  assert.match(body, /A Fase 3 volta a estado parcial/);
+  assert.match(body, /arquivo de continuação foi removido/);
+});
+
+test("evidência final histórica permanece íntegra, mas não prova o branch corretivo", () => {
+  assert.equal(existsSync(HISTORICAL_EVIDENCE), true);
+  const evidence = JSON.parse(text(HISTORICAL_EVIDENCE));
   const evidenceHash = evidence.evidenceHash;
   delete evidence.evidenceHash;
   assert.equal(sha256(`${JSON.stringify(evidence, null, 2)}\n`), evidenceHash);
-
-  assert.equal(evidence.status, "formally_completed");
-  assert.equal(evidence.phase, "3");
-  assert.equal(evidence.sprint, "3.7");
-  assert.equal(evidence.releaseCommit, RELEASE_COMMIT);
-  assert.equal(evidence.deployment.state, "success");
-  assert.equal(evidence.productionGate.context, "Risk Lab Premium Production Gate");
-  assert.equal(evidence.productionGate.state, "success");
-  assert.equal(evidence.productionGate.runId, 30219287742);
+  assert.equal(evidence.releaseCommit, "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2");
   assert.equal(evidence.ruleset.version, "0.2.0");
-  assert.equal(evidence.ruleset.registryVersion, "premium-readonly-v1");
   assert.equal(evidence.invariants.readOnly, true);
   assert.equal(evidence.invariants.notificationsAllowed, false);
   assert.equal(evidence.invariants.externalEffectsAllowed, false);
-  assert.equal(evidence.invariants.outsideCohort, "explicit_unavailable");
-  assert.equal(evidence.invariants.inconclusive, "preserve_unscored");
-  assert.deepEqual(evidence.cohort.inconclusiveUnscored, ["MCCI11"]);
-  assert.equal(evidence.cohort.falsePositives, 0);
-  assert.equal(evidence.cohort.falseNegatives, 0);
-  assert.equal(evidence.gates.reviewThreadsOpen, 0);
-  assert.equal(evidence.rollback.codeDefault, false);
+  assert.match(text(), /não prova as correções posteriores nem substitui o gate do SHA atual/);
 });
 
-test("Handoff preserva os fatos e hashes homologados da Fase 3", () => {
-  const body = text();
-  for (const required of [
-    "318 observações",
-    "acurácia: `100%`",
-    "cobertura: `83,33%`",
-    "falsos positivos: `0`",
-    "falsos negativos: `0`",
-    "MCCI11: `inconclusive_unscored`",
-    "ruleset `0.2.0`",
-    "premium-readonly-v1",
-    "a3b4f2c010fba3e62e52ed50b8fcacf2706474d2",
-    "Risk Lab Premium Production Gate",
-    "30219287742",
+test("artefatos e gates corretivos permanentes existem", () => {
+  for (const file of [
+    "firestore.rules",
+    "firestore.indexes.json",
+    "firebase.json",
+    "eslint.config.mjs",
+    "playwright.config.ts",
+    ".github/workflows/phase-2-closure.yml",
+    ".github/workflows/production-premium-smoke.yml",
+    "src/lib/observability/SafeLogger.ts",
+    "src/lib/security/GithubActionsOidc.ts",
+    "src/lib/risk-lab/PublicRiskLabEvidenceContract.ts",
+    "src/lib/risk-lab/RiskLabCategoryPolicy.ts",
+    "src/lib/reports/PremiumPeerSnapshot.ts",
+    "scripts/run-http-smoke.mjs",
+    "scripts/scan-secrets.mjs",
+    "tests/firestore-rules.test.ts",
+    "tests/e2e/critical-journeys.spec.ts",
   ]) {
-    assert.ok(body.includes(required), required);
-  }
-
-  const evidence = JSON.parse(text(FINAL_EVIDENCE));
-  assert.equal(evidence.ruleset.datasetHash, "f18f61b7ddb5cc63955fa9791c6e5e3e43552134aaa28a9dd622a96ee587fcae");
-  assert.equal(evidence.ruleset.calibrationReportHash, "22b84180531f3687c9b3ebeb691020e75e6cb608777276061997b734090d701a");
-  assert.equal(evidence.ruleset.calibrationEvidenceHash, "fd695ecf4cbc759f9953ddcaf15ef14f28ba43a0b3d74098dd5cd1938baa9c81");
-  assert.equal(evidence.ruleset.calibrationIndexHash, "35dd492e433855e50849cba05990bb9c5255be6f209fbcce5d5a9cb832ef0017");
-});
-
-test("arquivos e gates permanentes da Fase 3 existem", () => {
-  const files = [
-    "docs/production-evidence/risk-lab/cohort-phase-c/index.json",
-    "docs/production-evidence/risk-lab/cohort-phase-c/registry.json",
-    "docs/production-evidence/risk-lab/cohort-phase-c/dataset-index.json",
-    "docs/production-evidence/risk-lab/cohort-phase-c/backtest-report.json",
-    "docs/production-evidence/risk-lab/cohort-phase-c-manifest.json",
-    "docs/production-evidence/risk-lab/calibration-phase-3-6/calibration-report.json",
-    "docs/production-evidence/risk-lab/calibration-phase-3-6-manifest.json",
-    "docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json",
-    FINAL_EVIDENCE,
-    "src/lib/risk-lab/RiskLabRulesetV020.ts",
-    "src/lib/risk-lab/RiskLabPremiumReadModel.ts",
-    "src/lib/risk-lab/risk-lab-premium-readonly-v1.json",
-    "src/app/api/health/risk-lab-premium/route.ts",
-    ".github/workflows/risk-lab.yml",
-    ".github/workflows/risk-lab-premium-production-gate.yml",
-    "tests/risk-lab-premium-readonly.test.ts",
-    "tests/risk-lab-premium-integration.test.mjs",
-    "tests/risk-lab-premium-rollout-config.test.mjs",
-  ];
-  for (const file of files) {
     assert.equal(existsSync(file), true, `${file} deve existir`);
   }
-
-  const workflow = text(".github/workflows/risk-lab.yml");
-  assert.match(workflow, /Validate immutable cohort dataset and no-look-ahead backtest/);
-  assert.match(workflow, /Validate calibrated and homologated Risk Lab ruleset/);
-  assert.match(workflow, /Validate Premium read-only integration and Prompt v3/);
 });
 
-test("gate de produção permanece reativo, auditável e sem polling", () => {
-  const workflow = text(".github/workflows/risk-lab-premium-production-gate.yml");
-  for (const required of [
-    "github.event.context == 'Vercel'",
-    "github.event.state == 'success'",
-    "contains(github.event.branches.*.name, 'main')",
-    "payload.deploymentCommit === expectedCommit",
-    "payload.enabled === true",
-    "payload.mode === \"read_only\"",
-    "payload.rulesetVersion === \"0.2.0\"",
-    "payload.notificationsAllowed === false",
-    "payload.externalEffectsAllowed === false",
-    "statuses: write",
-    "Risk Lab Premium Production Gate",
+test("[REG-DEF-10] pipeline bloqueia instalação inconsistente e vulnerabilidades de produção", () => {
+  const workflow = text(".github/workflows/phase-2-closure.yml");
+  for (const gate of [
+    "npm ci",
+    "npm run audit:production",
+    "npm run security:secrets",
   ]) {
-    assert.ok(workflow.includes(required), required);
+    assert.ok(workflow.includes(gate), gate);
   }
-  assert.doesNotMatch(workflow, /\bsleep\s+\d+|\$\(seq\b|while\s+(true|:)|git\s+(commit|push)|gh\s+pr/i);
 });
 
-test("roadmap, segurança e critérios globais permanecem protegidos", () => {
+test("[REG-DEF-11] lint, TypeScript e build são gates bloqueantes", () => {
+  const workflow = text(".github/workflows/phase-2-closure.yml");
+  for (const gate of [
+    "npm run lint",
+    "npm run typecheck",
+    "npm run build",
+  ]) {
+    assert.ok(workflow.includes(gate), gate);
+  }
+});
+
+test("[REG-DEF-12] regressão, Emulator, cobertura, HTTP e E2E são obrigatórios", () => {
+  const workflow = text(".github/workflows/phase-2-closure.yml");
+  for (const gate of [
+    "npm run test:all",
+    "npm run test:rules",
+    "npm run test:coverage:critical",
+    "npm run test:mutation",
+    "npm run test:http",
+    "npm run test:e2e",
+  ]) {
+    assert.ok(workflow.includes(gate), gate);
+  }
+});
+
+test("manifesto de regressão mantém DEF-01 a DEF-20 vinculados a testes executáveis", () => {
+  const testSources = walk(path.join(ROOT, "tests"))
+    .filter((file) => /\.test\.(?:ts|mjs)$/.test(file))
+    .map((file) => text(file))
+    .join("\n");
+
+  for (let number = 1; number <= 20; number += 1) {
+    const id = `REG-DEF-${String(number).padStart(2, "0")}`;
+    assert.ok(testSources.includes(id), `${id} deve permanecer vinculado a uma regressão`);
+  }
+  assert.match(testSources, /REG-DEF-03-A/);
+  assert.match(testSources, /REG-DEF-03-B/);
+});
+
+test("roadmap, segurança, generalização e decisões abertas permanecem explícitos", () => {
   const body = text();
   for (const required of [
-    "SEO-S1 — dias 1–15",
-    "Fase 4.1 — Radar/Acompanhar fundo",
+    "Fase 4.1 — Radar/Acompanhar fundo fora da carteira",
     "Grátis acompanha até 1 fundo",
-    "Premium acompanha até 10 fundos",
-    "GitHub Actions não é fila, banco, cron de aplicação ou mecanismo de polling",
-    "Ausência de dado permanece `null`; não vira zero",
-    "IA recebe fatos determinísticos e não recalcula score nem preenche lacunas",
-    "Risk Lab não envia notificações nem altera carteira",
-    "ENABLE_RISK_LAB_PREMIUM_READONLY=false",
-    "código está em `main`",
-    "evidência final está no Git",
-    "issue foi encerrada após auditoria",
+    "Premium até 10",
+    "insufficient_data",
+    "Risk Lab permanece read-only no Premium",
+    "nenhum `route.ts` importa Firestore",
+    "WhatsApp: custo, opt-in, template, frequência e proteção de dados",
+    "Telegram permanece adiado",
+    "cobrança recorrente, anual ou compra avulsa",
+    "nenhuma validação manual do usuário substitui essa obrigação",
   ]) {
     assert.ok(body.includes(required), required);
   }

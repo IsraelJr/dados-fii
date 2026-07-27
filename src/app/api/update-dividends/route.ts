@@ -1,228 +1,53 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
-import {
-  DIVIDEND_MONTHS,
-  mergeDividendYear,
-  parseStatusInvestDividends,
-  parseStatusInvestMarketIndicators,
-} from "@/lib/market/StatusInvestParser";
+import { dividendUpdateService } from "@/lib/dividends/DividendUpdateService";
+import { DividendUpdateConflictError } from "@/lib/dividends/DividendUpdateRepository";
+import { normalizeTicker } from "@/lib/regulatory/RegulatoryNormalizer";
+import { internalAuthError, requireAdminOrCron } from "@/lib/security/InternalRequestAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MONTHS: string[] = [...DIVIDEND_MONTHS];
-const TIME_ZONE = "America/Sao_Paulo";
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{16,128}$/;
 
-function tickerOf(value: unknown) {
-  return String(value || "").trim().toUpperCase();
-}
-
-function saoPauloParts() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
-}
-
-function todayKey() {
-  const p = saoPauloParts();
-  return `${p.year}-${p.month}-${p.day}`;
-}
-
-function currentYear() {
-  return Number(saoPauloParts().year);
-}
-
-function currentMonthKey() {
-  return MONTHS[Number(saoPauloParts().month) - 1];
-}
-
-function clean(html: string) {
-  return String(html || "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#160;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function noAccent(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function removeUndefinedFields<T>(value: T): T {
-  if (Array.isArray(value)) return value.map((item) => removeUndefinedFields(item)) as T;
-
-  if (value && typeof value === "object" && !(value instanceof Date)) {
-    if (typeof (value as any).isEqual === "function") return value;
-
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([, fieldValue]) => fieldValue !== undefined)
-        .map(([key, fieldValue]) => [key, removeUndefinedFields(fieldValue)])
-    ) as T;
+export async function POST(request: NextRequest) {
+  const authorization = await requireAdminOrCron(request, { scope: "update-dividends", limit: 10 });
+  if (!authorization.ok) return internalAuthError(authorization);
+  const parsed = await request.json().catch(() => null);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return NextResponse.json({ error: "Payload JSON inválido." }, { status: 400 });
   }
-
-  return value;
-}
-
-async function getFiiDoc(ticker: string) {
-  const direct = await adminDb.collection("Fiis").doc(ticker).get();
-  if (direct.exists) return direct;
-
-  const byCode = await adminDb.collection("Fiis").where("code", "==", ticker).limit(1).get();
-  if (!byCode.empty) return byCode.docs[0];
-
-  throw new Error(`Ticker ${ticker} não encontrado.`);
-}
-
-async function getStatusInvestPage(ticker: string) {
-  const code = ticker.toLowerCase();
-  const urls = [
-    `https://statusinvest.com.br/fundos-imobiliarios/${code}`,
-    `https://statusinvest.com.br/fiagros/${code}`,
-    `https://statusinvest.com.br/fiinfras/${code}`,
-  ];
-  const ignored: string[] = [];
-
-  for (const url of urls) {
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "text/html" },
-    });
-
-    if (!res.ok) {
-      ignored.push(`${url} HTTP ${res.status}`);
-      continue;
-    }
-
-    const html = await res.text();
-    const text = clean(html);
-    const upperText = text.toUpperCase();
-    const normalized = noAccent(upperText);
-
-    if (normalized.includes("OPS") && normalized.includes("NAO ENCONTRAMOS")) {
-      ignored.push(`${url} não encontrado`);
-      continue;
-    }
-
-    if (!upperText.includes(ticker)) {
-      ignored.push(`${url} sem ticker`);
-      continue;
-    }
-
-    if (!upperText.includes("TIPO DATA COM") && !upperText.includes("DIVIDENDOS DO")) {
-      ignored.push(`${url} sem dividendos`);
-      continue;
-    }
-
-    return { text, url };
+  const body = parsed as Record<string, unknown>;
+  const unknownFields = Object.keys(body).filter((field) => field !== "ticker");
+  if (unknownFields.length) {
+    return NextResponse.json({
+      error: "O payload contém campos não permitidos.",
+      fields: unknownFields.sort(),
+    }, { status: 400 });
   }
-
-  throw new Error(`Nenhuma página válida encontrada. ${ignored.join(" | ")}`);
-}
-
-async function reserveDailyRequest(anonId: string, ticker: string) {
-  const ref = adminDb
-    .collection("Parameters")
-    .doc("DividendUpdateRequests")
-    .collection("requests")
-    .doc(`${todayKey()}_${anonId}_${ticker}`);
-
-  await adminDb.runTransaction(async (transaction) => {
-    const doc = await transaction.get(ref);
-    const data = doc.data() || {};
-
-    if (doc.exists) {
-      throw new Error("Você já solicitou atualização deste FII hoje.");
-    }
-
-    transaction.set(ref, {
-      anonId,
-      ticker,
-      requestDate: todayKey(),
-      attempts: Number(data.attempts || 0) + 1,
-      createdAt: data.createdAt || adminFieldValue.serverTimestamp(),
-      updatedAt: adminFieldValue.serverTimestamp(),
-      status: "reserved",
-    }, { merge: true });
-  });
-
-  return ref;
-}
-
-async function updateTickerDividends(ticker: string) {
-  const year = currentYear();
-  const doc = await getFiiDoc(ticker);
-  const previous = doc.data() || {};
-  const page = await getStatusInvestPage(ticker);
-  const fetched = parseStatusInvestDividends(page.text, year);
-  const fetchedMonths = Object.keys(fetched).sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
-  const marketIndicators = removeUndefinedFields(parseStatusInvestMarketIndicators(page.text, page.url, todayKey()));
-
-  if (!fetchedMonths.length) throw new Error(`Nenhum dividendo de ${year} encontrado no StatusInvest.`);
-
-  const field = `earnings${year}`;
-  const previousYear = previous[field] || {};
-  const merged = mergeDividendYear(previousYear, fetched);
-
-  await adminDb.collection("Fiis_Backup").doc(ticker).set({
-    ...previous,
-    backup_date: adminFieldValue.serverTimestamp(),
-    backup_reason: "on-demand-dividend-update",
-  }, { merge: false });
-
-  await doc.ref.set({
-    [field]: merged,
-    ...marketIndicators,
-    modified_in: adminFieldValue.serverTimestamp(),
-  }, { merge: true });
-
-  return {
-    ticker,
-    year,
-    fetchedMonths,
-    currentMonth: currentMonthKey(),
-    currentMonthIncluded: Boolean(merged[currentMonthKey()]),
-    indicatorsUpdated: Object.keys(marketIndicators).length > 0,
-    indicators: marketIndicators,
-  };
-}
-
-export async function POST(req: NextRequest) {
+  const idempotencyKey = String(request.headers.get("idempotency-key") || "").trim();
+  if (!IDEMPOTENCY_KEY.test(idempotencyKey)) {
+    return NextResponse.json({
+      error: "O header Idempotency-Key é obrigatório e deve possuir entre 16 e 128 caracteres seguros.",
+    }, { status: 400 });
+  }
+  const ticker = normalizeTicker(body.ticker);
+  if (!ticker) return NextResponse.json({ error: "Ticker ausente ou inválido." }, { status: 400 });
   try {
-    const { ticker } = await req.json();
-    const code = tickerOf(ticker);
-    if (!code) return NextResponse.json({ error: "Ticker inválido." }, { status: 400 });
-
-    const cookieStore = await cookies();
-    const anonId = cookieStore.get("anonId")?.value;
-    if (!anonId) return NextResponse.json({ error: "Cookie não encontrado. Aceite os cookies antes de solicitar atualização." }, { status: 400 });
-
-    const requestRef = await reserveDailyRequest(anonId, code);
-
-    try {
-      const result = await updateTickerDividends(code);
-      const status = result.currentMonthIncluded ? "success" : "partial";
-      await requestRef.set({ status, result, finishedAt: adminFieldValue.serverTimestamp() }, { merge: true });
-
-      if (!result.currentMonthIncluded) {
-        return NextResponse.json({ success: false, result }, { status: 202 });
-      }
-
-      return NextResponse.json({ success: true, result });
-    } catch (err: any) {
-      await requestRef.set({ status: "error", error: err.message, finishedAt: adminFieldValue.serverTimestamp() }, { merge: true });
-      throw err;
+    const result = await dividendUpdateService.update(ticker, {
+      actor: authorization.identity.actor,
+      origin: authorization.identity.type,
+      correlationId: request.headers.get("x-correlation-id") || randomUUID(),
+      idempotencyKey,
+    });
+    if (result.status === "not_found") return NextResponse.json({ error: "Fundo não encontrado." }, { status: 404 });
+    return NextResponse.json({ ok: true, result }, {
+      headers: { "Idempotency-Replayed": result.replayed ? "true" : "false" },
+    });
+  } catch (error) {
+    if (error instanceof DividendUpdateConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
     }
-  } catch (err: any) {
-    const message = err.message || "Erro ao atualizar dividendos.";
-    const status = message.includes("já solicitou") || message.includes("em andamento") ? 429 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: "Não foi possível atualizar os rendimentos." }, { status: 503 });
   }
 }

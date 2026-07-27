@@ -340,8 +340,8 @@ function classification(registration: CvmRegistrationRecord, general: CvmMonthly
   const creditShare = total ? (assets?.creditReceivables || 0) / total : 0;
   const fundsShare = total ? (assets?.fundShares || 0) / total : 0;
   let strategy = kind === "FI_INFRA" ? "Crédito de infraestrutura" : kind === "FIAGRO" ? "Multiestratégia agro" : declaredSegment || "Híbrido";
-  let method: "portfolio-composition" | "fund-kind" | "declared" = total > 0 ? "portfolio-composition" : declaredSegment ? "declared" : "fund-kind";
-  let confidence: "high" | "medium" | "low" = total > 0 ? "high" : declaredSegment ? "medium" : "low";
+  const method: "portfolio-composition" | "fund-kind" | "declared" = total > 0 ? "portfolio-composition" : declaredSegment ? "declared" : "fund-kind";
+  const confidence: "high" | "medium" | "low" = total > 0 ? "high" : declaredSegment ? "medium" : "low";
   if (total > 0) {
     if (creditShare >= 0.55) strategy = kind === "FIAGRO" ? "Crédito do agronegócio" : "Papel / Crédito";
     else if (directShare >= 0.55) strategy = kind === "FIAGRO" ? "Terras e ativos reais" : declaredSegment || "Tijolo";

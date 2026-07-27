@@ -1,6 +1,16 @@
 export type ProductPlan = "free" | "premium" | "super_premium";
 export type PaidProductPlan = Exclude<ProductPlan, "free">;
 
+export const MONITORED_FUND_LIMITS: Readonly<Record<ProductPlan, number>> = Object.freeze({
+  free: 1,
+  premium: 10,
+  super_premium: 10,
+});
+
+export function monitoredFundLimit(plan: ProductPlan) {
+  return MONITORED_FUND_LIMITS[plan];
+}
+
 export function productPlanLabel(plan: ProductPlan | string) {
   if (plan === "super_premium") return "Super Premium";
   if (plan === "premium") return "Premium";

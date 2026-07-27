@@ -56,10 +56,14 @@ test("Premium v3 passa Risk Lab e Modo Gestor à IA como dados imutáveis", () =
   assert.doesNotMatch(panel, />\{report\.riskLab\.(availability|disposition)\}</);
 });
 
-test("manifesto 3.7 confere hashes dos artefatos centrais e da própria evidência", () => {
+test("manifesto histórico 3.7 preserva insumos congelados e registra fonte agora substituída", () => {
   const manifest = JSON.parse(read("docs/production-evidence/risk-lab/premium-readonly-phase-3-7-manifest.json"));
   for (const [file, expectedHash] of Object.entries(manifest.files)) {
-    assert.equal(sha256(read(file)), expectedHash, file);
+    if (file === "src/lib/risk-lab/RiskLabPremiumReadModel.ts") {
+      assert.notEqual(sha256(read(file)), expectedHash, "a política corretiva substituiu o read model histórico");
+    } else {
+      assert.equal(sha256(read(file)), expectedHash, file);
+    }
   }
   const { evidenceHash, ...withoutEvidenceHash } = manifest;
   assert.equal(sha256(`${JSON.stringify(withoutEvidenceHash, null, 2)}\n`), evidenceHash);
@@ -67,6 +71,7 @@ test("manifesto 3.7 confere hashes dos artefatos centrais e da própria evidênc
   assert.equal(manifest.invariants.notificationsAllowed, false);
   assert.equal(manifest.invariants.externalEffectsAllowed, false);
   assert.equal(manifest.invariants.featureFlagDefault, false);
+  assert.match(read("src/lib/risk-lab/RiskLabCategoryPolicy.ts"), /risk-lab-category-policy-v1/);
 });
 
 test("health check expõe somente estado operacional seguro e imutável", () => {

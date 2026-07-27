@@ -63,9 +63,9 @@ export default function FiiTopPanels() {
 
         const fetchFiis = async () => {
             try {
-                const res = await fetch(`/api/fii?ts=${Date.now()}`, { cache: "no-store" });
-                const data: FII[] = await res.json();
-                if (active) setFiis(data ?? []);
+                const res = await fetch(`/api/fii?limit=500&ts=${Date.now()}`, { cache: "no-store" });
+                const data: { items?: FII[] } = await res.json();
+                if (active) setFiis(Array.isArray(data.items) ? data.items : []);
             } catch (err) {
                 console.error("Erro ao buscar FIIs:", err);
                 if (active) setFiis([]);
@@ -133,7 +133,7 @@ export default function FiiTopPanels() {
         type: "up" | "down";
     }) => {
         const percentLabel = formatPercent(variationNum);
-        let absLabel = "";
+        const absLabel = "";
         // if (Number.isFinite(absValue)) {
         //     // mostra sinal para o valor absoluto (mesmo sinal da variação)
         //     const sign = absValue > 0 ? "+" : absValue < 0 ? "-" : "";

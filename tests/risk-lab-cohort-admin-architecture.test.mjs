@@ -39,6 +39,7 @@ function executable(source) {
 
 test("API da coorte reutiliza autenticação Admin e executa etapas segmentadas só em Produção", () => {
   assert.match(route, /authorizeAdminRequest/);
+  assert.match(route, /requireGithubActionsProductionIdentity/);
   assert.match(route, /risk-lab-cohort-backtest-execute/);
   assert.match(route, /VERCEL_ENV !== "production"/);
   assert.match(route, /VERCEL_GIT_COMMIT_SHA/);
@@ -47,7 +48,7 @@ test("API da coorte reutiliza autenticação Admin e executa etapas segmentadas 
   assert.match(route, /segmentedRiskLabCohortBacktestService\.finalize\(\)/);
   assert.match(route, /new Set\(\["initialize", "case", "finalize", "advance"\]\)/);
   assert.match(route, /SEGMENTED_COHORT_TICKERS\.includes\(ticker\)/);
-  assert.doesNotMatch(executable(route), /CRON_SECRET|ADMIN_EMAILS|firebaseAdmin|adminDb/);
+  assert.doesNotMatch(executable(route), /CRON_SECRET|ADMIN_EMAILS|firebaseAdmin|adminDb|x-admin-secret/);
 });
 
 test("advance delega ao planner puro a inicialização, próximo fundo ou finalização", () => {
@@ -95,6 +96,9 @@ test("workflow somente registra a release e deixa os casos para o backend", () =
   assert.match(workflow, /^\s{2}workflow_dispatch:/m);
   assert.match(workflow, /risk-lab-3-5-20260720-v2/);
   assert.match(workflow, /RELEASE_COMMIT:\s*\$\{\{ inputs\.release_sha \}\}/);
-  assert.match(workflow, /action=initialize/);
+  assert.match(workflow, /"action":"initialize"/);
+  assert.match(workflow, /id-token:\s*write/);
+  assert.match(workflow, /getIDToken\("dados-fii-risk-lab-operation"\)/);
+  assert.doesNotMatch(workflow, /secrets\./);
   assert.doesNotMatch(executable(workflow), /action=case|action=finalize|git\s+push|sleep|for\s+attempt/);
 });

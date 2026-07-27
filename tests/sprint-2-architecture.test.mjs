@@ -13,12 +13,12 @@ test("public FII APIs delegate persistence and merge to RegulatoryDataService", 
 });
 
 test("legacy reports no longer read regulatory Fiis directly", () => {
-  for (const route of [
-    "src/app/api/wallet-risk-report/route.ts",
-    "src/app/api/wallet-risk-report/manual-prompt/route.ts",
-    "src/app/api/admin/missing-cnpj/route.ts",
+  for (const files of [
+    ["src/app/api/wallet-risk-report/route.ts", "src/server/controllers/WalletRiskReportController.ts"],
+    ["src/app/api/wallet-risk-report/manual-prompt/route.ts", "src/server/controllers/WalletRiskReportManualPromptController.ts"],
+    ["src/app/api/admin/missing-cnpj/route.ts"],
   ]) {
-    const source = read(route);
+    const source = files.map(read).join("\n");
     assert.match(source, /regulatoryDataService/);
     assert.doesNotMatch(source, /\.collection\(["']Fiis["']\)/);
   }
@@ -41,7 +41,7 @@ test("Health and Validation endpoints use canonical HTTP methods without direct 
 });
 
 test("admin session uses verified Firebase identity and HttpOnly cookie", () => {
-  const session = read("src/app/api/admin/session/route.ts");
+  const session = `${read("src/app/api/admin/session/route.ts")}\n${read("src/server/controllers/AdminSessionController.ts")}`;
   const security = read("src/lib/adminSecurity.ts");
   const dashboard = read("src/app/admin/sistema/page.tsx");
   assert.match(session, /verifyIdToken/);
@@ -171,7 +171,7 @@ test("Sprint 2.8 centralizes all provider calls in AI Insights Engine", () => {
   const engine = read("src/lib/ai/AIInsightsEngine.ts");
   const route = read("src/app/api/fii/[ticker]/insights/route.ts");
   const compatibility = read("src/app/api/fii-summary/route.ts");
-  const walletReport = read("src/app/api/wallet-risk-report/route.ts");
+  const walletReport = `${read("src/app/api/wallet-risk-report/route.ts")}\n${read("src/server/controllers/WalletRiskReportController.ts")}`;
   const page = read("src/app/fii/[ticker]/page.tsx");
   for (const field of ["executiveSummary", "changes", "risks", "opportunities", "alerts", "plainLanguage"]) {
     assert.match(engine, new RegExp(field));
@@ -217,7 +217,7 @@ test("Sprint 2.10 centralizes the seven canonical observability groups", () => {
   for (const metric of ["time", "retries", "failures", "ingestion", "parser", "qa", "publication"]) assert.match(`${engine}\n${dashboard}`.toLowerCase(), new RegExp(metric));
 });
 
-test("Sprint 2.11 monitors automatically through panel, Firestore, email and Telegram", () => {
+test("Sprint 2.11 monitors automatically through panel, Firestore and Resend", () => {
   const runRoute = read("src/app/api/admin/system/run-monitor/route.ts");
   const statusRoute = read("src/app/api/admin/system/monitor-status/route.ts");
   const cronRoute = read("src/app/api/cron/system-monitor/route.ts");
@@ -237,8 +237,9 @@ test("Sprint 2.11 monitors automatically through panel, Firestore, email and Tel
   assert.match(repository, /acquireMonitorLock/);
   assert.match(regulatoryTypes, /RegulatoryMonitorLocks/);
   assert.match(repository, /saveMonitorRun/);
-  assert.match(dispatcher, /sendMail/);
-  assert.match(dispatcher, /api\.telegram\.org/);
+  assert.match(dispatcher, /api\.resend\.com\/emails/);
+  assert.match(dispatcher, /Authorization: `Bearer \$\{apiKey\}`/);
+  assert.doesNotMatch(dispatcher, /nodemailer|telegram|twilio/i);
   assert.match(dashboard, /Monitor Automático/);
   assert.match(vercel, /\/api\/cron\/system-monitor/);
 });
@@ -285,7 +286,7 @@ test("FII detail derives agio or discount from legacy and canonical patrimonial 
 });
 
 test("legacy observability no longer accepts admin secrets", () => {
-  const route = read("src/app/api/admin/observability/route.ts");
+  const route = `${read("src/app/api/admin/observability/route.ts")}\n${read("src/server/controllers/AdminLegacyObservabilityController.ts")}`;
   assert.doesNotMatch(route, /ADMIN_UPDATE_SECRET|CRON_SECRET|x-admin-secret|searchParams\.get\("secret"\)/);
   assert.doesNotMatch(route, /export async function GET/);
   assert.match(route, /authorizeAdminRequest/);

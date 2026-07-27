@@ -17,7 +17,11 @@ export async function POST(req: NextRequest) {
     const run = await regulatoryDataService.runValidation(auth.identity.email, { limit });
     return adminJson({ ok: true, run });
   } catch (error) {
-    if (error instanceof ValidationExecutionError) return adminJson({ ok: false, error: error.message, run: error.run }, 500);
-    return adminJson({ ok: false, error: error instanceof Error ? error.message : "Erro ao executar a validação regulatória." }, 500);
+    if (error instanceof ValidationExecutionError) return adminJson({
+      ok: false,
+      error: "A validação regulatória falhou. Consulte a execução persistida pelo identificador retornado.",
+      run: error.run,
+    }, 500);
+    return adminJson({ ok: false, error: "Erro ao executar a validação regulatória." }, 500);
   }
 }

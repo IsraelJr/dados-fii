@@ -17,7 +17,7 @@ function assertCandidateId(value: string) {
 }
 
 function assertActor(value: string) {
-  if (!value || !value.includes("@") || value.length > 254) {
+  if (!value || /\s/.test(value) || value.length > 254) {
     throw new Error("Responsável administrativo inválido.");
   }
 }
@@ -32,11 +32,11 @@ function verifiedObservation(current: FnetDividendNoticePreview, actor: string, 
       documentId: current.documentId,
       sourceUrl: current.sourceUrl,
       sourceType: "primary_regulatory",
-      reviewMethod: "manual_document_review",
+      reviewMethod: "automatic_regulatory_validation",
       reviewedBy: actor,
       reviewedAt,
       page: null,
-      excerpt: `Aviso estruturado FNET confirmado: ${current.periodReferenceRaw}; R$ ${current.amountPerShare.toFixed(6)} por cota; protocolo entregue em ${current.announcedAt}.`,
+      excerpt: `Aviso estruturado FNET validado automaticamente: ${current.periodReferenceRaw}; R$ ${current.amountPerShare.toFixed(6)} por cota; protocolo entregue em ${current.announcedAt}; validação ${current.validationVersion} (${current.validationHash}).`,
     },
   };
 }
@@ -56,19 +56,41 @@ export class FirestoreFnetNoticeCandidateStore implements FnetNoticeCandidateRep
         };
       }
 
-      transaction.set(reference, candidate);
+      const verifiedReference = adminDb.collection(VERIFIED_COLLECTION).doc(`${candidate.ticker}_${candidate.competenceMonth}`);
+      const existingVerified = await transaction.get(verifiedReference);
+      const conflict = existingVerified.exists
+        && (existingVerified.data() as VerifiedDividendNotice).source.documentId !== candidate.documentId;
+      const persisted: FnetDividendNoticePreview = conflict
+        ? {
+            ...candidate,
+            reviewStatus: "quarantined",
+            validationReasons: [...candidate.validationReasons, "competence_document_conflict"],
+            rejectionReason: "Conflito com outro documento já verificado para o mesmo fundo e competência.",
+          }
+        : candidate;
+
+      transaction.set(reference, persisted);
+      if (!existingVerified.exists && !conflict) {
+        transaction.set(
+          verifiedReference,
+          verifiedObservation(candidate, candidate.reviewedBy || candidate.importedBy, candidate.reviewedAt || candidate.importedAt),
+        );
+      }
       const auditReference = adminDb.collection(AUDIT_COLLECTION).doc();
       transaction.set(auditReference, {
-        action: "import",
+        action: conflict ? "quarantine" : "automatic_verify",
         candidateId: candidate.candidateId,
         documentId: candidate.documentId,
         actor: candidate.importedBy,
         at: candidate.importedAt,
         sourceHash: candidate.sourceHash,
         protocolHash: candidate.protocolHash,
+        validationVersion: candidate.validationVersion,
+        validationHash: candidate.validationHash,
+        validationReasons: persisted.validationReasons,
       });
 
-      return { candidate, created: true };
+      return { candidate: persisted, created: true };
     });
   }
 
@@ -82,24 +104,11 @@ export class FirestoreFnetNoticeCandidateStore implements FnetNoticeCandidateRep
     return snapshot.docs.map((document) => document.data() as FnetDividendNoticePreview);
   }
 
-  async approve(candidateId: string, actor: string): Promise<FnetDividendNoticePreview> {
-    return this.review(candidateId, actor, "approved", null);
-  }
-
   async reject(candidateId: string, actor: string, reason: string): Promise<FnetDividendNoticePreview> {
     const normalizedReason = reason.trim();
     if (normalizedReason.length < 10 || normalizedReason.length > 500) {
       throw new Error("A rejeição exige justificativa entre 10 e 500 caracteres.");
     }
-    return this.review(candidateId, actor, "rejected", normalizedReason);
-  }
-
-  private async review(
-    candidateId: string,
-    actor: string,
-    status: "approved" | "rejected",
-    rejectionReason: string | null,
-  ): Promise<FnetDividendNoticePreview> {
     assertCandidateId(candidateId);
     assertActor(actor);
     const reference = adminDb.collection(CANDIDATE_COLLECTION).doc(candidateId);
@@ -110,48 +119,31 @@ export class FirestoreFnetNoticeCandidateStore implements FnetNoticeCandidateRep
       if (!snapshot.exists) throw new Error("Candidato FNET não encontrado.");
       const current = snapshot.data() as FnetDividendNoticePreview;
 
-      if (current.reviewStatus !== "pending_manual_review") {
-        if (current.reviewStatus === status) return current;
-        throw new Error(`Candidato já revisado como ${current.reviewStatus}.`);
-      }
-
-      const verifiedReference = status === "approved"
-        ? adminDb.collection(VERIFIED_COLLECTION).doc(`${current.ticker}_${current.competenceMonth}`)
-        : null;
-      const existingVerified = verifiedReference ? await transaction.get(verifiedReference) : null;
-      if (existingVerified?.exists) {
-        const existing = existingVerified.data() as VerifiedDividendNotice;
-        if (existing.source.documentId !== current.documentId) {
-          throw new Error(
-            `Conflito: ${current.ticker} ${current.competenceMonth} já possui observação aprovada pelo documento ${existing.source.documentId}.`,
-          );
-        }
+      if (current.reviewStatus === "rejected") return current;
+      if (current.reviewStatus !== "quarantined") {
+        throw new Error("Somente itens em quarentena podem ser rejeitados administrativamente.");
       }
 
       const reviewed: FnetDividendNoticePreview = {
         ...current,
-        reviewStatus: status,
+        reviewStatus: "rejected",
         reviewedBy: actor,
         reviewedAt,
-        rejectionReason,
+        rejectionReason: normalizedReason,
       };
       transaction.set(reference, reviewed);
 
-      if (verifiedReference && !existingVerified?.exists) {
-        transaction.set(verifiedReference, verifiedObservation(current, actor, reviewedAt));
-      }
-
       const auditReference = adminDb.collection(AUDIT_COLLECTION).doc();
       transaction.set(auditReference, {
-        action: status,
+        action: "reject_quarantined",
         candidateId,
         documentId: current.documentId,
         ticker: current.ticker,
         competenceMonth: current.competenceMonth,
         actor,
         at: reviewedAt,
-        rejectionReason,
-        verifiedObservationId: status === "approved" ? `${current.ticker}_${current.competenceMonth}` : null,
+        rejectionReason: normalizedReason,
+        verifiedObservationId: null,
       });
       return reviewed;
     });

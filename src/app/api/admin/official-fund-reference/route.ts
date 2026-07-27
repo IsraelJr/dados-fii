@@ -14,6 +14,6 @@ export async function POST(req: NextRequest) {
     const result = await regulatoryDataService.publishOfficialFundReference(body?.ticker, auth.identity.email);
     return adminJson({ ok: true, result });
   } catch (error) {
-    return adminJson({ ok: false, error: error instanceof Error ? error.message : "Falha ao publicar a referência oficial." }, 400);
+    return adminJson({ ok: false, error: "Falha ao publicar a referência oficial." }, 400);
   }
 }

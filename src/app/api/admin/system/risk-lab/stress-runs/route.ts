@@ -3,6 +3,7 @@ import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
 import { DividendStressRunService } from "@/lib/risk-lab/DividendStressRunService";
 import { dividendStressRunStore } from "@/lib/risk-lab/DividendStressRunStore";
 import { verifiedDividendNoticeStore } from "@/lib/risk-lab/VerifiedDividendNoticeStore";
+import { pseudonymousLogId, safeLog } from "@/lib/observability/SafeLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,8 +34,9 @@ export async function GET(request: NextRequest) {
     return adminJson({ ok: true, enabled: featureEnabled, statuses });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao carregar execuções de estresse.";
-    console.error("Risk Lab stress run list error", {
-      actor: authorization.identity.email,
+    safeLog("error", "risk-lab.stress.list.failed", {
+      actorId: pseudonymousLogId(authorization.identity.uid),
+      correlationId: request.headers.get("x-correlation-id"),
       message,
     });
     return adminJson({ ok: false, error: message }, 500);
@@ -53,24 +55,22 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const action = String(body?.action || "").trim().toLowerCase();
-  const actor = authorization.identity.email;
+  const actor = `admin:${authorization.identity.uid}`;
 
   try {
     if (action !== "execute") {
       return adminJson({ ok: false, error: "Ação inválida. Use execute." }, 400);
     }
-    if (body?.confirmed !== true) {
-      return adminJson({
-        ok: false,
-        error: "A execução exige confirmação explícita de que não produzirá efeitos externos.",
-      }, 400);
-    }
-
     const result = await service.execute(String(body?.ticker || ""), actor);
     return adminJson({ ok: true, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida na execução do detector.";
-    console.error("Risk Lab stress run execute error", { action, actor, message });
+    safeLog("error", "risk-lab.stress.execute.failed", {
+      action,
+      actorId: pseudonymousLogId(authorization.identity.uid),
+      correlationId: request.headers.get("x-correlation-id"),
+      message,
+    });
     const status = /série insuficiente/i.test(message)
       ? 409
       : /inválido|não suportado|confirmação/i.test(message)

@@ -12,6 +12,6 @@ export async function GET(req: NextRequest) {
     const parsers = await regulatoryDataService.getParserHealth();
     return adminJson({ ok: true, generatedAt: new Date().toISOString(), parsers });
   } catch (error) {
-    return adminJson({ ok: false, error: error instanceof Error ? error.message : "Erro ao consultar a saúde dos parsers." }, 500);
+    return adminJson({ ok: false, error: "Erro ao consultar a saúde dos parsers." }, 500);
   }
 }

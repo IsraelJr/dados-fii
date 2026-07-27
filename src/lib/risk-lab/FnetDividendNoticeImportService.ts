@@ -9,7 +9,6 @@ import type {
   FnetNoticeImportResult,
 } from "@/types/riskLabFnetNotice";
 
-const SUPPORTED_TICKERS = new Set(["MCCI11", "RBRY11"]);
 const FNET_ORIGIN = "https://fnet.bmfbovespa.com.br";
 const MAX_HTML_BYTES = 2_000_000;
 const FETCH_TIMEOUT_MS = 15_000;
@@ -23,9 +22,53 @@ function assertDocumentId(value: string) {
 }
 
 function assertActor(value: string) {
-  if (!value || !value.includes("@") || value.length > 254) {
+  if (!value || /\s/.test(value) || value.length > 254) {
     throw new Error("Responsável administrativo inválido.");
   }
+}
+
+function assertValidDate(value: string, label: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) throw new Error(`${label} inválida.`);
+  return timestamp;
+}
+
+export function validateAutomaticFnetNotice(input: {
+  ticker: string;
+  informationDate: string;
+  announcedAt: string;
+  baseDate: string;
+  paymentDate: string;
+  competenceMonth: string;
+  amountPerShare: number;
+  sourceHash: string;
+  protocolHash: string;
+  protocolVersion: number;
+}) {
+  const reasons: string[] = [];
+  if (!/^[A-Z]{4}11$/.test(input.ticker)) reasons.push("ticker_invalid");
+  if (!/^\d{4}-\d{2}$/.test(input.competenceMonth)) reasons.push("competence_invalid");
+  if (!Number.isFinite(input.amountPerShare) || input.amountPerShare <= 0 || input.amountPerShare > 100) {
+    reasons.push("amount_out_of_range");
+  }
+  if (!/^[a-f0-9]{64}$/.test(input.sourceHash)) reasons.push("source_hash_invalid");
+  if (!/^[a-f0-9]{64}$/.test(input.protocolHash)) reasons.push("protocol_hash_invalid");
+  if (!Number.isInteger(input.protocolVersion) || input.protocolVersion < 1) reasons.push("protocol_version_invalid");
+  const informationAt = assertValidDate(input.informationDate, "Data da informação");
+  const announcedAt = assertValidDate(input.announcedAt, "Data de anúncio");
+  const baseAt = assertValidDate(input.baseDate, "Data-base");
+  const paymentAt = assertValidDate(input.paymentDate, "Data de pagamento");
+  if (announcedAt < informationAt) reasons.push("announcement_before_information");
+  if (paymentAt < baseAt) reasons.push("payment_before_base_date");
+  return {
+    valid: reasons.length === 0,
+    reasons,
+    validationVersion: "fnet-notice-validation-v1" as const,
+    validationHash: sha256(JSON.stringify({
+      ...input,
+      validationVersion: "fnet-notice-validation-v1",
+    })),
+  };
 }
 
 async function fetchHtml(fetchImpl: typeof fetch, url: string) {
@@ -94,9 +137,6 @@ export class FnetDividendNoticeImportService {
     const notice = parseFnetDividendNoticeHtml(noticeHtml);
     const protocol = parseFnetProtocolHtml(protocolHtml);
 
-    if (!SUPPORTED_TICKERS.has(notice.ticker)) {
-      throw new Error(`Ticker ${notice.ticker} não pertence à coorte MCCI11/RBRY11.`);
-    }
     if (protocol.referenceDate !== notice.informationDate && protocol.referenceDate !== notice.baseDate) {
       throw new Error("Data de referência do protocolo diverge do aviso estruturado.");
     }
@@ -105,13 +145,30 @@ export class FnetDividendNoticeImportService {
     }
 
     const importedAt = this.now().toISOString();
+    const sourceHash = sha256(noticeHtml);
+    const protocolHash = sha256(protocolHtml);
+    const validation = validateAutomaticFnetNotice({
+      ticker: notice.ticker,
+      informationDate: notice.informationDate,
+      announcedAt: protocol.deliveredAt,
+      baseDate: notice.baseDate,
+      paymentDate: notice.paymentDate,
+      competenceMonth: notice.competenceMonth,
+      amountPerShare: notice.amountPerShare,
+      sourceHash,
+      protocolHash,
+      protocolVersion: protocol.version,
+    });
+    if (!validation.valid) {
+      throw new Error(`Aviso FNET reprovado pela validação automática: ${validation.reasons.join(", ")}.`);
+    }
     const candidate: FnetDividendNoticePreview = {
       candidateId: `${notice.ticker}_${notice.competenceMonth}_${normalizedId}`,
       documentId: normalizedId,
       sourceUrl,
-      sourceHash: sha256(noticeHtml),
+      sourceHash,
       protocolUrl,
-      protocolHash: sha256(protocolHtml),
+      protocolHash,
       protocolVersion: protocol.version,
       ticker: notice.ticker,
       fundName: notice.fundName,
@@ -123,11 +180,14 @@ export class FnetDividendNoticeImportService {
       periodReferenceRaw: notice.periodReferenceRaw,
       amountPerShare: notice.amountPerShare,
       incomeTaxExempt: notice.incomeTaxExempt,
-      reviewStatus: "pending_manual_review",
+      reviewStatus: "verified_automatic",
+      validationVersion: validation.validationVersion,
+      validationHash: validation.validationHash,
+      validationReasons: validation.reasons,
       importedBy: actor,
       importedAt,
-      reviewedBy: null,
-      reviewedAt: null,
+      reviewedBy: actor,
+      reviewedAt: importedAt,
       rejectionReason: null,
     };
 
@@ -136,11 +196,6 @@ export class FnetDividendNoticeImportService {
 
   async listRecent(limit = 30) {
     return this.repository.listRecent(limit);
-  }
-
-  async approve(candidateId: string, actor: string) {
-    assertActor(actor);
-    return this.repository.approve(candidateId.trim(), actor);
   }
 
   async reject(candidateId: string, actor: string, reason: string) {

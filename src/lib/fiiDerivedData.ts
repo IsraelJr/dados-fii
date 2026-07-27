@@ -100,7 +100,7 @@ function removeUndefinedFields<T>(value: T): T {
 
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .filter(([, fieldValue]) => fieldValue !== undefined && fieldValue !== null)
+        .filter(([, fieldValue]) => fieldValue !== undefined)
         .map(([key, fieldValue]) => [key, removeUndefinedFields(fieldValue)])
     ) as T;
   }
@@ -179,7 +179,15 @@ function classifyFundType(data: any) {
 }
 
 function getEarningsEntries(data: any) {
-  const entries: Array<{ year: number; month: string; value: number; paymentDate?: string; paymentKey?: string; dateWith?: string }> = [];
+  const entries: Array<{
+    year: number;
+    month: string;
+    value: number;
+    paymentDate?: string;
+    paymentKey?: string;
+    dateWith?: string;
+    priceDateWith?: number;
+  }> = [];
 
   Object.entries(data || {}).forEach(([key, yearData]) => {
     const yearMatch = key.match(/^earnings(\d{4})$/);
@@ -199,6 +207,7 @@ function getEarningsEntries(data: any) {
         paymentDate: paymentDate || undefined,
         paymentKey: date ? toDateKey(date) : undefined,
         dateWith: cleanText(info?.date_with) || undefined,
+        priceDateWith: positiveNumberOf(info?.price_date_with),
       });
     });
   });
@@ -258,7 +267,10 @@ function buildDividendSummary(data: any, price?: number) {
       value: round(entry.value, 6),
       paymentDate: entry.paymentDate,
       dateWith: entry.dateWith,
+      priceDateWith: entry.priceDateWith,
     })),
+    lastDividendPriceDateWith: last?.priceDateWith,
+    last12AsOf: last12.at(-1)?.paymentKey,
   });
 }
 
@@ -282,9 +294,11 @@ function buildValuation(data: any, price?: number) {
   const vpCota = vpCotaInput || calculatedVpCota || (isPlausibleVpCotaForPrice(impliedVpCota, price) ? impliedVpCota : undefined);
   const calculatedPvp = price && vpCota ? price / vpCota : undefined;
   const pvpInputConsistent = !calculatedPvp || approximatelyEqual(pvpInput, calculatedPvp);
-  const pvp = calculatedPvp && isPlausiblePvp(calculatedPvp)
-    ? calculatedPvp
-    : pvpInputConsistent ? pvpInput : undefined;
+  const pvp = price
+    ? calculatedPvp && isPlausiblePvp(calculatedPvp)
+      ? calculatedPvp
+      : pvpInputConsistent ? pvpInput : undefined
+    : undefined;
   const calculatedMarketCap = price && numberShares ? price * numberShares : undefined;
   const validatedDirectMarketCap = firstPlausibleNumber(data, marketCapPaths, (value) => Boolean(validateAggregateWithShares(value, numberShares)));
   const marketCap = calculatedMarketCap || validatedDirectMarketCap;
@@ -325,11 +339,82 @@ function buildValuation(data: any, price?: number) {
 
 export function deriveFiiRiskData(data: any) {
   const price = firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
-  const dividendYield = firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]);
+  const legacyDividendYield = firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]);
   const valuation = buildValuation(data, price);
   const dividendSummary = buildDividendSummary(data, price);
   const sector = cleanText(firstValue(data, ["sector", "setor"])) || classifySector(data);
   const fundType = cleanText(firstValue(data, ["fundType", "type", "tipo", "tipoFundo"])) || classifyFundType(data);
+  const total12m = dividendSummary.totalDividend12m || null;
+  const latestDividend = dividendSummary.lastDividend || null;
+  const priceAtDateWith = dividendSummary.lastDividendPriceDateWith || null;
+  const navPerShare = valuation.vpCota || null;
+  const dy12mCurrentPrice = price && total12m ? round((total12m / price) * 100, 2) : null;
+  const lastDividendYieldAtBaseDate = latestDividend && priceAtDateWith
+    ? round((latestDividend / priceAtDateWith) * 100, 2)
+    : null;
+  const distributionOnNav12m = total12m && navPerShare
+    ? round((total12m / navPerShare) * 100, 2)
+    : null;
+  const difference = legacyDividendYield && dy12mCurrentPrice !== null
+    ? round(Math.abs(legacyDividendYield - dy12mCurrentPrice), 4)
+    : null;
+  const metric = (
+    value: number | null,
+    numeratorField: string,
+    numerator: number | null,
+    denominatorField: string,
+    denominator: number | null,
+    asOf: string | null,
+    source: string,
+    reason?: string,
+  ) => ({
+    value,
+    unit: "percent" as const,
+    numerator: { field: numeratorField, value: numerator, unit: "BRL_per_share" as const },
+    denominator: { field: denominatorField, value: denominator, unit: "BRL_per_share" as const, asOf },
+    formulaVersion: "dividend-metrics-v2.0.0",
+    source,
+    asOf,
+    ...(reason ? { reason } : {}),
+  });
+  const canonicalDividendMetrics = {
+    dy12mCurrentPrice: metric(
+      dy12mCurrentPrice,
+      "dividends.total12m",
+      total12m,
+      "price",
+      price || null,
+      dividendSummary.last12AsOf || null,
+      "Cálculo Dados FII: dividendos pagos em 12 meses / cotação atual",
+      !total12m ? "missing_dividend_history" : !price ? "missing_current_price" : undefined,
+    ),
+    lastDividendYieldAtBaseDate: metric(
+      lastDividendYieldAtBaseDate,
+      "dividends.lastDividend",
+      latestDividend,
+      "dividends.lastDividendPriceDateWith",
+      priceAtDateWith,
+      dividendSummary.lastDividendDate || null,
+      "Cálculo Dados FII: último rendimento / cotação na data-com",
+      !latestDividend ? "missing_last_dividend" : !priceAtDateWith ? "missing_base_date_price" : undefined,
+    ),
+    distributionOnNav12m: metric(
+      distributionOnNav12m,
+      "dividends.total12m",
+      total12m,
+      "valuation.vpCota",
+      navPerShare,
+      dividendSummary.last12AsOf || null,
+      "Cálculo Dados FII: dividendos pagos em 12 meses / VP por cota",
+      !total12m ? "missing_dividend_history" : !navPerShare ? "missing_nav_per_share" : undefined,
+    ),
+    legacyConflict: {
+      detected: difference !== null && difference > 0.5,
+      legacyValue: legacyDividendYield || null,
+      canonicalValue: dy12mCurrentPrice,
+      absoluteDifferencePercentagePoints: difference,
+    },
+  };
 
   return removeUndefinedFields({
     sector,
@@ -347,13 +432,18 @@ export function deriveFiiRiskData(data: any) {
     dividendCuts12m: dividendSummary.dividendCuts12m,
     dy6m: dividendSummary.dy6mAnnualized,
     dy12mCalculated: dividendSummary.dy12mCalculated,
+    dividendYield: dy12mCurrentPrice,
+    dividendYield12m: dy12mCurrentPrice,
+    dy12m: dy12mCurrentPrice,
+    legacyDividendYield: legacyDividendYield || null,
+    canonicalDividendMetrics,
     valuation: {
       netWorth: valuation.netWorth,
       vpCota: valuation.vpCota,
       pvp: valuation.pvp,
       marketCap: valuation.marketCap,
       dataQuality: valuation.dataQuality,
-      dy12m: dividendYield || dividendSummary.dy12mCalculated,
+      dy12m: dy12mCurrentPrice,
       dy12mCalculated: dividendSummary.dy12mCalculated,
       dy6mAnnualized: dividendSummary.dy6mAnnualized,
     },

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useId, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Bell, BellRing, ArrowDown, ArrowUp, X } from "lucide-react";
 
@@ -10,14 +10,6 @@ interface Props {
 
 const WALLET_EMAIL_KEY = "dados-fii-wallet-email";
 const WALLET_TOKEN_KEY = "dados-fii-wallet-session";
-const VIP_EMAILS = String(process.env.NEXT_PUBLIC_VIP_EMAILS || process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-
-function isVipEmail(value: string) {
-    return VIP_EMAILS.includes(value.trim().toLowerCase());
-}
 
 function isValidEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -39,6 +31,14 @@ export default function FiiAlert({ fiiCode }: Props) {
     const [alertCreated, setAlertCreated] = useState(false);
 
     const emailRef = useRef<HTMLInputElement>(null);
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const titleId = useId();
+    const descriptionId = useId();
+    const emailId = useId();
+    const downId = useId();
+    const upId = useId();
+    const messageId = useId();
 
     useEffect(() => {
         setMounted(true);
@@ -53,7 +53,6 @@ export default function FiiAlert({ fiiCode }: Props) {
             if (storedToken && isValidEmail(cleanEmail)) {
                 setConfirmedEmail(cleanEmail);
                 setEmail(cleanEmail);
-                if (isVipEmail(cleanEmail)) setIsPremium(true);
             }
         } catch {
             return;
@@ -63,11 +62,21 @@ export default function FiiAlert({ fiiCode }: Props) {
     useEffect(() => {
         const fetchUser = async () => {
             try {
-                const res = await fetch("/api/get-user");
+                const storedEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
+                const storedToken = window.localStorage.getItem(WALLET_TOKEN_KEY) || "";
+                if (!storedToken || !isValidEmail(storedEmail)) return;
+                const res = await fetch("/api/get-user", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${storedToken}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ email: storedEmail }),
+                });
                 if (res.ok) {
                     const data = await res.json();
                     const cleanEmail = String(data?.email || "").trim().toLowerCase();
-                    setIsPremium(Boolean(data?.isPremium) || isVipEmail(cleanEmail));
+                    setIsPremium(data?.plan === "premium" || data?.plan === "super_premium");
 
                     if (isValidEmail(cleanEmail)) {
                         setConfirmedEmail(cleanEmail);
@@ -125,6 +134,17 @@ export default function FiiAlert({ fiiCode }: Props) {
         if (confirmedEmail) setEmail(confirmedEmail);
     }, [open, confirmedEmail]);
 
+    useEffect(() => {
+        if (!open) return;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        requestAnimationFrame(() => emailRef.current?.focus());
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            requestAnimationFrame(() => triggerRef.current?.focus());
+        };
+    }, [open]);
+
     const toggleAlert = () => {
         if (!open && confirmedEmail) setEmail(confirmedEmail);
         setOpen((current) => !current);
@@ -133,6 +153,35 @@ export default function FiiAlert({ fiiCode }: Props) {
     const closeAlert = () => {
         setOpen(false);
         setMessage("");
+    };
+
+    const handleDialogKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeAlert();
+            return;
+        }
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(
+            dialogRef.current?.querySelectorAll<HTMLElement>(
+                "button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])",
+            ) || [],
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    };
+
+    const submitAlert = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        void handleSubmit();
     };
 
     const handleSubmit = async () => {
@@ -149,13 +198,20 @@ export default function FiiAlert({ fiiCode }: Props) {
         setMessage("");
 
         try {
+            const sessionToken = window.localStorage.getItem(WALLET_TOKEN_KEY) || "";
+            if (!sessionToken) {
+                setMessage("Confirme seu e-mail na carteira antes de criar alertas.");
+                return;
+            }
             const res = await fetch("/api/add-alert", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    Authorization: `Bearer ${sessionToken}`,
+                    "Content-Type": "application/json",
+                },
                 body: JSON.stringify({
                     email,
                     fiiCode,
-                    isPremium,
                     percentUp,
                     percentDown,
                 }),
@@ -164,6 +220,7 @@ export default function FiiAlert({ fiiCode }: Props) {
             const json = await res.json();
 
             if (res.ok && json.success) {
+                setIsPremium(json.plan === "premium" || json.plan === "super_premium");
                 setMessage("Alerta criado com sucesso.");
                 setSuccess(true);
                 setAlertCreated(true);
@@ -198,10 +255,17 @@ export default function FiiAlert({ fiiCode }: Props) {
     };
 
     const popup = open && mounted ? createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 py-6" onClick={closeAlert}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 py-6" onMouseDown={(event) => {
+            if (event.currentTarget === event.target) closeAlert();
+        }}>
             <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                aria-describedby={descriptionId}
+                onKeyDown={handleDialogKeyboard}
                 className="relative w-full max-w-sm rounded-2xl border-2 border-white/80 bg-gray-950 p-4 text-white shadow-2xl ring-1 ring-white/20"
-                onClick={(event) => event.stopPropagation()}
             >
                 <button
                     type="button"
@@ -214,8 +278,8 @@ export default function FiiAlert({ fiiCode }: Props) {
 
                 <div className="mb-3 rounded-xl bg-gray-800 p-3 ring-1 ring-white/10">
                     <p className="text-xs font-bold uppercase tracking-wide text-indigo-200">Alerta de preço</p>
-                    <h3 className="mt-1 pr-6 text-lg font-extrabold text-white">Receba alertas do {fiiCode}</h3>
-                    <p className="mt-2 text-sm font-medium text-gray-300">
+                    <h3 id={titleId} className="mt-1 pr-6 text-lg font-extrabold text-white">Receba alertas do {fiiCode}</h3>
+                    <p id={descriptionId} className="mt-2 text-sm font-medium text-gray-300">
                         Plano grátis: avisamos quando o FII subir ou cair {ALERT_VALUE}%.
                     </p>
                 </div>
@@ -231,65 +295,73 @@ export default function FiiAlert({ fiiCode }: Props) {
                     </p>
                 </div>
 
-                <label className="mb-1 block text-left text-sm font-bold text-gray-300">Email para receber o alerta</label>
-                <input
-                    ref={emailRef}
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seuemail@exemplo.com"
-                    className="mb-3 w-full rounded-lg border border-gray-700 bg-gray-800 p-2 text-white outline-none placeholder:text-gray-500 focus:border-indigo-400"
-                    disabled={success}
-                />
+                <form onSubmit={submitAlert}>
+                    <label htmlFor={emailId} className="mb-1 block text-left text-sm font-bold text-gray-300">E-mail para receber o alerta</label>
+                    <input
+                        id={emailId}
+                        ref={emailRef}
+                        type="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="seuemail@exemplo.com"
+                        aria-invalid={Boolean(message) && !isValidEmail(email)}
+                        aria-describedby={message ? messageId : undefined}
+                        className="mb-3 w-full rounded-lg border border-gray-700 bg-gray-800 p-2 text-white outline-none placeholder:text-gray-400 focus:border-indigo-400"
+                        disabled={success}
+                    />
 
-                <div className={`mb-3 grid grid-cols-2 gap-3 ${isPremium ? "" : "opacity-60"}`}>
-                    <div>
-                        <label className="mb-1 block text-xs font-bold text-gray-300">Queda VIP</label>
-                        <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
-                            <ArrowDown className="h-5 w-5 text-red-400" />
-                            <input
-                                type="number"
-                                min={-20}
-                                max={-1}
-                                value={percentDown}
-                                onChange={handleChangeDown}
-                                className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
-                                disabled={success || !isPremium}
-                            />
+                    <div className={`mb-3 grid grid-cols-2 gap-3 ${isPremium ? "" : "opacity-60"}`}>
+                        <div>
+                            <label htmlFor={downId} className="mb-1 block text-xs font-bold text-gray-300">Queda VIP</label>
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                                <ArrowDown aria-hidden="true" className="h-5 w-5 text-red-400" />
+                                <input
+                                    id={downId}
+                                    type="number"
+                                    min={-20}
+                                    max={-1}
+                                    value={percentDown}
+                                    onChange={handleChangeDown}
+                                    className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
+                                    disabled={success || !isPremium}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor={upId} className="mb-1 block text-xs font-bold text-gray-300">Alta VIP</label>
+                            <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
+                                <input
+                                    id={upId}
+                                    type="number"
+                                    min={1}
+                                    max={20}
+                                    value={percentUp}
+                                    onChange={handleChangeUp}
+                                    className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
+                                    disabled={success || !isPremium}
+                                />
+                                <ArrowUp aria-hidden="true" className="h-5 w-5 text-green-400" />
+                            </div>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="mb-1 block text-xs font-bold text-gray-300">Alta VIP</label>
-                        <div className="flex items-center gap-2 rounded-lg bg-gray-800 px-2 py-1">
-                            <input
-                                type="number"
-                                min={1}
-                                max={20}
-                                value={percentUp}
-                                onChange={handleChangeUp}
-                                className="w-full bg-transparent p-1 text-center text-white outline-none disabled:cursor-not-allowed"
-                                disabled={success || !isPremium}
-                            />
-                            <ArrowUp className="h-5 w-5 text-green-400" />
-                        </div>
-                    </div>
-                </div>
+                    {!isPremium && <p className="mb-3 rounded-lg bg-gray-800/70 p-2 text-center text-xs font-bold text-gray-300">No plano grátis, o alerta usa o padrão de {ALERT_VALUE}%.</p>}
 
-                {!isPremium && <p className="mb-3 rounded-lg bg-gray-800/70 p-2 text-center text-xs font-bold text-gray-300">No plano grátis, o alerta usa o padrão de {ALERT_VALUE}%.</p>}
+                    <button
+                        type="submit"
+                        disabled={loading || success}
+                        className={`mt-1 w-full rounded-lg py-2 font-bold text-white ${loading || success
+                            ? "cursor-not-allowed bg-gray-700 text-gray-400"
+                            : "bg-indigo-600 hover:bg-indigo-700"
+                            }`}
+                    >
+                        {loading ? "Salvando..." : success ? "Alerta criado" : "Criar alerta"}
+                    </button>
+                </form>
 
-                <button
-                    onClick={handleSubmit}
-                    disabled={loading || success}
-                    className={`mt-1 w-full rounded-lg py-2 font-bold text-white ${loading || success
-                        ? "cursor-not-allowed bg-gray-700 text-gray-400"
-                        : "bg-indigo-600 hover:bg-indigo-700"
-                        }`}
-                >
-                    {loading ? "Salvando..." : success ? "Alerta criado" : "Criar alerta"}
-                </button>
-
-                {message && <p className="mt-3 text-center text-sm font-medium text-gray-300">{message}</p>}
+                {message && <p id={messageId} role={success ? "status" : "alert"} className="mt-3 text-center text-sm font-medium text-gray-200">{message}</p>}
 
                 {success && (
                     <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-gray-700">
@@ -307,11 +379,13 @@ export default function FiiAlert({ fiiCode }: Props) {
     return (
         <div className="relative inline-block">
             <button
+                ref={triggerRef}
                 type="button"
                 onClick={toggleAlert}
                 className="rounded-full p-2 transition-colors hover:bg-gray-700"
                 aria-label={`Criar alerta para ${fiiCode}`}
                 aria-expanded={open}
+                aria-haspopup="dialog"
             >
                 {alertCreated ? (
                     <BellRing className="h-5 w-5 text-green-400" />

@@ -63,7 +63,6 @@ function statusStyle(value?: string | null) {
 export default function DividendStressRunPanel() {
   const [enabled, setEnabled] = useState(false);
   const [statuses, setStatuses] = useState<DividendStressRunStatus[]>([]);
-  const [confirmations, setConfirmations] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [busyTicker, setBusyTicker] = useState<DividendStressRunTicker | null>(null);
   const [error, setError] = useState("");
@@ -91,7 +90,7 @@ export default function DividendStressRunPanel() {
     try {
       const response = await requestJson<ExecuteResponse>("/api/admin/system/risk-lab/stress-runs", {
         method: "POST",
-        body: JSON.stringify({ action: "execute", ticker, confirmed: true }),
+        body: JSON.stringify({ action: "execute", ticker }),
       });
       if (!response.ok) throw new Error(response.error);
       setMessage(
@@ -99,7 +98,6 @@ export default function DividendStressRunPanel() {
           ? `${ticker}: execução manual criada e auditada.`
           : `${ticker}: o mesmo snapshot já havia sido executado; nenhum registro duplicado foi criado.`,
       );
-      setConfirmations((current) => ({ ...current, [ticker]: false }));
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível executar o detector.");
@@ -143,7 +141,6 @@ export default function DividendStressRunPanel() {
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
           {statuses.map((status) => {
             const ready = status.readiness.readyForStressDetection;
-            const confirmed = Boolean(confirmations[status.ticker]);
             const latest = status.latestRun;
             const busy = busyTicker === status.ticker;
             return (
@@ -185,19 +182,9 @@ export default function DividendStressRunPanel() {
                   <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500 ring-1 ring-slate-200">Nenhuma execução persistida para este fundo.</p>
                 )}
 
-                <label className="mt-4 flex items-start gap-3 text-sm font-bold text-slate-800">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    onChange={(event) => setConfirmations((current) => ({ ...current, [status.ticker]: event.target.checked }))}
-                    className="mt-1 h-4 w-4"
-                  />
-                  Confirmo que esta ação apenas grava um resultado preliminar, sem alertas, notificações ou alteração do Premium.
-                </label>
-
                 <button
                   type="button"
-                  disabled={!enabled || !ready || !confirmed || busy}
+                  disabled={!enabled || !ready || busy}
                   onClick={() => void execute(status.ticker)}
                   className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40"
                 >

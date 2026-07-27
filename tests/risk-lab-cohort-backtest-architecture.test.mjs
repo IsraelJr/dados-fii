@@ -100,14 +100,18 @@ test("persistência possui tentativa imutável, lock, auditoria, hash e isolamen
   assert.doesNotMatch(executable(service), /getPremiumReport|AIInsights|sendEmail|sendNotification|createAlert/);
 });
 
-test("rota protege o release e o GitHub somente inicia uma tentativa persistida", () => {
-  assert.match(route, /parameters\.source === "github-actions"/);
-  assert.match(route, /parameters\.release === deployedRelease/);
-  assert.match(route, /VERCEL_ENV === "production"/);
+test("rota pública é somente leitura e o GitHub inicia pela rota autenticada", () => {
+  assert.match(route, /forbiddenMutation/);
+  assert.match(route, /status: "read-only"/);
+  assert.match(route, /decidePublicEvidenceStatus/);
+  assert.doesNotMatch(route, /\.initialize\(\)|\.runTicker\(|\.finalize\(\)/);
+  assert.match(adminRoute, /requireGithubActionsProductionIdentity/);
+  assert.match(adminRoute, /activeProductionRelease/);
   assert.match(workflow, /risk-lab-3-5-20260720-v2/);
   assert.match(workflow, /inputs\.release_sha/);
   assert.match(workflow, /evidence\.releaseCommit == \$release/);
-  assert.match(workflow, /action=initialize/);
+  assert.match(workflow, /"action":"initialize"/);
+  assert.match(workflow, /id-token:\s*write/);
   assert.equal((workflow.match(/curl\b/g) || []).length, 1);
   assert.doesNotMatch(executable(workflow), /action=case|action=finalize|git\s+push|gh\s+pr|sleep|npm run test/);
 });

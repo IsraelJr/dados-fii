@@ -1,24 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { diagnoseMarketBenchmarks } from "@/lib/marketBenchmarks";
+import { internalAuthError, requireAdminOrCron } from "@/lib/security/InternalRequestAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function allowedSecrets() {
-  return [process.env.ADMIN_UPDATE_SECRET, process.env.CRON_SECRET].filter(Boolean);
-}
-
-function isAuthorized(req: NextRequest, body?: any) {
-  const secrets = allowedSecrets();
-  if (!secrets.length) return false;
-
-  const authHeader = req.headers.get("authorization") || "";
-  const headerSecret = req.headers.get("x-admin-secret") || authHeader.replace(/^Bearer\s+/i, "");
-  const querySecret = req.nextUrl.searchParams.get("secret");
-  const bodySecret = body?.secret;
-
-  return [headerSecret, querySecret, bodySecret].some((value) => Boolean(value && secrets.includes(value)));
-}
 
 function wantsTextOutput(req: NextRequest, body?: any) {
   const format = String(req.nextUrl.searchParams.get("format") || body?.format || "").toLowerCase();
@@ -44,7 +29,8 @@ function textOutputResponse(filename: string, payload: unknown, attachment = fal
 
 export async function GET(req: NextRequest) {
   try {
-    if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+    const authorization = await requireAdminOrCron(req, { scope: "diagnose-market-benchmarks" });
+    if (!authorization.ok) return internalAuthError(authorization);
 
     const payload = await diagnoseMarketBenchmarks();
 
@@ -54,15 +40,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(payload);
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message || "Erro ao diagnosticar benchmarks." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Erro ao diagnosticar benchmarks." }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-
   try {
-    if (!isAuthorized(req, body)) return NextResponse.json({ ok: false, error: "Não autorizado." }, { status: 401 });
+    const authorization = await requireAdminOrCron(req, { scope: "diagnose-market-benchmarks" });
+    if (!authorization.ok) return internalAuthError(authorization);
+    const body = await req.json().catch(() => ({}));
 
     const payload = await diagnoseMarketBenchmarks();
 
@@ -72,6 +58,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(payload);
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message || "Erro ao diagnosticar benchmarks." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Erro ao diagnosticar benchmarks." }, { status: 500 });
   }
 }

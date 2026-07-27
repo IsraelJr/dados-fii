@@ -17,11 +17,11 @@ test("carregamento inicial consulta apenas o status", () => {
   assert.match(panel, /requestJson<StatusResponse>\("\/api\/admin\/system\/risk-lab\/stress-runs"\)/);
 });
 
-test("execução exige ação, ticker e confirmação explícita", () => {
+test("execução exige ação e ticker sem validação técnica manual", () => {
   assert.match(panel, /method: "POST"/);
-  assert.match(panel, /action: "execute", ticker, confirmed: true/);
-  assert.match(panel, /disabled=\{!enabled \|\| !ready \|\| !confirmed \|\| busy\}/);
-  assert.match(panel, /type="checkbox"/);
+  assert.match(panel, /action: "execute", ticker/);
+  assert.match(panel, /disabled=\{!enabled \|\| !ready \|\| busy\}/);
+    assert.doesNotMatch(panel, /type="checkbox"|confirmed:\s*true|const \[confirmations/);
 });
 
 test("painel declara ausência de efeitos externos e caráter preliminar", () => {

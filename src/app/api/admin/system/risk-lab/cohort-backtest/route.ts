@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
+import { requireGithubActionsProductionIdentity } from "@/lib/security/GithubActionsOidc";
+import { riskLabCohortIdentityService } from "@/lib/risk-lab/RiskLabCohortIdentityService";
 import {
   planRiskLabCohortAdvance,
   type RiskLabCohortAdvanceAction,
@@ -28,16 +30,60 @@ function clientNextAction(action: RiskLabCohortAdvanceAction) {
   return action;
 }
 
+async function authorizeOperator(
+  request: NextRequest,
+  scope: string,
+  options: { limit: number; windowMs: number },
+) {
+  if (request.headers.has("authorization")) {
+    try {
+      const identity = await requireGithubActionsProductionIdentity(request, {
+        audience: "dados-fii-risk-lab-operation",
+        allowedWorkflowFiles: [
+          "risk-lab-cohort-backtest.yml",
+          "risk-lab-frozen-dividend-notices.yml",
+        ],
+      });
+      return {
+        ok: true as const,
+        actor: `github-oidc:${identity.runId}:${identity.runAttempt}`,
+        operatorId: `github:${identity.actorId}`,
+      };
+    } catch {
+      return {
+        ok: false as const,
+        rejection: adminJson({ ok: false, error: "Identidade OIDC inválida." }, 401),
+      };
+    }
+  }
+  const authorization = await authorizeAdminRequest(request, scope, options);
+  if (authorization.rejection) return { ok: false as const, rejection: authorization.rejection };
+  return {
+    ok: true as const,
+    actor: `admin:${authorization.identity.uid}`,
+    operatorId: authorization.identity.uid,
+  };
+}
+
 export async function GET(request: NextRequest) {
-  const authorization = await authorizeAdminRequest(
+  const authorization = await authorizeOperator(
     request,
     "risk-lab-cohort-backtest-status",
     { limit: 30, windowMs: 60_000 },
   );
-  if (authorization.rejection) return authorization.rejection;
+  if (!authorization.ok) return authorization.rejection;
 
   try {
     const releaseCommit = activeProductionRelease();
+    if (request.nextUrl.searchParams.get("view") === "identities") {
+      const identities = await riskLabCohortIdentityService.list();
+      return adminJson({
+        ok: true,
+        releaseCommit,
+        runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
+        identities,
+      });
+    }
     const evidence = await segmentedRiskLabCohortBacktestService.getPublicEvidence();
     const plan = releaseCommit
       ? planRiskLabCohortAdvance(releaseCommit, SEGMENTED_COHORT_TICKERS, evidence)
@@ -57,20 +103,20 @@ export async function GET(request: NextRequest) {
       ? error.message
       : "Falha ao carregar o status do backtest da coorte.";
     console.error("Risk Lab segmented admin status error", {
-      actor: authorization.identity.email,
+      actor: authorization.actor,
       message,
     });
-    return adminJson({ ok: false, error: message }, 500);
+    return adminJson({ ok: false, error: "Falha ao carregar o status do backtest." }, 500);
   }
 }
 
 export async function POST(request: NextRequest) {
-  const authorization = await authorizeAdminRequest(
+  const authorization = await authorizeOperator(
     request,
     "risk-lab-cohort-backtest-execute",
     { limit: 12, windowMs: 30 * 60_000 },
   );
-  if (authorization.rejection) return authorization.rejection;
+  if (!authorization.ok) return authorization.rejection;
 
   const releaseCommit = activeProductionRelease();
   if (!releaseCommit) {
@@ -118,7 +164,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.info("Risk Lab segmented admin execution requested", {
-      actor: authorization.identity.email,
+      actor: authorization.actor,
       releaseCommit,
       runId: RISK_LAB_COHORT_BACKTEST_RUN_ID,
       requestedAction: action,
@@ -150,13 +196,13 @@ export async function POST(request: NextRequest) {
       ? error.message
       : "Falha ao executar etapa do backtest da coorte.";
     console.error("Risk Lab segmented admin execution error", {
-      actor: authorization.identity.email,
+      actor: authorization.actor,
       releaseCommit,
       action,
       ticker: ticker || null,
       message,
     });
     const status = /execução|inicializado|inicializada|incompleto/i.test(message) ? 409 : 500;
-    return adminJson({ ok: false, error: message }, status);
+    return adminJson({ ok: false, error: status === 409 ? message : "Falha ao executar a etapa do backtest." }, status);
   }
 }

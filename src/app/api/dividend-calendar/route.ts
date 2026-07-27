@@ -174,6 +174,6 @@ export async function GET(req: Request) {
       }
     );
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Erro ao carregar calendário." }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao carregar calendário." }, { status: 500 });
   }
 }

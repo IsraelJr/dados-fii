@@ -78,9 +78,9 @@ export default function FontesDosDadosPage() {
           <p className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-amber-800">
             <ShieldAlert size={14} /> Uso responsável
           </p>
-          <h2 className="mt-4 text-2xl font-black text-slate-900">Confirme antes de decidir</h2>
+          <h2 className="mt-4 text-2xl font-black text-slate-900">Rastreabilidade para decisões</h2>
           <p className="mt-3 text-sm leading-6 text-slate-700">
-            Para decisões relevantes, confirme as informações nos relatórios gerenciais, comunicados oficiais, informes dos fundos, páginas das administradoras e demais documentos públicos dos FIIs.
+            Para decisões relevantes, o Dados FII apresenta fontes, datas-base e limitações para que cada informação possa ser rastreada aos relatórios gerenciais, comunicados oficiais, informes e demais documentos públicos dos fundos.
           </p>
           <div className="mt-5 rounded-2xl bg-white p-4 text-sm leading-6 text-slate-700 ring-1 ring-amber-200">
             O site ajuda a organizar e interpretar dados. Ele não substitui análise própria, planejamento financeiro ou orientação profissional individualizada.

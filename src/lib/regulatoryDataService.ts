@@ -15,7 +15,6 @@ import {
   nowIso,
   safeRegulatoryOverlay,
   source,
-  withMarketQuote,
 } from "@/lib/regulatory/RegulatoryNormalizer";
 import { regulatoryRepository, type RegulatoryRepository } from "@/lib/regulatory/RegulatoryRepository";
 import {
@@ -25,10 +24,11 @@ import {
   type RegulatoryOverlay,
   type RollbackAuthorization,
 } from "@/lib/regulatory/RegulatoryTypes";
-import { validateRegulatoryFund } from "@/lib/regulatory/RegulatoryValidator";
+import { assessFundDataQuality, validateRegulatoryFund } from "@/lib/regulatory/RegulatoryValidator";
 import { scoreEngine, type ScoreEngine } from "@/lib/scores/ScoreEngine";
 import { freeReportEngine, type FreeReportEngine } from "@/lib/reports/FreeReportEngine";
 import { premiumReportEngine, PremiumReportError, type PremiumPortfolioHolding, type PremiumReportEngine } from "@/lib/reports/PremiumReportEngine";
+import { assertFreshPremiumPeerSnapshot, buildPremiumPeerSnapshot } from "@/lib/reports/PremiumPeerSnapshot";
 import { riskLabPremiumReadModel, type RiskLabPremiumReadModel } from "@/lib/risk-lab/RiskLabPremiumReadModel";
 import { observabilityEngine, type ObservabilityEngine } from "@/lib/observability/ObservabilityEngine";
 import { automaticMonitor, type AutomaticMonitor } from "@/lib/monitor/AutomaticMonitor";
@@ -171,8 +171,28 @@ export class RegulatoryDataService {
     const officialReference = getOfficialFundReference(ticker);
     const canonical = canonicalFrom(ticker, baseData, overlay);
     const membership = ifixMembership(ticker, canonical.kind, ifixCompositionData);
-    const issues = validateRegulatoryFund(canonical);
     const derivedData = deriveFiiRiskData(baseData);
+    const marketDataUpdatedAt = quote ? nowIso() : null;
+    const assessment = assessFundDataQuality(canonical, {
+      ...baseData,
+      ...derivedData,
+      marketDataUpdatedAt,
+    });
+    const issues = [
+      ...validateRegulatoryFund(canonical),
+      ...assessment.missingFields.map((field) => ({
+        code: `missing_financial_${field}`,
+        field,
+        message: `Campo financeiro ${field} ausente ou sem tipo numérico válido.`,
+        severity: "warning" as const,
+      })),
+      ...assessment.invalidFields.map((field) => ({
+        code: `invalid_financial_${field}`,
+        field,
+        message: `Campo financeiro ${field} viola uma invariante de integridade.`,
+        severity: "error" as const,
+      })),
+    ];
     const publicData = {
       ...baseData,
       ...derivedData,
@@ -188,7 +208,7 @@ export class RegulatoryDataService {
       },
       marketDataSource: quote ? "Planilha de cotações Dados FII" : null,
       fundDataSource: catalogProjection.cnpj ? "Catálogo oficial normalizado Dados FII" : legacyRecord ? "Base interna Dados FII" : null,
-      marketDataUpdatedAt: quote ? nowIso() : null,
+      marketDataUpdatedAt,
       regulatoryMeta: {
         schemaVersion: canonical.schemaVersion,
         currentVersion: canonical.currentVersion,
@@ -196,9 +216,14 @@ export class RegulatoryDataService {
         sources: canonical.sources
           .concat(officialReference ? [source(officialReference.sourceName, "regulatory", officialReference.referenceDate)] : [])
           .concat(quote ? [source("Planilha de cotações Dados FII", "market", nowIso())] : []),
-        validation: { valid: !issues.some((issue) => issue.severity === "error"), issues },
+        validation: {
+          valid: assessment.valid,
+          status: assessment.status,
+          issues,
+          assessment,
+        },
       },
-    } as PublicFundData;
+    } as unknown as PublicFundData;
     const safePvp = plausiblePvpValue(publicData.pvp);
     if (safePvp === undefined) delete publicData.pvp;
     else publicData.pvp = safePvp;
@@ -213,6 +238,77 @@ export class RegulatoryDataService {
     return publicData;
   }
 
+  private refreshCachedMarketData(cached: PublicFundData, quote: MarketQuote | null): PublicFundData {
+    const base = { ...cached } as Record<string, unknown>;
+    for (const key of [
+      "scores",
+      "canonicalDividendMetrics",
+      "valuation",
+      "dividends",
+      "dividendYield",
+      "dividendYield12m",
+      "dy12m",
+      "dy12mCalculated",
+      "dy6m",
+      "pvp",
+      "marketCap",
+      "lastDividend",
+      "lastDividendDate",
+      "averageDividend12m",
+      "monthsPaidLast12",
+      "dividendVolatility12m",
+      "dividendCuts12m",
+    ]) delete base[key];
+    Object.assign(base, quote || marketFallback(cached.ticker));
+    const marketDataUpdatedAt = quote ? nowIso() : null;
+    const derived = deriveFiiRiskData(base);
+    const refreshed = {
+      ...base,
+      ...derived,
+      code: cached.ticker,
+      ticker: cached.ticker,
+      marketDataSource: quote ? "Planilha de cotações Dados FII" : null,
+      marketDataUpdatedAt,
+      dataSources: {
+        ...(cached.dataSources && typeof cached.dataSources === "object" ? cached.dataSources : {}),
+        price: quote ? "Planilha de cotações Dados FII" : "Preço indisponível",
+      },
+    } as unknown as PublicFundData;
+    const canonical = canonicalFrom(cached.ticker, refreshed, {
+      ticker: cached.ticker,
+      currentVersion: cached.regulatoryMeta.currentVersion,
+      sources: cached.regulatoryMeta.sources,
+    });
+    const assessment = assessFundDataQuality(canonical, refreshed);
+    const identityIssues = validateRegulatoryFund(canonical);
+    refreshed.regulatoryMeta = {
+      ...cached.regulatoryMeta,
+      cache: "hit",
+      validation: {
+        valid: assessment.valid,
+        status: assessment.status,
+        assessment,
+        issues: [
+          ...identityIssues,
+          ...assessment.missingFields.map((field) => ({
+            code: `missing_financial_${field}`,
+            field,
+            message: `Campo financeiro ${field} ausente ou sem tipo numérico válido.`,
+            severity: "warning" as const,
+          })),
+          ...assessment.invalidFields.map((field) => ({
+            code: `invalid_financial_${field}`,
+            field,
+            message: `Campo financeiro ${field} viola uma invariante de integridade.`,
+            severity: "error" as const,
+          })),
+        ],
+      },
+    };
+    if (scoresEnabled()) refreshed.scores = this.scores.calculate(refreshed);
+    return refreshed;
+  }
+
   async getByTicker(value: unknown, options?: { bypassCache?: boolean; marketQuote?: MarketQuote | null }): Promise<PublicFundData | null> {
     return this.observability.track("regulatory.read", async () => {
       const ticker = normalizeTicker(value);
@@ -222,7 +318,7 @@ export class RegulatoryDataService {
         const cachedQuote = options && "marketQuote" in options
           ? options.marketQuote || null
           : (await this.getMarketQuotes()).find((item) => item.code === ticker) || null;
-        return withMarketQuote(cached, cachedQuote, "hit");
+        return this.refreshCachedMarketData(cached, cachedQuote);
       }
 
       const [legacyRecord, overlay, quotes, ifixCompositionData] = await Promise.all([
@@ -426,6 +522,22 @@ export class RegulatoryDataService {
     });
   }
 
+  async rebuildPremiumPeerSnapshot(actor: string) {
+    return this.observability.track("premium.peers.rebuild", async () => {
+      const funds = await this.listFunds(2_000, { includeMarket: false, includeScores: true });
+      const snapshot = buildPremiumPeerSnapshot(funds.map((fund) => ({
+        ticker: fund.ticker,
+        fundKind: fund.fundKind,
+        segment: String(fund.segment_new || fund.segment || fund.segmento || "").trim() || null,
+        scores: fund.scores,
+      })), nowIso());
+      if (snapshot.sourceFundCount < 5) {
+        throw new Error("Catálogo insuficiente para materializar pares Premium.");
+      }
+      return this.repository.savePremiumPeerSnapshot(snapshot, actor);
+    });
+  }
+
   async getAIInsights(value: unknown, options?: { requestKey?: string | null }): Promise<FundAIInsights | null> {
     return this.observability.track("ai.insights", async () => {
       const report = await this.getFreeReport(value);
@@ -454,21 +566,43 @@ export class RegulatoryDataService {
         if (holdingMap.size >= 120) break;
       }
       const holdings = Array.from(holdingMap, ([ticker, quotas]) => ({ ticker, quotas }));
-      const [peers, portfolioData] = await Promise.all([
-        this.listFunds(500, { includeMarket: false, includeScores: true }),
+      const [peerSnapshot, portfolioData] = await Promise.all([
+        this.repository.getPremiumPeerSnapshot(),
         holdings.length ? this.getMany(holdings.map((item) => item.ticker), 120) : Promise.resolve(null),
       ]);
+      try {
+        assertFreshPremiumPeerSnapshot(peerSnapshot);
+      } catch (error) {
+        throw new PremiumReportError(
+          error instanceof Error ? error.message : "Snapshot de pares Premium indisponível.",
+          "PREMIUM_PEER_SNAPSHOT_UNAVAILABLE",
+          503,
+        );
+      }
       const portfolioHoldings: PremiumPortfolioHolding[] = holdings.map((item) => ({
         ...item,
         fund: portfolioData?.items[item.ticker] || null,
       }));
       const riskLab = this.riskLabPremium.read(freeReport.ticker, {
         enabled: featureEnabled("ENABLE_RISK_LAB_PREMIUM_READONLY", false),
+        category: {
+          fundKind: freeReport.identity.fundKind,
+          segment: freeReport.identity.segment,
+          sector: freeReport.identity.sector,
+          regulatoryClassification: freeReport.identity.regulatoryClassification,
+          isFundOfFunds: freeReport.identity.isFundOfFunds,
+        },
       });
-      const draft = this.premiumReports.prepare(freeReport, peers, nowIso(), portfolioHoldings, riskLab);
+      const draft = this.premiumReports.prepare(freeReport, peerSnapshot, nowIso(), portfolioHoldings, riskLab);
       const aiAnalysis = await this.aiInsights.generatePremiumInsights(draft, { requestKey: options?.requestKey });
       const report = this.premiumReports.complete(draft, aiAnalysis);
-      await this.repository.recordAuditEvent("premium-read", options?.auditActor || "premium:server", freeReport.ticker, {
+      const correlationId = options?.requestKey || this.requestFingerprint([
+        "premium",
+        freeReport.ticker,
+        report.generatedAt,
+      ]);
+      const receipt = await this.repository.recordAuditEvent("premium-read", options?.auditActor || "premium:server", freeReport.ticker, {
+        correlationId,
         reportVersion: report.reportVersion,
         promptVersion: report.aiAnalysis.metadata.promptVersion,
         accessPlan: options?.accessPlan || "unknown",
@@ -480,7 +614,15 @@ export class RegulatoryDataService {
         notificationsAllowed: report.riskLab.notificationsAllowed,
         externalEffectsAllowed: report.riskLab.externalEffectsAllowed,
       });
-      return report;
+      return {
+        ...report,
+        auditReceipt: {
+          eventId: receipt.eventId,
+          action: "premium-read" as const,
+          createdAt: receipt.createdAt,
+          correlationId,
+        },
+      };
     });
   }
 

@@ -34,7 +34,7 @@ function normalizeTicker(value: string): DividendStressRunTicker {
 }
 
 function assertActor(value: string) {
-  if (!value || !value.includes("@") || value.length > 254) {
+  if (!value || /\s/.test(value) || value.length > 254) {
     throw new Error("Responsável administrativo inválido.");
   }
 }

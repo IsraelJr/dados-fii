@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AIInsightsError } from "@/lib/ai/AIInsightsEngine";
+import { publicError } from "@/lib/http/PublicError";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
 
 export const runtime = "nodejs";
@@ -29,7 +30,8 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof AIInsightsError) {
-      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+      const response = publicError(error, "Não foi possível gerar o resumo do FII.");
+      return NextResponse.json({ error: response.message, code: response.code }, { status: response.status });
     }
     console.error("FII summary compatibility error", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ error: "Não foi possível gerar o resumo do FII." }, { status: 500 });

@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 export default function UpdateDividendsBatchPage() {
-  const [secret, setSecret] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [limit, setLimit] = useState("10");
   const [cursor, setCursor] = useState("");
@@ -13,12 +12,8 @@ export default function UpdateDividendsBatchPage() {
   async function runBatch(currentCursor: string) {
     const res = await fetch("/api/admin/update-dividends-batch", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secret": secret,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        secret,
         year: Number(year),
         limit: Number(limit),
         cursor: currentCursor || undefined,
@@ -79,11 +74,6 @@ export default function UpdateDividendsBatchPage() {
       </p>
 
       <div className="space-y-4 rounded-2xl border bg-white p-5 shadow-sm">
-        <label className="block">
-          <span className="text-sm font-semibold">Senha ADMIN_UPDATE_SECRET</span>
-          <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} className="mt-1 w-full rounded-lg border p-2" />
-        </label>
-
         <label className="block">
           <span className="text-sm font-semibold">Ano</span>
           <input value={year} onChange={(e) => setYear(e.target.value)} className="mt-1 w-full rounded-lg border p-2" />

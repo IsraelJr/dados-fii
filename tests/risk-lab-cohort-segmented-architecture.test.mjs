@@ -16,17 +16,16 @@ function executable(source) {
   return source.replace(/^\s*#.*$/gm, "");
 }
 
-test("API pública divide a execução em initialize, case e finalize no release exato", () => {
-  assert.match(publicRoute, /action === "initialize"/);
-  assert.match(publicRoute, /action === "case"/);
-  assert.match(publicRoute, /action === "finalize"/);
-  assert.match(publicRoute, /parameters\.release === deployedRelease/);
-  assert.match(publicRoute, /SEGMENTED_COHORT_TICKERS\.includes\(ticker\)/);
-  assert.doesNotMatch(publicRoute, /segmentedRiskLabCohortBacktestService\.run\(\)/);
+test("API pública publica evidência sem executar nenhuma etapa", () => {
+  assert.match(publicRoute, /forbiddenMutation/);
+  assert.match(publicRoute, /decidePublicEvidenceStatus/);
+  assert.match(publicRoute, /getPublicEvidence/);
+  assert.doesNotMatch(publicRoute, /\.initialize\(\)|\.runTicker\(|\.finalize\(\)|SEGMENTED_COHORT_TICKERS/);
 });
 
 test("API Admin mantém autenticação, coorte fechada e avanço delegado", () => {
   assert.match(adminRoute, /authorizeAdminRequest/);
+  assert.match(adminRoute, /requireGithubActionsProductionIdentity/);
   assert.match(adminRoute, /new Set\(\["initialize", "case", "finalize", "advance"\]\)/);
   assert.match(adminRoute, /SEGMENTED_COHORT_TICKERS\.includes\(ticker\)/);
   assert.match(adminRoute, /action === "advance"/);
@@ -48,9 +47,10 @@ test("cliente existente executa seis tickers sem aprovação manual e persiste p
 
 test("GitHub somente inicia a tentativa e não executa fundos ou formaliza evidência", () => {
   const source = executable(workflow);
-  assert.match(workflow, /action=initialize/);
+  assert.match(workflow, /"action":"initialize"/);
   assert.match(workflow, /^\s{2}workflow_dispatch:/m);
   assert.match(workflow, /inputs\.release_sha/);
+  assert.match(workflow, /getIDToken\("dados-fii-risk-lab-operation"\)/);
   assert.equal((workflow.match(/curl\b/g) || []).length, 1);
   assert.doesNotMatch(source, /action=case|action=finalize/);
   assert.doesNotMatch(source, /DEVA11|VSLH11|KNCR11|KNSC11|MCCI11|RBRY11/);

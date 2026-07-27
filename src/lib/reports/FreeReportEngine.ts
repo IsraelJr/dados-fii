@@ -48,7 +48,11 @@ function numberValue(value: unknown): number | null {
 
 function firstNumber(data: Data, keys: string[]) {
   for (const key of keys) {
-    const parsed = numberValue(data[key]);
+    const value = key.split(".").reduce<unknown>((current, part) => {
+      if (!current || typeof current !== "object" || Array.isArray(current)) return undefined;
+      return (current as Data)[part];
+    }, data);
+    const parsed = numberValue(value);
     if (parsed !== null) return parsed;
   }
   return null;
@@ -294,7 +298,7 @@ export class FreeReportEngine {
       market: {
         price: typeof data.price === "string" || typeof data.price === "number" ? data.price : null,
         variation: typeof data.variation === "string" || typeof data.variation === "number" ? data.variation : null,
-        dividendYield: firstNumber(data, ["dividendYield12m", "dy12m", "dividendYield", "dy"]),
+        dividendYield: firstNumber(data, ["canonicalDividendMetrics.dy12mCurrentPrice.value"]),
         pvp,
         lastDividend: dividend.value,
         lastDividendReference: dividend.reference,

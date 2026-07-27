@@ -47,14 +47,6 @@ class MemoryRepository implements FnetNoticeCandidateRepository {
     return [...this.values.values()];
   }
 
-  async approve(candidateId: string, actor: string) {
-    const current = this.values.get(candidateId);
-    if (!current) throw new Error("Candidato ausente.");
-    const approved = { ...current, reviewStatus: "approved" as const, reviewedBy: actor, reviewedAt: "2026-07-18T12:00:00.000Z" };
-    this.values.set(candidateId, approved);
-    return approved;
-  }
-
   async reject(candidateId: string, actor: string, reason: string) {
     const current = this.values.get(candidateId);
     if (!current) throw new Error("Candidato ausente.");
@@ -76,7 +68,7 @@ function mockFetch(notice: string, protocol: string, calls: string[]) {
   }) as typeof fetch;
 }
 
-test("importa aviso e protocolo, calcula hashes e mantém revisão pendente", async () => {
+test("importa aviso e protocolo, calcula hashes e valida automaticamente", async () => {
   const repository = new MemoryRepository();
   const calls: string[] = [];
   const service = new FnetDividendNoticeImportService({
@@ -91,7 +83,9 @@ test("importa aviso e protocolo, calcula hashes e mantém revisão pendente", as
   assert.equal(result.candidate.candidateId, "MCCI11_2026-06_1244228");
   assert.equal(result.candidate.amountPerShare, 1);
   assert.equal(result.candidate.announcedAt, "2026-07-10T18:04:00-03:00");
-  assert.equal(result.candidate.reviewStatus, "pending_manual_review");
+  assert.equal(result.candidate.reviewStatus, "verified_automatic");
+  assert.equal(result.candidate.validationVersion, "fnet-notice-validation-v1");
+  assert.match(result.candidate.validationHash, /^[a-f0-9]{64}$/);
   assert.match(result.candidate.sourceHash, /^[a-f0-9]{64}$/);
   assert.match(result.candidate.protocolHash, /^[a-f0-9]{64}$/);
   assert.equal(calls.length, 2);
@@ -111,18 +105,17 @@ test("reimportação do mesmo documento é idempotente", async () => {
   assert.equal(repository.values.size, 1);
 });
 
-test("rejeita ticker fora da coorte antes de persistir", async () => {
+test("aceita qualquer ticker FII/FIAGRO válido sem exceção hardcoded de coorte", async () => {
   const repository = new MemoryRepository();
   const service = new FnetDividendNoticeImportService({
     repository,
     fetchImpl: mockFetch(noticeHtml("MXRF11"), protocolHtml(), []),
   });
 
-  await assert.rejects(
-    () => service.importByDocumentId("123", "admin@example.com"),
-    /não pertence à coorte MCCI11\/RBRY11/,
-  );
-  assert.equal(repository.values.size, 0);
+  const result = await service.importByDocumentId("123", "admin@example.com");
+  assert.equal(result.candidate.ticker, "MXRF11");
+  assert.equal(result.candidate.reviewStatus, "verified_automatic");
+  assert.equal(repository.values.size, 1);
 });
 
 test("rejeita protocolo com data divergente", async () => {
@@ -151,16 +144,14 @@ test("rejeita ID antes de realizar qualquer consulta externa", async () => {
   assert.equal(calls.length, 0);
 });
 
-test("aprovação humana permanece ação separada da importação", async () => {
+test("importação concluída não depende de segunda aprovação humana", async () => {
   const repository = new MemoryRepository();
   const service = new FnetDividendNoticeImportService({
     repository,
     fetchImpl: mockFetch(noticeHtml("RBRY11"), protocolHtml(), []),
   });
   const imported = await service.importByDocumentId("617900", "importer@example.com");
-  const approved = await service.approve(imported.candidate.candidateId, "reviewer@example.com");
-
-  assert.equal(imported.candidate.reviewStatus, "pending_manual_review");
-  assert.equal(approved.reviewStatus, "approved");
-  assert.equal(approved.reviewedBy, "reviewer@example.com");
+  assert.equal(imported.candidate.reviewStatus, "verified_automatic");
+  assert.equal(imported.candidate.reviewedBy, "importer@example.com");
+  assert.deepEqual(imported.candidate.validationReasons, []);
 });

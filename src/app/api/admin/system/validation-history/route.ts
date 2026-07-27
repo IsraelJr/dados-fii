@@ -13,6 +13,6 @@ export async function GET(req: NextRequest) {
     const history = await regulatoryDataService.getValidationHistory(limit);
     return adminJson({ ok: true, count: history.length, history });
   } catch (error) {
-    return adminJson({ ok: false, error: error instanceof Error ? error.message : "Erro ao consultar o histórico de validações." }, 500);
+    return adminJson({ ok: false, error: "Erro ao consultar o histórico de validações." }, 500);
   }
 }

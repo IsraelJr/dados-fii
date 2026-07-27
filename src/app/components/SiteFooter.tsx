@@ -38,7 +38,7 @@ export default function SiteFooter() {
         <div>
           <p className="font-extrabold text-slate-800">Uso consciente</p>
           <p className="mt-3 leading-6">
-            Confirme dados relevantes nos comunicados oficiais, relatórios gerenciais e páginas da administradora do fundo.
+            Dados relevantes são acompanhados de origem, data-base e limitações para permitir rastreabilidade aos documentos oficiais.
           </p>
           <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 ring-1 ring-amber-100">
             FIIs têm risco de mercado, liquidez, crédito, vacância e corte de dividendos.

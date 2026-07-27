@@ -10,7 +10,6 @@ type LogItem = {
 };
 
 export default function FiiMaintenancePage() {
-    const [secret, setSecret] = useState("");
     const [action, setAction] = useState<Action>("both");
     const [year, setYear] = useState(String(new Date().getFullYear()));
     const [limit, setLimit] = useState("5");
@@ -25,16 +24,12 @@ export default function FiiMaintenancePage() {
     const runBatch = async (currentCursor: string) => {
         const res = await fetch("/api/admin/fii-maintenance", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-admin-secret": secret,
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 action,
                 year: Number(year),
                 limit: Number(limit),
                 cursor: currentCursor || undefined,
-                secret,
             }),
         });
 
@@ -44,11 +39,6 @@ export default function FiiMaintenancePage() {
     };
 
     const start = async () => {
-        if (!secret.trim()) {
-            addLog("Informe a senha temporária ADMIN_UPDATE_SECRET.", "error");
-            return;
-        }
-
         setRunning(true);
         let currentCursor = cursor;
 
@@ -86,11 +76,6 @@ export default function FiiMaintenancePage() {
     };
 
     const runOneBatch = async () => {
-        if (!secret.trim()) {
-            addLog("Informe a senha temporária ADMIN_UPDATE_SECRET.", "error");
-            return;
-        }
-
         setRunning(true);
         try {
             const data = await runBatch(cursor);
@@ -111,17 +96,6 @@ export default function FiiMaintenancePage() {
             </p>
 
             <div className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-2">
-                <label className="block">
-                    <span className="text-sm font-semibold">Senha ADMIN_UPDATE_SECRET</span>
-                    <input
-                        type="password"
-                        value={secret}
-                        onChange={(e) => setSecret(e.target.value)}
-                        className="mt-1 w-full rounded-lg border p-2"
-                        placeholder="Senha temporária"
-                    />
-                </label>
-
                 <label className="block">
                     <span className="text-sm font-semibold">Ação</span>
                     <select
