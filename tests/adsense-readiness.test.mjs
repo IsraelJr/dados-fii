@@ -23,11 +23,12 @@ test("AdSense carrega apenas no host de produção e em páginas públicas eleg�
   const loader = read("src/app/components/AdSenseLoader.tsx");
   assert.match(layout, /<AdSenseLoader \/>/);
   assert.doesNotMatch(layout, /pagead2\.googlesyndication\.com\/pagead\/js\/adsbygoogle\.js/);
+  assert.match(layout, /"google-adsense-account": ADSENSE_PUBLISHER_ID/);
   assert.match(loader, /window\.location\.hostname === "www\.dadosfii\.com\.br"/);
   for (const prefix of ["/admin", "/api", "/carteira", "/fii", "/login", "/configuracoes"]) assert.ok(loader.includes(`"${prefix}"`), `rota bloqueada ausente: ${prefix}`);
   assert.match(loader, /ELIGIBLE_EXACT_PATHS/);
   assert.match(loader, /ELIGIBLE_PREFIXES/);
-  assert.doesNotMatch(loader, /\/autores\/|\/politica-editorial/);
+  assert.doesNotMatch(loader, /\/autores\/|\/politica-editorial|\/politica-de-privacidade/);
 });
 
 test("consentimento oferece aceitar, recusar e reabrir preferências", () => {
