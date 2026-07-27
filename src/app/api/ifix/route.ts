@@ -4,10 +4,11 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const BRAPI_BASE_URL = "https://brapi.dev/api/v2";
+const PUBLIC_IFIX_SOURCE = "Dados FII";
 
 type IfixQuote = {
     points: number;
-    source: string;
+    technicalSource: "Yahoo Finance" | "brapi.dev";
     lastDate?: string | null;
     open?: number | null;
     previousClose?: number | null;
@@ -105,7 +106,7 @@ async function getFromYahoo(): Promise<IfixQuote> {
 
     return {
         points,
-        source: "Yahoo Finance",
+        technicalSource: "Yahoo Finance",
         lastDate: last ? new Date(last.timestamp * 1000).toISOString().slice(0, 10) : null,
         open,
         previousClose,
@@ -153,7 +154,7 @@ async function getFromBrapi(): Promise<IfixQuote> {
 
             return {
                 points,
-                source: "brapi.dev",
+                technicalSource: "brapi.dev",
                 lastDate: parseDate(last?.date),
                 open,
                 previousClose,
@@ -170,7 +171,6 @@ async function getFromBrapi(): Promise<IfixQuote> {
 
 export async function GET() {
     const providers = [getFromYahoo, getFromBrapi];
-    const errors: string[] = [];
 
     for (const provider of providers) {
         try {
@@ -191,7 +191,7 @@ export async function GET() {
                     changePercent: quote.changePercent ?? null,
                     changePercentFormatted,
                     trend: quote.changePercent && quote.changePercent > 0 ? "up" : quote.changePercent && quote.changePercent < 0 ? "down" : "flat",
-                    source: quote.source,
+                    source: PUBLIC_IFIX_SOURCE,
                     lastDate: quote.lastDate || null,
                     updatedAt: new Date().toISOString(),
                     ok: true,
@@ -205,8 +205,8 @@ export async function GET() {
                     },
                 }
             );
-        } catch (err: any) {
-            errors.push(err?.message || "Erro desconhecido");
+        } catch {
+            // Tenta o próximo provedor técnico sem expô-lo no contrato público.
         }
     }
 
@@ -224,12 +224,11 @@ export async function GET() {
             changePercent: null,
             changePercentFormatted: null,
             trend: "flat",
-            source: null,
+            source: PUBLIC_IFIX_SOURCE,
             lastDate: null,
             updatedAt: new Date().toISOString(),
             ok: false,
             error: "Não foi possível consultar o IFIX.",
-            details: errors,
         },
         {
             status: 200,
