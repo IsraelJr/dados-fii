@@ -2,7 +2,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 10.0.0  
+**Versão:** 10.1.0  
 **Data:** 27/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
@@ -22,7 +22,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | Premium será visível para descoberta e beta antes do checkout. | Premium ficava invisível exceto para e-mail administrativo. | Demanda poderá ser medida sem prometer cobrança inexistente. |
 | Acesso administrativo atual não prova validação do Premium. | Uso do proprietário podia ser confundido com validação de usuário. | Validação exige usuários externos, telemetria e disposição real a pagar. |
 | A carteira deve ser um copiloto de decisões, não um narrador de oscilações. | Alertas poderiam enfatizar altas e baixas diárias. | O produto separará mudança material de ruído e explicará impacto na renda, risco e tese. |
-| O Handoff v10.0.0 é a única fonte canônica ativa. | Handoff v9.0.0 e roadmaps anteriores. | Evidências históricas continuam válidas, mas a ordem futura foi substituída. |
+| O Handoff v10.1.0 é a única fonte canônica ativa. | Handoff v10.0.0 e roadmaps anteriores. | Evidências históricas continuam válidas; o avanço técnico da PV-1B passa a fazer parte do estado oficial. |
 
 ## 1. Estado atual do projeto
 
@@ -37,28 +37,54 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - Hash da evidência Premium: `8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b`.
 - A nova fase foi aberta na branch `agent/product-validation-phase-1`, issue `#154` e PR draft `#155`.
 - O documento de direção da fase está em `docs/product/product-validation-phase-1.md`.
+- PV-1A foi implementada no branch.
+- PV-1B foi implementada no branch, mas ainda não está formalmente concluída porque a nova cadeia completa de CI, Emulator, build, E2E, Preview e produção ainda não foi aprovada.
 
 ### Auditoria inicial da PV-1
 
-O estado atual da carteira não atende ainda ao contrato de Produto Validável:
+O estado atual da interface da carteira ainda não atende ao contrato completo de Produto Validável:
 
 - `src/app/carteira/page.tsx` concentra regras financeiras, persistência, carregamento, snapshots e interface no mesmo componente;
 - carteira e snapshots utilizam `localStorage` (`dados-fii-wallet-v1` e `dados-fii-wallet-monthly-snapshots-v1`);
-- snapshot do mês corrente é regravado conforme preços e dados carregados, sem modelo explícito de proveniência;
-- `parseCurrency` converte valores inválidos para zero, o que conflita com a regra fail-closed;
-- o histórico de dividendos é reconstruído a partir da carteira atual, não representa necessariamente a posição histórica do usuário;
-- não existe ainda domínio separado para entrada manual, conflito com snapshot, autoria, versão ou isolamento entre usuários;
-- a PR antiga `#65` não é base canônica para PV-1 e deverá ser encerrada ou substituída após reconciliação.
+- snapshot do mês corrente é regravado conforme preços e dados carregados;
+- `parseCurrency` converte valores inválidos para zero;
+- o histórico de dividendos é reconstruído a partir da carteira atual;
+- a interface ainda não consome a nova API server-side;
+- a PR antiga `#65` foi encerrada sem merge por não atender ao contrato vigente.
+
+### Implementado no branch da PV-1
+
+- domínio `PortfolioHistory` tipado e versionado;
+- competência `YYYY-MM`;
+- moeda pt-BR fail-closed;
+- zero válido separado de ausência;
+- proveniência `manual`, `automatic_snapshot` e `legacy`;
+- conflito explícito e snapshots imutáveis;
+- repository server-side e adapter Firestore;
+- ownership por contexto autenticado;
+- identidade centralizada por sessão validada ou cookie anônimo existente;
+- nenhum `ownerId`, `userId` ou e-mail do body concede identidade;
+- rotas finas `/api/portfolio/history` e `/api/portfolio/history/migrate`;
+- migração idempotente limitada ao ano corrente;
+- índice Firestore por owner, carteira e competência;
+- testes de domínio, isolamento, idempotência e arquitetura.
+
+### Evidência da esteira nesta fase
+
+- run `30304926247`: reprovado no teste canônico do Handoff;
+- causa: divergência textual da asserção arquitetural;
+- correção aplicada no commit `95b3906470f2b3f0679181c55eb730de048be2fb`;
+- nova cadeia completa ainda pendente no SHA mais recente.
 
 ### Matriz atual
 
 | Área | Estado |
 |---|---|
 | Segurança, CI e Risk Lab históricos | Formalmente concluídos |
-| Carteira atual | Funcional, porém client-side e não validada para PV-1 |
-| Histórico patrimonial | Parcial; snapshots locais sem contrato de proveniência completo |
-| Histórico manual | Não implementado |
-| Telemetria da jornada | Não implementada |
+| PV-1A — domínio e contratos | Implementada no branch; gates completos pendentes |
+| PV-1B — persistência e ownership | Implementada no branch; gates completos pendentes |
+| PV-1C — interface e gráficos | Pendente |
+| PV-1D — telemetria e produção | Pendente |
 | Premium automático | Implementado para acesso controlado; não validado comercialmente |
 | Checkout/cobrança | Não implementado e fora da PV-1 |
 | AdSense | Congelado |
@@ -222,29 +248,40 @@ Aceite: cobrança idempotente, ambiente de teste, recuperação de falhas, plano
 
 - Release corretivo: `0e029f78560d11d12720c447f2f9058c482e4277`.
 - PRs históricas principais: `#141`, `#142`, `#143`, `#146`, `#147`, `#148`, `#149`, `#150`, `#151`, `#152`, `#153`.
-- PR antiga aberta: `#65`; não integra automaticamente a PV-1.
+- PR `#65`: encerrada sem merge por substituição canônica.
 
 ### Nova fase
 
 - Branch: `agent/product-validation-phase-1`.
 - Primeiro commit: `21f84c7fb311070b118ecaaa5f837b9c0aa91775`.
+- Commit de correção do teste canônico: `95b3906470f2b3f0679181c55eb730de048be2fb`.
 - Issue: `#154 — PV-1: validar jornada principal da carteira e histórico manual`.
-- PR draft: `#155 — docs: inicia fase de validação do produto`.
+- PR draft: `#155 — feat: inicia PV-1 com domínio do histórico da carteira`.
 - Documento: `docs/product/product-validation-phase-1.md`.
-- Handoff: v10.0.0.
+- Auditoria: `docs/product/pv-1-wallet-gap-analysis.md`.
+- Handoff: v10.1.0.
 
-### Arquivos centrais já identificados
+### Arquivos centrais da PV-1
 
-- `src/app/carteira/page.tsx`;
-- `DADOS_FII_HANDOFF.md`;
-- `tests/canonical-handoff.test.mjs`;
-- `tests/e2e/critical-journeys.spec.ts`;
-- `firestore.rules`;
-- `.github/workflows/phase-2-closure.yml`.
+- `src/lib/portfolio/PortfolioHistory.ts`;
+- `src/lib/portfolio/PortfolioHistoryRepository.ts`;
+- `src/lib/portfolio/PortfolioHistoryService.ts`;
+- `src/lib/portfolio/InMemoryPortfolioHistoryRepository.ts`;
+- `src/lib/portfolio/LegacyPortfolioHistoryMigration.ts`;
+- `src/server/repositories/FirestorePortfolioHistoryRepository.ts`;
+- `src/server/auth/WalletIdentityResolver.ts`;
+- `src/server/controllers/PortfolioHistoryController.ts`;
+- `src/server/controllers/PortfolioHistoryMigrationController.ts`;
+- `src/app/api/portfolio/history/route.ts`;
+- `src/app/api/portfolio/history/migrate/route.ts`;
+- `tests/portfolio-history.test.ts`;
+- `tests/portfolio-history-service.test.ts`;
+- `tests/portfolio-history-migration.test.ts`;
+- `tests/portfolio-history-architecture.test.mjs`.
 
 ## 8. Funcionalidades concluídas, parciais e pendentes
 
-### Concluídas
+### Concluídas historicamente
 
 - motor regulatório e catálogo;
 - base de carteira atual;
@@ -253,20 +290,27 @@ Aceite: cobrança idempotente, ambiente de teste, recuperação de falhas, plano
 - CI, segurança e produção corretiva;
 - snapshots locais básicos.
 
-### Parciais
+### Implementadas no branch atual
 
-- carteira: funciona, mas depende de `localStorage` e componente monolítico;
-- histórico patrimonial: snapshots existem, sem proveniência e persistência server-side completas;
-- histórico de dividendos: reconstrução pela carteira atual, não posição histórica verdadeira;
-- Premium: tecnicamente disponível para acesso controlado, sem validação comercial;
-- SEO: fundação existente, expansão congelada.
+- domínio do histórico;
+- repository e service;
+- ownership e isolamento;
+- adapter Firestore;
+- API CRUD;
+- migração idempotente do legado;
+- testes unitários e arquiteturais iniciais.
 
 ### Pendentes
 
-- histórico manual do ano corrente;
-- domínio e repository da carteira/histórico;
-- isolamento entre usuários;
-- telemetria de ativação e retenção;
+- integração da interface com a nova API;
+- formulário do histórico manual;
+- edição e exclusão na tela;
+- conflito visual manual/snapshot;
+- gráficos server-side;
+- telemetria;
+- Firestore Emulator específico da coleção;
+- E2E desktop/mobile;
+- Preview, produção e smoke;
 - descoberta Premium e lista de interesse;
 - beta externo;
 - relatório incremental;
@@ -287,6 +331,8 @@ Aceite: cobrança idempotente, ambiente de teste, recuperação de falhas, plano
 - Snapshot automático não pode ser adulterado pelo cliente como se fosse manual.
 - Eventos analíticos não armazenam valores da carteira.
 - Erros públicos não expõem detalhes internos.
+- E-mail, `ownerId` e `userId` enviados no body nunca concedem identidade.
+- Sessão por e-mail exige token válido, não expirado e persistido no servidor.
 
 ## 10. Variáveis de ambiente
 
@@ -319,6 +365,7 @@ Aceite: cobrança idempotente, ambiente de teste, recuperação de falhas, plano
 - testes de schema e valores pt-BR;
 - duplicidade e conflito de competência;
 - ownership e isolamento entre usuários;
+- migração idempotente;
 - Firestore Emulator ou equivalente;
 - cobertura crítica e mutation sanity;
 - build;
@@ -363,10 +410,11 @@ Nenhuma validação manual do usuário substitui essa obrigação.
 
 ### Operação
 
-- encerrar ou substituir a PR `#65`;
 - decidir ferramenta de telemetria;
 - selecionar coorte beta externa;
-- definir suporte, termos e fluxo de exclusão de dados antes da venda.
+- definir suporte, termos e fluxo de exclusão de dados antes da venda;
+- executar e aprovar a nova cadeia completa de CI no SHA vigente;
+- integrar a interface sem apagar legado antes da confirmação de migração.
 
 ---
 
