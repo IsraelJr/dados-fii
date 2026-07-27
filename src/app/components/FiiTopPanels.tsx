@@ -2,44 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
+import {
+    calculateIntradayVariationPercent,
+    parseMarketNumber,
+} from "@/lib/market/MarketQuoteNormalization";
 
 interface FII {
     code: string;
     price: string;
     opening: string;
-    variation: string;
+    variation?: string;
 }
 
 type FiiWithNumeric = FII & {
     priceNum: number;
     openingNum: number;
     variationNum: number;
-    variationFromSheet: boolean;
-};
-
-const parseBRL = (s?: string) => {
-    if (!s) return NaN;
-    try {
-        const clean = String(s)
-            .replace(/R\$\s?/i, "")
-            .replace(/\s/g, "")
-            .replace(/\./g, "")
-            .replace(",", ".");
-        return Number(clean);
-    } catch {
-        return NaN;
-    }
-};
-
-const parsePercent = (s?: string) => {
-    if (!s) return NaN;
-    try {
-        if (/R\$/i.test(s)) return NaN;
-        const clean = String(s).replace("%", "").replace(/\s/g, "").replace(",", ".");
-        return Number(clean);
-    } catch {
-        return NaN;
-    }
 };
 
 const formatBRL = (n: number) =>
@@ -83,42 +61,51 @@ export default function FiiTopPanels() {
 
     if (loading) return <p>Carregando FIIs...</p>;
 
-    const normalized: FiiWithNumeric[] = fiis.map((fii) => {
-        const priceNum = parseBRL(fii.price);
-        const openingNum = parseBRL(fii.opening);
-        const sheetVar = parsePercent(fii.variation);
-        const variationFromSheet = Number.isFinite(sheetVar);
-        let variationNum = sheetVar;
+    const normalized: FiiWithNumeric[] = fiis.flatMap((fii) => {
+        const priceNum = parseMarketNumber(fii.price);
+        const openingNum = parseMarketNumber(fii.opening);
+        const variationNum = calculateIntradayVariationPercent(fii.price, fii.opening);
 
-        if (!variationFromSheet) {
-            if (Number.isFinite(priceNum) && Number.isFinite(openingNum) && openingNum !== 0) {
-                variationNum = ((priceNum - openingNum) / openingNum) * 100;
-            } else {
-                variationNum = 0;
-            }
-        }
+        if (priceNum === null || openingNum === null || variationNum === null) return [];
 
-        return {
+        return [{
             ...fii,
             priceNum,
             openingNum,
             variationNum,
-            variationFromSheet,
-        };
+        }];
     });
 
-    const topAltas = [...normalized].sort((a, b) => b.variationNum - a.variationNum).slice(0, 3);
-    const topBaixas = [...normalized].sort((a, b) => a.variationNum - b.variationNum).slice(0, 3);
+    const topAltas = normalized
+        .filter((fii) => fii.variationNum > 0)
+        .sort((a, b) => b.variationNum - a.variationNum)
+        .slice(0, 3);
+    const topBaixas = normalized
+        .filter((fii) => fii.variationNum < 0)
+        .sort((a, b) => a.variationNum - b.variationNum)
+        .slice(0, 3);
+
+    if (!topAltas.length && !topBaixas.length) {
+        return (
+            <section className="rounded-2xl bg-white p-5 text-center shadow-sm ring-1 ring-slate-200">
+                <p className="text-sm font-bold text-slate-600">
+                    Variações do dia temporariamente indisponíveis por inconsistência nos dados de cotação.
+                </p>
+            </section>
+        );
+    }
 
     const Badge = ({
         code,
         variationNum,
         priceNum,
+        openingNum,
         type,
     }: {
         code: string;
         variationNum: number;
         priceNum: number;
+        openingNum: number;
         type: "up" | "down";
     }) => {
         const percentLabel = formatPercent(variationNum);
@@ -126,7 +113,7 @@ export default function FiiTopPanels() {
             <div
                 className={`p-2 rounded shadow text-xs cursor-pointer flex items-center gap-2 ${type === "up" ? "bg-green-800 text-green-200" : "bg-red-800 text-red-200"
                     }`}
-                title={`Preço atual: ${Number.isFinite(priceNum) ? formatBRL(priceNum) : "-"}`}
+                title={`Atual: ${formatBRL(priceNum)} · Abertura: ${formatBRL(openingNum)}`}
             >
                 {type === "up" ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
                 <span className="font-bold">{code}</span>
@@ -137,35 +124,41 @@ export default function FiiTopPanels() {
 
     return (
         <div className="flex flex-col items-center gap-4 max-w-lg mx-auto">
-            <div className="w-full">
-                <h3 className="text-center font-bold text-green-700 mb-2">📈 Maiores Altas</h3>
-                <div className="flex justify-center gap-2 flex-wrap">
-                    {topAltas.map((fii) => (
-                        <Badge
-                            key={`alta-${fii.code}`}
-                            code={fii.code}
-                            variationNum={fii.variationNum}
-                            priceNum={fii.priceNum}
-                            type="up"
-                        />
-                    ))}
+            {topAltas.length > 0 && (
+                <div className="w-full">
+                    <h3 className="text-center font-bold text-green-700 mb-2">📈 Maiores Altas</h3>
+                    <div className="flex justify-center gap-2 flex-wrap">
+                        {topAltas.map((fii) => (
+                            <Badge
+                                key={`alta-${fii.code}`}
+                                code={fii.code}
+                                variationNum={fii.variationNum}
+                                priceNum={fii.priceNum}
+                                openingNum={fii.openingNum}
+                                type="up"
+                            />
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
-            <div className="w-full">
-                <h3 className="text-center font-bold text-red-700 mb-2">📉 Maiores Baixas</h3>
-                <div className="flex justify-center gap-2 flex-wrap">
-                    {topBaixas.map((fii) => (
-                        <Badge
-                            key={`baixa-${fii.code}`}
-                            code={fii.code}
-                            variationNum={fii.variationNum}
-                            priceNum={fii.priceNum}
-                            type="down"
-                        />
-                    ))}
+            {topBaixas.length > 0 && (
+                <div className="w-full">
+                    <h3 className="text-center font-bold text-red-700 mb-2">📉 Maiores Baixas</h3>
+                    <div className="flex justify-center gap-2 flex-wrap">
+                        {topBaixas.map((fii) => (
+                            <Badge
+                                key={`baixa-${fii.code}`}
+                                code={fii.code}
+                                variationNum={fii.variationNum}
+                                priceNum={fii.priceNum}
+                                openingNum={fii.openingNum}
+                                type="down"
+                            />
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
             <p className="text-gray-600">Possui atraso de aproximadamente 15 minutos</p>
         </div>
     );
