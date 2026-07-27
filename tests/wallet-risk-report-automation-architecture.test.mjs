@@ -4,6 +4,15 @@ import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
+test("interface usa diretamente a automação para abrir relatório e baixar PDF", () => {
+  const card = read("src/app/components/WalletRiskReportCard.tsx");
+  assert.match(card, /fetch\("\/api\/wallet-risk-report"/);
+  assert.doesNotMatch(card, /fetch\("\/api\/wallet-risk-report\/manual-prompt/);
+  assert.match(card, /await requestAutomaticReport\(false\)/);
+  assert.match(card, /Gerar e baixar PDF/);
+  assert.match(card, /generationMode !== "automatic_openai"/);
+});
+
 test("fluxo legado encaminha para automação e preserva fallback manual", () => {
   for (const path of [
     "src/app/api/wallet-risk-report/manual-prompt/route.ts",
