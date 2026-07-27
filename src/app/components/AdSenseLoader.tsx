@@ -20,7 +20,7 @@ const ELIGIBLE_EXACT_PATHS = new Set([
   "/como-usamos-ia",
   "/guias",
 ]);
-const ELIGIBLE_PREFIXES = ["/guias/", "/autores/"];
+const ELIGIBLE_PREFIXES = ["/guias/"];
 const BLOCKED_PREFIXES = ["/admin", "/api", "/carteira", "/fii", "/login", "/configuracoes"];
 
 type ConsentChoice = "accepted" | "rejected" | null;
