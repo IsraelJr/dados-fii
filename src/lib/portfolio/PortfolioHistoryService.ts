@@ -20,10 +20,16 @@ export type PortfolioHistoryImportResult = Readonly<{
 }>;
 
 export class PortfolioHistoryService {
+  private readonly repository: PortfolioHistoryRepository;
+  private readonly clock: () => Date;
+
   constructor(
-    private readonly repository: PortfolioHistoryRepository,
-    private readonly clock: () => Date = () => new Date(),
-  ) {}
+    repository: PortfolioHistoryRepository,
+    clock: () => Date = () => new Date(),
+  ) {
+    this.repository = repository;
+    this.clock = clock;
+  }
 
   async list(actor: PortfolioActor, portfolioId: string): Promise<readonly PortfolioHistoryEntry[]> {
     return this.repository.listByPortfolio(actor.ownerId, portfolioId);
