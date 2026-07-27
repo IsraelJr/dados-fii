@@ -2,21 +2,23 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 8.3.0
+**Versão:** 9.0.0
 
 **Data:** 27/07/2026
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
 **Último SHA de `main` auditado antes das correções:** `607dafefefaba5c88f986236eb365440c6fb8c94`
 
-**Branch corretiva:** `agent/corrective-sprints-r0-r5`
-**Draft PR corretiva:** `#141` — https://github.com/IsraelJr/dados-fii/pull/141
-**Commit remoto base das Sprints R0–R5:** `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`
-**Último commit corretivo de código aprovado no CI:** `c6af2a045da64c99b777f18ce4ea2536216d4dc9`
+**Release corretivo aprovado em produção antes desta reconciliação documental:** `0e029f78560d11d12720c447f2f9058c482e4277`
+**PRs corretivas mescladas:** `#141`, `#142` e `#143`
+**Gate read-only pós-deploy:** run `30236078462` — aprovado
+**Production Premium Smoke:** run `30236078473` — aprovado
+**Artefato do smoke:** `8641670026`
+**Hash da evidência Premium:** `8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b`
 
-**Sprint atual:** encerramento verificável das Sprints Corretivas R0–R5
+**Sprint atual:** SEO-S1 — fundação técnica e páginas prioritárias
 
-**Estado oficial:** implementação corretiva e todos os checks do PR aprovados no commit `c6af2a045da64c99b777f18ce4ea2536216d4dc9`; a draft PR #141 permanece aberta e merge, deployment e auditoria pós-deploy ainda são obrigatórios
+**Estado oficial:** Sprints Corretivas R0–R5 e Fase 3 formalmente concluídas; código, CI, deployment, geração Premium real, auditoria persistida e isolamento read-only foram comprovados no mesmo release
 **Política documental:** este é o único Handoff corrente. Versões anteriores pertencem ao histórico do Git, não à árvore ativa.
 
 ## Como interpretar os status
@@ -36,8 +38,8 @@ Código, documento, teste unitário, HTTP 200, workflow ou deployment isolado n�
 
 | Decisão vigente | Decisão substituída | Efeito |
 |---|---|---|
-| A auditoria independente de 26/07/2026, executada no SHA `607dafe…`, prevalece sobre a declaração anterior de conclusão da Fase 3. | Handoff v6.14.0 declarava Fase 3 formalmente concluída. | A Fase 3 volta a estado parcial até que os defeitos corretivos sejam aceitos no Git, CI e produção. |
-| O Handoff v8.3.0 é a única fonte canônica ativa. | Handoff v7.0.0 externo, v6.14.0 do Git e arquivo `DADOS_FII_HANDOFF_SPRINT_3_5_CONTINUACAO.md`. | O arquivo de continuação foi removido; fontes antigas permanecem apenas como histórico. |
+| A auditoria independente de 26/07/2026, executada no SHA `607dafe…`, prevalece sobre a declaração anterior de conclusão da Fase 3; os bloqueadores foram corrigidos e revalidados no release `0e029f…`. | Handoff v6.14.0 declarava Fase 3 concluída sem os gates corretivos posteriores. | A Fase 3 volta a estar formalmente concluída com nova cadeia de evidências, sem reutilizar a aprovação antiga. |
+| O Handoff v9.0.0 é a única fonte canônica ativa. | Handoffs v8.3.0, v7.0.0 externo, v6.14.0 do Git e arquivo `DADOS_FII_HANDOFF_SPRINT_3_5_CONTINUACAO.md`. | O arquivo de continuação foi removido; fontes antigas permanecem apenas como histórico. |
 | HTTP 200 só representa evidência Risk Lab aprovada, atual e compatível com release/ruleset/metodologia. | Endpoint podia responder 200 com `ok:false` ou execução reprovada/antiga. | Ausência usa 404, incompatibilidade 409, execução 202, reprovação 422 e sucesso real 200. |
 | Privilégio, plano, e-mail e identidade são resolvidos no servidor. | `isPremium`, e-mail ou segredo informado pelo cliente influenciavam autorização. | Mutação e entitlement falham fechado. |
 | Segredo administrativo não é aceito em query, body ou headers legados. | Segredo compartilhado e estático era usado por rotas legadas. | Admin humano usa sessão HttpOnly; cron usa Bearer; GitHub usa OIDC efêmero vinculado ao workflow/SHA. |
@@ -58,14 +60,16 @@ Código, documento, teste unitário, HTTP 200, workflow ou deployment isolado n�
 
 - Fases 1 e 2 permanecem formalmente concluídas com evidências históricas preservadas.
 - Risk Lab 3.0–3.6 possui implementação e evidência metodológica no Git.
-- A integração 3.7 existe no `main` anterior, mas sua conclusão formal foi revogada pela auditoria independente por defeitos transversais de segurança, dados, CI, produção e generalização.
+- A integração 3.7 foi corrigida e novamente aprovada após auditoria independente, CI integral e smoke autenticado em produção.
 - O SHA `607dafefefaba5c88f986236eb365440c6fb8c94` foi observado em produção antes das correções.
-- As correções DEF-01 a DEF-20 estão implementadas ou protegidas por estado fail-closed no branch `agent/corrective-sprints-r0-r5`.
-- A draft PR `#141` contém as correções. O commit remoto base é `434eda8ebffe603bbc6e0a63a5c95beb4e72441e`; os follow-ups de Login, acessibilidade e contraste culminam em `c6af2a045da64c99b777f18ce4ea2536216d4dc9`.
+- As correções DEF-01 a DEF-20 foram mescladas pela PR `#141`; as regressões DEF-21/22 eliminaram o acionamento manual do smoke e a perda de OIDC por redirect nas PRs `#142` e `#143`.
+- A PR `#141` foi mesclada no commit `f29a0287d52e2245a66184efd099192d27548c0d`.
 - No primeiro CI da PR, Risk Lab `#319` e Portfolio Notifications `#552` passaram. O gate central `#354` aprovou todos os passos até o E2E, que revelou Login oculto fora de `localhost`, contraste insuficiente e regiões roláveis sem foco.
 - O CI atuou como gate real: runs intermediários detectaram um locator ambíguo e quatro contrastes WCAG adicionais; nenhum achado foi ignorado ou convertido em exceção.
 - No commit `c6af2a0…`, Portfolio Notifications `#556`, Risk Lab `#323` e Phase 2 Closure `#358` passaram; o gate central encerrou com E2E 12/12 em desktop e mobile.
-- O branch ainda não pode ser chamado de formalmente concluído porque faltam merge, deployment do mesmo SHA e smoke autenticado de produção.
+- O release corretivo final de runtime `0e029f78560d11d12720c447f2f9058c482e4277` foi publicado no Vercel e aprovado pelos contextos `Vercel`, `Risk Lab Premium Production Gate` e `Production Premium Smoke`.
+- O smoke OIDC reconstruiu um snapshot de 642 fundos, gerou o Premium v2.0.0 para TGAR11, confirmou impacto da carteira, persistiu e releu o evento `premium-read` `pKWEwtSiIbdatbauietl`.
+- A evidência `8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b` confirma read-only, notificações desativadas, efeitos externos desativados e ausência de blocker.
 - O browser E2E está versionado para desktop e mobile. A execução local ficou bloqueada pelo CDN do browser no sandbox; o runner do GitHub comprovou as correções Chromium.
 - Em 27/07/2026, a execução local aprovou 529 testes sem falha, skip ou pendência; Firestore Emulator, mutation sanity, build de 38 páginas e smoke HTTP 200/400/401/403/404/405/503 também passaram.
 - A cobertura crítica medida foi 100% de linhas, 93,66% de branches e 98,53% de funções; `npm audit --omit=dev --audit-level=high` retornou zero vulnerabilidades.
@@ -76,19 +80,19 @@ Código, documento, teste unitário, HTTP 200, workflow ou deployment isolado n�
 
 | Área | Git corretivo | Teste local | Produção corretiva | Estado |
 |---|---:|---:|---:|---|
-| R0 — contenção | Sim | Sim | Não | CI verde; merge/produção pendentes |
-| R1 — dados/fórmulas | Sim | Sim | Não | CI verde; merge/produção pendentes |
-| R2 — CI/segurança | Sim | Sim; E2E CI 12/12 | Não | CI verde; merge/produção pendentes |
-| R3 — Premium/evidência | Sim | Sim, sem produção | Não | Aguardando smoke pós-deploy |
-| R4 — Risk Lab/FNET | Sim, fail-closed por categoria | Sim | Não | CI verde; merge/produção pendentes |
-| R5 — arquitetura/observabilidade/performance/UX | Sim | Sim; axe desktop/mobile aprovado | Não | CI verde; merge/produção pendentes |
-| Fase 3 completa | Código histórico + correções | Local | Não | Parcial |
-| SEO-S1 | Correções essenciais incluídas | Local | Não | Parcial |
+| R0 — contenção | Sim | Sim | Sim | Formalmente concluída |
+| R1 — dados/fórmulas | Sim | Sim | Sim | Formalmente concluída |
+| R2 — CI/segurança | Sim | Sim; E2E CI 12/12 | Sim | Formalmente concluída |
+| R3 — Premium/evidência | Sim | Sim | Sim | Smoke OIDC e auditoria aprovados |
+| R4 — Risk Lab/FNET | Sim, fail-closed por categoria | Sim | Sim | Formalmente concluída |
+| R5 — arquitetura/observabilidade/performance/UX | Sim | Sim; axe desktop/mobile aprovado | Sim | Formalmente concluída |
+| Fase 3 completa | Sim | Sim | Sim | Formalmente concluída |
+| SEO-S1 | Correções essenciais incluídas | Local/CI | Parcial | Sprint atual |
 | Fase 4.1 — Radar | Não | Não | Não | Planejada |
 
 ### Defeitos cobertos
 
-O branch cobre os vinte defeitos da auditoria:
+As PRs corretivas cobrem os vinte defeitos da auditoria e as duas regressões descobertas no fechamento:
 
 - DEF-01/13/17: contrato público de evidência, smoke Premium real e documentação reconciliada;
 - DEF-02: ticker inválido não vira listagem;
@@ -119,49 +123,46 @@ Inclui `RegulatoryDataService`, repositórios, cache, Score, Health, Validation,
 
 ### Fase 3 — Risk Lab
 
-**Estado da fase completa:** parcial.
+**Estado da fase completa:** formalmente concluída.
 
 - 3.0–3.4: evidências históricas preservadas.
 - 3.5: dataset congelado e backtest metodológico preservados.
 - 3.6: ruleset `0.2.0` e calibração preservados.
-- 3.7: integração read-only existe, mas a aceitação completa depende do novo smoke Premium autenticado no SHA corretivo.
+- 3.7: integração read-only, geração Premium real, snapshot de pares e auditoria persistida aprovados no smoke OIDC do release `0e029f…`.
 
-A evidência `docs/production-evidence/risk-lab/phase-3-final-closure.json` continua íntegra como registro histórico do release `a3b4f2c…`; ela não prova as correções posteriores nem substitui o gate do SHA atual.
+A evidência `docs/production-evidence/risk-lab/phase-3-final-closure.json` continua íntegra como registro histórico do release `a3b4f2c…`; a aprovação corretiva posterior está nos runs `30236078462` e `30236078473`, no artifact `8641670026` e na evidência persistida de hash `8a970905…`.
 
 ---
 
 ## 3. Sprint atual
 
-**Nome:** encerramento verificável das Sprints Corretivas R0–R5.
+**Nome:** SEO-S1 — fundação técnica e páginas prioritárias.
 
-### Escopo em execução
+### Encerramento corretivo comprovado
 
-1. congelar código e documentação;
-2. executar instalação limpa, audit, secret scan, lint e typecheck;
-3. executar testes completos, Firestore Emulator e cobertura crítica;
-4. executar build, smoke HTTP e E2E desktop/mobile;
-5. abrir PR corretiva com rastreabilidade DEF/COR;
-6. obter CI verde no SHA do PR;
-7. mesclar conforme proteção do repositório;
-8. identificar o SHA efetivamente publicado;
-9. executar smoke Premium via OIDC;
-10. reconciliar Handoff, evidência pública e produção.
+1. PRs corretivas mescladas sem bypass;
+2. instalação limpa, audit, secret scan, lint e typecheck aprovados;
+3. testes completos, Firestore Emulator e cobertura crítica aprovados;
+4. build, smoke HTTP e E2E desktop/mobile aprovados;
+5. SHA de produção identificado;
+6. smoke Premium OIDC aprovado;
+7. audit receipt persistido e relido;
+8. Handoff reconciliado.
 
 ### Critério de encerramento
 
-Esta Sprint só termina quando o mesmo SHA estiver aprovado no CI e em produção. Falha ou ausência de E2E, deployment, audit receipt ou persistência `premium-read` mantém o estado parcial.
+COR-CLOSE está concluída. SEO-S1 só termina com baseline, indexação técnica, validação do host canônico e evidências de produção próprias.
 
 ---
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **COR-CLOSE — PR, CI, merge, deploy e double check pós-deploy.**
-2. **SEO-S1 — baseline e indexação técnica completa**, preservando as correções de canonical/sitemap deste branch.
-3. **Fase 4.1 — Radar/Acompanhar fundo fora da carteira.**
-4. **Fase 4.2 — inteligência documental e “o que mudou”.**
-5. **Fase 4.3 — carteira histórica verdadeira, retorno total e atribuição.**
-6. **Fase 4.4 — screener, comparador e filtros salvos.**
-7. **Fase 4.5 — fair value e sustentabilidade de dividendos por categoria.**
+1. **SEO-S1 — baseline e indexação técnica completa**, preservando as correções de canonical/sitemap.
+2. **Fase 4.1 — Radar/Acompanhar fundo fora da carteira.**
+3. **Fase 4.2 — inteligência documental e “o que mudou”.**
+4. **Fase 4.3 — carteira histórica verdadeira, retorno total e atribuição.**
+5. **Fase 4.4 — screener, comparador e filtros salvos.**
+6. **Fase 4.5 — fair value e sustentabilidade de dividendos por categoria.**
 
 Cobrança, WhatsApp, Telegram e recomendações individualizadas não antecipam nem substituem os gates corretivos.
 
@@ -258,9 +259,15 @@ Aceite: Grátis acompanha até 1 fundo; Premium até 10; limite e plano no servi
 - Follow-up remoto de Login e acessibilidade: `fd0e0280ec4d8f4550be6227b98fd7854d218f23`.
 - Follow-up de precisão do E2E: `0447ee33072712462704c315df4c087c918f85b3`.
 - Commit corretivo de contraste aprovado no CI: `c6af2a045da64c99b777f18ce4ea2536216d4dc9`.
-- Draft PR corretiva: [#141 — fix: executar Sprints Corretivas R0–R5](https://github.com/IsraelJr/dados-fii/pull/141).
+- PR corretiva mesclada: [#141 — fix: executar Sprints Corretivas R0–R5](https://github.com/IsraelJr/dados-fii/pull/141); merge `f29a0287d52e2245a66184efd099192d27548c0d`.
+- PR de automação pós-deploy mesclada: [#142 — fix: automatizar smoke Premium pós-deploy](https://github.com/IsraelJr/dados-fii/pull/142); merge `a19e8b9ed077a2459d8356e6e6b2a5464cd523d4`.
+- PR de correção OIDC mesclada: [#143 — fix: preservar OIDC no smoke Premium](https://github.com/IsraelJr/dados-fii/pull/143); merge `0e029f78560d11d12720c447f2f9058c482e4277`.
 - CI inicial: Portfolio Notifications run `30233676618` aprovado; Risk Lab run `30233676617` aprovado; Phase 2 Closure run `30233676643` reprovado exclusivamente no E2E.
 - CI aprovado no código final: Portfolio Notifications run `30234489574`; Risk Lab run `30234489557`; Phase 2 Closure run `30234489569`.
+- CI da automação pós-deploy: Phase 2 Closure run `30235627100` aprovado.
+- CI da correção OIDC: Phase 2 Closure run `30235898675` aprovado.
+- Gate read-only em produção: run `30236078462` aprovado.
+- Smoke Premium real em produção: run `30236078473`, artifact `8641670026`, audit event `pKWEwtSiIbdatbauietl`, evidência `8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b`.
 
 ### Arquivos corretivos centrais
 
@@ -302,7 +309,7 @@ Aceite: Grátis acompanha até 1 fundo; Premium até 10; limite e plano no servi
 - Risk Lab 3.0–3.6 metodológico;
 - integração Premium read-only implementada.
 
-### Implementadas no branch, não comprovadas em produção
+### Concluídas e comprovadas em produção
 
 - contrato financeiro e qualidade fail-closed;
 - autorização de alertas, dividendos, Admin, cron e OIDC;
@@ -317,9 +324,8 @@ Aceite: Grátis acompanha até 1 fundo; Premium até 10; limite e plano no servi
 
 ### Parciais
 
-- Fase 3: falta prova corretiva pós-deploy.
 - Risk Lab: apenas domínios com evidência suficiente podem alertar; demais retornam `insufficient_data`.
-- SEO-S1: correções essenciais existem, mas faltam baseline e validação em produção.
+- SEO-S1: correções essenciais estão em produção, mas faltam baseline e validação de indexação.
 - observabilidade: estrutura sanitizada existe; métricas externas/alertas operacionais dependem do ambiente.
 
 ### Pendentes de produto
@@ -448,10 +454,14 @@ Valores nunca são registrados no Handoff, log ou evidência.
 - Regressão aplicada: Login deixou de depender do hostname; controles sem dados usam contraste AA; regiões roláveis receberam nome, foco por teclado e indicador visual.
 - E2E intermediário: locator de alerta passou a ser escopado ao diálogo sem reduzir a asserção semântica; axe revelou e bloqueou contrastes de 2,6:1, 2,93:1 e 3,76:1.
 - E2E Chromium definitivo no run `30234489569`: 12/12 aprovados em desktop e mobile, incluindo axe sem violação séria/crítica.
+- CI pós-merge da automação do smoke: run `30235627100` aprovado.
+- CI da correção do host canônico/OIDC: run `30235898675` aprovado.
+- Produção `0e029f…`: Vercel, Risk Lab Premium Production Gate `30236078462` e Production Premium Smoke `30236078473` aprovados.
+- Smoke Premium: snapshot de 642 fundos, relatório v2.0.0 para TGAR11, impacto da carteira disponível, audit event `pKWEwtSiIbdatbauietl` relido e quatro checks aprovados.
 
 ### Regressões obrigatórias
 
-- REG-DEF-01 a REG-DEF-20;
+- REG-DEF-01 a REG-DEF-22;
 - ticker `ABC`, duplicidade e paginação inválida;
 - BODB11/RJDA11 incompletos;
 - DY legado divergente e ausência de cotação;
@@ -468,6 +478,8 @@ Valores nunca são registrados no Handoff, log ou evidência.
 - SafeLogger sem e-mail, OTP, JWT ou Bearer;
 - um `h1`, teclado, desktop/mobile e axe sem violação séria/crítica;
 - build sem fallback silencioso de sitemap.
+- smoke pós-deploy automático somente no status Vercel `success` do `main`;
+- POST OIDC no host canônico `www`, sem redirect de credencial, e artefato vinculado ao release.
 
 ### Gate pós-deploy
 
@@ -486,12 +498,7 @@ Valores nunca são registrados no Handoff, log ou evidência.
 
 ### Bloqueadoras para concluir as correções
 
-- resolver qualquer thread de revisão;
-- mesclar sem bypass de gate;
-- publicar o mesmo SHA;
-- executar o workflow `Production Premium Smoke`;
-- registrar o SHA mesclado, deployment e execução pós-deploy neste Handoff;
-- repetir a auditoria adversarial pós-deploy.
+Nenhuma. As PRs foram mescladas sem bypass, o release foi publicado e os gates pós-deploy foram aprovados com evidência reproduzível.
 
 ### Decisões de produto abertas
 
@@ -503,9 +510,9 @@ Valores nunca são registrados no Handoff, log ou evidência.
 - composição exata de planos além do Radar 1/10;
 - quais categorias Risk Lab receberão próxima calibração;
 - política jurídica final de alertas e linguagem informativa;
-- estratégia de Search Console e host canônico definitivo entre apex e `www`;
+- estratégia de Search Console para o host canônico `www`;
 - retenção e exclusão de dados de carteira/alertas.
 
 ### Regra de conclusão
 
-Enquanto qualquer bloqueador acima existir, as Sprints Corretivas não são formalmente concluídas, o sistema ainda exige prova técnica automatizada pós-deploy e nenhuma validação manual do usuário substitui essa obrigação.
+As Sprints Corretivas R0–R5 estão formalmente concluídas. Releases futuros continuam obrigados aos mesmos gates automatizados: CI, deployment, smoke OIDC, auditoria persistida e commit statuses. Nenhuma validação manual do usuário substitui essa obrigação.

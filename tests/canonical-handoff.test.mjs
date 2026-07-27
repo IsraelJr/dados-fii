@@ -37,24 +37,25 @@ test("existe somente um Handoff canônico ativo", () => {
   assert.deepEqual(matches, [HANDOFF]);
 });
 
-test("[REG-DEF-17] Handoff registra o estado corretivo sem antecipar produção", () => {
+test("[REG-DEF-17] Handoff só conclui correções com evidência real de produção", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 8\.3\.0/);
+  assert.match(body, /\*\*Versão:\*\* 9\.0\.0/);
   assert.match(body, /\*\*Data:\*\* 27\/07\/2026/);
   assert.match(body, /607dafefefaba5c88f986236eb365440c6fb8c94/);
-  assert.match(body, /agent\/corrective-sprints-r0-r5/);
-  assert.match(body, /Draft PR corretiva:\*\* `#141`/);
-  assert.match(body, /434eda8ebffe603bbc6e0a63a5c95beb4e72441e/);
-  assert.match(body, /c6af2a045da64c99b777f18ce4ea2536216d4dc9/);
-  assert.match(body, /30234489574/);
-  assert.match(body, /30234489557/);
-  assert.match(body, /30234489569/);
-  assert.match(body, /\*\*Estado oficial:\*\* implementação corretiva e todos os checks do PR aprovados/);
+  assert.match(body, /0e029f78560d11d12720c447f2f9058c482e4277/);
+  assert.match(body, /PRs corretivas mescladas:\*\* `#141`, `#142` e `#143`/);
+  assert.match(body, /30236078462/);
+  assert.match(body, /30236078473/);
+  assert.match(body, /8641670026/);
+  assert.match(body, /8a9709056d046a8f2f73d4e20e7cdcb77c861706b592c24a6333fdf566ee983b/);
+  assert.match(body, /pKWEwtSiIbdatbauietl/);
+  assert.match(body, /\*\*Estado oficial:\*\* Sprints Corretivas R0–R5 e Fase 3 formalmente concluídas/);
   assert.match(body, /E2E Chromium definitivo.*12\/12 aprovados/is);
   assert.match(body, /529 aprovados, zero falhos, zero ignorados, zero pendentes/);
-  assert.match(body, /Fase 3 completa \| Código histórico \+ correções \| Local \| Não \| Parcial/);
-  assert.doesNotMatch(body, /correções formalmente concluídas|produção corretiva aprovada/i);
+  assert.match(body, /Fase 3 completa \| Sim \| Sim \| Sim \| Formalmente concluída/);
+  assert.match(body, /Nenhuma\. As PRs foram mescladas sem bypass/);
+  assert.doesNotMatch(body, /merge\/produção pendentes|aguardando smoke pós-deploy/i);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -84,12 +85,12 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
 test("decisão nova substitui explicitamente a conclusão anterior", () => {
   const body = text();
   assert.match(body, /auditoria independente de 26\/07\/2026.*prevalece.*declaração anterior de conclusão da Fase 3/is);
-  assert.match(body, /Handoff v6\.14\.0 declarava Fase 3 formalmente concluída/);
-  assert.match(body, /A Fase 3 volta a estado parcial/);
+  assert.match(body, /Handoff v6\.14\.0 declarava Fase 3 concluída sem os gates corretivos posteriores/);
+  assert.match(body, /A Fase 3 volta a estar formalmente concluída com nova cadeia de evidências/);
   assert.match(body, /arquivo de continuação foi removido/);
 });
 
-test("evidência final histórica permanece íntegra, mas não prova o branch corretivo", () => {
+test("evidência histórica permanece íntegra e a aprovação corretiva usa nova cadeia", () => {
   assert.equal(existsSync(HISTORICAL_EVIDENCE), true);
   const evidence = JSON.parse(text(HISTORICAL_EVIDENCE));
   const evidenceHash = evidence.evidenceHash;
@@ -100,7 +101,8 @@ test("evidência final histórica permanece íntegra, mas não prova o branch co
   assert.equal(evidence.invariants.readOnly, true);
   assert.equal(evidence.invariants.notificationsAllowed, false);
   assert.equal(evidence.invariants.externalEffectsAllowed, false);
-  assert.match(text(), /não prova as correções posteriores nem substitui o gate do SHA atual/);
+  assert.match(text(), /aprovação corretiva posterior está nos runs `30236078462` e `30236078473`/);
+  assert.match(text(), /evidência persistida de hash `8a970905…`/);
 });
 
 test("artefatos e gates corretivos permanentes existem", () => {
@@ -162,13 +164,13 @@ test("[REG-DEF-12] regressão, Emulator, cobertura, HTTP e E2E são obrigatório
   }
 });
 
-test("manifesto de regressão mantém DEF-01 a DEF-20 vinculados a testes executáveis", () => {
+test("manifesto de regressão mantém DEF-01 a DEF-22 vinculados a testes executáveis", () => {
   const testSources = walk(path.join(ROOT, "tests"))
     .filter((file) => /\.test\.(?:ts|mjs)$/.test(file))
     .map((file) => text(file))
     .join("\n");
 
-  for (let number = 1; number <= 20; number += 1) {
+  for (let number = 1; number <= 22; number += 1) {
     const id = `REG-DEF-${String(number).padStart(2, "0")}`;
     assert.ok(testSources.includes(id), `${id} deve permanecer vinculado a uma regressão`);
   }
@@ -188,7 +190,7 @@ test("roadmap, segurança, generalização e decisões abertas permanecem explí
     "WhatsApp: custo, opt-in, template, frequência e proteção de dados",
     "Telegram permanece adiado",
     "cobrança recorrente, anual ou compra avulsa",
-    "nenhuma validação manual do usuário substitui essa obrigação",
+    "Nenhuma validação manual do usuário substitui essa obrigação",
   ]) {
     assert.ok(body.includes(required), required);
   }
