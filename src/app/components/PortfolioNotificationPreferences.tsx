@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { BellRing, Loader2, Save } from "lucide-react";
+import PortfolioHistoryPanel from "./PortfolioHistoryPanel";
 
 const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
@@ -62,7 +63,7 @@ export default function PortfolioNotificationPreferences() {
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
     window.addEventListener("dados-fii-wallet-session-updated", load);
     return () => window.removeEventListener("dados-fii-wallet-session-updated", load);
   }, [load]);
@@ -85,40 +86,43 @@ export default function PortfolioNotificationPreferences() {
   }
 
   return (
-    <section className="mx-auto mb-6 w-full max-w-6xl rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="max-w-3xl">
-          <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BellRing size={14} /> Notificações da carteira</p>
-          <h2 className="mt-3 text-xl font-black text-slate-900">Avise apenas quando houver uma mudança relevante</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Um novo rendimento anunciado ou alterado continua gerando aviso. Quando os rendimentos não mudarem, o site só notificará se o patrimônio acumular alta ou queda igual ou superior ao limite.</p>
+    <>
+      <PortfolioHistoryPanel />
+      <section className="mx-auto mb-6 w-full max-w-6xl rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BellRing size={14} /> Notificações da carteira</p>
+            <h2 className="mt-3 text-xl font-black text-slate-900">Avise apenas quando houver uma mudança relevante</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Um novo rendimento anunciado ou alterado continua gerando aviso. Quando os rendimentos não mudarem, o site só notificará se o patrimônio acumular alta ou queda igual ou superior ao limite.</p>
+          </div>
+          {preferences && <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">Plano {preferences.planLabel}</span>}
         </div>
-        {preferences && <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">Plano {preferences.planLabel}</span>}
-      </div>
 
-      {!preferences && !loading ? (
-        <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-600 ring-1 ring-slate-200">Confirme seu e-mail no bloco “Salve sua carteira” para ver e configurar este limite.</p>
-      ) : null}
+        {!preferences && !loading ? (
+          <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-600 ring-1 ring-slate-200">Confirme seu e-mail no bloco “Salve sua carteira” para ver e configurar este limite.</p>
+        ) : null}
 
-      {preferences ? (
-        <div className="mt-5 rounded-2xl bg-indigo-50/70 p-4 ring-1 ring-indigo-100">
-          {preferences.isPaid ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className="block flex-1 text-sm font-bold text-slate-700">
-                Variação patrimonial para notificar
-                <span className="mt-1 flex items-center rounded-xl bg-white px-3 ring-1 ring-indigo-200">
-                  <input type="number" min={preferences.minimumPercent} max={preferences.maximumPercent} step="0.1" value={threshold.replace(",", ".")} onChange={(event) => setThreshold(event.target.value.replace(".", ","))} className="w-full bg-transparent py-3 text-base font-black text-slate-900 outline-none" />
-                  <span className="font-black text-slate-500">%</span>
-                </span>
-              </label>
-              <button type="button" onClick={save} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60">{loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar limite</button>
-            </div>
-          ) : (
-            <p className="text-sm font-bold leading-6 text-indigo-950">No plano Grátis, o limite é fixo em <strong>{preferences.thresholdPercent}%</strong>. Planos Premium e Super Premium podem escolher um valor entre 0,5% e 20%.</p>
-          )}
-        </div>
-      ) : null}
-      {loading && !preferences ? <p className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-slate-500"><Loader2 size={16} className="animate-spin" /> Carregando configuração…</p> : null}
-      {message ? <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200">{message}</p> : null}
-    </section>
+        {preferences ? (
+          <div className="mt-5 rounded-2xl bg-indigo-50/70 p-4 ring-1 ring-indigo-100">
+            {preferences.isPaid ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="block flex-1 text-sm font-bold text-slate-700">
+                  Variação patrimonial para notificar
+                  <span className="mt-1 flex items-center rounded-xl bg-white px-3 ring-1 ring-indigo-200">
+                    <input type="number" min={preferences.minimumPercent} max={preferences.maximumPercent} step="0.1" value={threshold.replace(",", ".")} onChange={(event) => setThreshold(event.target.value.replace(".", ","))} className="w-full bg-transparent py-3 text-base font-black text-slate-900 outline-none" />
+                    <span className="font-black text-slate-500">%</span>
+                  </span>
+                </label>
+                <button type="button" onClick={() => void save()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-700 px-5 py-3 text-sm font-extrabold text-white disabled:opacity-60">{loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Salvar limite</button>
+              </div>
+            ) : (
+              <p className="text-sm font-bold leading-6 text-indigo-950">No plano Grátis, o limite é fixo em <strong>{preferences.thresholdPercent}%</strong>. Planos Premium e Super Premium podem escolher um valor entre 0,5% e 20%.</p>
+            )}
+          </div>
+        ) : null}
+        {loading && !preferences ? <p className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-slate-500"><Loader2 size={16} className="animate-spin" /> Carregando configuração…</p> : null}
+        {message ? <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200">{message}</p> : null}
+      </section>
+    </>
   );
 }
