@@ -12,6 +12,12 @@ function listSourceFiles(directory) {
   });
 }
 
+function publicSourceOccurrences(pattern) {
+  return listSourceFiles("src")
+    .filter((path) => /\.(?:ts|tsx|js|jsx|json)$/.test(path))
+    .filter((path) => pattern.test(read(path)));
+}
+
 test("AdSense carrega apenas no host de produção e em páginas públicas elegíveis", () => {
   const layout = read("src/app/layout.tsx");
   const loader = read("src/app/components/AdSenseLoader.tsx");
@@ -21,7 +27,7 @@ test("AdSense carrega apenas no host de produção e em páginas públicas eleg�
   for (const prefix of ["/admin", "/api", "/carteira", "/fii", "/login", "/configuracoes"]) assert.ok(loader.includes(`"${prefix}"`), `rota bloqueada ausente: ${prefix}`);
   assert.match(loader, /ELIGIBLE_EXACT_PATHS/);
   assert.match(loader, /ELIGIBLE_PREFIXES/);
-  assert.doesNotMatch(loader, /\/autores\//);
+  assert.doesNotMatch(loader, /\/autores\/|\/politica-editorial/);
 });
 
 test("consentimento oferece aceitar, recusar e reabrir preferências", () => {
@@ -37,10 +43,10 @@ test("consentimento oferece aceitar, recusar e reabrir preferências", () => {
   assert.match(privacy, /adssettings\.google\.com/);
 });
 
-test("sitemap contém conteúdo editorial forte e exclui tickers e páginas pessoais", () => {
+test("sitemap contém conteúdo público forte e exclui páginas indevidas", () => {
   const sitemap = read("src/app/sitemap.ts");
-  for (const route of ["/sobre", "/politica-editorial", "/politica-de-correcoes", "/como-usamos-ia", "/guias/fundos-imobiliarios", "/guias/dividendos-de-fiis", "/guias/risco-em-fiis", "/guias/carteira-de-fiis"]) assert.ok(sitemap.includes(route), `rota editorial ausente: ${route}`);
-  assert.doesNotMatch(sitemap, /tickers\.map|\/fii\/|\/autores\//);
+  for (const route of ["/sobre", "/politica-de-correcoes", "/como-usamos-ia", "/guias/fundos-imobiliarios", "/guias/dividendos-de-fiis", "/guias/risco-em-fiis", "/guias/carteira-de-fiis"]) assert.ok(sitemap.includes(route), `rota pública ausente: ${route}`);
+  assert.doesNotMatch(sitemap, /tickers\.map|\/fii\/|\/autores\/|\/politica-editorial/);
 });
 
 test("quatro pilares possuem conteúdo próprio, identidade Dados FII e schema Article", () => {
@@ -54,18 +60,20 @@ test("quatro pilares possuem conteúdo próprio, identidade Dados FII e schema A
   assert.match(article, /Revisado em/);
 });
 
-test("páginas institucionais e ads.txt obrigatórios existem sem perfil pessoal", () => {
-  for (const path of ["src/app/sobre/page.tsx", "src/app/politica-editorial/page.tsx", "src/app/politica-de-correcoes/page.tsx", "src/app/como-usamos-ia/page.tsx", "public/ads.txt"]) assert.equal(existsSync(path), true, `arquivo ausente: ${path}`);
+test("páginas institucionais necessárias e ads.txt existem sem páginas pessoais ou estratégicas", () => {
+  for (const path of ["src/app/sobre/page.tsx", "src/app/politica-de-correcoes/page.tsx", "src/app/como-usamos-ia/page.tsx", "public/ads.txt"]) assert.equal(existsSync(path), true, `arquivo ausente: ${path}`);
   assert.equal(existsSync("src/app/autores/israel-alves/page.tsx"), false);
+  assert.equal(existsSync("src/app/politica-editorial/page.tsx"), false);
   assert.match(read("public/ads.txt"), /^google\.com, pub-3245357129779122, DIRECT, f08c47fec0942fa0\s*$/);
 });
 
-test("código público não menciona nome ou rota pessoal", () => {
-  const forbidden = /Israel Alves|israel-alves/;
-  const occurrences = listSourceFiles("src")
-    .filter((path) => /\.(?:ts|tsx|js|jsx|json)$/.test(path))
-    .filter((path) => forbidden.test(read(path)));
-  assert.deepEqual(occurrences, []);
+test("código público não menciona identidade pessoal", () => {
+  assert.deepEqual(publicSourceOccurrences(/Israel Alves|israel-alves/), []);
+});
+
+test("código público não expõe regras internas de publicação, indexação ou monetização", () => {
+  const forbidden = /\/politica-editorial|score interno|gate de qualidade|gate de monetização|pontos para publicar|para indexar e|para monetizar/i;
+  assert.deepEqual(publicSourceOccurrences(forbidden), []);
 });
 
 test("headers impedem indexação acidental em áreas fracas", () => {

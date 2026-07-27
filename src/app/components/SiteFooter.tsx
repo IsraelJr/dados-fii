@@ -27,10 +27,9 @@ export default function SiteFooter() {
         </div>
 
         <div>
-          <p className="font-extrabold text-slate-800">Confiança editorial</p>
+          <p className="font-extrabold text-slate-800">Confiança e qualidade</p>
           <div className="mt-3 grid gap-2">
             <Link href="/sobre" className="hover:text-indigo-700">Sobre o Dados FII</Link>
-            <Link href="/politica-editorial" className="hover:text-indigo-700">Política editorial</Link>
             <Link href="/politica-de-correcoes" className="hover:text-indigo-700">Política de correções</Link>
             <Link href="/como-usamos-ia" className="hover:text-indigo-700">Como usamos IA</Link>
           </div>

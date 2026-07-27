@@ -59,7 +59,7 @@ export default function PrivacyPolicyPage() {
         <h2 className="text-xl font-extrabold">Documentos relacionados</h2>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/termos-de-uso" className="rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-900">Termos de uso</Link>
-          <Link href="/politica-editorial" className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white">Política editorial</Link>
+          <Link href="/politica-de-correcoes" className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white">Política de correções</Link>
           <Link href="/como-usamos-ia" className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white">Uso de IA</Link>
         </div>
       </aside>

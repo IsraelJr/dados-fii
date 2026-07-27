@@ -15,7 +15,6 @@ const ELIGIBLE_EXACT_PATHS = new Set([
   "/politica-de-privacidade",
   "/termos-de-uso",
   "/sobre",
-  "/politica-editorial",
   "/politica-de-correcoes",
   "/como-usamos-ia",
   "/guias",
