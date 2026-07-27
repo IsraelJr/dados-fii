@@ -67,7 +67,12 @@ jobs:
         run: npm run typecheck
 
       - name: Complete unit, integration and contract suite
-        run: npm run test:all
+        id: complete_test_suite
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p .tmp
+          npm run test:all 2>&1 | tee .tmp/test-all.log
 
       - name: Firestore rules integration tests
         run: npm run test:rules
@@ -116,7 +121,6 @@ jobs:
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "dados-fii-build.appspot.com"
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
           NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
-          NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-0000000000"
         run: npm run build
 
       - name: Real HTTP contract smoke
@@ -128,12 +132,13 @@ jobs:
       - name: Critical end-to-end journeys
         run: npm run test:e2e
 
-      - name: Upload E2E diagnostics
+      - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: corrective-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          name: core-ci-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
+            .tmp/test-all.log
             playwright-report
             test-results
           retention-days: 7

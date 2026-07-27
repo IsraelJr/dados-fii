@@ -6,9 +6,17 @@ const vercelConfig = JSON.parse(readFileSync("vercel.json", "utf8"));
 const serviceSource = readFileSync("src/lib/regulatoryDataService.ts", "utf8");
 const readModelSource = readFileSync("src/lib/risk-lab/RiskLabPremiumReadModel.ts", "utf8");
 
-test("rollout Vercel ativa explicitamente somente a leitura Premium do Risk Lab", () => {
+const ALLOWED_PRODUCT_FLAGS = [
+  "ENABLE_RISK_LAB_PREMIUM_READONLY",
+  "ENABLE_WALLET_RISK_REPORT_AUTOMATIC",
+  "ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK",
+].sort();
+
+test("rollout Vercel contém somente flags de produto explicitamente auditadas", () => {
   assert.equal(vercelConfig.env?.ENABLE_RISK_LAB_PREMIUM_READONLY, "true");
-  assert.equal(Object.keys(vercelConfig.env || {}).length, 1);
+  assert.equal(vercelConfig.env?.ENABLE_WALLET_RISK_REPORT_AUTOMATIC, "true");
+  assert.equal(vercelConfig.env?.ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK, "false");
+  assert.deepEqual(Object.keys(vercelConfig.env || {}).sort(), ALLOWED_PRODUCT_FLAGS);
 });
 
 test("código permanece fail-closed fora do deployment configurado", () => {

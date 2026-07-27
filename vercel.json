@@ -1,7 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "env": {
-    "ENABLE_RISK_LAB_PREMIUM_READONLY": "true"
+    "ENABLE_RISK_LAB_PREMIUM_READONLY": "true",
+    "ENABLE_WALLET_RISK_REPORT_AUTOMATIC": "true",
+    "ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK": "false"
   },
   "crons": [
     {
