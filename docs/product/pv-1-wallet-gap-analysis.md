@@ -7,79 +7,79 @@
 
 ## Veredito
 
-A carteira atual é funcional como protótipo local, mas não atende ao padrão de Produto Validável.
+A carteira atual é funcional como protótipo local, mas ainda não atende ao padrão de Produto Validável.
 
 ## Evidências observadas
 
 Arquivo principal auditado: `src/app/carteira/page.tsx`.
 
-### Persistência
+### Persistência atual da interface
 
 - carteira em `localStorage` pela chave `dados-fii-wallet-v1`;
 - snapshots em `localStorage` pela chave `dados-fii-wallet-monthly-snapshots-v1`;
-- ausência de ownership server-side;
-- ausência de isolamento comprovável entre usuários;
-- perda potencial ao trocar navegador, limpar armazenamento ou usar outro dispositivo.
+- perda potencial ao trocar navegador, limpar armazenamento ou usar outro dispositivo;
+- a interface ainda não consome o novo histórico server-side.
 
-### Domínio
+### Domínio legado da tela
 
-- regras de moeda, competência, snapshots, dividendos, pesos, histórico e interface estão no mesmo componente;
+- regras de moeda, competência, snapshots, dividendos, pesos, histórico e interface continuam no mesmo componente;
 - `parseCurrency` converte entrada inválida em `0`, escondendo erro de qualidade;
 - `getCurrentYearData` usa o ano anterior como fallback, o que pode misturar competências sem estado explícito;
 - histórico de dividendos é recalculado com as cotas atuais, não com a posição histórica;
 - snapshot do mês corrente é atualizado conforme preço e dados carregados;
-- assinatura de snapshot não considera todos os campos do snapshot;
-- não existe proveniência `manual`, `automatic_snapshot` ou `legacy`;
-- não existe regra explícita de conflito entre entrada manual e snapshot automático.
+- assinatura de snapshot não considera todos os campos do snapshot.
 
-### Arquitetura
+## Avanço implementado no branch
 
-O componente cliente acumula responsabilidades incompatíveis:
+### PV-1A — domínio e contratos
 
-1. persistência;
-2. integração HTTP;
-3. regra financeira;
-4. normalização;
-5. snapshots;
-6. construção de histórico;
-7. exportação;
-8. apresentação.
-
-Isso impede teste isolado adequado e aumenta o risco de regressões.
-
-## Decisão técnica
-
-Não será adicionada apenas uma modal sobre o `localStorage` existente. Isso criaria aparência de produto sem corrigir integridade e persistência.
-
-A PV-1 será dividida em blocos internos:
-
-### PV-1A — Domínio e contratos
+Implementado:
 
 - `PortfolioHistoryEntry` tipado e versionado;
 - competência canônica `YYYY-MM`;
-- schemas de criação, edição e leitura;
-- validação fail-closed de valores;
-- proveniência e política de conflito;
+- validação fail-closed de moeda pt-BR;
+- zero válido separado de ausência;
+- bloqueio de mês futuro;
+- proveniência `manual`, `automatic_snapshot` e `legacy`;
+- política de conflito e snapshot imutável;
 - testes unitários.
 
-### PV-1B — Persistência e ownership
+### PV-1B — persistência e ownership
 
-- repository server-side;
-- chave determinística por usuário/carteira/competência;
-- autenticação e ownership;
-- migração/leitura compatível do legado;
-- testes de integração e regras.
+Implementado no branch, ainda sujeito aos gates completos:
 
-### PV-1C — Interface e gráficos
+- `PortfolioHistoryRepository`;
+- `InMemoryPortfolioHistoryRepository` para testes;
+- `FirestorePortfolioHistoryRepository` server-side;
+- chave determinística por owner, carteira e competência;
+- `PortfolioHistoryService` com criação, listagem, edição, exclusão e importação legada;
+- `WalletIdentityResolver` centralizado;
+- identidade por sessão validada ou cookie anônimo existente;
+- nenhum `ownerId`, `userId` ou e-mail do body concede ownership;
+- rotas finas em `/api/portfolio/history`;
+- migração idempotente em `/api/portfolio/history/migrate`;
+- migração limitada ao ano corrente;
+- entradas futuras, inválidas ou vazias rejeitadas;
+- testes de isolamento entre usuários, idempotência e arquitetura;
+- índice Firestore por `ownerId`, `portfolioId` e `competence`.
+
+## Achado da esteira
+
+O run `30304926247` foi reprovado no teste canônico do Handoff por divergência textual entre a regra documentada e a asserção. A causa foi corrigida no commit `95b3906470f2b3f0679181c55eb730de048be2fb`. Os demais gates ainda precisam executar no novo SHA.
+
+## Próximos blocos
+
+### PV-1C — interface e gráficos
 
 - formulário acessível;
 - criação, edição e exclusão de registros manuais;
 - snapshots automáticos somente leitura;
+- migração acionada após autenticação, sem apagar o local antes da confirmação;
 - conflito explícito;
-- gráficos e resumos derivados do domínio;
+- gráficos e resumos derivados da fonte server-side;
 - E2E desktop/mobile.
 
-### PV-1D — Telemetria e produção
+### PV-1D — telemetria e produção
 
 - eventos sanitizados;
 - Preview;
@@ -87,48 +87,18 @@ A PV-1 será dividida em blocos internos:
 - smoke não destrutivo;
 - atualização final do Handoff.
 
-## Contrato inicial proposto
-
-```ts
-export type PortfolioHistorySource =
-  | "manual"
-  | "automatic_snapshot"
-  | "legacy";
-
-export type PortfolioHistoryEntry = {
-  schemaVersion: 1;
-  userId: string;
-  portfolioId: string;
-  competence: `${number}-${string}`;
-  totalValue: number | null;
-  dividends: number | null;
-  source: PortfolioHistorySource;
-  createdAt: string;
-  updatedAt: string;
-};
-```
-
-O contrato final não confiará em `userId` recebido do cliente. A identidade será injetada pelo servidor.
-
-## Casos obrigatórios
+## Casos obrigatórios restantes
 
 - usuário novo sem carteira;
 - usuário com carteira local legada;
 - carteira persistida no servidor;
-- competência duplicada;
-- dezembro para janeiro;
-- mês futuro;
-- zero válido;
-- ausência;
-- moeda pt-BR;
-- `NaN` e infinito;
 - conflito manual/snapshot;
-- edição de manual;
-- tentativa de editar snapshot;
-- tentativa de acessar registro de outro usuário;
-- troca de dispositivo/navegador.
+- dezembro para janeiro;
+- troca de dispositivo/navegador;
+- E2E e acessibilidade;
+- produção.
 
-## Itens que não serão feitos nesta sprint
+## Fora de escopo
 
 - anos anteriores ao corrente;
 - importação por planilha;
