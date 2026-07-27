@@ -28,21 +28,11 @@ test("página pública possui estrutura, navegação e acessibilidade essenciais
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
-test("login possui diálogo modal, validação compreensível e restauração de foco", async ({ page }) => {
+test("Home não exibe botão flutuante nem diálogo de Login", async ({ page }) => {
   await page.goto("/");
-  const trigger = page.getByRole("button", { name: "Login" });
-  await trigger.click();
-
-  const dialog = page.getByRole("dialog", { name: "Entrar" });
-  await expect(dialog).toBeVisible();
-  await expect(page.getByLabel("E-mail")).toBeFocused();
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("email válido");
+  await expect(page.getByRole("button", { name: "Login" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Entrar" })).toHaveCount(0);
   await expectNoHighImpactAccessibilityViolations(page);
-
-  await page.keyboard.press("Escape");
-  await expect(dialog).toBeHidden();
-  await expect(trigger).toBeFocused();
 });
 
 test("carteira adiciona um fundo, persiste localmente e permanece acessível", async ({ page }) => {
