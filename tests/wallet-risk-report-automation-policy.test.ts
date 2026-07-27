@@ -7,8 +7,8 @@ import {
   validateAutomaticRiskReportMarkdown,
   walletRiskReportAutomaticEnabled,
   walletRiskReportManualFallbackEnabled,
-} from "../src/lib/reports/WalletRiskReportAutomationPolicy.ts";
-import { FII_RISK_REPORT_PROMPT_VERSION } from "../src/lib/prompts/fiiRiskReport.ts";
+} from "../src/lib/reports/WalletRiskReportAutomationPolicy";
+import { FII_RISK_REPORT_PROMPT_VERSION } from "../src/lib/prompts/fiiRiskReport";
 
 const REQUIRED_REPORT = `
 # Relatório de Risco da Carteira de FIIs
