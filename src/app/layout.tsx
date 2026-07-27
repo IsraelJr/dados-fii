@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
+import AdSenseLoader from "./components/AdSenseLoader";
+import CookieBanner from "./components/CookieBanner";
 import SiteFooter from "./components/SiteFooter";
 import SiteNav from "./components/SiteNav";
 import UserNotificationCenter from "./components/UserNotificationCenter";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,13 +19,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const ADSENSE_CLIENT =
-  process.env.NEXT_PUBLIC_ADSENSE_CLIENT ||
-  process.env.NEXT_PUBLIC_ADS_OPEN ||
-  "ca-pub-3245357129779122";
-
-const SITE_URL = "https://dadosfii.com.br";
-
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -30,7 +27,7 @@ export const metadata: Metadata = {
   },
   description:
     "Consulte FIIs, dividendos, próximos pagamentos, carteira, notícias e dados de fundos imobiliários em linguagem simples.",
-  applicationName: "Dados FII",
+  applicationName: SITE_NAME,
   keywords: [
     "FIIs",
     "fundos imobiliários",
@@ -41,28 +38,19 @@ export const metadata: Metadata = {
     "rendimentos FIIs",
     "fundos imobiliários Brasil",
   ],
-  authors: [{ name: "Dados FII" }],
+  authors: [{ name: "Dados FII", url: "/autores/israel-alves" }],
   creator: "Dados FII",
   publisher: "Dados FII",
-  alternates: {
-    canonical: "./",
-  },
+  alternates: { canonical: "./" },
   openGraph: {
     type: "website",
     locale: "pt_BR",
     url: SITE_URL,
-    siteName: "Dados FII",
+    siteName: SITE_NAME,
     title: "Dados FII | Fundos Imobiliários, dividendos e carteira",
     description:
       "Consulte FIIs, dividendos, próximos pagamentos, carteira, notícias e dados de fundos imobiliários em linguagem simples.",
-    images: [
-      {
-        url: "/logo.png",
-        width: 512,
-        height: 512,
-        alt: "Dados FII",
-      },
-    ],
+    images: [{ url: "/logo.png", width: 512, height: 512, alt: SITE_NAME }],
   },
   twitter: {
     card: "summary",
@@ -89,27 +77,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
-      <head>
-        <script
-          async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
-          crossOrigin="anonymous"
-        />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-slate-50 text-slate-900 antialiased`}
-      >
+      <Script id="dados-fii-consent-default" strategy="beforeInteractive">
+        {`window.dataLayer=window.dataLayer||[];window.dataLayer.push(['consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500}]);`}
+      </Script>
+      <body className={`${geistSans.variable} ${geistMono.variable} bg-slate-50 text-slate-900 antialiased`}>
+        <AdSenseLoader />
         <SiteNav />
         <UserNotificationCenter />
         {children}
         <SiteFooter />
+        <CookieBanner global />
       </body>
     </html>
   );
