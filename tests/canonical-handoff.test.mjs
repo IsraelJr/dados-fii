@@ -38,10 +38,10 @@ test("existe somente um Handoff canônico ativo", () => {
   assert.deepEqual(matches, [HANDOFF]);
 });
 
-test("Handoff v10 registra a nova fase sem apagar evidências históricas", () => {
+test("Handoff v10.1 registra a nova fase sem apagar evidências históricas", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.0\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.1\.0/);
   assert.match(body, /\*\*Data:\*\* 27\/07\/2026/);
   assert.match(body, /Produto Validável/);
   assert.match(body, /PV-1 — Jornada principal da carteira e histórico manual/);
