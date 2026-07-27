@@ -1,5 +1,3 @@
-import { featureEnabled } from "@/lib/featureFlags";
-
 export const WALLET_RISK_REPORT_AUTOMATIC_FLAG = "ENABLE_WALLET_RISK_REPORT_AUTOMATIC" as const;
 export const WALLET_RISK_REPORT_MANUAL_FLAG = "ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK" as const;
 export const WALLET_RISK_REPORT_AUTOMATIC_SOURCE = "openai_api";
@@ -33,12 +31,18 @@ export type RiskReportValidation = {
   tooShort: boolean;
 };
 
+function rolloutFlagEnabled(name: string, defaultValue = false) {
+  const value = process.env[name];
+  if (value == null || value === "") return defaultValue;
+  return !["0", "false", "off", "no"].includes(value.trim().toLowerCase());
+}
+
 export function walletRiskReportAutomaticEnabled() {
-  return featureEnabled(WALLET_RISK_REPORT_AUTOMATIC_FLAG, false);
+  return rolloutFlagEnabled(WALLET_RISK_REPORT_AUTOMATIC_FLAG, false);
 }
 
 export function walletRiskReportManualFallbackEnabled() {
-  return featureEnabled(WALLET_RISK_REPORT_MANUAL_FLAG, false);
+  return rolloutFlagEnabled(WALLET_RISK_REPORT_MANUAL_FLAG, false);
 }
 
 export function isManualPlaceholderReport(report: StoredRiskReport | null | undefined) {
