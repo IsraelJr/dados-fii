@@ -12,7 +12,6 @@ const ELIGIBLE_EXACT_PATHS = new Set([
   "/glossario",
   "/metodologia",
   "/fontes-dos-dados",
-  "/politica-de-privacidade",
   "/termos-de-uso",
   "/sobre",
   "/politica-de-correcoes",
