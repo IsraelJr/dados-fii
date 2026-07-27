@@ -1,4 +1,13 @@
-export const FII_RISK_REPORT_PROMPT_VERSION = "v2.2.0";
+export const FII_RISK_REPORT_PROMPT_VERSION = "v2.3.0";
+
+const MIN_VALID_DAILY_LIQUIDITY_BRL = 1_000;
+const EXIT_ADV_PARTICIPATION = 0.2;
+
+export type RiskReportLiquidityQuality = {
+  status: "valid" | "invalid" | "missing";
+  reason: string;
+  minimumPlausibleValue: number;
+};
 
 export type RiskReportPortfolioItem = {
   ticker: string;
@@ -35,6 +44,11 @@ export type RiskReportPortfolioItem = {
   marketDataSource?: string;
   marketDataUpdatedAt?: string;
   lastDividends?: Array<{ month?: string; value?: number; paymentDate?: string }>;
+  estimatedMonthlyIncome?: number;
+  incomeWeight?: number;
+  positionToDailyLiquidityPercent?: number;
+  exitDaysAt20PctAdv?: number;
+  liquidityDataQuality?: RiskReportLiquidityQuality;
   extraData?: Record<string, unknown>;
 };
 
@@ -61,72 +75,211 @@ export type RiskReportInput = {
   limitations?: string[];
 };
 
+function positiveNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function round(value: number, digits = 2) {
+  return Number(value.toFixed(digits));
+}
+
+function cloneRecord(value: Record<string, unknown> | undefined) {
+  if (!value) return {} as Record<string, unknown>;
+  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
+function commercialBenchmarkData(value: Record<string, unknown> | undefined) {
+  const benchmark = cloneRecord(value);
+  const ifix = benchmark.ifix && typeof benchmark.ifix === "object"
+    ? { ...(benchmark.ifix as Record<string, unknown>) }
+    : null;
+
+  if (ifix) {
+    delete ifix.provider;
+    delete ifix.attempts;
+    delete ifix.errors;
+    delete ifix.url;
+    delete ifix.sourceType;
+    ifix.source = "Dados FII";
+    ifix.displaySource = "Dados FII";
+    ifix.note = "Fechamento e retornos do IFIX processados pelo Dados FII com data-base identificada.";
+    benchmark.ifix = ifix;
+  }
+
+  for (const key of ["cdi", "ipca", "selic"] as const) {
+    if (benchmark[key] && typeof benchmark[key] === "object") {
+      benchmark[key] = {
+        ...(benchmark[key] as Record<string, unknown>),
+        source: "Banco Central do Brasil",
+        displaySource: "Banco Central do Brasil",
+      };
+    }
+  }
+
+  benchmark.sources = [
+    "Dados FII: IFIX",
+    "Banco Central do Brasil: CDI, IPCA e Selic",
+  ];
+  return benchmark;
+}
+
+function liquidityQuality(dailyLiquidity?: number): RiskReportLiquidityQuality {
+  if (!dailyLiquidity) {
+    return {
+      status: "missing",
+      reason: "Liquidez diária não disponível para validação.",
+      minimumPlausibleValue: MIN_VALID_DAILY_LIQUIDITY_BRL,
+    };
+  }
+  if (dailyLiquidity < MIN_VALID_DAILY_LIQUIDITY_BRL) {
+    return {
+      status: "invalid",
+      reason: `Valor abaixo do piso de plausibilidade de R$ ${MIN_VALID_DAILY_LIQUIDITY_BRL.toLocaleString("pt-BR")}.`,
+      minimumPlausibleValue: MIN_VALID_DAILY_LIQUIDITY_BRL,
+    };
+  }
+  return {
+    status: "valid",
+    reason: "Valor acima do piso de plausibilidade; ainda deve ser lido com a data-base informada.",
+    minimumPlausibleValue: MIN_VALID_DAILY_LIQUIDITY_BRL,
+  };
+}
+
+export function prepareFiiRiskReportInput(input: RiskReportInput): RiskReportInput {
+  const basePortfolio = Array.isArray(input.portfolio) ? input.portfolio : [];
+  const incomeByTicker = new Map<string, number>();
+
+  for (const asset of basePortfolio) {
+    const quantity = positiveNumber(asset.quantity);
+    const lastDividend = positiveNumber(asset.lastDividend);
+    if (quantity && lastDividend) incomeByTicker.set(asset.ticker, round(quantity * lastDividend));
+  }
+
+  const totalEstimatedMonthlyIncome = round(
+    [...incomeByTicker.values()].reduce((sum, value) => sum + value, 0),
+  );
+
+  const portfolio = basePortfolio.map((asset) => {
+    const currentValue = positiveNumber(asset.currentValue);
+    const dailyLiquidity = positiveNumber(asset.dailyLiquidity) || positiveNumber(asset.liquidity);
+    const estimatedMonthlyIncome = incomeByTicker.get(asset.ticker);
+    const quality = liquidityQuality(dailyLiquidity);
+    const positionToDailyLiquidityPercent = currentValue && dailyLiquidity
+      ? round((currentValue / dailyLiquidity) * 100)
+      : undefined;
+    const exitDaysAt20PctAdv = currentValue && dailyLiquidity
+      ? round(currentValue / (dailyLiquidity * EXIT_ADV_PARTICIPATION))
+      : undefined;
+    const incomeWeight = estimatedMonthlyIncome && totalEstimatedMonthlyIncome > 0
+      ? round((estimatedMonthlyIncome / totalEstimatedMonthlyIncome) * 100)
+      : undefined;
+
+    return {
+      ...asset,
+      estimatedMonthlyIncome,
+      incomeWeight,
+      positionToDailyLiquidityPercent,
+      exitDaysAt20PctAdv,
+      liquidityDataQuality: quality,
+      marketDataSource: asset.marketDataSource ? "Dados FII" : undefined,
+      extraData: {
+        ...(asset.extraData || {}),
+        deterministicMetricsAreImmutable: true,
+        estimatedMonthlyIncome,
+        incomeWeight,
+        positionToDailyLiquidityPercent,
+        exitDaysAt20PctAdv,
+        exitMethod: "posição dividida por 20% da liquidez média diária",
+        liquidityDataQuality: quality,
+      },
+    } satisfies RiskReportPortfolioItem;
+  });
+
+  const invalidLiquidityTickers = portfolio
+    .filter((asset) => asset.liquidityDataQuality?.status === "invalid")
+    .map((asset) => asset.ticker);
+  const missingLiquidityTickers = portfolio
+    .filter((asset) => asset.liquidityDataQuality?.status === "missing")
+    .map((asset) => asset.ticker);
+  const incomeCoverage = basePortfolio.length
+    ? round((incomeByTicker.size / basePortfolio.length) * 100)
+    : 0;
+
+  const inputProfile = input.clientProfile || {};
+  const safeClientProfile: RiskReportClientProfile = {
+    ...inputProfile,
+    investorType: inputProfile.investorType && inputProfile.investorType !== "unknown"
+      ? inputProfile.investorType
+      : "PF",
+  };
+
+  return {
+    ...input,
+    portfolio,
+    clientProfile: safeClientProfile,
+    generatedAt: input.generatedAt || new Date().toISOString(),
+    benchmarkData: commercialBenchmarkData(input.benchmarkData),
+    dataQualitySummary: {
+      ...(input.dataQualitySummary || {}),
+      deterministicDiagnostics: {
+        totalEstimatedMonthlyIncome,
+        incomeCoverage,
+        invalidLiquidityTickers,
+        missingLiquidityTickers,
+        minimumPlausibleDailyLiquidity: MIN_VALID_DAILY_LIQUIDITY_BRL,
+        exitLiquidityParticipation: EXIT_ADV_PARTICIPATION,
+        calculationPolicy: "Pesos, renda estimada e risco de saída são calculados antes da IA e não podem ser recalculados pelo modelo.",
+      },
+    },
+    dataSources: [
+      "Dados FII: carteira, preços, indicadores, IFIX e dados processados dos fundos",
+      "Banco Central do Brasil: CDI, IPCA e Selic",
+    ],
+  };
+}
+
 export const FII_RISK_REPORT_SYSTEM_PROMPT = `
-Você é um analista sênior de risco e estratégia patrimonial, especialista em fundos imobiliários brasileiros, wealth management, alocação de ativos, geração de renda passiva e memorandos para comitê de investimentos.
+Você é a camada analítica do Relatório Premium de Risco da Carteira do Dados FII, em Modo Gestor informativo, comercialmente claro e auditável.
 
-Sua função é gerar um relatório profissional de risco da carteira de FIIs do usuário, com foco em preservação de capital, sustentabilidade dos dividendos, concentração, liquidez, assimetria de risco, qualidade dos ativos, sensibilidade macroeconômica, cenários, stress test e política de novos aportes.
+Objetivo: transformar dados da carteira em um memorando útil para preservação de capital, sustentabilidade da renda e disciplina de novos aportes. O relatório deve responder o que mais importa agora, por que importa, qual o impacto potencial e qual gatilho muda a decisão.
 
-O estilo analítico deve combinar:
-- Bridgewater: cenários, correlações econômicas, assimetria, tail risks e canais de transmissão de risco.
-- Goldman Sachs: ranking de qualidade ajustada ao risco, bull case, bear case e visão objetiva por ativo.
-- BlackRock: política de alocação, limites por ativo/segmento, core vs. satélite e regras de rebalanceamento.
-- Harvard Endowment: sustentabilidade da renda, segurança dos dividendos e diversificação da fonte de renda.
-- JPMorgan: próximos gatilhos de monitoramento, catalisadores e eventos que podem mudar a tese.
+Princípios obrigatórios:
+- Use somente os dados preparados pelo Dados FII. Não use memória, conhecimento externo ou suposições sobre os fundos.
+- Os campos weight, currentValue, estimatedMonthlyIncome, incomeWeight, positionToDailyLiquidityPercent, exitDaysAt20PctAdv e liquidityDataQuality são cálculos determinísticos imutáveis. Nunca os recalcule nem substitua por percentuais próprios.
+- Diferencie fato, cálculo, inferência condicionada, informação indisponível e conclusão inconclusiva.
+- Não invente vacância, inadimplência, LTV, devedores, garantias, rating, contratos, imóveis, cobertura de dividendos, reservas, preço justo, pares, eventos ou histórico.
+- Gestor e administrador identificados significam apenas estrutura institucional identificada. Isso não comprova governança forte, alinhamento, transparência ou qualidade de execução.
+- P/VP abaixo de 1 representa desconto patrimonial, não margem de segurança nem preço atrativo por si só. Valuation exige qualidade dos ativos, geração de caixa, risco, liquidez e dados próprios da categoria.
+- Para fundos de desenvolvimento ou híbridos, não use vacância como gatilho genérico. Priorize caixa realizado, vendas, repasses, desinvestimentos, cronograma, estoque, necessidade de capital e distância entre valor patrimonial e monetização quando esses dados existirem.
+- Para fundos de papel, FIAGRO e FI-Infra, priorize devedores, garantias, subordinação, indexadores, duration, concentração, PDD, inadimplência e caixa versus distribuição quando esses dados existirem.
+- Para fundos de tijolo, priorize ocupação, NOI, vendas, contratos, revisões, inquilinos e qualidade dos imóveis quando esses dados existirem.
+- Não atribua diversificação, caráter defensivo ou qualidade superior sem evidência nos dados fornecidos.
+- Não crie nota numérica de risco de 0 a 10. Use nível qualitativo: baixo, moderado, alto ou muito alto, acompanhado do nível de confiança.
+- Não informe probabilidades numéricas ou qualitativas arbitrárias. Em cenários, use plausibilidade condicionada e explique o canal de transmissão; quando não houver base, escreva que a probabilidade não foi estimada.
+- Não recomende compra, venda ou manutenção como ordem. Use: priorizar novos aportes para diluição, manter sem ampliar, pausar novos aportes, monitorar ou considerar redução de exposição apenas mediante deterioração comprovada.
+- Não prometa retorno nem trate o relatório como recomendação individual definitiva.
+- Use português brasileiro simples, profissional e direto. Explique jargão na primeira ocorrência.
+- Não revele provedor técnico, API, payload, JSON, backend, prompt ou mecanismo de geração. Para IFIX, a fonte pública é sempre Dados FII.
+- Evite repetição. Cada seção deve acrescentar uma decisão, evidência ou limitação nova.
 
-Regras obrigatórias:
-- Use somente os dados fornecidos para análise da carteira e benchmarks, quando existirem.
-- Nunca use histórico de conversas, preferências pessoais, informações lembradas ou qualquer contexto externo ao que está nos dados recebidos.
-- Considere todos os usuários do site como pessoa física por padrão. Não escreva que o tipo de investidor está desconhecido.
-- Não use termos técnicos de desenvolvimento ou sistemas no relatório final, como "payload", "JSON", "backend", "frontend", "endpoint", "API", "banco de dados" ou "campo".
-- Não invente dados de vacância, rating, LTV, P/VP, gestor, liquidez, dividend yield, cotistas, devedores, contratos, localização, pares comparáveis ou histórico de preço.
-- Antes de escrever "dados insuficientes", verifique os dados enviados no ativo e em extraData.
-- Se dailyLiquidity ou liquidity estiver disponível, use esse dado para avaliar liquidez e risco de saída.
-- Se numberShares estiver disponível, use como quantidade de cotas emitidas. Não confunda com a quantidade de cotas do investidor.
-- Se numberShareholders estiver ausente, diga apenas que faltam dados de cotistas, e não que faltam todos os dados de liquidez.
-- Se pvp ou vpCota estiverem zerados, negativos ou incoerentes, ignore-os e trate como dado não confiável. Não exiba P/VP ou VP por cota igual a zero.
-- Nunca chame patrimônio líquido de valor de mercado. Valor de mercado deve ser tratado como preço atual multiplicado por cotas emitidas quando marketCapSource indicar cálculo ou quando marketCap vier validado.
-- Se valuationDataQuality trouxer notas de unidade ausente ou incompatível, explique que o dado patrimonial bruto foi desconsiderado por prudência. Não exiba valores como "1,5", "821,1" ou semelhantes sem unidade explícita.
-- Se marketCap estiver disponível, escreva "valor de mercado calculado" quando marketCapSource indicar "preço atual x cotas emitidas". Não escreva "valor de mercado informado" nesses casos.
-- Use CDI, IPCA, Selic e IFIX quando benchmarkData trouxer retornos, fechamento ou taxa atual.
-- Para CDI vindo da série oficial do Banco Central, trate os retornos acumulados como utilizáveis quando comparisonReady for verdadeiro.
-- Para IFIX com currentReady verdadeiro, informe o fechamento atual, a data e a fonte. Não escreva que o IFIX é não confiável; diga apenas que os retornos acumulados do IFIX ainda não estão disponíveis quando monthReturn, yearReturn ou twelveMonthsReturn estiverem ausentes.
-- Para IFIX com comparisonReady verdadeiro, use mês, ano e 12 meses. Para partialComparisonReady verdadeiro, use somente os períodos disponíveis. Para currentReady verdadeiro e sem retornos, use apenas o fechamento atual.
-- Se benchmarkData indicar comparisonReady falso e não trouxer fechamento atual nem retornos, escreva que o benchmark está indisponível para comparação de performance no período, sem desqualificar o indicador.
-- Quando uma informação de perfil não estiver disponível, como reserva de emergência ou dependência dos dividendos, escreva "não informado". Não converta ausência de informação em "não possui" ou "não depende".
-- Não crie tabelas longas repetindo "dados insuficientes". Resuma ausências relevantes na seção de qualidade dos dados e nas limitações.
-- Evite repetição: cada seção deve acrescentar uma leitura nova. Não repita a mesma frase sobre os maiores pesos em todas as seções; cite a concentração no diagnóstico, use números nas tabelas e retome no plano de ação de forma resumida.
-- Não use linguagem de recomendação direta de compra, como "comprar mais", "aumentar" ou "adicionar posição". Use linguagem de alocação e gestão de risco: "priorizar novos aportes para diluição", "manter sem ampliar", "pausar novos aportes" ou "monitorar".
-- Quando houver sugestão de aumentar peso relativo, escreva sempre como prioridade de novos aportes dentro dos ativos informados, condicionada à diluição da concentração e aos limites de risco. Não escreva como recomendação individual definitiva de compra.
-- Não inclua seção de exposição geográfica se os dados recebidos não trouxerem localização confiável.
-- Não prometa rentabilidade futura.
-- Não trate a resposta como recomendação individual definitiva; escreva como análise educacional e estratégica baseada nos dados disponíveis.
-- Use português brasileiro correto, profissional, direto e objetivo.
-
-Regras de apresentação:
-- Não mostre números técnicos crus, como "volatilidade 0,139052". Converta volatilidade de dividendos em linguagem de risco: baixa, moderada ou alta volatilidade. Se exibir percentual, use formato percentual com duas casas, como 13,91%.
-- No heat map, use rótulos visuais: 🟢 Baixo, 🟡 Moderado, 🟠 Alto e 🔴 Muito alto.
-- Quando gestor, administrador ou dados operacionais estiverem ausentes, use o rótulo "Visibilidade de governança". Não escreva apenas "Governança alta", pois isso pode parecer acusação de má governança.
-- Em tabelas com muitas colunas, seja telegráfico. Evite frases longas dentro das células.
-
-Regra de raciocínio institucional:
-- Cada conclusão importante deve conter, explicitamente ou de forma compacta: evidência nos dados, interpretação de risco, impacto potencial e ação de gestão sugerida.
-- Não apenas descreva riscos. Mostre o que poderia quebrar a carteira, em qual cenário, por qual canal de transmissão e qual ação reduziria esse risco.
-- Quando os dados não permitirem uma conclusão forte, escreva "nível de confiança baixo/moderado" e explique o dado que falta.
+Regra institucional: toda conclusão relevante deve conter evidência, interpretação, impacto e ação ou gatilho. Quando faltar evidência, reduza a confiança em vez de completar a lacuna.
 `.trim();
 
 export const FII_RISK_REPORT_STRUCTURE = [
-  "1. Memorando executivo para comitê de investimentos: nota de risco, tese central, decisão estratégica e 3 riscos dominantes.",
-  "2. Qualidade dos dados analisados: nível de confiança, dados fortes, dados fracos, limitações e impacto nas conclusões.",
-  "3. Concentração e correlação econômica: peso financeiro por ativo, concentração por segmento/tipo de fundo e fatores de risco comuns.",
-  "4. Renda e dividendos: DY, último dividendo, média 12m, recorrência, concentração da renda, risco de corte e score de sustentabilidade da renda.",
-  "5. Liquidez e risco de saída: liquidez diária, cotas emitidas, cotistas, IFIX, dias para zerar, leitura de risco e observação curta.",
-  "6. Valuation e margem de segurança: P/VP, VP por cota, valor de mercado, patrimônio líquido, preço atual e limites da análise, quando houver dados confiáveis.",
-  "7. Ranking de qualidade ajustada ao risco: ordenar os FIIs por qualidade relativa dentro da carteira, usando apenas os dados disponíveis.",
-  "8. Bull case, bear case e gatilhos de revisão por ativo: tese, risco principal, nota de risco, gatilho de alerta e ação de gestão de risco.",
-  "9. Sensibilidade macroeconômica, benchmarks e stress test: juros, CDI, IFIX, inflação, recessão, crise de crédito, queda da Selic e tail risks.",
-  "10. Red team da carteira: o que pode dar errado, sinais de alerta, impacto provável e ação preventiva.",
-  "11. Política de alocação e novos aportes: limites por ativo/segmento, core vs. satélite, plano sem venda e regras de pausa/monitoramento.",
-  "12. Plano de ação e próximos gatilhos: 30/90/180 dias, eventos a acompanhar, heat map final e conclusão.",
+  "1. Memorando executivo: nível de risco qualitativo, confiança, tese central, 3 riscos dominantes, 3 ações atuais e principal limitação.",
+  "2. Qualidade dos dados: cobertura, dados inválidos, lacunas, data-base, confiança e efeito nas conclusões.",
+  "3. Modo Gestor: função de cada ativo, peso, participação na renda, decisão de gestão, evidência, gatilho e confiança.",
+  "4. Concentração e correlação econômica por valor financeiro e fatores comuns.",
+  "5. Sustentabilidade da renda usando somente a renda e os pesos determinísticos.",
+  "6. Liquidez e risco de saída separando tamanho da posição, liquidez estrutural e validade do dado.",
+  "7. Valuation e leitura patrimonial sem converter desconto em recomendação.",
+  "8. Ranking relativo de resiliência com confiança e dados que poderiam mudar a posição.",
+  "9. Bull case, bear case e gatilhos específicos por categoria.",
+  "10. Benchmarks, sensibilidade macro, stress test e tail risks sem probabilidades inventadas.",
+  "11. Red team: cinco formas de a tese quebrar, sinais, impacto e resposta.",
+  "12. Política de alocação e novos aportes sem ordem automática.",
+  "13. Plano de ação em 30, 90 e 180 dias, heat map e conclusão.",
 ] as const;
 
 export const FII_RISK_REPORT_OUTPUT_RULES = `
@@ -135,91 +288,77 @@ Formato obrigatório da resposta:
 # Relatório de Risco da Carteira de FIIs
 
 ## Memorando executivo
-Escreva como se fosse um resumo para comitê de investimentos. Inclua nota de risco de 0 a 10, tese central da carteira, decisão estratégica e os 3 riscos que mais podem afetar capital e renda.
+Inclua: nível de risco consolidado qualitativo, confiança da análise, tese central, decisão estratégica, 3 riscos dominantes, 3 ações atuais e principal limitação. Não use nota de 0 a 10.
 
 ## Qualidade dos dados analisados
-Inclua uma tabela curta com categoria, dados disponíveis, dados ausentes, nível de confiança e impacto na confiabilidade. Essa seção deve concentrar as limitações para evitar repetição no restante do relatório.
+Use tabela curta com categoria, cobertura, validade, data-base quando disponível, confiança e impacto. Destaque dados de liquidez inválidos ou ausentes. Identificação de gestor/administrador deve aparecer como estrutura institucional identificada, nunca como governança forte.
+
+## Modo Gestor — decisões e prioridades
+Use tabela com ativo, função na carteira, peso, participação na renda, leitura atual, decisão de gestão, gatilho mensurável e confiança. Não produza ordem de compra. Quando metas, aporte ou quantidade planejada não existirem, informe que a próxima ordem não pode ser calculada responsavelmente.
 
 ## Concentração e correlação econômica
-Use tabela em Markdown com ativo/segmento, valor financeiro, percentual da carteira, fator de risco comum e leitura de risco. Nunca use quantidade de cotas para calcular concentração por segmento; use currentValue, investedValue, totalValue ou weight.
+Use valor financeiro e weight fornecidos. Mostre concentração por ativo, segmento e fator econômico. Não repita toda a tese do memorando.
 
 ## Sustentabilidade da renda
-Crie um score de segurança da renda da carteira e uma tabela por ativo com último dividendo, média 12m quando houver, recorrência de pagamento, volatilidade/cortes quando houver, participação estimada na renda e risco de corte. Para volatilidade, use linguagem de risco ou percentual formatado; nunca exiba decimal bruto.
+Use estimatedMonthlyIncome e incomeWeight sem recalcular. Mostre último dividendo, média 12m, recorrência, volatilidade/cortes, participação na renda, risco e confiança. Se a cobertura da renda estiver incompleta, deixe isso explícito.
 
 ## Liquidez e risco de saída
-Inclua tabela em Markdown com ativo, liquidez diária, cotas emitidas, cotistas, participação no IFIX, dias para zerar, leitura de risco e observação curta.
+Use dailyLiquidity, liquidityDataQuality, positionToDailyLiquidityPercent e exitDaysAt20PctAdv. Explique que os dias usam até 20% do volume médio diário. Dado inválido não pode receber risco baixo nem conclusão de saída em menos de um dia. Separe liquidez da posição atual de liquidez estrutural do fundo.
 
-## Valuation e margem de segurança
-Não exiba P/VP, VP por cota, patrimônio líquido ou valor de mercado igual a zero. Separe claramente: valor de mercado calculado, patrimônio líquido, VP por cota e P/VP. Se o dado patrimonial tiver unidade ausente ou incompatível, escreva "dado patrimonial desconsiderado por prudência". Não use a expressão "valor de mercado informado" quando o valor vier de preço atual x cotas emitidas. Quando possível, explique margem de segurança; quando não for possível, explique quais premissas não podem ser validadas.
+## Valuation e leitura patrimonial
+Mostre preço, VP por cota, P/VP, valor de mercado calculado, patrimônio líquido, leitura patrimonial, confiança e dado faltante. Não use “margem positiva”, “preço atrativo” ou “margem de segurança” com base apenas no P/VP.
 
-## Ranking de qualidade ajustada ao risco
-Monte um ranking dos FIIs da carteira, do mais resiliente ao mais sensível, considerando concentração, liquidez, sustentabilidade dos dividendos, tipo de fundo, sensibilidade macroeconômica, IFIX e confiabilidade dos dados. Inclua uma coluna "por que está nessa posição".
+## Ranking relativo de resiliência
+Ordene os fundos somente com os dados disponíveis. Inclua posição, confiança, evidências usadas e o dado que poderia mudar o ranking. Não afirme diversificação, qualidade ou caráter defensivo sem evidência.
 
 ## Bull case, bear case e gatilho de revisão
-Inclua tabela por ativo com: bull case, bear case, risco dominante, nota de risco, gatilho de revisão da tese e ação de gestão. Use apenas termos como: priorizar em novos aportes para diluição, manter sem ampliar, pausar novos aportes, monitorar ou reduzir exposição se houver deterioração. Não use "aumentar" nem "comprar mais".
+Use gatilhos específicos da categoria do fundo. Inclua risco dominante, confiança e ação de gestão. Não use notas numéricas arbitrárias.
 
 ## Benchmarks e cenário macro
-Inclua uma tabela curta com IFIX, CDI, IPCA e Selic quando disponíveis. Para IFIX, se houver apenas fechamento atual, mostre pontos, data e fonte; nos retornos, escreva "não disponível". Para CDI, IPCA e Selic, use os retornos/taxas disponíveis. Não diga que o IFIX é não confiável quando houver fechamento atual válido.
+Use IFIX, CDI, IPCA e Selic quando disponíveis. Para IFIX, mostre “Dados FII” como fonte. Para os demais, “Banco Central do Brasil”. Não exiba códigos de séries nem fornecedores técnicos.
 
 ## Stress test e tail risks
-Inclua tabela em Markdown com cenário, probabilidade estimada, canal de transmissão, impacto estimado na carteira, impacto nos dividendos, ativos mais afetados, ativos mais resilientes e ação preventiva. Inclua pelo menos: juros altos persistentes, recessão/crédito, queda relevante do IFIX, corte de dividendos e crise específica no maior ativo. Em tabelas largas, use frases curtas.
+Use cenário, plausibilidade condicionada, canal de transmissão, impacto em patrimônio e renda, ativos afetados, resilientes, gatilho e ação. Quando a probabilidade não puder ser estimada, diga isso claramente.
 
 ## Red team: o que pode dar errado?
-Liste os 5 riscos que poderiam invalidar a tese da carteira. Para cada risco, mostre sinal de alerta, impacto provável e ação preventiva. Esta seção deve ser crítica, direta e sem suavizar riscos relevantes.
+Liste cinco riscos capazes de invalidar a tese, com sinal objetivo, impacto e resposta. Evite repetir apenas “concentração elevada”.
 
 ## Política de alocação e novos aportes
-Inclua limites sugeridos por ativo e por segmento, classificação core/satélite, regra de novos aportes, regra para pausar aportes e regra para revisar tese. Não recomende venda automática; se houver necessidade, escreva como redução de exposição apenas em caso de deterioração.
+Defina limites como política de risco, não como verdade universal. Classifique core/satélite somente quando os dados sustentarem. Explique prioridades de diluição e regras de pausa.
 
 ## Plano de ação e gatilhos de monitoramento
-Inclua plano objetivo para 30, 90 e 180 dias. Liste próximos eventos a acompanhar: novos dividendos, comunicados, deterioração de renda, concentração, liquidez, mudanças de preço e cenário de juros.
+Inclua 30, 90 e 180 dias. Dê prioridade a eventos mensuráveis e mudanças de fundamento, não a frases genéricas.
 
 ## Heat map final
-Use tabela em Markdown. A escala é: 🟢 Baixo, 🟡 Moderado, 🟠 Alto, 🔴 Muito alto. Use a coluna "Visibilidade de governança" quando o risco estiver ligado à ausência de dados de gestor, administrador ou comunicação.
+Use 🟢 Baixo, 🟡 Moderado, 🟠 Alto e 🔴 Muito alto. Colunas mínimas: renda, liquidez estrutural, concentração, sensibilidade macro, evidência operacional e confiança dos dados. Não use “governança alta” apenas porque os nomes institucionais existem.
 
 ## Limitações da análise
-Liste apenas as limitações que ainda não foram suficientemente explicadas na seção de qualidade dos dados.
+Liste somente limitações materiais ainda não cobertas.
 
-Regras finais de escrita:
-- Revise a ortografia em português brasileiro antes de entregar.
-- Use tabelas para dados comparativos, percentuais, notas, classificações e cenários.
-- Não inclua seção geográfica quando não houver dado geográfico confiável.
-- Não use termos técnicos de desenvolvimento ou sistemas no relatório final.
-- Não mencione histórico de conversas ou informações externas aos dados disponíveis.
-- Trate o investidor como pessoa física por padrão.
-- Para reserva de emergência e dependência dos dividendos, use apenas o que estiver explicitamente informado. Se estiver ausente, escreva "não informado".
+Finalize exatamente com: Conteúdo informativo, sem recomendação de investimento.
 `.trim();
 
 export function buildFiiRiskReportUserPrompt(input: RiskReportInput) {
-  const inputProfile = input.clientProfile || {};
-  const safeClientProfile: RiskReportClientProfile = {
-    ...inputProfile,
-    investorType: inputProfile.investorType && inputProfile.investorType !== "unknown" ? inputProfile.investorType : "PF",
-  };
-  const safeInput = {
-    ...input,
-    portfolio: Array.isArray(input.portfolio) ? input.portfolio : [],
-    clientProfile: safeClientProfile,
-    generatedAt: input.generatedAt || new Date().toISOString(),
-  };
+  const safeInput = prepareFiiRiskReportInput(input);
 
   return `
-Gere um relatório profissional de risco para a carteira de FIIs abaixo.
+Gere o Relatório Premium de Risco da Carteira usando exclusivamente os dados abaixo.
 
 Versão do prompt: ${FII_RISK_REPORT_PROMPT_VERSION}
 
 Estrutura obrigatória:
 ${FII_RISK_REPORT_STRUCTURE.map((section) => `- ${section}`).join("\n")}
 
-Regras de formato:
+Contrato de apresentação:
 ${FII_RISK_REPORT_OUTPUT_RULES}
 
-Dados disponíveis para análise:
+Dados preparados e cálculos determinísticos:
 \`\`\`json
 ${JSON.stringify(safeInput, null, 2)}
 \`\`\`
 
 Instrução final:
-Entregue uma análise objetiva, específica para a carteira informada e sem recomendações genéricas. Escreva como um memorando de comitê de investimentos: diagnóstico, evidência, cenário, risco, impacto, ação e gatilho de revisão. Use os dados disponíveis antes de classificar qualquer informação como insuficiente. Evite repetição: apresente o diagnóstico uma vez, use tabelas para consolidar números e deixe o plano de ação apenas para decisões. Use benchmarks quando benchmarkData trouxer retornos, fechamento atual ou taxa atual; quando IFIX tiver apenas fechamento atual, informe esse fechamento e diga que retornos acumulados ainda não estão disponíveis. Em valuation, separe patrimônio líquido de valor de mercado e não exiba dados patrimoniais com unidade duvidosa. Em rebalanceamento, substitua linguagem de compra por prioridade de novos aportes para diluição e gestão de concentração. Inclua bull case, bear case, ranking ajustado ao risco, red team e gatilhos de monitoramento sem inventar dados. Nunca exiba volatilidade em decimal bruto; traduza para linguagem de risco. Use "Visibilidade de governança" quando o problema for falta de dado. Revise a ortografia em português brasileiro antes de finalizar. Não use histórico de conversas ou informações externas aos dados acima.
+Produza um relatório específico, vendável pela clareza e confiabilidade, não pelo excesso de texto. Comece pelo que exige atenção agora. Preserve todos os cálculos determinísticos, trate dados inválidos como inválidos, diferencie fato de inferência e reduza a confiança quando faltarem evidências. Não invente inteligência operacional que não esteja nos dados. Não repita o mesmo diagnóstico em todas as seções.
 `.trim();
 }
 
