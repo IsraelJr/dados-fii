@@ -204,17 +204,10 @@ export default function Home() {
     const [macroContext, setMacroContext] = useState<MacroContextState | null>(() => getCachedMacroContext());
     const [loadingFII, setLoadingFII] = useState(false);
     const [isMarketOpen, setIsMarketOpen] = useState(false);
-    const [showLogin, setShowLogin] = useState(false);
     const [adsClosed, setAdsClosed] = useState(true);
 
     const closeAds = useCallback(() => {
         setAdsClosed(true);
-    }, []);
-
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            setShowLogin(window.location.hostname === "localhost");
-        }
     }, []);
 
     const fetchFII = async () => {
@@ -417,11 +410,9 @@ export default function Home() {
 
     return (
         <main className="font-sans">
-            {showLogin && (
-                <div className="fixed right-4 top-20 z-50">
-                    <Login />
-                </div>
-            )}
+            <div className="fixed right-4 top-20 z-50">
+                <Login />
+            </div>
 
             <section className="bg-gradient-to-b from-white to-slate-50 px-4 py-8 md:py-12">
                 <div className="mx-auto max-w-6xl">

@@ -617,7 +617,7 @@ function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
           {years.map((year) => {
             const hasData = snapshots.some((item) => getSnapshotYear(item) === year && (item.totalValue > 0 || item.estimatedMonthlyIncome > 0));
             return (
-              <button key={year} type="button" onClick={() => setSelectedYear(year)} className={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ${selectedYear === year ? "bg-indigo-600 text-white ring-indigo-600" : hasData ? "bg-white text-slate-700 ring-slate-300 hover:bg-indigo-50" : "bg-slate-50 text-slate-400 ring-slate-200"}`}>{year}</button>
+              <button key={year} type="button" onClick={() => setSelectedYear(year)} className={`rounded-full px-3 py-1.5 text-xs font-extrabold ring-1 ${selectedYear === year ? "bg-indigo-600 text-white ring-indigo-600" : hasData ? "bg-white text-slate-700 ring-slate-300 hover:bg-indigo-50" : "bg-slate-50 text-slate-600 ring-slate-300 hover:bg-slate-100"}`}>{year}</button>
             );
           })}
         </div>
@@ -785,7 +785,12 @@ function HistoryLineChart({ snapshots, getValue, emptyText }: { snapshots: Walle
   }).join(" ");
   return (
     <>
-      <div className="max-w-full overflow-x-auto">
+      <div
+        role="region"
+        aria-label="Gráfico histórico com rolagem horizontal"
+        tabIndex={0}
+        className="max-w-full overflow-x-auto focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+      >
         <svg viewBox={`0 0 ${width} 180`} className="h-56 min-w-full rounded-2xl bg-white ring-1 ring-slate-200" style={{ width }}>
           {snapshots.length > 1 && <polyline points={coords} fill="none" stroke="currentColor" strokeWidth="4" className="text-indigo-600" strokeLinecap="round" strokeLinejoin="round" />}
           {snapshots.map((item, index) => {
