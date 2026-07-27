@@ -37,7 +37,7 @@ test("login possui diálogo modal, validação compreensível e restauração de
   await expect(dialog).toBeVisible();
   await expect(page.getByLabel("E-mail")).toBeFocused();
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("email válido");
+  await expect(dialog.getByRole("alert")).toContainText("email válido");
   await expectNoHighImpactAccessibilityViolations(page);
 
   await page.keyboard.press("Escape");
