@@ -9,15 +9,17 @@ const REQUIRED_REPORT = `
 # Relatório de Risco da Carteira de FIIs
 ## Memorando executivo
 ## Qualidade dos dados analisados
+## Modo Gestor — decisões e prioridades
 ## Concentração e correlação econômica
 ## Sustentabilidade da renda
 ## Liquidez e risco de saída
-## Valuation e margem de segurança
+## Valuation e leitura patrimonial
+## Ranking relativo de resiliência
 ## Stress test e tail risks
 ## Plano de ação e gatilhos de monitoramento
 ## Heat map final
 ${"Análise baseada exclusivamente nos dados fornecidos. ".repeat(80)}
-`;
+Conteúdo informativo, sem recomendação de investimento.`;
 
 test("flags do relatório automático são fail-closed", () => {
   const automatic = process.env.ENABLE_WALLET_RISK_REPORT_AUTOMATIC;
@@ -66,17 +68,33 @@ test("relatório automático válido pode ser reutilizado no mesmo prompt", () =
   assert.equal(canReuseAutomaticReport(report, "future-version"), false);
 });
 
-test("validação exige relatório completo e gera instrução de reparo", () => {
+test("validação exige relatório comercial completo e gera instrução de reparo", () => {
   const valid = validateAutomaticRiskReportMarkdown(REQUIRED_REPORT);
   assert.equal(valid.ok, true);
+  assert.equal(valid.missingFooter, false);
+  assert.deepEqual(valid.forbiddenFindings, []);
 
-  const invalid = validateAutomaticRiskReportMarkdown("# Relatório curto\nPrompt completo para copiar");
+  const invalid = validateAutomaticRiskReportMarkdown("# Relatório curto\nPrompt completo para copiar\nFonte: brapi.dev\nNota de risco: 6,3");
   assert.equal(invalid.ok, false);
   assert.equal(invalid.manualPlaceholderDetected, true);
   assert.equal(invalid.tooShort, true);
+  assert.equal(invalid.missingFooter, true);
   assert.ok(invalid.missingHeadings.length > 0);
+  assert.ok(invalid.forbiddenFindings.some((item) => item.code === "technical_ifix_provider"));
+  assert.ok(invalid.forbiddenFindings.some((item) => item.code === "arbitrary_numeric_risk_score"));
 
   const repair = buildRiskReportRepairInstruction(invalid);
   assert.match(repair, /Reescreva o relatório completo/);
   assert.match(repair, /modo manual/);
+  assert.match(repair, /Dados FII como fonte pública do IFIX/);
+  assert.match(repair, /Conteúdo informativo, sem recomendação de investimento/);
+});
+
+test("validação bloqueia conclusões comerciais sem evidência", () => {
+  const invalid = REQUIRED_REPORT
+    .replace("Análise baseada", "Preço atrativo e margem positiva. Governança alta. Análise baseada");
+  const result = validateAutomaticRiskReportMarkdown(invalid);
+  assert.equal(result.ok, false);
+  assert.ok(result.forbiddenFindings.some((item) => item.code === "pvp_as_buy_signal"));
+  assert.ok(result.forbiddenFindings.some((item) => item.code === "governance_overclaim"));
 });
