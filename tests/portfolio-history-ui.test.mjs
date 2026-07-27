@@ -30,6 +30,24 @@ test("histórico manual está integrado à página da carteira", () => {
   assert.match(preferences, /<PortfolioHistoryPanel \/>/);
 });
 
+test("telemetria registra apenas nomes allowlistados e não envia valores financeiros", () => {
+  const panel = text("src/app/components/PortfolioHistoryPanel.tsx");
+  const contract = text("src/lib/product/ProductEvent.ts");
+  const controller = text("src/server/controllers/ProductEventController.ts");
+  assert.match(panel, /\/api\/product\/events/);
+  for (const event of [
+    "portfolio_viewed",
+    "history_month_added",
+    "history_month_updated",
+    "history_month_deleted",
+  ]) {
+    assert.match(panel, new RegExp(event));
+    assert.match(contract, new RegExp(event));
+  }
+  assert.match(panel, /JSON\.stringify\(\{ name \}\)/);
+  assert.doesNotMatch(controller, /totalValue|dividends|ticker|email\s*:/);
+});
+
 test("interface não contém e-mail pessoal nem desbloqueio por anúncio", () => {
   const source = [
     text("src/app/components/PortfolioHistoryPanel.tsx"),
