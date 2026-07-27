@@ -1,7 +1,7 @@
 import type {
   PortfolioHistoryCompetence,
   PortfolioHistoryEntry,
-} from "./PortfolioHistory.ts";
+} from "./PortfolioHistory";
 
 export type PortfolioOwnerId = string;
 
