@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 10
     environment: production
     env:
-      PRODUCTION_ORIGIN: https://dadosfii.com.br
+      PRODUCTION_ORIGIN: https://www.dadosfii.com.br
       RELEASE_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.event.sha }}
     steps:
       - name: Validate release identifier
@@ -59,14 +59,14 @@ jobs:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
-          http_code=$(curl --silent --show-error --location --max-time 300 \
+          http_code=$(curl --silent --show-error --max-time 300 \
             --output premium-production-smoke.json --write-out "%{http_code}" \
             --request POST \
             --header "Authorization: Bearer ${OIDC_TOKEN}" \
             --header "Content-Type: application/json" \
             "${PRODUCTION_ORIGIN}/api/internal/production-premium-smoke")
           if [[ "$http_code" != "200" ]]; then
-            jq '{ok, evidence: {status: .evidence.status, blocker: .evidence.blocker, checks: .evidence.checks}}' premium-production-smoke.json || true
+            jq '{ok, error, evidence: {status: .evidence.status, blocker: .evidence.blocker, checks: .evidence.checks}}' premium-production-smoke.json || true
             exit 1
           fi
           jq -e --arg release "$RELEASE_COMMIT" '
@@ -122,7 +122,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: premium-production-smoke-${{ inputs.release_sha }}
+          name: premium-production-smoke-${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.event.sha }}
           path: premium-production-smoke.json
           if-no-files-found: error
           retention-days: 7
