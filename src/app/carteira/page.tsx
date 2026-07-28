@@ -739,8 +739,8 @@ function SimpleMonthlySummary({ insights, historicalStats, topWeight, topWeightP
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearBest ? `${getSnapshotMonthLabel(historicalStats.currentYearBest)}: ${formatCurrency(historicalStats.currentYearBest.estimatedMonthlyIncome)}` : "-"} />
         <LightMetric label={`Menor mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearWorst ? `${getSnapshotMonthLabel(historicalStats.currentYearWorst)}: ${formatCurrency(historicalStats.currentYearWorst.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label={`Total em ${historicalStats.currentYear}`} value={formatCurrency(historicalStats.currentYearTotal)} />
-        <LightMetric label={`Média mensal em ${historicalStats.currentYear}`} value={formatCurrency(historicalStats.currentYearAverage)} />
+        <LightMetric label="Total no ano" value={formatCurrency(historicalStats.currentYearTotal)} />
+        <LightMetric label="Média mensal" value={formatCurrency(historicalStats.currentYearAverage)} />
         <LightMetric label="Maior mês do histórico" value={historicalStats.allTimeBest ? `${historicalStats.allTimeBest.label}: ${formatCurrency(historicalStats.allTimeBest.estimatedMonthlyIncome)}` : "-"} />
         <LightMetric label="Menor mês do histórico" value={historicalStats.allTimeWorst ? `${historicalStats.allTimeWorst.label}: ${formatCurrency(historicalStats.allTimeWorst.estimatedMonthlyIncome)}` : "-"} />
         <LightMetric label="Maior ano de dividendos" value={historicalStats.bestYear ? `${historicalStats.bestYear.year}: ${formatCurrency(historicalStats.bestYear.total)}` : "-"} />
