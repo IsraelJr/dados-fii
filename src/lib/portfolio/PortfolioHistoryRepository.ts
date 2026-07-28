@@ -20,21 +20,29 @@ export interface PortfolioHistoryRepository {
   deleteManual(key: PortfolioHistoryKey): Promise<void>;
 }
 
-export function portfolioHistoryDocumentId(key: PortfolioHistoryKey): string {
+function normalizedKey(key: PortfolioHistoryKey) {
   const ownerId = String(key.ownerId || "").trim();
   const portfolioId = String(key.portfolioId || "").trim();
   const competence = String(key.competence || "").trim();
 
-  if (!ownerId || ownerId.length > 512) {
-    throw new Error("INVALID_OWNER_ID");
-  }
-  if (!/^[A-Za-z0-9_-]{1,80}$/.test(portfolioId)) {
-    throw new Error("INVALID_PORTFOLIO_ID");
-  }
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(competence)) {
-    throw new Error("INVALID_COMPETENCE");
-  }
+  if (!ownerId || ownerId.length > 512) throw new Error("INVALID_OWNER_ID");
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(portfolioId)) throw new Error("INVALID_PORTFOLIO_ID");
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(competence)) throw new Error("INVALID_COMPETENCE");
 
-  const ownerHash = createHash("sha256").update(ownerId, "utf8").digest("hex");
+  return {
+    ownerHash: createHash("sha256").update(ownerId, "utf8").digest("hex"),
+    portfolioId,
+    competence,
+  };
+}
+
+// Mantido para o repositório em memória e compatibilidade de testes.
+export function portfolioHistoryDocumentId(key: PortfolioHistoryKey): string {
+  const { ownerHash, portfolioId, competence } = normalizedKey(key);
   return `${ownerHash}__${portfolioId}__${competence}`;
+}
+
+export function portfolioHistoryAnnualDocumentId(key: PortfolioHistoryKey): string {
+  const { ownerHash, portfolioId, competence } = normalizedKey(key);
+  return `${ownerHash}__${portfolioId}__${competence.slice(0, 4)}`;
 }
