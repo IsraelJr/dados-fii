@@ -37,6 +37,12 @@ test("repository server-side é a única camada do histórico que importa Firest
   assert.doesNotMatch(service, /firebaseAdmin|adminDb|\.collection\(/);
 });
 
+test("listagem do histórico não depende de índice composto implantado separadamente", () => {
+  const repository = text("src/server/repositories/FirestorePortfolioHistoryRepository.ts");
+  assert.doesNotMatch(repository, /\.orderBy\("competence"/);
+  assert.match(repository, /localeCompare\(right\.competence\)/);
+});
+
 test("identidade por e-mail exige sessão validada e cookie anônimo exige usuário existente", () => {
   const body = text("src/server/auth/WalletIdentityResolver.ts");
   assert.match(body, /WalletSessions/);

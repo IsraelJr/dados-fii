@@ -20,13 +20,13 @@ test("isola histórico por owner mesmo com carteira e competência iguais", asyn
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: "R$ 10.000,00",
+    dividends: "R$ 100,00",
   });
   await context.service.createManual({ ownerId: "user-b" }, {
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: "R$ 20.000,00",
+    dividends: "R$ 200,00",
   });
 
   const userA = await context.service.list({ ownerId: "user-a" }, "default");
@@ -34,8 +34,10 @@ test("isola histórico por owner mesmo com carteira e competência iguais", asyn
 
   assert.equal(userA.length, 1);
   assert.equal(userB.length, 1);
-  assert.equal(userA[0].totalValue, 10000);
-  assert.equal(userB[0].totalValue, 20000);
+  assert.equal(userA[0].totalValue, null);
+  assert.equal(userB[0].totalValue, null);
+  assert.equal(userA[0].dividends, 100);
+  assert.equal(userB[0].dividends, 200);
 });
 
 test("rejeita duplicidade na mesma competência e owner", async () => {
@@ -54,23 +56,23 @@ test("rejeita duplicidade na mesma competência e owner", async () => {
   );
 });
 
-test("atualiza somente registro manual e preserva createdAt", async () => {
+test("atualiza somente dividendos e preserva createdAt", async () => {
   const context = service();
   const created = await context.service.createManual({ ownerId: "user-a" }, {
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: "10.000,00",
+    dividends: "100,00",
   });
 
   const updated = await context.service.updateManual(
     { ownerId: "user-a" },
     created,
-    { totalValue: "11.500,50", dividends: "120,00" },
+    { dividends: "120,00" },
   );
 
   assert.equal(updated.createdAt, created.createdAt);
-  assert.equal(updated.totalValue, 11500.5);
+  assert.equal(updated.totalValue, null);
   assert.equal(updated.dividends, 120);
   const stored = await context.service.list({ ownerId: "user-a" }, "default");
   assert.deepEqual(stored, [updated]);
@@ -82,14 +84,14 @@ test("não permite usar owner diferente para editar registro de outro usuário",
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: 10000,
+    dividends: 100,
   });
 
   await assert.rejects(
     context.service.updateManual(
       { ownerId: "user-b" },
       created,
-      { totalValue: 1 },
+      { dividends: 1 },
     ),
     /HISTORY_ENTRY_NOT_FOUND/,
   );
@@ -120,13 +122,13 @@ test("exclui registro manual sem afetar outro owner", async () => {
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: 10000,
+    dividends: 100,
   });
   await context.service.createManual({ ownerId: "user-b" }, {
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: 20000,
+    dividends: 200,
   });
 
   await context.service.deleteManual({ ownerId: "user-a" }, userA);

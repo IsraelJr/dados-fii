@@ -42,12 +42,11 @@ test("normaliza moeda pt-BR sem converter erro em zero", () => {
   expectCode(() => parseOptionalMoney(-1), "INVALID_MONEY");
 });
 
-test("cria registro manual do ano corrente com proveniência e timestamps", () => {
+test("cria registro manual apenas com dividendos e patrimônio nulo", () => {
   const entry = createManualPortfolioHistoryEntry({
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: "R$ 10.500,25",
     dividends: "125,40",
   }, NOW);
 
@@ -55,7 +54,7 @@ test("cria registro manual do ano corrente com proveniência e timestamps", () =
     schemaVersion: 1,
     portfolioId: "default",
     competence: "2026-06",
-    totalValue: 10500.25,
+    totalValue: null,
     dividends: 125.4,
     source: "manual",
     createdAt: NOW.toISOString(),
@@ -64,30 +63,31 @@ test("cria registro manual do ano corrente com proveniência e timestamps", () =
   assert.equal(Object.isFrozen(entry), true);
 });
 
-test("aceita zero válido e preserva ausência", () => {
+test("aceita dividendo zero como valor válido", () => {
   const entry = createManualPortfolioHistoryEntry({
     portfolioId: "default",
     year: 2026,
     month: 7,
-    totalValue: 0,
+    dividends: 0,
   }, NOW);
 
-  assert.equal(entry.totalValue, 0);
-  assert.equal(entry.dividends, null);
+  assert.equal(entry.totalValue, null);
+  assert.equal(entry.dividends, 0);
 });
 
-test("rejeita competência futura e entrada vazia", () => {
+test("rejeita competência futura e ausência de dividendos", () => {
   expectCode(() => createManualPortfolioHistoryEntry({
     portfolioId: "default",
     year: 2026,
     month: 8,
-    totalValue: 100,
+    dividends: 100,
   }, NOW), "FUTURE_COMPETENCE");
 
   expectCode(() => createManualPortfolioHistoryEntry({
     portfolioId: "default",
     year: 2026,
     month: 7,
+    dividends: "",
   }, NOW), "EMPTY_ENTRY");
 });
 
@@ -96,7 +96,7 @@ test("rejeita identificador de carteira inválido", () => {
     portfolioId: "../other-user",
     year: 2026,
     month: 7,
-    totalValue: 100,
+    dividends: 100,
   }, NOW), "INVALID_PORTFOLIO_ID");
 });
 
@@ -105,7 +105,7 @@ test("detecta duplicidade manual e conflito com snapshot", () => {
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: 100,
+    dividends: 100,
   }, NOW);
 
   assert.deepEqual(detectPortfolioHistoryConflict(manual, manual), {
@@ -118,6 +118,7 @@ test("detecta duplicidade manual e conflito com snapshot", () => {
   const snapshot: PortfolioHistoryEntry = {
     ...manual,
     source: "automatic_snapshot",
+    totalValue: 10000,
   };
   assert.deepEqual(detectPortfolioHistoryConflict(snapshot, manual), {
     competence: "2026-06",
@@ -132,7 +133,7 @@ test("insere ordenado e falha fechado em duplicidade", () => {
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: 100,
+    dividends: 100,
   }, NOW);
   const may = createManualPortfolioHistoryEntry({
     portfolioId: "default",
@@ -152,7 +153,7 @@ test("somente registro manual pode ser editado ou excluído", () => {
     portfolioId: "default",
     year: 2026,
     month: 6,
-    totalValue: 100,
+    dividends: 100,
   }, NOW);
   assert.doesNotThrow(() => assertCanEditPortfolioHistory(manual));
 

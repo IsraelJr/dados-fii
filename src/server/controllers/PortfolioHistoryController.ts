@@ -53,7 +53,6 @@ export async function POST(request: Request) {
       portfolioId: portfolioIdFrom(request, body),
       year: body.year,
       month: body.month,
-      totalValue: body.totalValue,
       dividends: body.dividends,
     });
     return NextResponse.json({ ok: true, entry }, { status: 201 });
@@ -74,7 +73,7 @@ export async function PATCH(request: Request) {
     const entry = await service.updateManual(
       { ownerId: identity.ownerId },
       current,
-      { totalValue: body.totalValue, dividends: body.dividends },
+      { dividends: body.dividends },
     );
     return NextResponse.json({ ok: true, entry });
   } catch (error) {
