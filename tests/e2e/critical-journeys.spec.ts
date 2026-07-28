@@ -118,6 +118,7 @@ test("histórico manual permite incluir, sobrescrever, excluir e sincronizar div
 
   await page.goto("/carteira");
   const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
+  const chips = history.getByLabel("Meses informados no histórico");
   await expect(history.getByRole("heading", { name: "Complete seu histórico de dividendos" })).toBeVisible();
   await expect(history.getByLabel("Patrimônio do mês")).toHaveCount(0);
   await expect(history.getByLabel("Ano do histórico")).toBeDisabled();
@@ -125,7 +126,7 @@ test("histórico manual permite incluir, sobrescrever, excluir e sincronizar div
   await history.getByLabel("Mês do histórico").selectOption("1");
   await history.getByLabel("Dividendos recebidos no mês").fill("120,00");
   await history.getByRole("button", { name: "Salvar mês" }).click();
-  await expect(history.getByText("R$ 120,00")).toBeVisible();
+  await expect(chips.getByText("R$ 120,00", { exact: true })).toBeVisible();
   await expect(page.locator("svg text", { hasText: "R$ 120" })).toBeVisible();
 
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
@@ -134,14 +135,14 @@ test("histórico manual permite incluir, sobrescrever, excluir e sincronizar div
   await history.getByLabel("Mês do histórico").selectOption("1");
   await history.getByLabel("Dividendos recebidos no mês").fill("130,00");
   await history.getByRole("button", { name: "Salvar mês" }).click();
-  await expect(history.getByText("R$ 130,00")).toBeVisible();
+  await expect(chips.getByText("R$ 130,00", { exact: true })).toBeVisible();
   await expect(page.locator("svg text", { hasText: "R$ 130" })).toBeVisible();
 
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   await expect.poll(() => mutationMethods).toContain("PATCH");
 
   await history.getByRole("button", { name: /Excluir/ }).click();
-  await expect(history.getByText("R$ 130,00")).toHaveCount(0);
+  await expect(chips.getByText("R$ 130,00", { exact: true })).toHaveCount(0);
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   await expect.poll(() => mutationMethods).toContain("DELETE");
 
