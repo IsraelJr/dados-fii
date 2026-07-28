@@ -1,0 +1,45 @@
+name: Patch header contrast
+
+on:
+  push:
+    branches:
+      - fix/history-source-sync
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[header-contrast-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/history-source-sync
+      - name: Fix header subtitle contrast
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          matched = []
+          for path in Path('src').rglob('*.tsx'):
+              text = path.read_text()
+              lines = text.splitlines()
+              changed = False
+              for index, line in enumerate(lines):
+                  if 'Fundos imobiliários' in line and 'text-slate-500' in line:
+                      lines[index] = line.replace('text-slate-500', 'text-slate-600')
+                      changed = True
+              if changed:
+                  path.write_text('\n'.join(lines) + ('\n' if text.endswith('\n') else ''))
+                  matched.append(str(path))
+          if not matched:
+              raise SystemExit('Cabeçalho com contraste insuficiente não encontrado')
+          print('\n'.join(matched))
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src
+          git commit -m "fix: aumenta contraste do subtítulo do cabeçalho [header-contrast-patched]"
+          git push origin HEAD:fix/history-source-sync
