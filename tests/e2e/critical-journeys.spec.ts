@@ -119,13 +119,17 @@ test("histórico manual permite incluir, editar e excluir dividendos sem patrim�
   await history.getByLabel("Ano do histórico").fill(String(currentYear));
   await history.getByLabel("Mês do histórico").selectOption("1");
   await history.getByLabel("Dividendos recebidos no mês").fill("120,00");
-  await history.getByRole("button", { name: "Adicionar" }).click();
+  await history.getByRole("button", { name: "Salvar mês" }).click();
   await expect(history.getByText("R$ 120,00")).toBeVisible();
+  const evolution = page.getByRole("heading", { name: "Patrimônio e dividendos por ano" }).locator("..").locator("..");
+  await expect(evolution.getByText("R$ 120,00")).toBeVisible();
+  await expect(page.getByText("Total no ano").locator("..")).toContainText("R$ 120,00");
 
   await history.getByRole("button", { name: /Editar/ }).click();
   await history.getByLabel("Dividendos recebidos no mês").fill("130,00");
   await history.getByRole("button", { name: "Salvar" }).click();
   await expect(history.getByText("R$ 130,00")).toBeVisible();
+  await expect(evolution.getByText("R$ 130,00")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await history.getByRole("button", { name: /Excluir/ }).click();
