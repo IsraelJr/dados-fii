@@ -89,7 +89,7 @@ export class PortfolioHistoryService {
   async updateManual(
     actor: PortfolioActor,
     current: PortfolioHistoryEntry,
-    values: Readonly<{ totalValue?: unknown; dividends?: unknown }>,
+    values: Readonly<{ dividends: unknown }>,
   ): Promise<PortfolioHistoryEntry> {
     assertCanEditPortfolioHistory(current);
     const now = this.clock();
@@ -98,7 +98,6 @@ export class PortfolioHistoryService {
       portfolioId: current.portfolioId,
       year,
       month,
-      totalValue: values.totalValue,
       dividends: values.dividends,
     }, now);
     const updated = Object.freeze({
