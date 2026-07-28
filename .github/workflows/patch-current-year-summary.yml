@@ -1,0 +1,80 @@
+name: Patch current year summary
+
+on:
+  push:
+    branches:
+      - fix/current-year-summary-source
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[summary-source-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/current-year-summary-source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patch summary source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/carteira/page.tsx')
+          s = p.read_text()
+          old = '''function SimpleMonthlySummary({ insights, historicalStats, topWeight, topWeightPercent }: { insights: WalletInsights; historicalStats: HistoricalDividendStats; topWeight?: EnrichedFii; topWeightPercent: number }) {
+  const history = insights.dividendHistory;
+  return ('''
+          new = '''function SimpleMonthlySummary({ insights, historicalStats, topWeight, topWeightPercent }: { insights: WalletInsights; historicalStats: HistoricalDividendStats; topWeight?: EnrichedFii; topWeightPercent: number }) {
+  const history = insights.dividendHistory;
+  const currentYearBest = history.best;
+  const currentYearWorst = history.worst;
+  const currentYearTotal = history.total;
+  const currentYearAverage = history.average;
+  const historicalBestValue = historicalStats.allTimeBest?.estimatedMonthlyIncome ?? 0;
+  const historicalWorstValue = historicalStats.allTimeWorst?.estimatedMonthlyIncome ?? Number.POSITIVE_INFINITY;
+  const allTimeBest = currentYearBest && currentYearBest.value >= historicalBestValue
+    ? { label: `${currentYearBest.label}/${String(historicalStats.currentYear).slice(-2)}`, value: currentYearBest.value }
+    : historicalStats.allTimeBest
+      ? { label: historicalStats.allTimeBest.label, value: historicalStats.allTimeBest.estimatedMonthlyIncome }
+      : null;
+  const allTimeWorst = currentYearWorst && currentYearWorst.value <= historicalWorstValue
+    ? { label: `${currentYearWorst.label}/${String(historicalStats.currentYear).slice(-2)}`, value: currentYearWorst.value }
+    : historicalStats.allTimeWorst
+      ? { label: historicalStats.allTimeWorst.label, value: historicalStats.allTimeWorst.estimatedMonthlyIncome }
+      : null;
+  const bestYear = !historicalStats.bestYear || currentYearTotal >= historicalStats.bestYear.total
+    ? { year: historicalStats.currentYear, total: currentYearTotal }
+    : historicalStats.bestYear;
+  return ('''
+          if old not in s:
+              raise SystemExit('summary function anchor not found')
+          s = s.replace(old, new, 1)
+          old_metrics = '''<LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearBest ? `${getSnapshotMonthLabel(historicalStats.currentYearBest)}: ${formatCurrency(historicalStats.currentYearBest.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label={`Menor mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearWorst ? `${getSnapshotMonthLabel(historicalStats.currentYearWorst)}: ${formatCurrency(historicalStats.currentYearWorst.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Total no ano" value={formatCurrency(historicalStats.currentYearTotal)} />
+        <LightMetric label="Média mensal" value={formatCurrency(historicalStats.currentYearAverage)} />
+        <LightMetric label="Maior mês do histórico" value={historicalStats.allTimeBest ? `${historicalStats.allTimeBest.label}: ${formatCurrency(historicalStats.allTimeBest.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Menor mês do histórico" value={historicalStats.allTimeWorst ? `${historicalStats.allTimeWorst.label}: ${formatCurrency(historicalStats.allTimeWorst.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Maior ano de dividendos" value={historicalStats.bestYear ? `${historicalStats.bestYear.year}: ${formatCurrency(historicalStats.bestYear.total)}` : "-"} />'''
+          new_metrics = '''<LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={currentYearBest ? `${currentYearBest.label}: ${formatCurrency(currentYearBest.value)}` : "-"} />
+        <LightMetric label={`Menor mês de ${historicalStats.currentYear}`} value={currentYearWorst ? `${currentYearWorst.label}: ${formatCurrency(currentYearWorst.value)}` : "-"} />
+        <LightMetric label="Total no ano" value={formatCurrency(currentYearTotal)} />
+        <LightMetric label="Média mensal" value={formatCurrency(currentYearAverage)} />
+        <LightMetric label="Maior mês do histórico" value={allTimeBest ? `${allTimeBest.label}: ${formatCurrency(allTimeBest.value)}` : "-"} />
+        <LightMetric label="Menor mês do histórico" value={allTimeWorst ? `${allTimeWorst.label}: ${formatCurrency(allTimeWorst.value)}` : "-"} />
+        <LightMetric label="Maior ano de dividendos" value={bestYear ? `${bestYear.year}: ${formatCurrency(bestYear.total)}` : "-"} />'''
+          if old_metrics not in s:
+              raise SystemExit('summary metrics anchor not found')
+          p.write_text(s.replace(old_metrics, new_metrics, 1))
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/app/carteira/page.tsx
+          git commit -m 'fix: unify current-year summary with chart source [summary-source-patched]'
+          git push origin HEAD:fix/current-year-summary-source
