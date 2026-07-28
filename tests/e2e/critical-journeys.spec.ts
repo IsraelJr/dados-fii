@@ -64,7 +64,7 @@ test("carteira adiciona um fundo, persiste localmente e permanece acessível", a
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
-test("histórico manual permite incluir, editar e excluir sem enviar dados financeiros à telemetria", async ({ page }) => {
+test("histórico manual permite incluir, editar e excluir dividendos sem patrimônio estimado", async ({ page }) => {
   const currentYear = new Date().getFullYear();
   const entries: Array<Record<string, unknown>> = [];
   const trackedBodies: unknown[] = [];
@@ -87,12 +87,13 @@ test("histórico manual permite incluir, editar e excluir sem enviar dados finan
     }
     const body = route.request().postDataJSON() as Record<string, unknown>;
     if (method === "POST") {
+      expect(body).not.toHaveProperty("totalValue");
       const competence = `${body.year}-${String(body.month).padStart(2, "0")}`;
       entries.splice(0, entries.length, {
         schemaVersion: 1,
         portfolioId: "default",
         competence,
-        totalValue: 10000,
+        totalValue: null,
         dividends: 120,
         source: "manual",
         createdAt: new Date().toISOString(),
@@ -102,7 +103,8 @@ test("histórico manual permite incluir, editar e excluir sem enviar dados finan
       return;
     }
     if (method === "PATCH") {
-      entries[0] = { ...entries[0], totalValue: 11000, dividends: 130, updatedAt: new Date().toISOString() };
+      expect(body).not.toHaveProperty("totalValue");
+      entries[0] = { ...entries[0], dividends: 130, updatedAt: new Date().toISOString() };
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entry: entries[0] }) });
       return;
     }
@@ -112,25 +114,22 @@ test("histórico manual permite incluir, editar e excluir sem enviar dados finan
 
   await page.goto("/carteira");
   const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
-  await expect(history.getByRole("heading", { name: "Complete seu histórico" })).toBeVisible();
+  await expect(history.getByRole("heading", { name: "Complete seu histórico de dividendos" })).toBeVisible();
+  await expect(history.getByLabel("Patrimônio do mês")).toHaveCount(0);
   await history.getByLabel("Ano do histórico").fill(String(currentYear));
   await history.getByLabel("Mês do histórico").selectOption("1");
-  await history.getByLabel("Patrimônio do mês").fill("10.000,00");
-  await history.getByLabel("Dividendos do mês").fill("120,00");
+  await history.getByLabel("Dividendos recebidos no mês").fill("120,00");
   await history.getByRole("button", { name: "Adicionar" }).click();
-  await expect(history.getByText("R$ 10.000,00")).toBeVisible();
   await expect(history.getByText("R$ 120,00")).toBeVisible();
 
   await history.getByRole("button", { name: /Editar/ }).click();
-  await history.getByLabel("Patrimônio do mês").fill("11.000,00");
-  await history.getByLabel("Dividendos do mês").fill("130,00");
+  await history.getByLabel("Dividendos recebidos no mês").fill("130,00");
   await history.getByRole("button", { name: "Salvar" }).click();
-  await expect(history.getByText("R$ 11.000,00")).toBeVisible();
   await expect(history.getByText("R$ 130,00")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await history.getByRole("button", { name: /Excluir/ }).click();
-  await expect(history.getByText("Nenhum mês informado no ano corrente.")).toBeVisible();
+  await expect(history.getByText("Nenhum dividendo informado no ano corrente.")).toBeVisible();
 
   await expect.poll(() => trackedBodies.length).toBeGreaterThanOrEqual(4);
   for (const body of trackedBodies) expect(Object.keys(body as Record<string, unknown>)).toEqual(["name"]);
