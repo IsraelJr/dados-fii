@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare:summary-source": "node scripts/apply-current-year-summary-source.mjs",
+    "predev": "npm run prepare:summary-source",
     "dev": "next dev --turbopack",
+    "prebuild": "npm run prepare:summary-source",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
