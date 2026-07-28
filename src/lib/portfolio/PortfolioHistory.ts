@@ -22,8 +22,7 @@ export type ManualPortfolioHistoryInput = Readonly<{
   portfolioId: string;
   year: unknown;
   month: unknown;
-  totalValue?: unknown;
-  dividends?: unknown;
+  dividends: unknown;
 }>;
 
 export type PortfolioHistoryConflict = Readonly<{
@@ -141,12 +140,11 @@ export function createManualPortfolioHistoryEntry(
     );
   }
 
-  const totalValue = parseOptionalMoney(input.totalValue);
   const dividends = parseOptionalMoney(input.dividends);
-  if (totalValue === null && dividends === null) {
+  if (dividends === null) {
     throw new PortfolioHistoryValidationError(
       "EMPTY_ENTRY",
-      "Informe patrimônio, dividendos ou ambos.",
+      "Informe o total de dividendos recebidos no mês.",
     );
   }
 
@@ -155,7 +153,7 @@ export function createManualPortfolioHistoryEntry(
     schemaVersion: PORTFOLIO_HISTORY_SCHEMA_VERSION,
     portfolioId,
     competence,
-    totalValue,
+    totalValue: null,
     dividends,
     source: "manual" as const,
     createdAt: timestamp,
