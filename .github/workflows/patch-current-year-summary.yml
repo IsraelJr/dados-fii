@@ -53,19 +53,23 @@ jobs:
           if old not in s:
               raise SystemExit('summary function anchor not found')
           s = s.replace(old, new, 1)
-          s = s.replace('''<LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearBest ? `${getSnapshotMonthLabel(historicalStats.currentYearBest)}: ${formatCurrency(historicalStats.currentYearBest.estimatedMonthlyIncome)}` : "-"} />
+          old_metrics = '''<LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearBest ? `${getSnapshotMonthLabel(historicalStats.currentYearBest)}: ${formatCurrency(historicalStats.currentYearBest.estimatedMonthlyIncome)}` : "-"} />
         <LightMetric label={`Menor mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearWorst ? `${getSnapshotMonthLabel(historicalStats.currentYearWorst)}: ${formatCurrency(historicalStats.currentYearWorst.estimatedMonthlyIncome)}` : "-"} />
         <LightMetric label="Total no ano" value={formatCurrency(historicalStats.currentYearTotal)} />
         <LightMetric label="Média mensal" value={formatCurrency(historicalStats.currentYearAverage)} />
         <LightMetric label="Maior mês do histórico" value={historicalStats.allTimeBest ? `${historicalStats.allTimeBest.label}: ${formatCurrency(historicalStats.allTimeBest.estimatedMonthlyIncome)}` : "-"} />
         <LightMetric label="Menor mês do histórico" value={historicalStats.allTimeWorst ? `${historicalStats.allTimeWorst.label}: ${formatCurrency(historicalStats.allTimeWorst.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label="Maior ano de dividendos" value={historicalStats.bestYear ? `${historicalStats.bestYear.year}: ${formatCurrency(historicalStats.bestYear.total)}` : "-"} />''', '''<LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={currentYearBest ? `${currentYearBest.label}: ${formatCurrency(currentYearBest.value)}` : "-"} />
+        <LightMetric label="Maior ano de dividendos" value={historicalStats.bestYear ? `${historicalStats.bestYear.year}: ${formatCurrency(historicalStats.bestYear.total)}` : "-"} />'''
+          new_metrics = '''<LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={currentYearBest ? `${currentYearBest.label}: ${formatCurrency(currentYearBest.value)}` : "-"} />
         <LightMetric label={`Menor mês de ${historicalStats.currentYear}`} value={currentYearWorst ? `${currentYearWorst.label}: ${formatCurrency(currentYearWorst.value)}` : "-"} />
         <LightMetric label="Total no ano" value={formatCurrency(currentYearTotal)} />
         <LightMetric label="Média mensal" value={formatCurrency(currentYearAverage)} />
         <LightMetric label="Maior mês do histórico" value={allTimeBest ? `${allTimeBest.label}: ${formatCurrency(allTimeBest.value)}` : "-"} />
         <LightMetric label="Menor mês do histórico" value={allTimeWorst ? `${allTimeWorst.label}: ${formatCurrency(allTimeWorst.value)}` : "-"} />
-        <LightMetric label="Maior ano de dividendos" value={bestYear ? `${bestYear.year}: ${formatCurrency(bestYear.total)}` : "-"} />''', 1)
+        <LightMetric label="Maior ano de dividendos" value={bestYear ? `${bestYear.year}: ${formatCurrency(bestYear.total)}` : "-"} />'''
+          if old_metrics not in s:
+              raise SystemExit('summary metrics anchor not found')
+          s = s.replace(old_metrics, new_metrics, 1)
           p.write_text(s)
           PY
       - name: Commit patch
