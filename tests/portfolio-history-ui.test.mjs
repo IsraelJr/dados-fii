@@ -14,20 +14,32 @@ test("painel de histórico usa API server-side e não Firestore", () => {
   assert.doesNotMatch(source, /firebaseAdmin|adminDb|\.collection\(/);
 });
 
-test("painel permite criar, editar e excluir somente registros manuais", () => {
+test("painel permite incluir, sobrescrever e excluir registros manuais", () => {
   const source = text("src/app/components/PortfolioHistoryPanel.tsx");
   assert.match(source, /api\("POST"/);
   assert.match(source, /api\("PATCH"/);
   assert.match(source, /api\("DELETE"/);
   assert.match(source, /entry\.source !== "manual"/);
-  assert.match(source, /Snapshot automático/);
-  assert.match(source, /Registro legado/);
+  assert.match(source, /pendingRef/);
+  assert.match(source, /Meses informados/);
+  assert.match(source, /Salvar mês/);
 });
 
 test("histórico manual está integrado à página da carteira", () => {
   const preferences = text("src/app/components/PortfolioNotificationPreferences.tsx");
   assert.match(preferences, /PortfolioHistoryPanel/);
   assert.match(preferences, /<PortfolioHistoryPanel \/>/);
+});
+
+test("sincronização cobre saída, background, congelamento e retorno online", () => {
+  const panel = text("src/app/components/PortfolioHistoryPanel.tsx");
+  const preferences = text("src/app/components/PortfolioNotificationPreferences.tsx");
+  assert.match(panel, /pagehide/);
+  assert.match(panel, /keepalive/);
+  assert.match(preferences, /visibilitychange/);
+  assert.match(preferences, /visibilityState === "hidden"/);
+  assert.match(preferences, /"freeze"/);
+  assert.match(preferences, /"online"/);
 });
 
 test("telemetria registra apenas nomes allowlistados e não envia valores financeiros", () => {
