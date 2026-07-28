@@ -80,3 +80,4 @@ jobs:
           git add src/app/carteira/page.tsx
           git commit -m 'fix: unify current-year summary with chart source'
           git push origin HEAD:fix/current-year-summary-source
+# trigger
