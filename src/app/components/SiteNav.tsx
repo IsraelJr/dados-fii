@@ -16,7 +16,7 @@ export default function SiteNav() {
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <Link href="/" className="flex items-center gap-2 font-extrabold text-slate-900" aria-label="Dados FII - Início">
           <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm"><BarChart3 size={20} /></span>
-          <span className="leading-tight">Dados FII<span className="block text-xs font-bold text-slate-500">Fundos imobiliários</span></span>
+          <span className="leading-tight">Dados FII<span className="block text-xs font-bold text-slate-600">Fundos imobiliários</span></span>
         </Link>
         <div className="flex items-center gap-1 overflow-x-auto rounded-full bg-slate-100 p-1">
           {links.map(({ href, label, icon: Icon }) => (
