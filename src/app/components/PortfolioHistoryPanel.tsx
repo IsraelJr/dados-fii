@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Loader2, Pencil, Save, Trash2, X } from "lucide-react";
+import { Loader2, Save, Trash2 } from "lucide-react";
+import AppToast from "./AppToast";
 
 type HistorySource = "manual" | "automatic_snapshot" | "legacy";
 type ProductEventName = "portfolio_viewed" | "history_month_added" | "history_month_updated" | "history_month_deleted";
@@ -17,6 +18,11 @@ type HistoryEntry = Readonly<{
   updatedAt: string;
 }>;
 
+type PendingHistory = Readonly<{
+  upserts: Record<string, HistoryEntry>;
+  deletes: string[];
+}>;
+
 type FormState = {
   year: string;
   month: string;
@@ -25,27 +31,52 @@ type FormState = {
 
 const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
+const PENDING_KEY = "dados-fii-portfolio-history-pending-v2";
 const PORTFOLIO_ID = "default";
 const HISTORY_UPDATED_EVENT = "dados-fii-portfolio-history-updated";
-const EMPTY_FORM: FormState = {
-  year: String(new Date().getFullYear()),
-  month: String(Math.max(1, new Date().getMonth())),
-  dividends: "",
-};
+const SYNC_DELAY_MS = 8_000;
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+] as const;
+
+function currentYear() {
+  return new Date().getFullYear();
+}
+
+function lastClosedMonth() {
+  return new Date().getMonth();
+}
+
+function firstAvailableMonth() {
+  return String(Math.max(1, lastClosedMonth()));
+}
+
+function emptyForm(): FormState {
+  return {
+    year: String(currentYear()),
+    month: firstAvailableMonth(),
+    dividends: "",
+  };
+}
 
 function currency(value: number | null) {
   return value === null ? "Não informado" : value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function monthLabel(competence: string) {
-  const [year, month] = competence.split("-").map(Number);
-  return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(year, month - 1, 1));
+function parseCurrencyInput(value: string) {
+  const normalized = value.replace(/\s/g, "").replace("R$", "").replace(/\./g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-function sourceLabel(source: HistorySource) {
-  if (source === "manual") return "Informado por você";
-  if (source === "automatic_snapshot") return "Snapshot automático";
-  return "Registro legado";
+function competenceOf(year: string, month: string) {
+  return `${year}-${String(Number(month)).padStart(2, "0")}`;
+}
+
+function monthLabel(competence: string) {
+  const [year, month] = competence.split("-").map(Number);
+  return `${MONTH_NAMES[month - 1]} / ${year}`;
 }
 
 function credentials() {
@@ -60,9 +91,10 @@ function authHeaders(): Record<string, string> {
   return { "x-wallet-email": email, "x-wallet-session": token };
 }
 
-async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>) {
+async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>, keepalive = false) {
   const response = await fetch(`/api/portfolio/history?portfolioId=${PORTFOLIO_ID}`, {
     method,
+    keepalive,
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: method === "GET" ? undefined : JSON.stringify({ portfolioId: PORTFOLIO_ID, ...body }),
   });
@@ -86,169 +118,262 @@ function publishHistory(entries: readonly HistoryEntry[]) {
   window.dispatchEvent(new CustomEvent(HISTORY_UPDATED_EVENT, { detail: { entries } }));
 }
 
+function sortEntries(entries: readonly HistoryEntry[]) {
+  return [...entries].sort((left, right) => left.competence.localeCompare(right.competence));
+}
+
+function readPending(): PendingHistory {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(PENDING_KEY) || "{}");
+    return {
+      upserts: parsed?.upserts && typeof parsed.upserts === "object" ? parsed.upserts : {},
+      deletes: Array.isArray(parsed?.deletes) ? parsed.deletes : [],
+    };
+  } catch {
+    return { upserts: {}, deletes: [] };
+  }
+}
+
+function writePending(pending: PendingHistory) {
+  if (!Object.keys(pending.upserts).length && !pending.deletes.length) {
+    window.localStorage.removeItem(PENDING_KEY);
+    return;
+  }
+  window.localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+}
+
 export default function PortfolioHistoryPanel() {
   const [entries, setEntries] = useState<readonly HistoryEntry[]>([]);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [editing, setEditing] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(() => emptyForm());
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [success, setSuccess] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error" | "warning" } | null>(null);
   const viewedTracked = useRef(false);
+  const persistedCompetences = useRef(new Set<string>());
+  const pendingRef = useRef<PendingHistory>({ upserts: {}, deletes: [] });
+  const syncTimer = useRef<number | null>(null);
+
+  const applyEntries = useCallback((nextEntries: readonly HistoryEntry[]) => {
+    const sorted = sortEntries(nextEntries);
+    setEntries(sorted);
+    publishHistory(sorted);
+  }, []);
+
+  const flush = useCallback(async (keepalive = false) => {
+    const pending = pendingRef.current;
+    const upserts = Object.values(pending.upserts);
+    const deletes = pending.deletes;
+    if (!upserts.length && !deletes.length) return;
+
+    setSyncing(true);
+    try {
+      for (const entry of upserts) {
+        const [year, month] = entry.competence.split("-").map(Number);
+        const existed = persistedCompetences.current.has(entry.competence);
+        if (existed) {
+          await api("PATCH", { competence: entry.competence, dividends: entry.dividends }, keepalive);
+          track("history_month_updated");
+        } else {
+          await api("POST", { year, month, dividends: entry.dividends }, keepalive);
+          persistedCompetences.current.add(entry.competence);
+          track("history_month_added");
+        }
+      }
+
+      for (const competence of deletes) {
+        if (persistedCompetences.current.has(competence)) {
+          await api("DELETE", { competence }, keepalive);
+          persistedCompetences.current.delete(competence);
+          track("history_month_deleted");
+        }
+      }
+
+      pendingRef.current = { upserts: {}, deletes: [] };
+      writePending(pendingRef.current);
+    } catch (error) {
+      setToast({
+        message: error instanceof Error ? error.message : "Não foi possível sincronizar o histórico.",
+        variant: "error",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (syncTimer.current !== null) window.clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => void flush(), SYNC_DELAY_MS);
+  }, [flush]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setMessage("");
     try {
       const json = await api("GET");
-      const nextEntries = Array.isArray(json.entries) ? json.entries : [];
-      setEntries(nextEntries);
-      publishHistory(nextEntries);
+      const serverEntries: HistoryEntry[] = Array.isArray(json.entries) ? json.entries : [];
+      persistedCompetences.current = new Set(serverEntries.map((entry) => entry.competence));
+      const pending = readPending();
+      pendingRef.current = pending;
+      const deleted = new Set(pending.deletes);
+      const merged = serverEntries
+        .filter((entry) => !deleted.has(entry.competence))
+        .filter((entry) => !pending.upserts[entry.competence])
+        .concat(Object.values(pending.upserts));
+      applyEntries(merged);
+      if (Object.keys(pending.upserts).length || pending.deletes.length) scheduleFlush();
       if (!viewedTracked.current) {
         viewedTracked.current = true;
         track("portfolio_viewed");
       }
     } catch (error) {
-      setEntries([]);
-      publishHistory([]);
-      setMessage(error instanceof Error ? error.message : "Não foi possível carregar o histórico.");
+      setToast({
+        message: error instanceof Error ? error.message : "Não foi possível carregar o histórico.",
+        variant: "error",
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applyEntries, scheduleFlush]);
 
   useEffect(() => {
     void load();
     const onSession = () => void load();
+    const onPageHide = () => void flush(true);
     window.addEventListener("dados-fii-wallet-session-updated", onSession);
-    return () => window.removeEventListener("dados-fii-wallet-session-updated", onSession);
-  }, [load]);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("dados-fii-wallet-session-updated", onSession);
+      window.removeEventListener("pagehide", onPageHide);
+      if (syncTimer.current !== null) window.clearTimeout(syncTimer.current);
+      void flush(true);
+    };
+  }, [flush, load]);
 
   const currentYearEntries = useMemo(
-    () => entries.filter((entry) => entry.competence.startsWith(`${new Date().getFullYear()}-`)),
+    () => entries.filter((entry) => entry.competence.startsWith(`${currentYear()}-`)),
     [entries],
   );
 
-  function resetForm() {
-    setEditing(null);
-    setForm(EMPTY_FORM);
+  const closedMonths = useMemo(
+    () => Array.from({ length: lastClosedMonth() }, (_, index) => index + 1),
+    [],
+  );
+
+  const complete = closedMonths.length > 0 && closedMonths.every((month) =>
+    currentYearEntries.some((entry) => entry.competence === competenceOf(String(currentYear()), String(month))),
+  );
+
+  function nextMonthAfter(month: number) {
+    const nextMissing = closedMonths.find((candidate) => candidate > month && !currentYearEntries.some(
+      (entry) => entry.competence === competenceOf(String(currentYear()), String(candidate)),
+    ));
+    return String(nextMissing ?? Math.min(month + 1, Math.max(lastClosedMonth(), 1)));
   }
 
-  function beginEdit(entry: HistoryEntry) {
-    if (entry.source !== "manual") return;
-    const [year, month] = entry.competence.split("-");
-    setEditing(entry.competence);
-    setSuccess("");
-    setForm({
-      year,
-      month: String(Number(month)),
-      dividends: entry.dividends === null ? "" : String(entry.dividends).replace(".", ","),
-    });
-  }
-
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
-    setMessage("");
-    setSuccess("");
-    try {
-      const editedCompetence = editing;
-      if (editing) {
-        await api("PATCH", { competence: editing, dividends: form.dividends });
-        track("history_month_updated");
-      } else {
-        await api("POST", { year: form.year, month: form.month, dividends: form.dividends });
-        track("history_month_added");
-      }
-      const savedLabel = editedCompetence
-        ? monthLabel(editedCompetence)
-        : monthLabel(`${form.year}-${String(Number(form.month)).padStart(2, "0")}`);
-      resetForm();
-      await load();
-      setSuccess(`Dividendos de ${savedLabel} salvos no histórico.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível salvar o histórico.");
-    } finally {
-      setSaving(false);
+    const dividends = parseCurrencyInput(form.dividends);
+    if (dividends === null) {
+      setToast({ message: "Informe um valor válido de dividendos.", variant: "warning" });
+      return;
     }
+
+    const competence = competenceOf(form.year, form.month);
+    const now = new Date().toISOString();
+    const existing = entries.find((entry) => entry.competence === competence);
+    const optimisticEntry: HistoryEntry = {
+      schemaVersion: 1,
+      portfolioId: PORTFOLIO_ID,
+      competence,
+      totalValue: null,
+      dividends,
+      source: "manual",
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+
+    const nextEntries = sortEntries(entries.filter((entry) => entry.competence !== competence).concat(optimisticEntry));
+    applyEntries(nextEntries);
+    pendingRef.current = {
+      upserts: { ...pendingRef.current.upserts, [competence]: optimisticEntry },
+      deletes: pendingRef.current.deletes.filter((item) => item !== competence),
+    };
+    writePending(pendingRef.current);
+    scheduleFlush();
+
+    setToast({ message: `${monthLabel(competence)} atualizado • ${currency(dividends)}`, variant: "success" });
+    setForm((current) => ({ ...current, month: nextMonthAfter(Number(current.month)), dividends: "" }));
   }
 
-  async function remove(entry: HistoryEntry) {
+  function remove(entry: HistoryEntry) {
     if (entry.source !== "manual") return;
-    if (!window.confirm(`Excluir ${monthLabel(entry.competence)} do histórico de dividendos?`)) return;
-    setSaving(true);
-    setMessage("");
-    setSuccess("");
-    try {
-      await api("DELETE", { competence: entry.competence });
-      track("history_month_deleted");
-      if (editing === entry.competence) resetForm();
-      await load();
-      setSuccess(`${monthLabel(entry.competence)} removido do histórico.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível excluir o mês.");
-    } finally {
-      setSaving(false);
-    }
+    const nextEntries = entries.filter((item) => item.competence !== entry.competence);
+    applyEntries(nextEntries);
+    const upserts = { ...pendingRef.current.upserts };
+    delete upserts[entry.competence];
+    pendingRef.current = {
+      upserts,
+      deletes: persistedCompetences.current.has(entry.competence)
+        ? Array.from(new Set([...pendingRef.current.deletes, entry.competence]))
+        : pendingRef.current.deletes,
+    };
+    writePending(pendingRef.current);
+    scheduleFlush();
   }
 
   return (
     <section aria-labelledby="portfolio-history-title" className="mx-auto mb-6 w-full max-w-6xl rounded-2xl border border-gray-200 bg-white p-4 text-gray-950 shadow-sm sm:p-6 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100">
+      <AppToast
+        message={toast?.message ?? ""}
+        variant={toast?.variant ?? "info"}
+        onClose={() => setToast(null)}
+      />
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 id="portfolio-history-title" className="text-xl font-extrabold text-gray-950 dark:text-white">Complete seu histórico de dividendos</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">Informe quanto recebeu em dividendos nos meses anteriores do ano corrente. Cada mês é salvo no banco e passa a alimentar os gráficos da carteira.</p>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">Informe os dividendos dos meses já encerrados. O gráfico é atualizado imediatamente e as alterações são sincronizadas em segundo plano.</p>
         </div>
         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Grátis</span>
       </div>
 
       <form onSubmit={submit} className="mt-5 grid gap-3 rounded-xl bg-gray-50 p-4 sm:grid-cols-2 lg:grid-cols-4 dark:bg-gray-900">
         <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Ano
-          <input aria-label="Ano do histórico" inputMode="numeric" value={form.year} disabled={Boolean(editing)} onChange={(event) => setForm((current) => ({ ...current, year: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+          <input aria-label="Ano do histórico" value={form.year} disabled className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 opacity-70 dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
         </label>
         <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Mês
-          <select aria-label="Mês do histórico" value={form.month} disabled={Boolean(editing)} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
-            {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => <option key={month} value={month}>{new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(2026, month - 1, 1))}</option>)}
+          <select aria-label="Mês do histórico" value={form.month} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+            {closedMonths.map((month) => <option key={month} value={month}>{MONTH_NAMES[month - 1]}</option>)}
           </select>
         </label>
         <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Dividendos recebidos
           <input aria-label="Dividendos recebidos no mês" inputMode="decimal" value={form.dividends} onChange={(event) => setForm((current) => ({ ...current, dividends: event.target.value }))} placeholder="R$ 120,00" required className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
         </label>
-        <div className="flex items-end gap-2">
-          <button type="submit" disabled={saving} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-indigo-700 disabled:opacity-60">
-            {saving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
-            {editing ? "Salvar alteração" : "Salvar mês"}
+        <div className="flex items-end">
+          <button type="submit" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-indigo-700">
+            <Save size={17} /> Salvar mês
           </button>
-          {editing && <button type="button" onClick={resetForm} aria-label="Cancelar edição" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-300 px-3 text-gray-700 dark:border-gray-700 dark:text-gray-200"><X size={18} /></button>}
         </div>
       </form>
 
-      {success && <p role="status" className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"><CheckCircle2 size={18} />{success}</p>}
-      {message && <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-100">{message}</p>}
+      {complete && <p className="mt-4 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">✓ Histórico completo até {MONTH_NAMES[Math.max(lastClosedMonth() - 1, 0)]} de {currentYear()}</p>}
+      {syncing && <p className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400"><Loader2 size={14} className="animate-spin" /> Sincronizando alterações...</p>}
 
-      <div className="mt-5" aria-label="Histórico mensal de dividendos">
-        {loading ? (
-          <div className="flex min-h-24 items-center justify-center"><Loader2 className="animate-spin" /></div>
-        ) : currentYearEntries.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-600 dark:border-gray-700 dark:text-gray-300">Nenhum dividendo informado no ano corrente.</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{currentYearEntries.map((entry) => (
-            <article key={entry.competence} className="rounded-xl border border-gray-200 bg-white p-4 text-gray-950 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-extrabold capitalize text-gray-950 dark:text-white">{monthLabel(entry.competence)}</p>
-                  <p className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">{currency(entry.dividends)}</p>
-                  <span className="mt-2 inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200">{sourceLabel(entry.source)}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" disabled={entry.source !== "manual" || saving} onClick={() => beginEdit(entry)} aria-label={`Editar ${monthLabel(entry.competence)}`} className="rounded-lg border border-gray-300 p-2 text-gray-700 disabled:cursor-not-allowed disabled:opacity-35 dark:border-gray-700 dark:text-gray-200"><Pencil size={16} /></button>
-                  <button type="button" disabled={entry.source !== "manual" || saving} onClick={() => void remove(entry)} aria-label={`Excluir ${monthLabel(entry.competence)}`} className="rounded-lg border border-red-200 p-2 text-red-700 disabled:cursor-not-allowed disabled:opacity-35 dark:border-red-900 dark:text-red-300"><Trash2 size={16} /></button>
-                </div>
-              </div>
-            </article>
-          ))}</div>
-        )}
-      </div>
+      {!loading && currentYearEntries.length > 0 && (
+        <div className="mt-5" aria-label="Meses informados no histórico">
+          <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-gray-500 dark:text-gray-400">Meses informados</p>
+          <div className="flex flex-wrap gap-2">
+            {currentYearEntries.map((entry) => (
+              <article key={entry.competence} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 py-1.5 pl-3 pr-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                <span className="font-bold">{MONTH_NAMES[Number(entry.competence.slice(5, 7)) - 1].slice(0, 3)} / {entry.competence.slice(0, 4)}</span>
+                <span>{currency(entry.dividends)}</span>
+                {entry.source === "manual" && (
+                  <button type="button" onClick={() => remove(entry)} aria-label={`Excluir ${monthLabel(entry.competence)}`} className="rounded-full p-1.5 text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950"><Trash2 size={14} /></button>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
