@@ -37,6 +37,10 @@ async function requestPreferences(action: "load" | "save", thresholdPercent?: nu
   return payload as PreferencePayload;
 }
 
+function requestPortfolioHistoryFlush() {
+  window.dispatchEvent(new Event("pagehide"));
+}
+
 export default function PortfolioNotificationPreferences() {
   const [preferences, setPreferences] = useState<PreferencePayload | null>(null);
   const [threshold, setThreshold] = useState("3");
@@ -64,8 +68,24 @@ export default function PortfolioNotificationPreferences() {
 
   useEffect(() => {
     void load();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") requestPortfolioHistoryFlush();
+    };
+    const onFreeze = () => requestPortfolioHistoryFlush();
+    const onOnline = () => requestPortfolioHistoryFlush();
+
     window.addEventListener("dados-fii-wallet-session-updated", load);
-    return () => window.removeEventListener("dados-fii-wallet-session-updated", load);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("freeze", onFreeze);
+    window.addEventListener("online", onOnline);
+
+    return () => {
+      window.removeEventListener("dados-fii-wallet-session-updated", load);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      document.removeEventListener("freeze", onFreeze);
+      window.removeEventListener("online", onOnline);
+    };
   }, [load]);
 
   async function save() {
