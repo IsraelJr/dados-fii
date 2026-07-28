@@ -35,9 +35,11 @@ test("persiste meses como mapa dentro do documento anual", () => {
   assert.doesNotMatch(repositorySource, /doc\(portfolioHistoryDocumentId\(key\)\)/);
 });
 
-test("não lê estrutura legada de User e publica atualização para consumidores", () => {
+test("não lê estrutura legada e publica atualização otimista para consumidores", () => {
   assert.doesNotMatch(repositorySource, /collection\(["']User["']\)/);
   assert.match(panelSource, /dados-fii-portfolio-history-updated/);
   assert.match(panelSource, /Salvar mês/);
-  assert.match(panelSource, /salvos no histórico/);
+  assert.match(panelSource, /writePending/);
+  assert.match(panelSource, /scheduleFlush/);
+  assert.match(panelSource, /atualizado •/);
 });

@@ -64,10 +64,10 @@ test("carteira adiciona um fundo, persiste localmente e permanece acessível", a
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
-test("histórico manual permite incluir, editar e excluir dividendos sem patrimônio estimado", async ({ page }) => {
-  const currentYear = new Date().getFullYear();
+test("histórico manual permite incluir, sobrescrever, excluir e sincronizar dividendos", async ({ page }) => {
   const entries: Array<Record<string, unknown>> = [];
   const trackedBodies: unknown[] = [];
+  const mutationMethods: string[] = [];
 
   await page.addInitScript(() => {
     window.localStorage.setItem("dados-fii-wallet-email", "e2e@example.com");
@@ -85,16 +85,19 @@ test("histórico manual permite incluir, editar e excluir dividendos sem patrim�
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entries }) });
       return;
     }
+
+    mutationMethods.push(method);
     const body = route.request().postDataJSON() as Record<string, unknown>;
+    expect(body).not.toHaveProperty("totalValue");
+
     if (method === "POST") {
-      expect(body).not.toHaveProperty("totalValue");
       const competence = `${body.year}-${String(body.month).padStart(2, "0")}`;
       entries.splice(0, entries.length, {
         schemaVersion: 1,
         portfolioId: "default",
         competence,
         totalValue: null,
-        dividends: 120,
+        dividends: Number(body.dividends),
         source: "manual",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -102,38 +105,48 @@ test("histórico manual permite incluir, editar e excluir dividendos sem patrim�
       await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, entry: entries[0] }) });
       return;
     }
+
     if (method === "PATCH") {
-      expect(body).not.toHaveProperty("totalValue");
-      entries[0] = { ...entries[0], dividends: 130, updatedAt: new Date().toISOString() };
+      entries[0] = { ...entries[0], dividends: Number(body.dividends), updatedAt: new Date().toISOString() };
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entry: entries[0] }) });
       return;
     }
+
     entries.splice(0, entries.length);
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
   });
 
   await page.goto("/carteira");
   const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
+  const chips = history.getByLabel("Meses informados no histórico");
   await expect(history.getByRole("heading", { name: "Complete seu histórico de dividendos" })).toBeVisible();
   await expect(history.getByLabel("Patrimônio do mês")).toHaveCount(0);
-  await history.getByLabel("Ano do histórico").fill(String(currentYear));
+  await expect(history.getByLabel("Ano do histórico")).toBeDisabled();
+
   await history.getByLabel("Mês do histórico").selectOption("1");
   await history.getByLabel("Dividendos recebidos no mês").fill("120,00");
   await history.getByRole("button", { name: "Salvar mês" }).click();
-  await expect(history.getByText("R$ 120,00")).toBeVisible();
+  await expect(chips.getByText("R$ 120,00", { exact: true })).toBeVisible();
   await expect(page.locator("svg text", { hasText: "R$ 120" })).toBeVisible();
 
-  await history.getByRole("button", { name: /Editar/ }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await expect.poll(() => mutationMethods).toContain("POST");
+
+  await history.getByLabel("Mês do histórico").selectOption("1");
   await history.getByLabel("Dividendos recebidos no mês").fill("130,00");
-  await history.getByRole("button", { name: "Salvar" }).click();
-  await expect(history.getByText("R$ 130,00")).toBeVisible();
+  await history.getByRole("button", { name: "Salvar mês" }).click();
+  await expect(chips.getByText("R$ 130,00", { exact: true })).toBeVisible();
   await expect(page.locator("svg text", { hasText: "R$ 130" })).toBeVisible();
 
-  page.once("dialog", (dialog) => dialog.accept());
-  await history.getByRole("button", { name: /Excluir/ }).click();
-  await expect(history.getByText("Nenhum dividendo informado no ano corrente.")).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await expect.poll(() => mutationMethods).toContain("PATCH");
 
-  await expect.poll(() => trackedBodies.length).toBeGreaterThanOrEqual(4);
+  await history.getByRole("button", { name: /Excluir/ }).click();
+  await expect(chips.getByText("R$ 130,00", { exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await expect.poll(() => mutationMethods).toContain("DELETE");
+
+  await expect.poll(() => trackedBodies.length).toBeGreaterThanOrEqual(3);
   for (const body of trackedBodies) expect(Object.keys(body as Record<string, unknown>)).toEqual(["name"]);
   await expectNoHighImpactAccessibilityViolations(page);
 });
