@@ -30,9 +30,13 @@ export class FirestorePortfolioHistoryRepository implements PortfolioHistoryRepo
     const snapshot = await adminDb.collection(COLLECTION)
       .where("ownerId", "==", ownerId)
       .where("portfolioId", "==", portfolioId)
-      .orderBy("competence", "asc")
       .get();
-    return Object.freeze(snapshot.docs.map((document) => entryFromData(document.data())));
+
+    return Object.freeze(
+      snapshot.docs
+        .map((document) => entryFromData(document.data()))
+        .sort((left, right) => left.competence.localeCompare(right.competence)),
+    );
   }
 
   async findByCompetence(key: PortfolioHistoryKey): Promise<PortfolioHistoryEntry | null> {
