@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
   PortfolioHistoryCompetence,
   PortfolioHistoryEntry,
@@ -24,7 +25,7 @@ export function portfolioHistoryDocumentId(key: PortfolioHistoryKey): string {
   const portfolioId = String(key.portfolioId || "").trim();
   const competence = String(key.competence || "").trim();
 
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(ownerId)) {
+  if (!ownerId || ownerId.length > 512) {
     throw new Error("INVALID_OWNER_ID");
   }
   if (!/^[A-Za-z0-9_-]{1,80}$/.test(portfolioId)) {
@@ -34,5 +35,6 @@ export function portfolioHistoryDocumentId(key: PortfolioHistoryKey): string {
     throw new Error("INVALID_COMPETENCE");
   }
 
-  return `${ownerId}__${portfolioId}__${competence}`;
+  const ownerHash = createHash("sha256").update(ownerId, "utf8").digest("hex");
+  return `${ownerHash}__${portfolioId}__${competence}`;
 }
