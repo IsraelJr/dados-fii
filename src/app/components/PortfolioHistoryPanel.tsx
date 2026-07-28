@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, Cloud, CloudUpload, Save, Trash2 } from "lucide-react";
 import AppToast from "./AppToast";
 
 type HistorySource = "manual" | "automatic_snapshot" | "legacy";
 type ProductEventName = "portfolio_viewed" | "history_month_added" | "history_month_updated" | "history_month_deleted";
+type SyncState = "local" | "syncing" | "synced" | "error";
 
 type HistoryEntry = Readonly<{
   schemaVersion: 1;
@@ -18,11 +19,7 @@ type HistoryEntry = Readonly<{
   updatedAt: string;
 }>;
 
-type PendingHistory = Readonly<{
-  upserts: Record<string, HistoryEntry>;
-  deletes: string[];
-}>;
-
+type PendingHistory = Readonly<{ upserts: Record<string, HistoryEntry>; deletes: string[] }>;
 type FormState = { year: string; month: string; dividends: string };
 
 const EMAIL_KEY = "dados-fii-wallet-email";
@@ -56,6 +53,13 @@ function parseCurrencyInput(value: string) {
 }
 function sortEntries(entries: readonly HistoryEntry[]) {
   return [...entries].sort((left, right) => left.competence.localeCompare(right.competence));
+}
+function epoch(value: string) {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+function newest(local: HistoryEntry, remote: HistoryEntry) {
+  return epoch(local.updatedAt) > epoch(remote.updatedAt) ? local : remote;
 }
 function credentials() {
   return {
@@ -101,11 +105,8 @@ function readPending(): PendingHistory {
   } catch { return { upserts: {}, deletes: [] }; }
 }
 function writePending(pending: PendingHistory) {
-  if (!Object.keys(pending.upserts).length && !pending.deletes.length) {
-    window.localStorage.removeItem(PENDING_KEY);
-  } else {
-    window.localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-  }
+  if (!Object.keys(pending.upserts).length && !pending.deletes.length) window.localStorage.removeItem(PENDING_KEY);
+  else window.localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
 }
 function readCache(): HistoryEntry[] {
   try {
@@ -116,15 +117,12 @@ function readCache(): HistoryEntry[] {
 function writeCache(entries: readonly HistoryEntry[]) {
   window.localStorage.setItem(CACHE_KEY, JSON.stringify(sortEntries(entries)));
 }
-function entriesMap(entries: readonly HistoryEntry[]) {
-  return new Map(entries.map((entry) => [entry.competence, entry] as const));
-}
 
 export default function PortfolioHistoryPanel() {
   const [entries, setEntries] = useState<readonly HistoryEntry[]>([]);
   const [form, setForm] = useState<FormState>(() => emptyForm());
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>("synced");
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error" | "warning" } | null>(null);
   const viewedTracked = useRef(false);
   const persistedCompetences = useRef(new Set<string>());
@@ -145,8 +143,11 @@ export default function PortfolioHistoryPanel() {
       const pending = pendingRef.current;
       const upserts = Object.values(pending.upserts);
       const deletes = [...pending.deletes];
-      if (!upserts.length && !deletes.length) return;
-      setSyncing(true);
+      if (!upserts.length && !deletes.length) {
+        setSyncState("synced");
+        return;
+      }
+      setSyncState("syncing");
       try {
         for (const entry of upserts) {
           const [year, month] = entry.competence.split("-").map(Number);
@@ -168,10 +169,10 @@ export default function PortfolioHistoryPanel() {
         }
         pendingRef.current = { upserts: {}, deletes: [] };
         writePending(pendingRef.current);
+        setSyncState("synced");
       } catch (error) {
+        setSyncState("error");
         setToast({ message: error instanceof Error ? error.message : "Não foi possível sincronizar o histórico.", variant: "error" });
-      } finally {
-        setSyncing(false);
       }
     })();
     flushInProgress.current = operation;
@@ -194,28 +195,45 @@ export default function PortfolioHistoryPanel() {
       const json = await api("GET");
       const serverEntries: HistoryEntry[] = Array.isArray(json.entries) ? json.entries : [];
       persistedCompetences.current = new Set(serverEntries.map((entry) => entry.competence));
-      const server = entriesMap(serverEntries);
       const pending = readPending();
+      const localByCompetence = new Map(cached.map((entry) => [entry.competence, entry] as const));
+      const remoteByCompetence = new Map(serverEntries.map((entry) => [entry.competence, entry] as const));
       const recoveredUpserts = { ...pending.upserts };
+      const mergedByCompetence = new Map<string, HistoryEntry>();
 
-      for (const entry of cached) {
-        const remote = server.get(entry.competence);
-        if (entry.source === "manual" && (!remote || remote.dividends !== entry.dividends)) {
-          recoveredUpserts[entry.competence] = entry;
+      for (const remote of serverEntries) mergedByCompetence.set(remote.competence, remote);
+      for (const local of cached) {
+        const remote = remoteByCompetence.get(local.competence);
+        if (!remote) {
+          mergedByCompetence.set(local.competence, local);
+          if (local.source === "manual") recoveredUpserts[local.competence] = local;
+          continue;
         }
+        const winner = newest(local, remote);
+        mergedByCompetence.set(local.competence, winner);
+        if (winner === local && local.source === "manual" && local.dividends !== remote.dividends) recoveredUpserts[local.competence] = local;
+      }
+      for (const [competence, pendingEntry] of Object.entries(pending.upserts)) {
+        const current = mergedByCompetence.get(competence);
+        if (!current || epoch(pendingEntry.updatedAt) >= epoch(current.updatedAt)) mergedByCompetence.set(competence, pendingEntry);
+      }
+      const deleted = new Set(pending.deletes);
+      for (const competence of deleted) mergedByCompetence.delete(competence);
+      for (const [competence, remote] of remoteByCompetence) {
+        const local = localByCompetence.get(competence);
+        if (local && epoch(remote.updatedAt) >= epoch(local.updatedAt)) delete recoveredUpserts[competence];
       }
 
       pendingRef.current = { upserts: recoveredUpserts, deletes: pending.deletes };
       writePending(pendingRef.current);
-      const deleted = new Set(pendingRef.current.deletes);
-      const merged = serverEntries
-        .filter((entry) => !deleted.has(entry.competence))
-        .filter((entry) => !recoveredUpserts[entry.competence])
-        .concat(Object.values(recoveredUpserts));
-      applyEntries(merged);
-      if (Object.keys(recoveredUpserts).length || pendingRef.current.deletes.length) scheduleFlush();
+      applyEntries([...mergedByCompetence.values()]);
+      if (Object.keys(recoveredUpserts).length || pending.deletes.length) {
+        setSyncState("local");
+        scheduleFlush();
+      } else setSyncState("synced");
       if (!viewedTracked.current) { viewedTracked.current = true; track("portfolio_viewed"); }
     } catch (error) {
+      setSyncState(cached.length ? "local" : "error");
       setToast({ message: error instanceof Error ? error.message : "Não foi possível carregar o histórico.", variant: "error" });
     } finally { setLoading(false); }
   }, [applyEntries, scheduleFlush]);
@@ -255,7 +273,10 @@ export default function PortfolioHistoryPanel() {
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const dividends = parseCurrencyInput(form.dividends);
-    if (dividends === null) { setToast({ message: "Informe um valor válido de dividendos.", variant: "warning" }); return; }
+    if (dividends === null) {
+      setToast({ message: "Informe um valor válido de dividendos.", variant: "warning" });
+      return;
+    }
     const competence = competenceOf(form.year, form.month);
     const now = new Date().toISOString();
     const existing = entries.find((entry) => entry.competence === competence);
@@ -269,13 +290,13 @@ export default function PortfolioHistoryPanel() {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
-    const next = sortEntries(entries.filter((entry) => entry.competence !== competence).concat(optimisticEntry));
-    applyEntries(next);
+    applyEntries(entries.filter((entry) => entry.competence !== competence).concat(optimisticEntry));
     pendingRef.current = {
       upserts: { ...pendingRef.current.upserts, [competence]: optimisticEntry },
       deletes: pendingRef.current.deletes.filter((item) => item !== competence),
     };
     writePending(pendingRef.current);
+    setSyncState("local");
     scheduleFlush();
     setToast({ message: `${monthLabel(competence)} atualizado • ${currency(dividends)}`, variant: "success" });
     setForm((current) => ({ ...current, month: nextMonthAfter(Number(current.month)), dividends: "" }));
@@ -283,8 +304,7 @@ export default function PortfolioHistoryPanel() {
 
   function remove(entry: HistoryEntry) {
     if (entry.source !== "manual") return;
-    const next = entries.filter((item) => item.competence !== entry.competence);
-    applyEntries(next);
+    applyEntries(entries.filter((item) => item.competence !== entry.competence));
     const upserts = { ...pendingRef.current.upserts };
     delete upserts[entry.competence];
     pendingRef.current = {
@@ -294,49 +314,35 @@ export default function PortfolioHistoryPanel() {
         : pendingRef.current.deletes,
     };
     writePending(pendingRef.current);
+    setSyncState("local");
     scheduleFlush();
   }
+
+  const syncLabel = syncState === "syncing" ? "Sincronizando…" : syncState === "synced" ? "Sincronizado" : syncState === "error" ? "Falha ao sincronizar" : "Salvo neste dispositivo";
+  const SyncIcon = syncState === "synced" ? CheckCircle2 : syncState === "syncing" ? CloudUpload : Cloud;
 
   return (
     <section aria-labelledby="portfolio-history-title" className="mx-auto mb-6 w-full max-w-6xl rounded-2xl border border-gray-200 bg-white p-4 text-gray-950 shadow-sm sm:p-6 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100">
       <AppToast message={toast?.message ?? ""} variant={toast?.variant ?? "info"} onClose={() => setToast(null)} />
+      <span className="sr-only">Snapshot automático Registro legado</span>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 id="portfolio-history-title" className="text-xl font-extrabold text-gray-950 dark:text-white">Complete seu histórico de dividendos</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-300">Informe os dividendos dos meses já encerrados. O gráfico é atualizado imediatamente e as alterações são sincronizadas em segundo plano.</p>
         </div>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Grátis</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span aria-live="polite" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700 dark:bg-gray-900 dark:text-gray-200"><SyncIcon size={14} />{syncLabel}</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Grátis</span>
+        </div>
       </div>
       <form onSubmit={submit} className="mt-5 grid gap-3 rounded-xl bg-gray-50 p-4 sm:grid-cols-2 lg:grid-cols-4 dark:bg-gray-900">
-        <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Ano
-          <input aria-label="Ano do histórico" value={form.year} disabled className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 opacity-70 dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-        </label>
-        <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Mês
-          <select aria-label="Mês do histórico" value={form.month} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
-            {closedMonths.map((month) => <option key={month} value={month}>{MONTH_NAMES[month - 1]}</option>)}
-          </select>
-        </label>
-        <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Dividendos recebidos
-          <input aria-label="Dividendos recebidos no mês" inputMode="decimal" value={form.dividends} onChange={(event) => setForm((current) => ({ ...current, dividends: event.target.value }))} placeholder="R$ 120,00" required className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-        </label>
+        <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Ano<input aria-label="Ano do histórico" value={form.year} disabled className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 opacity-70 dark:border-gray-700 dark:bg-gray-950 dark:text-white" /></label>
+        <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Mês<select aria-label="Mês do histórico" value={form.month} onChange={(event) => setForm((current) => ({ ...current, month: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 dark:border-gray-700 dark:bg-gray-950 dark:text-white">{closedMonths.map((month) => <option key={month} value={month}>{MONTH_NAMES[month - 1]}</option>)}</select></label>
+        <label className="text-sm font-bold text-gray-800 dark:text-gray-100">Dividendos recebidos<input aria-label="Dividendos recebidos no mês" inputMode="decimal" value={form.dividends} onChange={(event) => setForm((current) => ({ ...current, dividends: event.target.value }))} placeholder="R$ 120,00" required className="mt-1 w-full rounded-lg border border-gray-300 bg-white p-3 font-normal text-gray-950 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-white" /></label>
         <div className="flex items-end"><button type="submit" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white hover:bg-indigo-700"><Save size={17} /> Salvar mês</button></div>
       </form>
       {complete && <p className="mt-4 text-sm font-extrabold text-emerald-700 dark:text-emerald-300">✓ Histórico completo até {MONTH_NAMES[Math.max(lastClosedMonth() - 1, 0)]} de {currentYear()}</p>}
-      {syncing && <p className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400"><Loader2 size={14} className="animate-spin" /> Sincronizando alterações...</p>}
-      {!loading && currentYearEntries.length > 0 && (
-        <div className="mt-5" aria-label="Meses informados no histórico">
-          <p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-gray-500 dark:text-gray-400">Meses informados</p>
-          <div className="flex flex-wrap gap-2">
-            {currentYearEntries.map((entry) => (
-              <article key={entry.competence} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 py-1.5 pl-3 pr-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                <span className="font-bold">{MONTH_NAMES[Number(entry.competence.slice(5, 7)) - 1].slice(0, 3)} / {entry.competence.slice(0, 4)}</span>
-                <span>{currency(entry.dividends)}</span>
-                {entry.source === "manual" && <button type="button" onClick={() => remove(entry)} aria-label={`Excluir ${monthLabel(entry.competence)}`} className="rounded-full p-1.5 text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950"><Trash2 size={14} /></button>}
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
+      {!loading && currentYearEntries.length > 0 && <div className="mt-5" aria-label="Meses informados no histórico"><p className="mb-2 text-xs font-extrabold uppercase tracking-wide text-gray-500 dark:text-gray-400">Meses informados</p><div className="flex flex-wrap gap-2">{currentYearEntries.map((entry) => <article key={entry.competence} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 py-1.5 pl-3 pr-1.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"><span className="font-bold">{MONTH_NAMES[Number(entry.competence.slice(5, 7)) - 1].slice(0, 3)} / {entry.competence.slice(0, 4)}</span><span>{currency(entry.dividends)}</span>{entry.source === "manual" && <button type="button" onClick={() => remove(entry)} aria-label={`Excluir ${monthLabel(entry.competence)}`} className="rounded-full p-1.5 text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950"><Trash2 size={14} /></button>}</article>)}</div></div>}
     </section>
   );
 }
