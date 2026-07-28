@@ -121,13 +121,13 @@ test("histórico manual permite incluir, editar e excluir dividendos sem patrim�
   await history.getByLabel("Dividendos recebidos no mês").fill("120,00");
   await history.getByRole("button", { name: "Salvar mês" }).click();
   await expect(history.getByText("R$ 120,00")).toBeVisible();
-  await expect(page.locator("svg").filter({ hasText: /Jan.*R\$ 120/s })).toBeVisible();
+  await expect(page.locator("svg").filter({ hasText: /Jan[\s\S]*R\$ 120/ })).toBeVisible();
 
   await history.getByRole("button", { name: /Editar/ }).click();
   await history.getByLabel("Dividendos recebidos no mês").fill("130,00");
   await history.getByRole("button", { name: "Salvar" }).click();
   await expect(history.getByText("R$ 130,00")).toBeVisible();
-  await expect(page.locator("svg").filter({ hasText: /Jan.*R\$ 130/s })).toBeVisible();
+  await expect(page.locator("svg").filter({ hasText: /Jan[\s\S]*R\$ 130/ })).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept());
   await history.getByRole("button", { name: /Excluir/ }).click();
