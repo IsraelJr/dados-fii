@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node scripts/apply-current-year-summary-source.mjs && next build",
   "env": {
     "ENABLE_RISK_LAB_PREMIUM_READONLY": "true",
     "ENABLE_WALLET_RISK_REPORT_AUTOMATIC": "true",
