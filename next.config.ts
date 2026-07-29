@@ -1,5 +1,6 @@
-import "./scripts/apply-current-year-summary-source.mjs";
 import type { NextConfig } from "next";
+
+await import("./scripts/apply-current-year-summary-source.mjs");
 
 const securityHeaders = [
   {
