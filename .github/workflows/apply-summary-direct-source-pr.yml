@@ -1,0 +1,135 @@
+name: Apply direct summary source PR
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.ref == 'fix/summary-direct-source' && !contains(github.event.pull_request.head.sha, '0000000')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply direct source patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          page = Path('src/app/carteira/page.tsx')
+          source = page.read_text()
+          if 'function SimpleMonthlySummary({ insights, snapshots' in source:
+              raise SystemExit(0)
+
+          old_call = '<SimpleMonthlySummary insights={insights} historicalStats={historicalDividendStats} topWeight={topWeight} topWeightPercent={topWeightPercent} />'
+          new_call = '<SimpleMonthlySummary insights={insights} snapshots={consolidatedSnapshots} topWeight={topWeight} topWeightPercent={topWeightPercent} />'
+          if old_call not in source:
+              raise SystemExit('SimpleMonthlySummary invocation not found')
+          source = source.replace(old_call, new_call, 1)
+
+          start = source.index('function SimpleMonthlySummary(')
+          end = source.index('\n\nfunction VisualHistorySection', start)
+          replacement = '''function SimpleMonthlySummary({ insights, snapshots, topWeight, topWeightPercent }: { insights: WalletInsights; snapshots: readonly WalletSnapshot[]; topWeight?: EnrichedFii; topWeightPercent: number }) {
+  const history = insights.dividendHistory;
+  const currentYear = new Date().getFullYear();
+  const currentYearItems = snapshots.filter((snapshot) => getSnapshotYear(snapshot) === currentYear && snapshot.estimatedMonthlyIncome > 0);
+  const summary = currentYearItems.reduce(
+    (acc, snapshot) => {
+      const value = snapshot.estimatedMonthlyIncome;
+      return {
+        total: acc.total + value,
+        best: !acc.best || value > acc.best.estimatedMonthlyIncome ? snapshot : acc.best,
+        worst: !acc.worst || value < acc.worst.estimatedMonthlyIncome ? snapshot : acc.worst,
+      };
+    },
+    { total: 0, best: null as WalletSnapshot | null, worst: null as WalletSnapshot | null },
+  );
+  const average = currentYearItems.length ? summary.total / currentYearItems.length : 0;
+
+  const historicalItems = snapshots.filter((snapshot) => getSnapshotYear(snapshot) !== currentYear && snapshot.estimatedMonthlyIncome > 0);
+  const historicalBest = historicalItems.reduce<WalletSnapshot | null>((best, snapshot) => !best || snapshot.estimatedMonthlyIncome > best.estimatedMonthlyIncome ? snapshot : best, null);
+  const historicalWorst = historicalItems.reduce<WalletSnapshot | null>((worst, snapshot) => !worst || snapshot.estimatedMonthlyIncome < worst.estimatedMonthlyIncome ? snapshot : worst, null);
+  const allTimeBest = summary.best && (!historicalBest || summary.best.estimatedMonthlyIncome >= historicalBest.estimatedMonthlyIncome) ? summary.best : historicalBest;
+  const allTimeWorst = summary.worst && (!historicalWorst || summary.worst.estimatedMonthlyIncome <= historicalWorst.estimatedMonthlyIncome) ? summary.worst : historicalWorst;
+
+  const totalsByYear = snapshots.filter((snapshot) => snapshot.estimatedMonthlyIncome > 0).reduce((totals, snapshot) => {
+    const year = getSnapshotYear(snapshot);
+    totals.set(year, (totals.get(year) || 0) + snapshot.estimatedMonthlyIncome);
+    return totals;
+  }, new Map<number, number>());
+  const bestYearEntry = [...totalsByYear.entries()].sort((left, right) => right[1] - left[1])[0];
+
+  return (
+    <section className="mt-6 rounded-2xl bg-white p-5 text-slate-800 shadow-sm ring-1 ring-slate-200">
+      <div>
+        <p className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-indigo-700"><BarChart3 size={14} /> Resumo</p>
+        <h2 className="mt-3 text-xl font-black text-slate-900">Leitura rápida dos números</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Meses informados manualmente substituem a estimativa calculada com as cotas atuais.</p>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <LightMetric label={`Maior mês de ${currentYear}`} value={summary.best ? `${getSnapshotMonthLabel(summary.best)}: ${formatCurrency(summary.best.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label={`Menor mês de ${currentYear}`} value={summary.worst ? `${getSnapshotMonthLabel(summary.worst)}: ${formatCurrency(summary.worst.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Total no ano" value={formatCurrency(summary.total)} />
+        <LightMetric label="Média mensal" value={formatCurrency(average)} />
+        <LightMetric label="Maior mês do histórico" value={allTimeBest ? `${allTimeBest.label}: ${formatCurrency(allTimeBest.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Menor mês do histórico" value={allTimeWorst ? `${allTimeWorst.label}: ${formatCurrency(allTimeWorst.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Maior ano de dividendos" value={bestYearEntry ? `${bestYearEntry[0]}: ${formatCurrency(bestYearEntry[1])}` : "-"} />
+        <LightMetric label="Maior pagador estimado" value={history.topPayer ? `${history.topPayer.ticker}: ${formatCurrency(history.topPayer.value)}` : "-"} />
+        <LightMetric label="Maior peso financeiro" value={topWeight ? `${topWeight.ticker}: ${formatPercentValue(topWeightPercent)}` : "-"} />
+      </div>
+    </section>
+  );
+}'''
+          page.write_text(source[:start] + replacement + source[end:])
+
+          package = Path('package.json')
+          data = json.loads(package.read_text())
+          scripts = data.get('scripts', {})
+          for name in ('prepare:summary-source', 'predev', 'prebuild'):
+              scripts.pop(name, None)
+          if scripts.get('build') == 'node scripts/apply-current-year-summary-source.mjs && next build':
+              scripts['build'] = 'next build'
+          data['scripts'] = scripts
+          package.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+
+          vercel = Path('vercel.json')
+          vdata = json.loads(vercel.read_text())
+          vdata.pop('buildCommand', None)
+          vercel.write_text(json.dumps(vdata, ensure_ascii=False, indent=2) + '\n')
+
+          legacy_script = Path('scripts/apply-current-year-summary-source.mjs')
+          if legacy_script.exists(): legacy_script.unlink()
+          branch_workflow = Path('.github/workflows/apply-summary-direct-source.yml')
+          if branch_workflow.exists(): branch_workflow.unlink()
+
+          Path('tests/current-year-summary-source.test.mjs').write_text('''import assert from "node:assert/strict";\nimport test from "node:test";\nimport { readFileSync } from "node:fs";\n\nconst source = readFileSync("src/app/carteira/page.tsx", "utf8");\n\ntest("gráfico e resumo recebem a mesma série consolidada", () => {\n  assert.match(source, /<VisualHistorySection snapshots=\\{consolidatedSnapshots\\}/);\n  assert.match(source, /<SimpleMonthlySummary insights=\\{insights\\} snapshots=\\{consolidatedSnapshots\\}/);\n  assert.doesNotMatch(source, /SimpleMonthlySummary insights=\\{insights\\} historicalStats=/);\n});\n\ntest("resumo calcula maior, menor e total diretamente da série", () => {\n  assert.match(source, /currentYearItems = snapshots\\.filter/);\n  assert.match(source, /total: acc\\.total \\+ value/);\n  assert.match(source, /value > acc\\.best\\.estimatedMonthlyIncome/);\n  assert.match(source, /value < acc\\.worst\\.estimatedMonthlyIncome/);\n});\n''')
+          PY
+
+      - name: Validate
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+          node --test tests/current-year-summary-source.test.mjs
+
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'fix: derive summary directly from chart series'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
