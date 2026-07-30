@@ -2,301 +2,280 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 10.2.0  
-**Data:** 27/07/2026  
+**Versão:** 10.3.0  
+**Data:** 30/07/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**Branch de trabalho:** `agent/product-validation-phase-1`  
-**Issue:** `#154`  
-**PR:** `#155`  
-**SHA validado em Preview:** `797e0cd2f608157d4d728c578e696160cac78bb7`  
-**Sprint atual:** `PV-1 — Jornada principal da carteira e histórico manual`
+**SHA atual de referência:** `e2f8c6a076e7e1f88b443a06556afde9a5bfea6b`  
+**Sprint atual:** `PV-2A — Inteligência da Carteira: núcleo determinístico`
 
 ## Decisões vigentes que substituem decisões anteriores
 
 | Decisão vigente | Decisão substituída | Efeito |
 |---|---|---|
-| O projeto está na fase **Produto Validável**. | SEO-S1 e expansão de páginas eram a frente principal. | Ativação, retenção, confiança e conversão passam à frente de tráfego genérico. |
-| `PV-1` é a única sprint funcional prioritária até produção. | Múltiplas frentes funcionais concorrentes. | Novas ideias não furam a fila sem impacto direto em ativação, retenção, confiança ou receita. |
-| Google AdSense está congelado. | AdSense era tratado como marco de monetização. | Nenhuma funcionalidade depende de propaganda ou desbloqueio por anúncio. |
-| Histórico manual do ano corrente é gratuito. | Limite de dois meses e anúncio assistido estavam em avaliação. | A função é mecanismo de ativação e retenção. |
-| Premium será visível para descoberta e beta antes do checkout. | Premium era invisível exceto para o proprietário. | Demanda será medida antes de construir cobrança. |
-| A carteira é um copiloto de decisões, não um narrador de oscilações. | Alertas poderiam enfatizar variação diária. | O produto separa ruído de mudança material e explica impacto. |
-| O legado iOS não é mesclado automaticamente na página web. | O login do proprietário recebia tratamento específico de histórico antigo. | Todos os usuários, inclusive o proprietário, seguem o mesmo fluxo web. |
-| O inventário completo de ambiente fica em `docs/operations/runtime-environment-inventory.md`. | O Handoff repetia uma lista extensa e facilmente desatualizada. | O Handoff referencia um inventário versionado e testado sem expor valores. |
-| O Handoff v10.2.0 é a única fonte canônica ativa. | Handoffs v10.1.0 e anteriores. | Evidências históricas válidas são preservadas; estado atual é reconciliado abaixo. |
+| PV-1 está concluída funcionalmente. | PV-1 aguardava merge, produção e confirmação dos cards. | Histórico manual, gráfico e cards passam a ser base estável para a próxima sprint. |
+| Gráfico e resumo usam a mesma série consolidada. | O resumo dependia de estrutura derivada separada e podia divergir do gráfico. | Maior mês, menor mês, total e média reagem à mesma fonte de dados. |
+| A próxima frente é a Inteligência da Carteira determinística. | PV-2 começaria diretamente por descoberta Premium. | Primeiro o produto interpreta dados com regras reproduzíveis; IA generativa entra depois como camada de explicação. |
+| ChatGPT conduz produto, arquitetura, critérios e QA; Codex executa código, testes, commits e PRs. | Implementações grandes eram tentadas diretamente por conversa e conectores limitados. | A execução passa a ocorrer em ambiente de código real, com relatório técnico e evidências. |
+| Google AdSense continua congelado. | AdSense era tratado como prioridade de monetização. | Nenhuma entrega funcional depende de anúncios. |
+| Cobrança continua adiada até validação comercial. | Checkout poderia ser antecipado. | Premium deve provar valor e demanda antes de recorrência, Pix ou cartão. |
+| O Handoff v10.3.0 é a única fonte canônica ativa. | Handoffs v10.2.0 e anteriores. | O cenário abaixo prevalece em caso de divergência. |
 
 ## 1. Estado atual do projeto
 
-### Estado executivo
-
-- Fases 1, 2 e 3 permanecem formalmente concluídas quanto às evidências históricas já aprovadas.
-- Release corretivo histórico: `0e029f78560d11d12720c447f2f9058c482e4277`.
-- Gate read-only histórico: run `30236078462`.
-- Production Premium Smoke histórico: run `30236078473`, artifact `8641670026`.
-- PV-1 foi implementada na branch `agent/product-validation-phase-1` e PR `#155`.
-- O mesmo SHA `797e0cd2f608157d4d728c578e696160cac78bb7` foi aprovado por:
-  - `Portfolio Notifications CI` run `30314601269`;
-  - `Phase 2 Closure CI` run `30314601226`;
-  - Preview Vercel com status `success`.
-- A cadeia aprovou governança, Handoff, audit, secret scan, lint, TypeScript, suíte completa, Firestore Emulator, cobertura crítica, mutation sanity, build, smoke HTTP e E2E desktop/mobile.
-- A implementação está pronta para revisão e merge.
-- PV-1 ainda não é formalmente concluída em produção porque faltam merge em `main`, deploy do mesmo SHA e smoke pós-deploy.
-
-### Implementado na PV-1
-
-- domínio `PortfolioHistory` tipado e versionado;
-- competência canônica `YYYY-MM`;
-- moeda pt-BR fail-closed;
-- zero válido separado de ausência;
-- proveniência `manual`, `automatic_snapshot` e `legacy`;
-- conflito explícito e snapshots imutáveis;
-- repository server-side e adapter Firestore;
-- ownership por identidade resolvida no servidor;
-- rotas finas `/api/portfolio/history` e `/api/portfolio/history/migrate`;
-- migração idempotente limitada ao ano corrente;
-- remoção do carregamento automático do legado iOS;
-- painel gratuito de inclusão, edição e exclusão de meses manuais;
-- snapshots automáticos e legado como somente leitura;
-- telemetria allowlistada sem valores financeiros;
-- E2E da inclusão, edição, exclusão e privacidade da telemetria.
+- Fases 1, 2 e 3 permanecem formalmente concluídas.
+- A fase vigente continua sendo **Produto Validável**.
+- PV-1 foi concluída com histórico manual de dividendos, persistência, reconciliação local/servidor e atualização reativa da carteira.
+- PR `#155` entregou a base server-side e a jornada de histórico manual.
+- PR `#166` consolidou gráfico e resumo sobre `consolidatedSnapshots`, removeu patches temporários e adicionou E2E.
+- PR `#167` restaurou o layout original dos seis cards sem reintroduzir fontes paralelas.
+- O usuário confirmou em produção que os cards são atualizados corretamente conforme os meses são inseridos.
+- O `main` de referência está em `e2f8c6a076e7e1f88b443a06556afde9a5bfea6b`.
+- A próxima entrega funcional é o núcleo determinístico da Inteligência da Carteira.
 
 ### Matriz atual
 
 | Área | Estado |
 |---|---|
-| Segurança, CI e Risk Lab históricos | Formalmente concluídos |
-| PV-1A — domínio e contratos | Aprovada em CI/Preview |
-| PV-1B — persistência e ownership | Aprovada em CI/Preview |
-| PV-1C — interface e jornada | Aprovada em CI/Preview |
-| PV-1D — telemetria e E2E | Aprovada em CI/Preview |
-| Merge em `main` | Pendente |
-| Produção e smoke pós-deploy | Pendente |
-| Premium comercial | Não validado comercialmente |
-| Checkout/cobrança | Não implementado e fora da PV-1 |
+| Regulatory Engine | Concluído |
+| Core Intelligence & Product Foundation | Concluído |
+| Risk Lab read-only | Concluído |
+| Histórico manual do ano corrente | Concluído |
+| Sincronização gráfico/cards | Concluída |
+| Persistência local + servidor | Concluída |
+| Inteligência da Carteira determinística | Próxima sprint |
+| Explicação por IA dos sinais | Pendente após núcleo determinístico |
+| Descoberta Premium/beta | Pendente |
+| Checkout/cobrança | Não iniciado |
 | AdSense | Congelado |
 
 ## 2. Fases concluídas
 
 ### Fase 1 — Regulatory Engine
 
-**Estado:** formalmente concluída.
+**Estado:** concluída.
 
-Inclui parser regulatório, normalização, reconciliação, QA, publicação, backup, rollback e auditoria.
+Parser regulatório, normalização, reconciliação, QA, publicação, rollback, auditoria e suporte FII/FIAGRO.
 
 ### Fase 2 — Core Intelligence & Product Foundation
 
-**Estado:** formalmente concluída quanto à base histórica.
+**Estado:** concluída quanto à fundação.
 
-Inclui `RegulatoryDataService`, repositórios, cache, scores, Health, Validation, Admin, relatórios, AI Insights, monitor, catálogo, carteira e jobs.
+Inclui `RegulatoryDataService`, repositórios, cache, score, Health, Validation, Admin, relatórios, AI Insights, monitor, catálogo, carteira e jobs.
 
 ### Fase 3 — Risk Lab
 
-**Estado:** formalmente concluída.
+**Estado:** concluída.
 
 Inclui dataset, backtest, ruleset `0.2.0`, Premium read-only, bloqueio de efeitos externos, smoke OIDC e auditoria persistida.
 
-### Fase Produto Validável
+### PV-1 — Jornada principal da carteira e histórico manual
 
-**Estado:** em execução.
+**Estado:** concluída funcionalmente.
 
-PV-1 está tecnicamente validada em CI e Preview. A conclusão formal depende de produção no mesmo SHA.
+Inclui cadastro manual de dividendos de meses encerrados, inclusão, sobrescrita, exclusão, persistência, reconciliação, atualização imediata dos gráficos e cards, navegação/reload e testes desktop/mobile.
 
 ## 3. Sprint atual
 
-### PV-1 — Jornada principal da carteira e histórico manual
+### PV-2A — Inteligência da Carteira: núcleo determinístico
 
-**Objetivo:** entregar o fluxo:
+**Objetivo:** transformar a carteira de um painel de números em um copiloto que identifica mudanças materiais com cálculos reproduzíveis e sem depender de IA generativa.
 
-`cadastro/login → carteira → histórico → diagnóstico → retorno posterior sem perda de dados`.
+### Escopo
 
-### Escopo entregue
+- criar um domínio próprio para métricas e sinais da carteira;
+- calcular variação mensal e acumulada da renda;
+- calcular média móvel e estabilidade/volatilidade da renda;
+- calcular concentração por fundo e por segmento;
+- calcular participação de cada fundo na renda;
+- detectar dependência excessiva de um único fundo;
+- detectar meses atípicos positivos e negativos;
+- classificar tendência de renda em alta, queda, estável ou inconclusiva;
+- medir qualidade e completude dos dados;
+- produzir sinais estruturados, com código, severidade e evidências;
+- não exibir recomendação de compra ou venda;
+- não chamar OpenAI para cálculos determinísticos.
 
-- cadastro manual de ano, mês, patrimônio e dividendos;
-- edição e exclusão de registros manuais;
-- duplicidade bloqueada por owner, carteira e competência;
-- snapshots automáticos e legado imutáveis;
-- ownership server-side;
-- API server-side;
-- telemetria sanitizada;
-- interface gratuita e sem propaganda;
-- E2E desktop/mobile.
+### Sinais mínimos
 
-### Gate de conclusão formal
+- `RENDA_EM_ALTA`;
+- `RENDA_EM_QUEDA`;
+- `RENDA_INSTAVEL`;
+- `RENDA_ESTAVEL`;
+- `CONCENTRACAO_ELEVADA`;
+- `DEPENDENCIA_DE_UM_FUNDO`;
+- `MES_ATIPICO_POSITIVO`;
+- `MES_ATIPICO_NEGATIVO`;
+- `DADOS_INSUFICIENTES`.
 
-PV-1 só muda para concluída após:
+### Contrato mínimo de sinal
 
-1. merge da PR `#155` sem bypass;
-2. deploy em produção do mesmo SHA validado ou do merge commit com árvore equivalente;
-3. smoke não destrutivo em produção;
-4. confirmação da persistência e leitura do histórico;
-5. confirmação de ausência de carregamento automático do legado iOS;
-6. atualização deste Handoff com SHA de produção e IDs do smoke.
+```ts
+{
+  code: "RENDA_EM_QUEDA",
+  severity: "warning",
+  title: "Sua renda caiu nos últimos meses",
+  evidence: {
+    previousAverage: 140,
+    recentAverage: 112,
+    variationPercent: -20
+  }
+}
+```
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **PV-1 — merge, produção e smoke da jornada principal.**
-2. **PV-2 — descoberta do Premium e beta controlado, sem checkout falso.**
-3. **PV-3 — telemetria, retenção e validação de disposição a pagar.**
-4. **PV-4 — relatório incremental: “o que mudou desde a última análise”.**
-5. **PV-5 — Radar/Acompanhar fundo fora da carteira.**
-6. **PV-6 — cobrança, somente após evidência comercial suficiente.**
-7. **PV-7 — carteira histórica verdadeira, retorno total e atribuição.**
-8. **PV-8 — screener, comparador, filtros salvos e fair value por categoria.**
+1. **PV-2A — Inteligência da Carteira: núcleo determinístico.**
+2. **PV-2B — Apresentação dos sinais na carteira e resumo “O que mudou”.**
+3. **PV-2C — IA explicativa sobre sinais prontos, sem recalcular dados.**
+4. **PV-3 — Descoberta Premium, beta controlado e telemetria de interesse.**
+5. **PV-4 — Relatório incremental: mudanças desde a última análise.**
+6. **PV-5 — Radar/Acompanhar fundo fora da carteira: 1 grátis e 10 Premium.**
+7. **PV-6 — Validação de preço e cobrança.**
+8. **PV-7 — Checkout, recorrência, cancelamento e entitlement.**
+9. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
+10. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
 
-SEO editorial, AdSense, WhatsApp, Telegram e novas ferramentas não antecipam PV-1 a PV-3.
+SEO editorial, AdSense, WhatsApp, Telegram e grandes mudanças visuais não antecipam PV-2A a PV-3.
 
 ## 5. Escopo e critérios de aceite de cada sprint
 
-### PV-1
-
-Aceite técnico já comprovado no SHA `797e0cd2f608157d4d728c578e696160cac78bb7` pelos runs `30314601269` e `30314601226` e pelo Preview Vercel.
-
-Aceite final pendente: produção e smoke do mesmo código.
-
-### PV-2
-
-Escopo:
-
-- tornar a proposta Premium visível;
-- exibir benefícios, diferenças e amostra;
-- registrar interesse e consentimento;
-- permitir beta por allowlist server-side;
-- manter checkout indisponível.
+### PV-2A
 
 Aceite:
 
-- nenhum botão de pagamento falso;
-- `premium_viewed` e `premium_interest_submitted` medidos;
-- custo de IA limitado e auditável;
-- entitlement server-side.
+- métricas puras e determinísticas, sem dependência de React ou OpenAI;
+- testes unitários para cada fórmula e limiar;
+- ausência, zero e dados inválidos tratados separadamente;
+- resultados reproduzíveis para a mesma entrada;
+- nenhum hardcode por ticker ou usuário;
+- contrato versionado dos sinais;
+- lint, typecheck, suíte, build e E2E verdes;
+- nenhum valor financeiro em logs/telemetria;
+- documentação dos limiares e das hipóteses.
+
+### PV-2B
+
+Aceite:
+
+- bloco “O que mudou na sua carteira” na interface;
+- linguagem simples e orientada a impacto;
+- evidência visível para cada sinal;
+- ausência de alerta quando não houver mudança material;
+- acessibilidade desktop/mobile;
+- estados vazio, incompleto, carregando e erro explícitos.
+
+### PV-2C
+
+Aceite:
+
+- IA recebe somente métricas e sinais validados;
+- IA não recalcula números;
+- saída sem recomendação de compra/venda;
+- confiança e limitações explícitas;
+- cache/versionamento de prompt;
+- custo por geração limitado e auditável;
+- fallback determinístico quando IA estiver indisponível.
 
 ### PV-3
 
-Escopo:
-
-- funil de ativação;
-- retenção D7 e D30;
-- coorte beta externa;
-- entrevistas orientadas a comportamento e preço.
-
 Aceite:
 
-- métricas reproduzíveis;
-- eventos sem carteira, valores, e-mail ou ticker desnecessário;
-- decisão documentada sobre preço e cobrança;
-- validação não baseada apenas no proprietário.
+- proposta Premium visível sem checkout falso;
+- lista de interesse e beta por allowlist server-side;
+- telemetria sem dados financeiros ou identidade bruta;
+- decisão comercial baseada em usuários externos, não apenas no proprietário.
 
-### PV-4
+### PV-4 a PV-9
 
-Relatório-base mais delta desde a última análise. Não repetir relatório completo quando nada relevante mudou.
-
-### PV-5
-
-Acompanhar fundo fora da carteira. Grátis até 1 fundo; Premium até 10. Ausência de mudança não notifica.
-
-### PV-6
-
-Checkout, recorrência, cancelamento, webhooks, conciliação e entitlement. Só inicia após demanda comercial comprovada.
+Cada sprint exige escopo fechado, testes automatizados, Preview, produção e evidência antes de ser marcada como concluída.
 
 ## 6. Regras arquiteturais obrigatórias
 
 1. Route Handler → autenticação/schema → controller/application service → domínio → repository → Firestore/provedor.
 2. Nenhum `route.ts` importa Firestore diretamente.
 3. Componente React não contém regra financeira, conflito ou persistência de domínio.
-4. Repository não importa React, `NextResponse` ou apresentação.
-5. Carteira e histórico possuem tipos fortes e schemas versionados.
-6. Competência usa `YYYY-MM`.
+4. Métricas e sinais da carteira ficam em módulos puros, testáveis e independentes de UI.
+5. IA nunca é fonte de verdade para cálculo financeiro.
+6. Gráfico e cards que representam o mesmo conceito usam a mesma série consolidada.
 7. Ausência não vira zero; `NaN`, infinito, data futura e valor inválido falham fechado.
-8. Identidade do registro usa owner, carteira e competência.
+8. Competência usa `YYYY-MM`.
 9. Snapshot automático não é editável como manual.
-10. Conflito manual/snapshot é explícito.
-11. Proveniência e timestamps são obrigatórios.
-12. Logs e telemetria não contêm valores financeiros, posições, e-mail, token ou cookie.
-13. Plano, admin e identidade vêm do servidor.
-14. Risk Lab permanece read-only no Premium.
-15. Correções são gerais, sem hardcode por ticker, e-mail ou usuário.
-16. CI é gate de merge e deploy.
-17. Node 22 strip-only deve ser suportado pelos módulos executados diretamente nos testes.
+10. Proveniência e timestamps são obrigatórios.
+11. Logs e telemetria não contêm valores financeiros, posições, e-mail, token ou cookie.
+12. Plano, admin, identidade e entitlement vêm do servidor.
+13. Risk Lab permanece read-only no Premium.
+14. Correções são gerais, sem hardcode por ticker, e-mail ou usuário.
+15. CI é gate de merge e deploy.
+16. Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand` é aceita como correção funcional.
+17. Codex deve alterar o código-fonte diretamente, executar testes e entregar relatório técnico.
+18. Nenhuma validação manual substitui esses gates.
 
 ## 7. Arquivos, branches, commits e PRs existentes
 
-### Estado histórico
+### Referências atuais
 
-- Release corretivo: `0e029f78560d11d12720c447f2f9058c482e4277`.
-- PRs históricas principais: `#141`, `#142`, `#143`, `#146`, `#147`, `#148`, `#149`, `#150`, `#151`, `#152`, `#153`.
-- PR `#65`: encerrada sem merge por substituição canônica.
+- Repositório: `IsraelJr/dados-fii`.
+- Branch principal: `main`.
+- SHA de referência: `e2f8c6a076e7e1f88b443a06556afde9a5bfea6b`.
+- PR `#155`: jornada PV-1 e histórico server-side.
+- PR `#166`: consolidação do resumo com a série do gráfico.
+- PR `#167`: restauração do layout dos cards.
+- PR `#165`: fechada sem merge; tentativa substituída por `#166`.
 
-### PV-1
+### Arquivos centrais da carteira/histórico
 
-- Branch: `agent/product-validation-phase-1`.
-- Issue: `#154`.
-- PR: `#155`.
-- SHA validado: `797e0cd2f608157d4d728c578e696160cac78bb7`.
-- CI principal: run `30314601226` — sucesso.
-- CI de notificações: run `30314601269` — sucesso.
-- Preview Vercel: sucesso.
-- Documento de direção: `docs/product/product-validation-phase-1.md`.
-- Auditoria: `docs/product/pv-1-wallet-gap-analysis.md`.
-- Inventário de ambiente: `docs/operations/runtime-environment-inventory.md`.
-
-### Arquivos centrais
-
+- `src/app/carteira/page.tsx`;
+- `src/app/components/PortfolioHistoryPanel.tsx`;
 - `src/lib/portfolio/PortfolioHistory.ts`;
 - `src/lib/portfolio/PortfolioHistoryRepository.ts`;
 - `src/lib/portfolio/PortfolioHistoryService.ts`;
-- `src/lib/portfolio/LegacyPortfolioHistoryMigration.ts`;
 - `src/server/repositories/FirestorePortfolioHistoryRepository.ts`;
-- `src/server/auth/WalletIdentityResolver.ts`;
 - `src/server/controllers/PortfolioHistoryController.ts`;
-- `src/server/controllers/PortfolioHistoryMigrationController.ts`;
 - `src/app/api/portfolio/history/route.ts`;
-- `src/app/api/portfolio/history/migrate/route.ts`;
-- `src/app/components/PortfolioHistoryPanel.tsx`;
-- `src/lib/product/ProductEvent.ts`;
-- `src/server/controllers/ProductEventController.ts`;
 - `tests/portfolio-history*.test.*`;
 - `tests/e2e/critical-journeys.spec.ts`.
 
+### Documentos canônicos
+
+- `DADOS_FII_HANDOFF.md`;
+- `docs/product/product-validation-phase-1.md`;
+- `docs/operations/runtime-environment-inventory.md`;
+- `tests/canonical-handoff.test.mjs`.
+
 ## 8. Funcionalidades concluídas, parciais e pendentes
 
-### Concluídas historicamente
+### Concluídas
 
 - motor regulatório e catálogo;
+- carteira básica e snapshots;
+- histórico manual de dividendos do ano corrente;
+- persistência local e server-side;
+- reconciliação por `updatedAt`;
+- inclusão, sobrescrita e exclusão;
+- atualização imediata de gráfico e cards;
+- maior mês, menor mês, total e média sobre a mesma fonte;
 - relatórios Free, AI Insights e Premium controlado;
 - Risk Lab read-only;
-- segurança, CI e produção corretiva;
-- carteira básica e snapshots.
+- segurança, CI e gates de produção.
 
-### Concluídas tecnicamente na PV-1
+### Parciais
 
-- histórico manual server-side;
-- isolamento entre usuários;
-- inclusão, edição e exclusão;
-- proveniência e conflito;
-- migração idempotente;
-- remoção do autoload iOS;
-- telemetria sanitizada;
-- E2E desktop/mobile;
-- Preview aprovado.
+- inteligência da carteira: existem dados e relatórios, mas falta o motor unificado de métricas e sinais;
+- Premium: relatório existe, mas descoberta, beta e cobrança não estão finalizados;
+- notificações: existem, mas ainda precisam seguir rigorosamente mudança material e deduplicação.
 
-### Pendentes imediatas
+### Pendentes
 
-- merge da PR `#155`;
-- deploy em produção;
-- smoke pós-deploy;
-- confirmação do índice Firestore no ambiente de produção, quando necessário;
-- atualização final do Handoff com SHA de produção.
-
-### Pendentes de produto
-
-- descoberta Premium e lista de interesse;
-- beta externo;
+- núcleo determinístico da Inteligência da Carteira;
+- apresentação “O que mudou”;
+- IA explicativa sobre sinais;
+- descoberta Premium e beta externo;
 - relatório incremental;
-- Radar/Acompanhar fundo;
-- cobrança;
-- retorno total e atribuição;
-- screener e comparador.
+- acompanhar fundo fora da carteira;
+- cobrança e entitlement comercial;
+- WhatsApp/Telegram;
+- retorno total, atribuição, screener e comparador.
 
 ## 9. Decisões de segurança
 
@@ -304,32 +283,31 @@ Checkout, recorrência, cancelamento, webhooks, conciliação e entitlement. Só
 - `NEXT_PUBLIC_*` nunca concede plano, admin, ownership ou privilégio.
 - Carteira e histórico são privados e `noindex`.
 - Entitlement e identidade são resolvidos no servidor.
-- Firestore cliente permanece fail-closed conforme arquitetura vigente.
 - Escritas exigem autenticação, schema e ownership.
 - Usuário só acessa e altera seus próprios registros.
-- Snapshot automático não pode ser alterado como manual.
 - Eventos analíticos não armazenam valores da carteira.
-- Erros públicos não expõem detalhes internos.
-- E-mail, `ownerId` e `userId` enviados no body não concedem identidade.
-- Sessão por e-mail exige token persistido, válido e não expirado.
+- E-mail ou `ownerId` enviados no body não concedem identidade.
 - Não existe exceção por e-mail pessoal.
+- IA recebe apenas dados necessários e sanitizados.
+- Sinais determinísticos não podem disparar efeitos externos por conta própria.
 
 ## 10. Variáveis de ambiente
 
-O inventário versionado e testado está em:
+O inventário versionado está em:
 
 `docs/operations/runtime-environment-inventory.md`
 
 Regras:
 
 - valores nunca são registrados no Git, Handoff, logs ou evidências;
-- toda variável nova exige classificação, owner, ambientes, fallback, rollback e teste;
-- alias legado possui plano de remoção;
-- feature flag temporária possui condição de remoção.
+- variável nova exige classificação, owner, ambientes, fallback, rollback e teste;
+- feature flag temporária exige condição de remoção;
+- credenciais OpenAI permanecem server-only;
+- flags de Premium e Risk Lab permanecem fail-closed.
 
 ## 11. Testes obrigatórios
 
-Gate obrigatório:
+Gate mínimo:
 
 1. `npm ci`;
 2. governança de workflows;
@@ -344,28 +322,30 @@ Gate obrigatório:
 11. mutation sanity;
 12. build;
 13. smoke HTTP;
-14. Chromium;
-15. E2E desktop/mobile;
-16. Preview Vercel;
-17. produção e smoke pós-deploy.
+14. E2E desktop/mobile;
+15. Preview Vercel;
+16. produção e smoke pós-deploy.
 
-Evidência atual do SHA `797e0cd2f608157d4d728c578e696160cac78bb7`:
+Para carteira/histórico/inteligência, adicionar obrigatoriamente:
 
-- `Portfolio Notifications CI` run `30314601269`: aprovado;
-- `Phase 2 Closure CI` run `30314601226`: aprovado;
-- E2E da carteira e histórico manual: aprovado em desktop e mobile;
-- Preview Vercel: aprovado.
-
-Nenhuma validação manual substitui esses gates.
+- inclusão, sobrescrita e exclusão de mês;
+- navegação e reload;
+- reconciliação local/servidor;
+- gráfico e cards sincronizados;
+- zero sem informação não entra como menor mês;
+- limiares de sinais em testes de fronteira;
+- dados insuficientes não geram conclusão forte;
+- IA indisponível não quebra o diagnóstico determinístico.
 
 ## 12. Pendências e decisões ainda abertas
 
-### Bloqueadores imediatos
+### Imediatas
 
-- revisar e mesclar PR `#155`;
-- confirmar deploy do código validado em produção;
-- executar smoke não destrutivo;
-- registrar SHA e IDs finais.
+- fechar escopo numérico e limiares da PV-2A;
+- decidir janela de média móvel e critério de tendência;
+- decidir limites de concentração por fundo e segmento;
+- decidir regra de mês atípico;
+- definir formato final do contrato de sinais.
 
 ### Comerciais
 
@@ -373,22 +353,28 @@ Nenhuma validação manual substitui esses gates.
 - recorrência, anual ou compra avulsa;
 - provedor de pagamento;
 - cartão, Pix recorrente ou Pix avulso;
-- política de beta e limites de IA.
+- política e limites do beta;
+- limites de uso de IA por plano.
 
 ### Produto
 
-- tratamento visual avançado de conflito manual/snapshot;
 - importação de anos anteriores;
 - importação por planilha;
-- definição final do diagnóstico gratuito;
-- conteúdo da prévia Premium.
+- Radar/Acompanhar fundo;
+- relatório incremental;
+- retorno total e atribuição;
+- screener e comparador.
 
 ### Canais
 
 - WhatsApp: custo, opt-in, template e frequência;
 - Telegram permanece adiado;
-- e-mail deve permanecer deduplicado e orientado a mudança material.
+- e-mail deve ser deduplicado e orientado a mudança material.
 
-### Regra executiva
+### Processo de desenvolvimento
 
-Uma demanda só antecipa PV-1 a PV-3 quando comprovar impacto direto em ativação, retenção, confiança, conversão ou redução de custo/risco.
+- ChatGPT define escopo, regras, arquitetura, critérios de aceite e prompts técnicos.
+- Codex implementa no repositório, executa testes, abre PR e produz relatório técnico.
+- O resultado do Codex retorna para revisão de produto e QA antes da próxima sprint.
+
+Uma demanda só antecipa a ordem quando comprovar impacto direto em ativação, retenção, confiança, conversão ou redução de custo/risco.
