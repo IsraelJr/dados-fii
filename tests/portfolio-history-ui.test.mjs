@@ -77,8 +77,12 @@ test("resumo e gráfico consomem os mesmos snapshots sem patches de build", () =
   const vercel = JSON.parse(text("vercel.json"));
 
   assert.match(page, /<VisualHistorySection snapshots=\{consolidatedSnapshots\} \/>/);
-  assert.match(page, /<SimpleMonthlySummary insights=\{insights\} snapshots=\{consolidatedSnapshots\}/);
+  assert.match(page, /<SimpleMonthlySummary snapshots=\{consolidatedSnapshots\} \/>/);
   assert.match(page, /snapshots: readonly WalletSnapshot\[\]/);
+  assert.match(page, /className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6"/);
+  assert.match(page, /function SummaryMetric\(\{ label, primary, value \}/);
+  assert.match(page, /text-indigo-700/);
+  assert.doesNotMatch(page, /mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4/);
   assert.doesNotMatch(page, /historicalStats|HistoricalDividendStats|buildHistoricalDividendStats/);
   assert.doesNotMatch(uxEnhancer, /replaceDividendExtremesSummary|readHistoricalDividendSnapshots|data-dividend-extremes-fixed/);
   assert.doesNotMatch(layout, /WalletHistoricalSummaryEnhancer/);

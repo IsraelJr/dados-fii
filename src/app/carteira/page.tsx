@@ -619,7 +619,7 @@ export default function WalletPage() {
       <AttentionSection insights={insights} />
       <VisualHistorySection snapshots={consolidatedSnapshots} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
-      <SimpleMonthlySummary insights={insights} snapshots={consolidatedSnapshots} topWeight={topWeight} topWeightPercent={topWeightPercent} />
+      <SimpleMonthlySummary snapshots={consolidatedSnapshots} />
       <WalletEditorSection ticker={ticker} setTicker={setTicker} quotas={quotas} setQuotas={setQuotas} quotasInputRef={quotasInputRef} addItem={addItem} exportCsv={exportCsv} canExport={loaded.length > 0} />
       <WalletTable items={items} insights={insights} loading={loading} editingQuotas={editingQuotas} setEditingQuotas={setEditingQuotas} upcomingPayments={upcomingPayments} updateQuotas={updateQuotas} removeItem={removeItem} />
       <UpcomingPaymentsSection payments={displayedUpcomingPayments} shouldScroll={shouldScrollUpcomingPayments} />
@@ -681,8 +681,7 @@ function AttentionSection({ insights }: { insights: WalletInsights }) {
   );
 }
 
-function SimpleMonthlySummary({ insights, snapshots, topWeight, topWeightPercent }: { insights: WalletInsights; snapshots: readonly WalletSnapshot[]; topWeight?: EnrichedFii; topWeightPercent: number }) {
-  const history = insights.dividendHistory;
+function SimpleMonthlySummary({ snapshots }: { snapshots: readonly WalletSnapshot[] }) {
   const currentYear = new Date().getFullYear();
   const paidSnapshots = snapshots.filter((snapshot) => snapshot.estimatedMonthlyIncome > 0);
   const currentYearSnapshots = paidSnapshots.filter((snapshot) => getSnapshotYear(snapshot) === currentYear);
@@ -710,16 +709,13 @@ function SimpleMonthlySummary({ insights, snapshots, topWeight, topWeightPercent
         <h2 className="mt-3 text-xl font-black text-slate-900">Leitura rápida dos números</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">Meses informados manualmente substituem a estimativa calculada com as cotas atuais.</p>
       </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <LightMetric label={`Maior mês de ${currentYear}`} value={currentYearBest ? `${getSnapshotMonthLabel(currentYearBest)}: ${formatCurrency(currentYearBest.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label={`Menor mês de ${currentYear}`} value={currentYearWorst ? `${getSnapshotMonthLabel(currentYearWorst)}: ${formatCurrency(currentYearWorst.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label="Total no ano" value={formatCurrency(currentYearTotal)} />
-        <LightMetric label="Média mensal" value={formatCurrency(currentYearAverage)} />
-        <LightMetric label="Maior mês do histórico" value={allTimeBest ? `${allTimeBest.label}: ${formatCurrency(allTimeBest.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label="Menor mês do histórico" value={allTimeWorst ? `${allTimeWorst.label}: ${formatCurrency(allTimeWorst.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label="Maior ano de dividendos" value={bestYear ? `${bestYear.year}: ${formatCurrency(bestYear.total)}` : "-"} />
-        <LightMetric label="Maior pagador estimado" value={history.topPayer ? `${history.topPayer.ticker}: ${formatCurrency(history.topPayer.value)}` : "-"} />
-        <LightMetric label="Maior peso financeiro" value={topWeight ? `${topWeight.ticker}: ${formatPercentValue(topWeightPercent)}` : "-"} />
+      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6" title={`Média mensal em ${currentYear}: ${formatCurrency(currentYearAverage)}`}>
+        <SummaryMetric label={`Maior mês (${currentYear})`} primary={currentYearBest ? `${getSnapshotMonthLabel(currentYearBest)}/${currentYear}` : "Sem histórico"} value={currentYearBest ? formatCurrency(currentYearBest.estimatedMonthlyIncome) : "-"} />
+        <SummaryMetric label={`Menor mês (${currentYear})`} primary={currentYearWorst ? `${getSnapshotMonthLabel(currentYearWorst)}/${currentYear}` : "Sem histórico"} value={currentYearWorst ? formatCurrency(currentYearWorst.estimatedMonthlyIncome) : "-"} />
+        <SummaryMetric label="Maior da história" primary={allTimeBest ? `${getSnapshotMonthLabel(allTimeBest)}/${getSnapshotYear(allTimeBest)}` : "Sem histórico"} value={allTimeBest ? formatCurrency(allTimeBest.estimatedMonthlyIncome) : "-"} />
+        <SummaryMetric label="Menor da história" primary={allTimeWorst ? `${getSnapshotMonthLabel(allTimeWorst)}/${getSnapshotYear(allTimeWorst)}` : "Sem histórico"} value={allTimeWorst ? formatCurrency(allTimeWorst.estimatedMonthlyIncome) : "-"} />
+        <SummaryMetric label="Maior ano de dividendos" primary={bestYear ? String(bestYear.year) : "Sem histórico"} value={bestYear ? formatCurrency(bestYear.total) : "-"} />
+        <SummaryMetric label="Total do ano" primary={String(currentYear)} value={formatCurrency(currentYearTotal)} />
       </div>
     </section>
   );
@@ -869,8 +865,8 @@ function DarkMetric({ label, value, detail, tone }: { label: string; value: stri
   return <div className="rounded-2xl bg-gray-800 p-4 ring-1 ring-white/10"><p className="text-xs font-extrabold uppercase tracking-wide text-gray-400">{label}</p><strong className={`mt-2 block text-2xl ${valueClass}`}>{value}</strong><p className="mt-2 text-xs font-medium leading-5 text-gray-300">{detail}</p></div>;
 }
 
-function LightMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-sm font-black text-slate-900">{value}</p></div>;
+function SummaryMetric({ label, primary, value }: { label: string; primary: string; value: string }) {
+  return <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200"><p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 text-sm font-black text-slate-900">{primary}</p><p className="mt-1 text-sm font-black text-indigo-700">{value}</p></div>;
 }
 
 function HistoryChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
