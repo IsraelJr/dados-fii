@@ -218,9 +218,21 @@ test("resumo e gráfico usam o mesmo histórico consolidado e preservam fevereir
   await page.goto("/carteira");
   const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
   const summary = page.getByRole("heading", { name: "Leitura rápida dos números" }).locator("..").locator("..");
-  const bestMonth = summary.getByText(`Maior mês de ${currentYear}`, { exact: true }).locator("..");
-  const yearTotal = summary.getByText("Total no ano", { exact: true }).locator("..");
+  const summaryGrid = summary.locator("div.mt-5.grid").first();
+  const bestMonth = summary.getByText(`Maior mês (${currentYear})`, { exact: true }).locator("..");
+  const yearTotal = summaryGrid.locator(":scope > div").nth(5);
   const dividendChart = page.getByRole("heading", { name: `Dividendos pagos em ${currentYear}` }).locator("..");
+
+  await expect(summaryGrid).toHaveAttribute("class", "mt-5 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6");
+  await expect(summaryGrid.locator(":scope > div")).toHaveCount(6);
+  await expect(summaryGrid.locator(":scope > div > p:first-child")).toHaveText([
+    `Maior mês (${currentYear})`,
+    `Menor mês (${currentYear})`,
+    "Maior da história",
+    "Menor da história",
+    "Maior ano de dividendos",
+    "Total do ano",
+  ]);
 
   await history.getByLabel("Mês do histórico").selectOption("2");
   await history.getByLabel("Dividendos recebidos no mês").fill("450,03");
@@ -230,7 +242,8 @@ test("resumo e gráfico usam o mesmo histórico consolidado e preservam fevereir
   await expect.poll(() => mutationMethods.filter((method) => method === "POST").length).toBe(1);
   await expect(history.getByText("Sincronizado", { exact: true })).toBeVisible();
 
-  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(bestMonth).toContainText(`Fev/${currentYear}`);
+  await expect(bestMonth).toContainText("R$ 450,03");
   await expect(yearTotal).toContainText("R$ 550,03");
   await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
   await expect(dividendChart.locator("svg text").filter({ hasText: "R$ 450" })).toBeVisible();
@@ -240,7 +253,8 @@ test("resumo e gráfico usam o mesmo histórico consolidado e preservam fevereir
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   await expect.poll(() => mutationMethods).toContain("DELETE");
   await expect(history.getByText("Sincronizado", { exact: true })).toBeVisible();
-  await expect(bestMonth).toContainText("Jan: R$ 100,00");
+  await expect(bestMonth).toContainText(`Jan/${currentYear}`);
+  await expect(bestMonth).toContainText("R$ 100,00");
   await expect(yearTotal).toContainText("R$ 100,00");
   await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toHaveCount(0);
 
@@ -251,18 +265,21 @@ test("resumo e gráfico usam o mesmo histórico consolidado e preservam fevereir
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   await expect.poll(() => mutationMethods.filter((method) => method === "POST").length).toBe(2);
   await expect(history.getByText("Sincronizado", { exact: true })).toBeVisible();
-  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(bestMonth).toContainText(`Fev/${currentYear}`);
+  await expect(bestMonth).toContainText("R$ 450,03");
   await expect(yearTotal).toContainText("R$ 550,03");
   await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
   await expect(dividendChart.locator("svg text").filter({ hasText: "R$ 450" })).toBeVisible();
 
   await page.goto("/fontes-dos-dados");
   await page.goBack();
-  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(bestMonth).toContainText(`Fev/${currentYear}`);
+  await expect(bestMonth).toContainText("R$ 450,03");
   await expect(yearTotal).toContainText("R$ 550,03");
 
   await page.reload();
-  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(bestMonth).toContainText(`Fev/${currentYear}`);
+  await expect(bestMonth).toContainText("R$ 450,03");
   await expect(yearTotal).toContainText("R$ 550,03");
   await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
 });
