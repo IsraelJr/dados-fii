@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 function text(path) {
@@ -67,4 +67,26 @@ test("interface não contém e-mail pessoal nem desbloqueio por anúncio", () =>
   ].join("\n");
   assert.doesNotMatch(source, /israel\.junior2111@gmail\.com/i);
   assert.doesNotMatch(source, /adsense|assistir.*anúncio|propaganda/i);
+});
+
+test("resumo e gráfico consomem os mesmos snapshots sem patches de build", () => {
+  const page = text("src/app/carteira/page.tsx");
+  const layout = text("src/app/carteira/layout.tsx");
+  const uxEnhancer = text("src/app/components/WalletPageUxEnhancer.tsx");
+  const packageJson = JSON.parse(text("package.json"));
+  const vercel = JSON.parse(text("vercel.json"));
+
+  assert.match(page, /<VisualHistorySection snapshots=\{consolidatedSnapshots\} \/>/);
+  assert.match(page, /<SimpleMonthlySummary insights=\{insights\} snapshots=\{consolidatedSnapshots\}/);
+  assert.match(page, /snapshots: readonly WalletSnapshot\[\]/);
+  assert.doesNotMatch(page, /historicalStats|HistoricalDividendStats|buildHistoricalDividendStats/);
+  assert.doesNotMatch(uxEnhancer, /replaceDividendExtremesSummary|readHistoricalDividendSnapshots|data-dividend-extremes-fixed/);
+  assert.doesNotMatch(layout, /WalletHistoricalSummaryEnhancer/);
+  assert.equal(existsSync("src/app/components/WalletHistoricalSummaryEnhancer.tsx"), false);
+  assert.equal(existsSync("scripts/apply-current-year-summary-source.mjs"), false);
+  assert.equal(existsSync(".github/workflows/patch-current-year-summary.yml"), false);
+  assert.equal(packageJson.scripts["prepare:summary-source"], undefined);
+  assert.equal(packageJson.scripts.predev, undefined);
+  assert.equal(packageJson.scripts.build, "next build");
+  assert.equal(vercel.buildCommand, undefined);
 });

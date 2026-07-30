@@ -56,16 +56,6 @@ type ManualHistoryEntry = Readonly<{
   source: "manual" | "automatic_snapshot" | "legacy";
   updatedAt?: string;
 }>;
-type HistoricalDividendStats = Readonly<{
-  currentYear: number;
-  currentYearTotal: number;
-  currentYearAverage: number;
-  currentYearBest: WalletSnapshot | null;
-  currentYearWorst: WalletSnapshot | null;
-  allTimeBest: WalletSnapshot | null;
-  allTimeWorst: WalletSnapshot | null;
-  bestYear: { year: number; total: number } | null;
-}>;
 type DividendMonth = { month: string; label: string; value: number };
 type DividendHistory = {
   months: DividendMonth[];
@@ -365,32 +355,6 @@ function reconcileManualHistory(localEntries: readonly ManualHistoryEntry[], rem
   return [...merged.values()].sort((left, right) => left.competence.localeCompare(right.competence));
 }
 
-function buildHistoricalDividendStats(snapshots: readonly WalletSnapshot[]): HistoricalDividendStats {
-  const currentYear = new Date().getFullYear();
-  const paid = snapshots.filter((snapshot) => snapshot.estimatedMonthlyIncome > 0);
-  const currentYearItems = paid.filter((snapshot) => getSnapshotYear(snapshot) === currentYear);
-  const byValueDescending = (items: readonly WalletSnapshot[]) => [...items].sort((a, b) => b.estimatedMonthlyIncome - a.estimatedMonthlyIncome);
-  const currentYearSorted = byValueDescending(currentYearItems);
-  const allTimeSorted = byValueDescending(paid);
-  const totalsByYear = paid.reduce((acc, snapshot) => {
-    const year = getSnapshotYear(snapshot);
-    acc.set(year, (acc.get(year) || 0) + snapshot.estimatedMonthlyIncome);
-    return acc;
-  }, new Map<number, number>());
-  const bestYearEntry = [...totalsByYear.entries()].sort((a, b) => b[1] - a[1])[0];
-  const currentYearTotal = currentYearItems.reduce((sum, snapshot) => sum + snapshot.estimatedMonthlyIncome, 0);
-  return {
-    currentYear,
-    currentYearTotal,
-    currentYearAverage: currentYearItems.length ? currentYearTotal / currentYearItems.length : 0,
-    currentYearBest: currentYearSorted[0] || null,
-    currentYearWorst: currentYearSorted.at(-1) || null,
-    allTimeBest: allTimeSorted[0] || null,
-    allTimeWorst: allTimeSorted.at(-1) || null,
-    bestYear: bestYearEntry ? { year: bestYearEntry[0], total: bestYearEntry[1] } : null,
-  };
-}
-
 export default function WalletPage() {
   const [ticker, setTicker] = useState("");
   const [quotas, setQuotas] = useState("");
@@ -416,12 +380,7 @@ export default function WalletPage() {
   }, []);
 
   useEffect(() => {
-    const applyEntries = (entries: unknown) => {
-      const normalized = normalizeManualHistory(entries);
-      setManualHistory((current) => reconcileManualHistory(current, normalized));
-    };
-
-    applyEntries(readManualHistoryCache());
+    setManualHistory(readManualHistoryCache());
 
     const loadHistory = async () => {
       const email = window.localStorage.getItem(EMAIL_KEY)?.trim().toLowerCase();
@@ -446,7 +405,7 @@ export default function WalletPage() {
 
     const onHistory = (event: Event) => {
       const detail = (event as CustomEvent<{ entries?: unknown }>).detail;
-      applyEntries(detail?.entries);
+      setManualHistory(normalizeManualHistory(detail?.entries));
     };
     const onSession = () => void loadHistory();
 
@@ -593,11 +552,6 @@ export default function WalletPage() {
     });
     return [...byCompetence.values()].sort((left, right) => left.monthKey.localeCompare(right.monthKey));
   }, [snapshots, manualHistory, items.length]);
-  const historicalDividendStats = useMemo(
-    () => buildHistoricalDividendStats(consolidatedSnapshots),
-    [consolidatedSnapshots],
-  );
-
   function addItem() {
     const code = ticker.trim().toUpperCase();
     const totalQuotas = Number(quotas.replace(",", "."));
@@ -665,7 +619,7 @@ export default function WalletPage() {
       <AttentionSection insights={insights} />
       <VisualHistorySection snapshots={consolidatedSnapshots} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
-      <SimpleMonthlySummary insights={insights} historicalStats={historicalDividendStats} topWeight={topWeight} topWeightPercent={topWeightPercent} />
+      <SimpleMonthlySummary insights={insights} snapshots={consolidatedSnapshots} topWeight={topWeight} topWeightPercent={topWeightPercent} />
       <WalletEditorSection ticker={ticker} setTicker={setTicker} quotas={quotas} setQuotas={setQuotas} quotasInputRef={quotasInputRef} addItem={addItem} exportCsv={exportCsv} canExport={loaded.length > 0} />
       <WalletTable items={items} insights={insights} loading={loading} editingQuotas={editingQuotas} setEditingQuotas={setEditingQuotas} upcomingPayments={upcomingPayments} updateQuotas={updateQuotas} removeItem={removeItem} />
       <UpcomingPaymentsSection payments={displayedUpcomingPayments} shouldScroll={shouldScrollUpcomingPayments} />
@@ -727,8 +681,28 @@ function AttentionSection({ insights }: { insights: WalletInsights }) {
   );
 }
 
-function SimpleMonthlySummary({ insights, historicalStats, topWeight, topWeightPercent }: { insights: WalletInsights; historicalStats: HistoricalDividendStats; topWeight?: EnrichedFii; topWeightPercent: number }) {
+function SimpleMonthlySummary({ insights, snapshots, topWeight, topWeightPercent }: { insights: WalletInsights; snapshots: readonly WalletSnapshot[]; topWeight?: EnrichedFii; topWeightPercent: number }) {
   const history = insights.dividendHistory;
+  const currentYear = new Date().getFullYear();
+  const paidSnapshots = snapshots.filter((snapshot) => snapshot.estimatedMonthlyIncome > 0);
+  const currentYearSnapshots = paidSnapshots.filter((snapshot) => getSnapshotYear(snapshot) === currentYear);
+  const byIncomeDescending = (left: WalletSnapshot, right: WalletSnapshot) => right.estimatedMonthlyIncome - left.estimatedMonthlyIncome;
+  const currentYearByIncome = [...currentYearSnapshots].sort(byIncomeDescending);
+  const allTimeByIncome = [...paidSnapshots].sort(byIncomeDescending);
+  const currentYearTotal = currentYearSnapshots.reduce((total, snapshot) => total + snapshot.estimatedMonthlyIncome, 0);
+  const currentYearAverage = currentYearSnapshots.length ? currentYearTotal / currentYearSnapshots.length : 0;
+  const currentYearBest = currentYearByIncome[0] ?? null;
+  const currentYearWorst = currentYearByIncome.at(-1) ?? null;
+  const allTimeBest = allTimeByIncome[0] ?? null;
+  const allTimeWorst = allTimeByIncome.at(-1) ?? null;
+  const totalsByYear = paidSnapshots.reduce((totals, snapshot) => {
+    const year = getSnapshotYear(snapshot);
+    totals.set(year, (totals.get(year) ?? 0) + snapshot.estimatedMonthlyIncome);
+    return totals;
+  }, new Map<number, number>());
+  const bestYearEntry = [...totalsByYear.entries()].sort((left, right) => right[1] - left[1])[0];
+  const bestYear = bestYearEntry ? { year: bestYearEntry[0], total: bestYearEntry[1] } : null;
+
   return (
     <section className="mt-6 rounded-2xl bg-white p-5 text-slate-800 shadow-sm ring-1 ring-slate-200">
       <div>
@@ -737,13 +711,13 @@ function SimpleMonthlySummary({ insights, historicalStats, topWeight, topWeightP
         <p className="mt-2 text-sm leading-6 text-slate-600">Meses informados manualmente substituem a estimativa calculada com as cotas atuais.</p>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <LightMetric label={`Maior mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearBest ? `${getSnapshotMonthLabel(historicalStats.currentYearBest)}: ${formatCurrency(historicalStats.currentYearBest.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label={`Menor mês de ${historicalStats.currentYear}`} value={historicalStats.currentYearWorst ? `${getSnapshotMonthLabel(historicalStats.currentYearWorst)}: ${formatCurrency(historicalStats.currentYearWorst.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label="Total no ano" value={formatCurrency(historicalStats.currentYearTotal)} />
-        <LightMetric label="Média mensal" value={formatCurrency(historicalStats.currentYearAverage)} />
-        <LightMetric label="Maior mês do histórico" value={historicalStats.allTimeBest ? `${historicalStats.allTimeBest.label}: ${formatCurrency(historicalStats.allTimeBest.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label="Menor mês do histórico" value={historicalStats.allTimeWorst ? `${historicalStats.allTimeWorst.label}: ${formatCurrency(historicalStats.allTimeWorst.estimatedMonthlyIncome)}` : "-"} />
-        <LightMetric label="Maior ano de dividendos" value={historicalStats.bestYear ? `${historicalStats.bestYear.year}: ${formatCurrency(historicalStats.bestYear.total)}` : "-"} />
+        <LightMetric label={`Maior mês de ${currentYear}`} value={currentYearBest ? `${getSnapshotMonthLabel(currentYearBest)}: ${formatCurrency(currentYearBest.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label={`Menor mês de ${currentYear}`} value={currentYearWorst ? `${getSnapshotMonthLabel(currentYearWorst)}: ${formatCurrency(currentYearWorst.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Total no ano" value={formatCurrency(currentYearTotal)} />
+        <LightMetric label="Média mensal" value={formatCurrency(currentYearAverage)} />
+        <LightMetric label="Maior mês do histórico" value={allTimeBest ? `${allTimeBest.label}: ${formatCurrency(allTimeBest.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Menor mês do histórico" value={allTimeWorst ? `${allTimeWorst.label}: ${formatCurrency(allTimeWorst.estimatedMonthlyIncome)}` : "-"} />
+        <LightMetric label="Maior ano de dividendos" value={bestYear ? `${bestYear.year}: ${formatCurrency(bestYear.total)}` : "-"} />
         <LightMetric label="Maior pagador estimado" value={history.topPayer ? `${history.topPayer.ticker}: ${formatCurrency(history.topPayer.value)}` : "-"} />
         <LightMetric label="Maior peso financeiro" value={topWeight ? `${topWeight.ticker}: ${formatPercentValue(topWeightPercent)}` : "-"} />
       </div>
@@ -751,7 +725,7 @@ function SimpleMonthlySummary({ insights, historicalStats, topWeight, topWeightP
   );
 }
 
-function VisualHistorySection({ snapshots }: { snapshots: WalletSnapshot[] }) {
+function VisualHistorySection({ snapshots }: { snapshots: readonly WalletSnapshot[] }) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const years = getHistoryYears();
   const yearSnapshots = snapshots.filter((item) => getSnapshotYear(item) === selectedYear).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
