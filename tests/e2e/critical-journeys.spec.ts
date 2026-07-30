@@ -151,6 +151,122 @@ test("histórico manual permite incluir, sobrescrever, excluir e sincronizar div
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
+test("resumo e gráfico usam o mesmo histórico consolidado e preservam fevereiro", async ({ page }) => {
+  const currentYear = new Date().getFullYear();
+  const now = new Date().toISOString();
+  const entries: Array<Record<string, unknown>> = [{
+    schemaVersion: 1,
+    portfolioId: "default",
+    competence: `${currentYear}-01`,
+    totalValue: null,
+    dividends: 100,
+    source: "manual",
+    createdAt: now,
+    updatedAt: now,
+  }];
+  const mutationMethods: string[] = [];
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("dados-fii-wallet-email", "summary-e2e@example.com");
+    window.localStorage.setItem("dados-fii-wallet-session", "summary-session-e2e");
+  });
+
+  await page.route("**/api/product/events", async (route) => {
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+
+  await page.route("**/api/portfolio/history?portfolioId=default", async (route) => {
+    const method = route.request().method();
+    if (method === "GET") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entries }) });
+      return;
+    }
+
+    mutationMethods.push(method);
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    const competence = method === "POST"
+      ? `${body.year}-${String(body.month).padStart(2, "0")}`
+      : String(body.competence);
+
+    if (method === "DELETE") {
+      const index = entries.findIndex((entry) => entry.competence === competence);
+      if (index >= 0) entries.splice(index, 1);
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      return;
+    }
+
+    const entry = {
+      schemaVersion: 1,
+      portfolioId: "default",
+      competence,
+      totalValue: null,
+      dividends: Number(body.dividends),
+      source: "manual",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const index = entries.findIndex((item) => item.competence === competence);
+    if (index >= 0) entries[index] = entry;
+    else entries.push(entry);
+    await route.fulfill({
+      status: method === "POST" ? 201 : 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, entry }),
+    });
+  });
+
+  await page.goto("/carteira");
+  const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
+  const summary = page.getByRole("heading", { name: "Leitura rápida dos números" }).locator("..").locator("..");
+  const bestMonth = summary.getByText(`Maior mês de ${currentYear}`, { exact: true }).locator("..");
+  const yearTotal = summary.getByText("Total no ano", { exact: true }).locator("..");
+  const dividendChart = page.getByRole("heading", { name: `Dividendos pagos em ${currentYear}` }).locator("..");
+
+  await history.getByLabel("Mês do histórico").selectOption("2");
+  await history.getByLabel("Dividendos recebidos no mês").fill("450,03");
+  await history.getByRole("button", { name: "Salvar mês" }).click();
+  await expect(history.getByText("Salvo neste dispositivo", { exact: true })).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await expect.poll(() => mutationMethods.filter((method) => method === "POST").length).toBe(1);
+  await expect(history.getByText("Sincronizado", { exact: true })).toBeVisible();
+
+  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(yearTotal).toContainText("R$ 550,03");
+  await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
+  await expect(dividendChart.locator("svg text").filter({ hasText: "R$ 450" })).toBeVisible();
+
+  await history.getByRole("button", { name: `Excluir Fevereiro / ${currentYear}` }).click();
+  await expect(history.getByText("Salvo neste dispositivo", { exact: true })).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await expect.poll(() => mutationMethods).toContain("DELETE");
+  await expect(history.getByText("Sincronizado", { exact: true })).toBeVisible();
+  await expect(bestMonth).toContainText("Jan: R$ 100,00");
+  await expect(yearTotal).toContainText("R$ 100,00");
+  await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toHaveCount(0);
+
+  await history.getByLabel("Mês do histórico").selectOption("2");
+  await history.getByLabel("Dividendos recebidos no mês").fill("450,03");
+  await history.getByRole("button", { name: "Salvar mês" }).click();
+  await expect(history.getByText("Salvo neste dispositivo", { exact: true })).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await expect.poll(() => mutationMethods.filter((method) => method === "POST").length).toBe(2);
+  await expect(history.getByText("Sincronizado", { exact: true })).toBeVisible();
+  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(yearTotal).toContainText("R$ 550,03");
+  await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
+  await expect(dividendChart.locator("svg text").filter({ hasText: "R$ 450" })).toBeVisible();
+
+  await page.goto("/fontes-dos-dados");
+  await page.goBack();
+  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(yearTotal).toContainText("R$ 550,03");
+
+  await page.reload();
+  await expect(bestMonth).toContainText("Fev: R$ 450,03");
+  await expect(yearTotal).toContainText("R$ 550,03");
+  await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
+});
+
 test("área administrativa permanece fechada sem sessão", async ({ page }) => {
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/sistema$/);
