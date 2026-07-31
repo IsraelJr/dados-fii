@@ -2,6 +2,7 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { isPremiumPreviewEmail } from "@/lib/premiumSecurity";
 import { FII_RISK_REPORT_PROMPT_VERSION } from "@/lib/prompts/fiiRiskReport";
 import {
   canReuseAutomaticReport,
@@ -114,7 +115,7 @@ export async function POST(req: Request) {
     const reportId = sha256(`${user.docId}:${month}:wallet-risk-report`);
     const reportSnap = await adminDb.collection(REPORT_COLLECTION).doc(reportId).get();
     const report = reportSnap.data() || {};
-    const isVip = user.data.isVip === true;
+    const isVip = user.data.isVip === true || isPremiumPreviewEmail(email);
     const credits = reportCredits(user.data);
     const automaticReportReady = reportSnap.exists
       && canReuseAutomaticReport(report, FII_RISK_REPORT_PROMPT_VERSION);

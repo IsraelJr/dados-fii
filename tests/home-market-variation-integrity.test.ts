@@ -39,8 +39,10 @@ test("API pública substitui variação recebida pelo cálculo preço versus abe
   assert.match(route, /variationSource: calculatedVariation !== null \? "calculated_price_opening" : "unavailable"/);
 });
 
-test("botão flutuante de Login fica oculto na Home", () => {
+test("botão de Login fica disponível na Home para autenticação não administrativa", () => {
   const login = read("src/app/components/Login.tsx");
-  assert.match(login, /usePathname/);
-  assert.match(login, /if \(pathname === "\/"\) return null/);
+  assert.match(login, /onAuthStateChanged\(auth, setUser\)/);
+  assert.match(login, /aria-controls="login-dialog"/);
+  assert.match(login, /aria-label="Sair da conta"/);
+  assert.doesNotMatch(login, /usePathname|pathname === "\/"/);
 });

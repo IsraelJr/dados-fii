@@ -25,6 +25,11 @@ function previewEmails() {
     .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
 }
 
+export function isPremiumPreviewEmail(value: unknown) {
+  const email = String(value || "").trim().toLowerCase();
+  return Boolean(email) && previewEmails().includes(email);
+}
+
 async function firestoreEntitlement(uid: string, email: string) {
   const users = adminDb.collection("User");
   const [uidSnapshot, emailSnapshot] = await Promise.all([users.doc(uid).get(), users.doc(email).get()]);
@@ -64,7 +69,7 @@ export async function requirePremium(request: NextRequest): Promise<PremiumAutho
     const email = String(decoded.email || "").trim().toLowerCase();
     if (!decoded.email_verified || !email) return { ok: false, status: 403, error: "Confirme seu e-mail antes de acessar o Premium." };
     if (isAllowedAdminEmail(email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "super_premium", role: "admin", accessSource: "admin_override" } };
-    if (previewEmails().includes(email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "super_premium", role: "user", accessSource: "preview" } };
+    if (isPremiumPreviewEmail(email)) return { ok: true, identity: { uid: decoded.uid, email, plan: "super_premium", role: "user", accessSource: "preview" } };
     const claims = decoded as Record<string, unknown>;
     const claimPlan = String(claims.plan || "").toLowerCase();
     if (claims.premium === true || claims.isVip === true || ["premium", "vip", "super_premium"].includes(claimPlan)) {

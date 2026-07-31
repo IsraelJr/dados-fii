@@ -1,0 +1,189 @@
+name: Functional QA
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "23 09 * * 1-6"
+    - cron: "23 09 * * 0"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Ambiente com os secrets do usuário de QA"
+        required: true
+        type: choice
+        options:
+          - Preview
+          - Production
+        default: Preview
+      target_url:
+        description: "URL HTTPS exata a validar"
+        required: true
+        type: string
+      suite:
+        description: "Abrangência da execução"
+        required: true
+        type: choice
+        options:
+          - smoke
+          - critical
+          - full
+        default: critical
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  group: functional-qa-${{ github.event_name }}-${{ github.event.deployment.sha || github.sha }}-${{ github.event.deployment.environment || inputs.environment || 'Production' }}
+  cancel-in-progress: true
+
+jobs:
+  browser-qa:
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (
+        github.event.deployment_status.state == 'success' &&
+        (
+          github.event.deployment.environment == 'Preview' ||
+          github.event.deployment.environment == 'Production' ||
+          github.event.deployment.environment == 'production'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # governance-exception: Playwright cross-browser remoto com vídeo e trace
+    environment: ${{ github.event_name == 'deployment_status' && (github.event.deployment.environment == 'Preview' && 'Preview' || 'Production') || inputs.environment || 'Production' }}
+    env:
+      CI: "true"
+      E2E_REMOTE: "1"
+      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+    steps:
+      - name: Checkout deployed SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Resolve the exact deployed target
+        shell: bash
+        env:
+          DEPLOYMENT_ENVIRONMENT: ${{ github.event.deployment.environment }}
+          DEPLOYMENT_URL: ${{ github.event.deployment_status.environment_url }}
+          MANUAL_ENVIRONMENT: ${{ inputs.environment }}
+          MANUAL_URL: ${{ inputs.target_url }}
+          CONFIGURED_PRODUCTION_URL: ${{ vars.PRODUCTION_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "deployment_status" && "${DEPLOYMENT_ENVIRONMENT}" == "Preview" ]]; then
+            target="${DEPLOYMENT_URL}"
+            environment="Preview"
+          elif [[ "${GITHUB_EVENT_NAME}" == "deployment_status" ]]; then
+            target="${CONFIGURED_PRODUCTION_URL:-https://www.dadosfii.com.br}"
+            environment="Production"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            target="${MANUAL_URL}"
+            environment="${MANUAL_ENVIRONMENT}"
+          else
+            target="${CONFIGURED_PRODUCTION_URL:-https://www.dadosfii.com.br}"
+            environment="Production"
+          fi
+          [[ "${target}" =~ ^https://[^[:space:]]+$ ]]
+          [[ "${target}" != *"?"* && "${target}" != *"#"* ]]
+          printf 'E2E_BASE_URL=%s\n' "${target}" >> "$GITHUB_ENV"
+          printf 'E2E_ENVIRONMENT=%s\n' "${environment}" >> "$GITHUB_ENV"
+
+      - name: Validate isolated QA configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${E2E_USER_EMAIL}"
+          test -n "${E2E_USER_PASSWORD}"
+          [[ "${E2E_BASE_URL}" == https://* ]]
+          if [[ "${E2E_ENVIRONMENT}" == "Preview" ]]; then
+            test -n "${VERCEL_AUTOMATION_BYPASS_SECRET}"
+          fi
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Install supported browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Select functional journey
+        id: scope
+        shell: bash
+        env:
+          REQUESTED_SUITE: ${{ inputs.suite }}
+          DEPLOYMENT_ENVIRONMENT: ${{ github.event.deployment.environment }}
+          SCHEDULE_EXPRESSION: ${{ github.event.schedule }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "deployment_status" && "${DEPLOYMENT_ENVIRONMENT}" == "Preview" ]]; then
+            echo "args=--grep @critical" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_EVENT_NAME}" == "deployment_status" ]]; then
+            echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" && "${SCHEDULE_EXPRESSION}" == "23 09 * * 0" ]]; then
+            echo "args=" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
+          elif [[ "${REQUESTED_SUITE}" == "smoke" ]]; then
+            echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
+          elif [[ "${REQUESTED_SUITE}" == "critical" ]]; then
+            echo "args=--grep @critical" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Execute Playwright as the QA user
+        id: playwright
+        shell: bash
+        env:
+          PLAYWRIGHT_ARGS: ${{ steps.scope.outputs.args }}
+        run: npm run test:e2e -- ${PLAYWRIGHT_ARGS}
+
+      - name: Redact sensitive artifact content
+        id: redact
+        if: failure()
+        run: npm run test:e2e:redact
+
+      - name: Upload auditable failure evidence
+        if: failure() && steps.redact.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Publish deployment gate
+        if: always() && github.event_name == 'deployment_status'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.deployment.sha }}
+          QA_STATE: ${{ steps.playwright.outcome == 'success' && 'success' || 'failure' }}
+          QA_CONTEXT: ${{ github.event.deployment.environment == 'Preview' && 'Functional QA Preview' || 'Functional QA Production Smoke' }}
+          QA_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -nc \
+            --arg state "${QA_STATE}" \
+            --arg context "${QA_CONTEXT}" \
+            --arg description "Playwright funcional isolado, com evidências redigidas" \
+            --arg target_url "${QA_URL}" \
+            '{state: $state, context: $context, description: $description, target_url: $target_url}')
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" \
+            --data "${payload}"

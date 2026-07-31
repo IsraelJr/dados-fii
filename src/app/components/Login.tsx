@@ -1,16 +1,24 @@
 "use client";
 
 import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
-import { usePathname } from "next/navigation";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import {
+    createUserWithEmailAndPassword,
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    type User,
+} from "firebase/auth";
 import { app } from "@/lib/firebase";
 import { X } from "lucide-react";
 
 const auth = getAuth(app);
+const WALLET_EMAIL_KEY = "dados-fii-wallet-email";
+const WALLET_SESSION_KEY = "dados-fii-wallet-session";
 
 export default function LoginButton() {
-    const pathname = usePathname();
     const [showModal, setShowModal] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -28,6 +36,8 @@ export default function LoginButton() {
     useEffect(() => {
         if (showModal) emailRef.current?.focus();
     }, [showModal]);
+
+    useEffect(() => onAuthStateChanged(auth, setUser), []);
 
     const closeModal = () => {
         setShowModal(false);
@@ -115,11 +125,26 @@ export default function LoginButton() {
             });
             if (!profileResponse.ok) throw new Error("Falha ao sincronizar o perfil autenticado.");
 
+            const walletSessionResponse = await fetch("/api/wallet/session/firebase", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({}),
+            });
+            const walletSession = await walletSessionResponse.json().catch(() => ({}));
+            if (!walletSessionResponse.ok || typeof walletSession?.token !== "string") {
+                throw new Error("Falha ao preparar a sessão segura da carteira.");
+            }
+            window.localStorage.setItem(WALLET_EMAIL_KEY, userCred.user.email?.trim().toLowerCase() || email.trim().toLowerCase());
+            window.localStorage.setItem(WALLET_SESSION_KEY, walletSession.token);
+            window.dispatchEvent(new Event("dados-fii-wallet-session-updated"));
+            window.dispatchEvent(new Event("wallet-session-updated"));
+
             setMessage("✅ Login realizado com sucesso!");
             closeModal();
         } catch (err: any) {
-            console.error(err);
-
             let friendlyMessage = "❌ Falha ao autenticar. Tente novamente.";
             if (err.code === "auth/wrong-password") {
                 friendlyMessage = "❌ Senha incorreta. Verifique e tente novamente.";
@@ -140,21 +165,50 @@ export default function LoginButton() {
         }
     };
 
-    if (pathname === "/") return null;
+    const handleLogout = async () => {
+        const walletEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
+        const walletToken = window.localStorage.getItem(WALLET_SESSION_KEY) || "";
+        if (walletEmail && walletToken) {
+            await fetch("/api/wallet/session/firebase", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: walletEmail, token: walletToken }),
+            }).catch(() => undefined);
+        }
+        await signOut(auth).catch(() => undefined);
+        window.localStorage.removeItem(WALLET_EMAIL_KEY);
+        window.localStorage.removeItem(WALLET_SESSION_KEY);
+        window.dispatchEvent(new Event("dados-fii-wallet-session-updated"));
+        window.dispatchEvent(new Event("wallet-session-updated"));
+        setUser(null);
+        setMessage("");
+    };
 
     return (
         <div className="relative">
-            <button
-                ref={triggerRef}
-                type="button"
-                onClick={() => setShowModal(true)}
-                aria-haspopup="dialog"
-                aria-expanded={showModal}
-                aria-controls="login-dialog"
-                className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
-            >
-                Login
-            </button>
+            {user ? (
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    onClick={handleLogout}
+                    aria-label="Sair da conta"
+                    className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
+                >
+                    Sair
+                </button>
+            ) : (
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    onClick={() => setShowModal(true)}
+                    aria-haspopup="dialog"
+                    aria-expanded={showModal}
+                    aria-controls="login-dialog"
+                    className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
+                >
+                    Login
+                </button>
+            )}
 
             {showModal && (
                 <div

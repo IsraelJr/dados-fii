@@ -8,6 +8,7 @@ import {
   FII_RISK_REPORT_PROMPT_VERSION,
 } from "@/lib/prompts/fiiRiskReport";
 import { regulatoryDataService } from "@/lib/regulatoryDataService";
+import { isPremiumPreviewEmail } from "@/lib/premiumSecurity";
 import {
   buildWalletRiskReportInput,
   removeUndefinedFields,
@@ -286,7 +287,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
     const forceNew = Boolean(body.forceNew);
     const user = await loadUser(body);
-    const vip = user.data.isVip === true;
+    const vip = user.data.isVip === true || isPremiumPreviewEmail(user.email || user.data.email);
     const credits = reportCredits(user.data);
 
     if (!vip && credits <= 0) {

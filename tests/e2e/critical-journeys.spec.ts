@@ -1,5 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
+
+test.skip(Boolean(process.env.E2E_BASE_URL), "Suíte determinística local; jornadas remotas ficam em functional-qa.spec.ts.");
 
 test.beforeEach(async ({ page }) => {
   await page.route(/^https:\/\//, (route) => route.abort());
@@ -22,9 +25,9 @@ test("página pública possui estrutura, navegação e acessibilidade essenciais
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
-test("Home não exibe botão flutuante nem diálogo de Login", async ({ page }) => {
+test("Home oferece login sem abrir o diálogo automaticamente", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Login" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Login" })).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Entrar" })).toHaveCount(0);
   await expectNoHighImpactAccessibilityViolations(page);
 });

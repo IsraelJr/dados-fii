@@ -95,7 +95,12 @@ test("dependências usam lockfile e cache sem npm install mutável", () => {
 test("permissões de escrita e schedules operacionais ficam fora do GitHub Actions", () => {
   for (const file of workflowFiles()) {
     const body = executable(source(file));
-    assert.doesNotMatch(body, /^\s*schedule:/m, `${file} não pode executar cron de aplicação`);
+    if (file === "functional-qa.yml") {
+      const schedules = [...body.matchAll(/^\s+- cron:\s*"[^"]+"\s*$/gm)];
+      assert.equal(schedules.length, 2, `${file} possui apenas as auditorias diária e semanal formalizadas`);
+    } else {
+      assert.doesNotMatch(body, /^\s*schedule:/m, `${file} não pode executar cron de aplicação`);
+    }
     assert.doesNotMatch(body, /^\s*(contents|actions|pull-requests):\s*write\s*$/m, `${file} não precisa de permissão de escrita`);
   }
 });

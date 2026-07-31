@@ -60,6 +60,7 @@ Um workflow só permanece no GitHub quando precisa de pelo menos uma destas cara
 
 - CI de código: `pull_request` para `main`.
 - `push`: somente em `main` e apenas para validação pós-merge curta.
+- QA funcional pode usar os dois schedules exclusivos de `functional-qa.yml`: smoke diário curto e suíte completa semanal, ambos vinculados ao SHA de `main`, sem função de negócio.
 - Workflows pesados: somente `workflow_dispatch` ou evento único formalmente documentado.
 - Alterações exclusivamente documentais não executam suítes de código, salvo documentos que sejam contratos validados.
 - Um mesmo domínio não repete a mesma suíte em workflows diferentes no mesmo SHA.
@@ -127,7 +128,23 @@ Regras:
 6. A evidência intermediária permanece no banco, logs ou artefato curto.
 7. Branch/PR só é criada para evidência final estável e relevante.
 
-## 7. Exceção temporária vigente
+## 7. Exceções vigentes
+
+### QA funcional recorrente
+
+`functional-qa.yml` possui uma exceção permanente e estrita à proibição geral de cron. Ela existe para testar a aplicação publicada como usuário real, e não para executar trabalho da aplicação.
+
+Restrições:
+
+- somente dois schedules: smoke diário curto e suíte completa semanal;
+- usuário Firebase exclusivo, verificado, sem privilégios administrativos;
+- escrita limitada aos dados artificiais desse usuário, com cleanup idempotente;
+- `workers=1` e um único retry apenas na CI;
+- nenhum polling, `sleep`, fila, coleta ou processamento operacional;
+- evidências somente em falha, redigidas e retidas por até sete dias;
+- revisão de custo mensal no inventário.
+
+### Coleta FNET temporária
 
 `risk-lab-frozen-dividend-notices.yml` permanece manual por depender do coletor de engenharia e de checkpoint associado ao SHA.
 

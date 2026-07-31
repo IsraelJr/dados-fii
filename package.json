@@ -18,6 +18,8 @@
     "test:corrective": "node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/corrective-*.test.ts tests/corrective-*.test.mjs",
     "test:rules": "FIREBASE_EMULATORS_PATH=/tmp/dados-fii-firebase-emulators XDG_CONFIG_HOME=/tmp/dados-fii-firebase-config FIREBASE_CLI_DISABLE_UPDATE_CHECK=1 firebase emulators:exec --project demo-dados-fii --only firestore \"node --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/firestore-rules.test.ts\"",
     "test:e2e": "playwright test",
+    "test:e2e:local": "playwright test --project=desktop-chromium --project=mobile-chrome",
+    "test:e2e:redact": "node scripts/redact-playwright-artifacts.mjs playwright-report test-results",
     "test:http": "node scripts/run-http-smoke.mjs",
     "test:mutation": "node scripts/run-mutation-sanity.mjs",
     "test:coverage:critical": "node --experimental-test-coverage --test-coverage-lines=100 --test-coverage-branches=90 --test-coverage-functions=95 --test-coverage-include='src/lib/fiiDerivedData.ts' --test-coverage-include='src/lib/regulatory/RegulatoryValidator.ts' --import ./tests/register-ts-loader.mjs --experimental-strip-types --test tests/*.test.ts tests/*.test.mjs",
