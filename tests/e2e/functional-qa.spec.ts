@@ -354,7 +354,7 @@ test("@smoke @critical consulta de fundos trata ticker válido, ausente, inváli
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
-test("@full relatórios controlam acesso, persistem, geram PDF e não recomendam operação", async ({ page }) => {
+test("@critical @full relatórios controlam acesso, persistem, geram PDF e não recomendam operação", async ({ page }) => {
   await login(page);
   await page.goto("/carteira");
   try {

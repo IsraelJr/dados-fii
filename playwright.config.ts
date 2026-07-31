@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
+import { VERCEL_BYPASS_STORAGE_STATE } from "./tests/e2e/global-setup";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -25,12 +26,18 @@ const port = 3100;
 const localBaseURL = `http://127.0.0.1:${port}`;
 const configuredBaseURL = process.env.E2E_BASE_URL?.trim();
 const baseURL = configuredBaseURL || localBaseURL;
-const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
 const isRemoteRun = Boolean(configuredBaseURL);
+const bypassStorageState = isRemoteRun
+  && process.env.E2E_ENVIRONMENT === "Preview"
+  && process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  ? VERCEL_BYPASS_STORAGE_STATE
+  : undefined;
 
 export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: "test-results",
+  globalSetup: "./tests/e2e/global-setup.ts",
+  globalTeardown: "./tests/e2e/global-teardown.ts",
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -38,12 +45,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "line",
   use: {
     baseURL,
-    extraHTTPHeaders: bypassSecret
-      ? {
-          "x-vercel-protection-bypass": bypassSecret,
-          "x-vercel-set-bypass-cookie": "true",
-        }
-      : undefined,
+    storageState: bypassStorageState,
     locale: "pt-BR",
     timezoneId: "America/Sao_Paulo",
     trace: "retain-on-failure",

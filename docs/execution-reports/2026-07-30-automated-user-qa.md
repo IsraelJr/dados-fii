@@ -7,7 +7,7 @@
 
 ## Auditoria e arquivos alterados
 
-A auditoria identificou e corrigiu três bloqueadores: regressão da decisão da PR #149 na Home, redação insuficiente de artefatos e dependência fixa de janeiro a junho. Também encontrou mudanças de runtime em Login, sessão da carteira e entitlement de relatório.
+A auditoria inicial identificou e corrigiu regressão da decisão da PR #149 na Home, redação insuficiente de artefatos e dependência fixa de janeiro a junho. A rodada de 30/07 também eliminou quatro bloqueadores de segurança e cobertura: executor privilegiado dependente do SHA implantado, bypass da Vercel em header global, sessão Firebase sem renovação e relatório/PDF fora do gate de Preview.
 
 Arquivos e áreas alterados:
 
@@ -16,6 +16,9 @@ Arquivos e áreas alterados:
 - Playwright, fixture de evidências, redator e teste sentinela;
 - suíte funcional remota, helper de competências e regressões de calendário;
 - workflow `functional-qa.yml`;
+- runner privilegiado imutável em `functional-qa-runner.yml`, separado do dispatcher sem secrets;
+- política de origem e setup isolado do cookie de bypass da Vercel;
+- cliente de sessão com renovação após ausência, expiração ou `401`, coordenação entre abas e logout propagado;
 - testes arquiteturais e de política de sessão;
 - documentação operacional, governança e este relatório.
 
@@ -43,6 +46,12 @@ Jornadas Playwright remotas:
 ## Jornadas e proteções cobertas
 
 - Autenticação começa em `/carteira`; Login permanece oculto na Home.
+- O dispatcher não faz checkout, não executa `npm` e não recebe secrets. O SHA implantado é somente o alvo auditado.
+- O runner privilegiado é referenciado por SHA completo e faz checkout de uma revisão imutável distinta do deployment.
+- O bypass é usado em uma única requisição sem redirects à origem exata do Preview; o navegador recebe somente o cookie `_vercel_jwt`.
+- Firebase, Google, analytics e qualquer origem externa recebem zero headers de bypass, conforme teste sentinela.
+- Sessão ausente, expirada ou rejeitada com `401` é renovada com novo ID token Firebase; falha limpa a sessão e reapresenta Login.
+- Abas concorrentes reutilizam a renovação válida e o logout é propagado sem recriar a sessão.
 - Preview executa crítico e os testes `@preview`; produção diária nunca usa senha incorreta.
 - Histórico usa somente meses efetivamente encerrados no fuso de São Paulo.
 - Em janeiro a jornada não grava competência aberta; em fevereiro grava somente janeiro; quando fevereiro encerra, a exclusão/reinserção e o valor de R$ 450,03 são executados.
@@ -56,6 +65,7 @@ Jornadas Playwright remotas:
 - `E2E_USER_EMAIL` em `Preview` e `Production`;
 - `E2E_USER_PASSWORD` em `Preview` e `Production`;
 - `VERCEL_AUTOMATION_BYPASS_SECRET` em `Preview`.
+- `VERCEL_PREVIEW_HOST_SUFFIX` como variável protegida do environment `Preview`, com o sufixo exato do projeto/time Vercel.
 
 O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAILS` e de claims administrativos. O documento server-side pode receber `isVip: true` exclusivamente para a jornada de relatório. Nenhuma identidade enviada pelo cliente concede entitlement.
 
@@ -66,23 +76,25 @@ O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAI
 | Teste sentinela de artefatos | aprovado |
 | TypeScript | aprovado |
 | ESLint | aprovado, zero warnings |
-| `test:all` | aprovado: 614/614 |
+| `test:all` | aprovado: 623/623 |
 | Firestore Rules | aprovado: 3/3 no Emulator |
-| Cobertura crítica | aprovado: 100% linhas, 93,36% branches, 98,53% funções |
+| Cobertura crítica | aprovado: 100% linhas, 93,66% branches, 98,53% funções |
 | Mutation sanity | aprovado |
 | Build | aprovado com Firebase sintético em memória |
 | HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
-| E2E local | aprovado: 16/16 em Desktop Chromium e Mobile Chrome; 14 jornadas remotas ignoradas sem `E2E_BASE_URL` |
+| Secret scan | aprovado: 641 arquivos versionados |
+| E2E local | 30 descobertos: 16 aprovados em Desktop Chromium e Mobile Chrome; 14 remotos ignorados sem `E2E_BASE_URL` |
 | E2E Preview real | bloqueado em preflight fail-closed: os três secrets obrigatórios não estão provisionados |
 
-A primeira execução E2E revelou timeout do painel administrativo porque o teste local aguardava o rate limit/Firebase externo. O teste foi corrigido para simular explicitamente `401` no endpoint de sessão, mantendo o contrato de UI sem sessão, e a execução local foi serializada. A segunda execução completa passou sem retry.
+A validação nova incluiu 17 testes direcionados de arquitetura, origem, renovação, falha, logout e múltiplas abas. A bateria completa passou sem retry. O primeiro build local falhou pela ausência intencional de configuração Firebase; a repetição com a mesma credencial sintética e as mesmas variáveis públicas usadas pela CI oficial passou.
 
-Após o push de `ec42c17`, os workflows Phase 2 Closure CI, Risk Lab CI e Portfolio Notifications CI passaram. O Preview da Vercel também concluiu. `Functional QA Preview` falhou em oito segundos na validação de configuração, antes da instalação do navegador ou de qualquer autenticação, porque `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET` não estão provisionados. A PR permaneceu draft, aberta, não mesclada e com merge bloqueado pelo check vermelho.
+Na rodada anterior, os workflows Phase 2 Closure CI, Risk Lab CI e Portfolio Notifications CI passaram e o Preview da Vercel concluiu. `Functional QA Preview` falhou em oito segundos na validação de configuração, antes da instalação do navegador ou de qualquer autenticação, porque `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET` não estão provisionados. A rodada atual preserva o preflight fail-closed e ainda exige `VERCEL_PREVIEW_HOST_SUFFIX`; a execução real só poderá ser comprovada após o push e o provisionamento autorizado.
 
 ## Riscos restantes
 
 - A PR ainda contém alteração funcional de autenticação/sessão para todos os usuários; idealmente ela seria revisada ou separada antes do merge.
 - Secrets, usuário QA e entitlement server-side ainda não foram provisionados/confirmados.
+- O sufixo exato do Preview ainda precisa ser configurado como variável protegida do environment.
 - `Functional QA Preview` ainda não está comprovado como required check de `main`.
 - Vídeo é um formato binário e não pode ser redigido depois; a proteção depende da máscara visual instalada antes de qualquer preenchimento. O teste verifica a máscara, mas a execução real de Preview ainda é obrigatória.
 - Serviços externos podem afetar consulta de fundos e geração do relatório.

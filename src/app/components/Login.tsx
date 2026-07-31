@@ -11,11 +11,21 @@ import {
 } from "firebase/auth";
 import { usePathname } from "next/navigation";
 import { app } from "@/lib/firebase";
+import {
+    clearWalletSession,
+    ensureWalletSession,
+    installWalletUnauthorizedObserver,
+    markWalletLogout,
+    WALLET_EMAIL_KEY,
+    WALLET_SESSION_EXPIRES_AT_KEY,
+    WALLET_SESSION_INVALID_EVENT,
+    WALLET_SESSION_KEY,
+    WALLET_SESSION_LOGOUT_KEY,
+    WALLET_SESSION_UPDATED_EVENT,
+} from "@/lib/users/WalletSessionClient";
 import { X } from "lucide-react";
 
 const auth = getAuth(app);
-const WALLET_EMAIL_KEY = "dados-fii-wallet-email";
-const WALLET_SESSION_KEY = "dados-fii-wallet-session";
 
 export default function LoginButton() {
     const pathname = usePathname();
@@ -31,6 +41,7 @@ export default function LoginButton() {
     const passwordRef = useRef<HTMLInputElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
+    const userRef = useRef<User | null>(null);
 
     const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,7 +50,63 @@ export default function LoginButton() {
         if (showModal) emailRef.current?.focus();
     }, [showModal]);
 
-    useEffect(() => onAuthStateChanged(auth, setUser), []);
+    useEffect(() => {
+        let active = true;
+
+        const recover = async (nextUser: User, rejectedToken = "") => {
+            try {
+                await ensureWalletSession(nextUser, {
+                    force: Boolean(rejectedToken),
+                    rejectedToken,
+                });
+            } catch {
+                clearWalletSession();
+                await signOut(auth).catch(() => undefined);
+                if (!active) return;
+                userRef.current = null;
+                setUser(null);
+                setMessage("Sua sessão expirou. Entre novamente para continuar.");
+            }
+        };
+
+        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+            userRef.current = nextUser;
+            setUser(nextUser);
+            if (nextUser) void recover(nextUser);
+        });
+
+        const onInvalidSession = (event: Event) => {
+            const rejectedToken = (event as CustomEvent<{ rejectedToken?: string }>).detail?.rejectedToken || "";
+            if (userRef.current) void recover(userRef.current, rejectedToken);
+        };
+        const removeFetchObserver = installWalletUnauthorizedObserver((rejectedToken) => {
+            window.dispatchEvent(new CustomEvent(WALLET_SESSION_INVALID_EVENT, {
+                detail: { rejectedToken },
+            }));
+        });
+        const onStorage = (event: StorageEvent) => {
+            if (![WALLET_EMAIL_KEY, WALLET_SESSION_KEY, WALLET_SESSION_EXPIRES_AT_KEY, WALLET_SESSION_LOGOUT_KEY].includes(event.key || "")) return;
+            if (event.key === WALLET_SESSION_LOGOUT_KEY) {
+                clearWalletSession();
+                window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
+                window.dispatchEvent(new Event("wallet-session-updated"));
+                return;
+            }
+            window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
+            window.dispatchEvent(new Event("wallet-session-updated"));
+            if (userRef.current) void recover(userRef.current);
+        };
+
+        window.addEventListener(WALLET_SESSION_INVALID_EVENT, onInvalidSession);
+        window.addEventListener("storage", onStorage);
+        return () => {
+            active = false;
+            unsubscribe();
+            removeFetchObserver();
+            window.removeEventListener(WALLET_SESSION_INVALID_EVENT, onInvalidSession);
+            window.removeEventListener("storage", onStorage);
+        };
+    }, []);
 
     const closeModal = () => {
         setShowModal(false);
@@ -127,22 +194,7 @@ export default function LoginButton() {
             });
             if (!profileResponse.ok) throw new Error("Falha ao sincronizar o perfil autenticado.");
 
-            const walletSessionResponse = await fetch("/api/wallet/session/firebase", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${idToken}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({}),
-            });
-            const walletSession = await walletSessionResponse.json().catch(() => ({}));
-            if (!walletSessionResponse.ok || typeof walletSession?.token !== "string") {
-                throw new Error("Falha ao preparar a sessão segura da carteira.");
-            }
-            window.localStorage.setItem(WALLET_EMAIL_KEY, userCred.user.email?.trim().toLowerCase() || email.trim().toLowerCase());
-            window.localStorage.setItem(WALLET_SESSION_KEY, walletSession.token);
-            window.dispatchEvent(new Event("dados-fii-wallet-session-updated"));
-            window.dispatchEvent(new Event("wallet-session-updated"));
+            await ensureWalletSession(userCred.user, { force: true });
 
             setMessage("✅ Login realizado com sucesso!");
             closeModal();
@@ -170,6 +222,9 @@ export default function LoginButton() {
     const handleLogout = async () => {
         const walletEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
         const walletToken = window.localStorage.getItem(WALLET_SESSION_KEY) || "";
+        markWalletLogout();
+        window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
+        window.dispatchEvent(new Event("wallet-session-updated"));
         if (walletEmail && walletToken) {
             await fetch("/api/wallet/session/firebase", {
                 method: "DELETE",
@@ -178,10 +233,6 @@ export default function LoginButton() {
             }).catch(() => undefined);
         }
         await signOut(auth).catch(() => undefined);
-        window.localStorage.removeItem(WALLET_EMAIL_KEY);
-        window.localStorage.removeItem(WALLET_SESSION_KEY);
-        window.dispatchEvent(new Event("dados-fii-wallet-session-updated"));
-        window.dispatchEvent(new Event("wallet-session-updated"));
         setUser(null);
         setMessage("");
     };

@@ -4,13 +4,17 @@ import test from "node:test";
 
 const read = (file) => readFileSync(file, "utf8");
 const workflow = read(".github/workflows/functional-qa.yml");
+const trustedWorkflow = read(".github/workflows/functional-qa-runner.yml");
 const config = read("playwright.config.ts");
+const globalSetup = read("tests/e2e/global-setup.ts");
+const targetPolicy = read("tests/e2e/support/qaTarget.ts");
 const functionalSpec = read("tests/e2e/functional-qa.spec.ts");
 const competenceHelper = read("tests/e2e/support/closedCompetences.ts");
 const fixture = read("tests/e2e/fixtures.ts");
 const redactor = read("scripts/redact-playwright-artifacts.mjs");
 const sentinel = read("tests/playwright-artifact-redaction.test.mjs");
 const login = read("src/app/components/Login.tsx");
+const sessionClient = read("src/lib/users/WalletSessionClient.ts");
 const walletPage = read("src/app/carteira/page.tsx");
 const firebaseSession = read("src/server/controllers/WalletFirebaseSessionController.ts");
 const sessionPolicy = read("src/server/auth/WalletSessionPolicy.ts");
@@ -18,13 +22,39 @@ const identityResolver = read("src/server/auth/WalletIdentityResolver.ts");
 const reportController = read("src/server/controllers/WalletRiskReportController.ts");
 const reportStatusController = read("src/server/controllers/WalletRiskReportStatusController.ts");
 
-test("QA remoto usa somente usuário isolado e bypass por header", () => {
-  assert.match(workflow, /secrets\.E2E_USER_EMAIL/);
-  assert.match(workflow, /secrets\.E2E_USER_PASSWORD/);
-  assert.match(workflow, /secrets\.VERCEL_AUTOMATION_BYPASS_SECRET/);
-  assert.doesNotMatch(workflow, /E2E_ADMIN_UPDATE_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD/);
-  assert.match(config, /x-vercel-protection-bypass/);
-  assert.doesNotMatch(config, /protection-bypass[^]*searchParams|VERCEL_AUTOMATION_BYPASS_SECRET[^]*console\./);
+test("dispatcher não recebe secrets nem executa código do SHA implantado", () => {
+  assert.match(workflow, /uses:\s*IsraelJr\/dados-fii\/\.github\/workflows\/functional-qa-runner\.yml@[0-9a-f]{40}/);
+  assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit|^\s{4}environment:/m);
+  assert.doesNotMatch(workflow, /actions\/checkout|npm\s+(?:ci|run)|github\.event\.deployment\.sha[^]*ref:/);
+  assert.match(workflow, /deployment\.creator\.login == 'vercel\[bot\]'/);
+  assert.match(workflow, /deployment_status\.creator\.login == 'vercel\[bot\]'/);
+  assert.doesNotMatch(workflow, /target_url/);
+});
+
+test("runner privilegiado é imutável e trata o deployment somente como alvo", () => {
+  assert.match(trustedWorkflow, /QA_RUNNER_REF:\s*"[0-9a-f]{40}"/);
+  assert.match(trustedWorkflow, /ref:\s*\$\{\{ env\.QA_RUNNER_REF \}\}/);
+  assert.match(trustedWorkflow, /persist-credentials:\s*false/);
+  assert.doesNotMatch(trustedWorkflow, /ref:\s*\$\{\{\s*inputs\.deployment_sha/);
+  assert.doesNotMatch(trustedWorkflow, /run:\s*npm[^\n]*DEPLOYMENT_SHA/);
+  assert.match(trustedWorkflow, /deployments\?sha=\$\{DEPLOYMENT_SHA\}/);
+  assert.match(trustedWorkflow, /creator\.login == "vercel\[bot\]"/);
+  assert.match(trustedWorkflow, /scripts\/validate-functional-qa-target\.mjs/);
+  assert.match(trustedWorkflow, /secrets\.E2E_USER_EMAIL/);
+  assert.match(trustedWorkflow, /secrets\.E2E_USER_PASSWORD/);
+  assert.match(trustedWorkflow, /secrets\.VERCEL_AUTOMATION_BYPASS_SECRET/);
+  assert.doesNotMatch(trustedWorkflow, /E2E_ADMIN_UPDATE_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD/);
+});
+
+test("bypass nunca vira header global e só inicializa cookie na origem exata", () => {
+  assert.doesNotMatch(config, /extraHTTPHeaders/);
+  assert.match(config, /storageState:\s*bypassStorageState/);
+  assert.match(globalSetup, /request\.newContext\(\{\s*baseURL:\s*targetOrigin,\s*extraHTTPHeaders:\s*headers\s*\}\)/);
+  assert.match(globalSetup, /maxRedirects:\s*0/);
+  assert.match(globalSetup, /cookie\.name === "_vercel_jwt"/);
+  assert.match(targetPolicy, /request\.origin !== target\.origin/);
+  assert.match(targetPolicy, /previewHostnameSuffix/);
+  assert.doesNotMatch(`${config}\n${globalSetup}`, /console\.(?:log|error)[^]*VERCEL_AUTOMATION_BYPASS_SECRET/);
 });
 
 test("matriz, estabilidade, gate e evidências cumprem o contrato funcional", () => {
@@ -38,13 +68,13 @@ test("matriz, estabilidade, gate e evidências cumprem o contrato funcional", ()
   assert.match(fixture, /failure-screenshot/);
   assert.match(fixture, /runtime-evidence/);
   assert.match(fixture, /GITHUB_SHA/);
-  assert.match(workflow, /Functional QA Preview/);
-  assert.match(workflow, /npm run test:artifact-redaction/);
+  assert.match(trustedWorkflow, /Functional QA Preview/);
+  assert.match(trustedWorkflow, /npm run test:artifact-redaction/);
   assert.ok(
-    workflow.indexOf("npm run test:artifact-redaction") < workflow.indexOf("Install supported browsers"),
+    trustedWorkflow.indexOf("npm run test:artifact-redaction") < trustedWorkflow.indexOf("Install supported browsers"),
     "sentinela precisa rodar antes de qualquer navegação autenticada",
   );
-  assert.match(workflow, /steps\.redact\.outcome == 'success'/);
+  assert.match(trustedWorkflow, /steps\.redact\.outcome == 'success'/);
 });
 
 test("redator cobre conteúdo dinâmico e o sentinela expande arquivos recursivamente", () => {
@@ -86,10 +116,11 @@ test("jornada de histórico usa só competências encerradas e cleanup idempoten
 test("login inválido não pertence ao smoke e Preview o executa", () => {
   assert.match(functionalSpec, /test\("@preview @full login inválido/);
   assert.doesNotMatch(functionalSpec, /test\("@smoke[^"]*login inválido/);
-  assert.match(workflow, /--grep=@critical\|@preview/);
-  assert.match(workflow, /--grep @smoke --project=desktop-chromium/);
-  assert.match(workflow, /REQUESTED_SUITE[^]*MANUAL_ENVIRONMENT[^]*== "Preview"[^]*--grep=@critical\|@preview/);
-  assert.match(workflow, /REQUESTED_SUITE[^]*--grep @critical/);
+  assert.match(trustedWorkflow, /--grep=@critical\|@preview/);
+  assert.match(trustedWorkflow, /--grep @smoke --project=desktop-chromium/);
+  assert.match(trustedWorkflow, /REQUESTED_SUITE[^]*MANUAL_ENVIRONMENT[^]*== "Preview"[^]*--grep=@critical\|@preview/);
+  assert.match(trustedWorkflow, /REQUESTED_SUITE[^]*--grep @critical/);
+  assert.match(functionalSpec, /test\("@critical @full relatórios/);
 });
 
 test("Home oculta Login e autenticação funcional começa na carteira", () => {
@@ -115,6 +146,17 @@ test("sessão curta é revogável, isolada e rejeita expiração", () => {
   assert.match(identityResolver, /walletSessionMatches/);
   assert.match(functionalSpec, /revokedStatus/);
   assert.match(functionalSpec, /isolatedStatus: 401/);
+  assert.match(sessionClient, /getIdToken\(true\)/);
+  assert.match(sessionClient, /WALLET_SESSION_EXPIRES_AT_KEY/);
+  assert.match(sessionClient, /walletSessionIsUsable/);
+  assert.match(sessionClient, /RENEWAL_LOCK_NAME/);
+  assert.match(sessionClient, /WALLET_SESSION_LOGOUT_KEY/);
+  assert.match(sessionClient, /response\.status === 401/);
+  assert.match(login, /installWalletUnauthorizedObserver/);
+  assert.match(login, /addEventListener\("storage"/);
+  assert.match(login, /markWalletLogout/);
+  assert.doesNotMatch(login, /if \(nextUser\)[^]*else\s*\{[^}]*clearWalletSession/);
+  assert.match(login, /Sua sessão expirou\. Entre novamente/);
 });
 
 test("identidade enviada pelo cliente não concede entitlement nem administração", () => {
