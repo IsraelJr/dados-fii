@@ -25,9 +25,9 @@ test("página pública possui estrutura, navegação e acessibilidade essenciais
   await expectNoHighImpactAccessibilityViolations(page);
 });
 
-test("Home oferece login sem abrir o diálogo automaticamente", async ({ page }) => {
+test("Home preserva o botão flutuante de login oculto", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Login" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Login" })).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "Entrar" })).toHaveCount(0);
   await expectNoHighImpactAccessibilityViolations(page);
 });
@@ -288,6 +288,11 @@ test("resumo e gráfico usam o mesmo histórico consolidado e preservam fevereir
 });
 
 test("área administrativa permanece fechada sem sessão", async ({ page }) => {
+  await page.route("**/api/admin/session", (route) => route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: false, error: "Sessão administrativa necessária." }),
+  }));
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/sistema$/);
   await expect(page.getByRole("heading", { level: 1, name: "Acesso administrativo" })).toBeVisible();

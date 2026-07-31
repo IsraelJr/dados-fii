@@ -1,78 +1,102 @@
 # Relatório de execução — QA automatizado de usuário
 
 **Data:** 30/07/2026
+**PR:** #168 — draft
 **Branch:** `agent/functional-qa-automation`
-**Status de merge:** não recomendado enquanto secrets e gate remoto não estiverem confirmados
+**Status de merge:** não recomendado; não fazer merge
 
-## Arquivos alterados
+## Auditoria e arquivos alterados
 
-- configuração Playwright e scripts npm;
-- fixture de evidências e redator de artefatos;
-- suíte funcional remota e regressão E2E local;
-- workflow único de QA funcional;
-- política, inventário e testes de governança do GitHub Actions;
-- login/logout Firebase e emissão revogável de sessão da carteira;
-- integração do usuário de preview com relatórios;
-- documentação operacional e este relatório.
+A auditoria identificou e corrigiu três bloqueadores: regressão da decisão da PR #149 na Home, redação insuficiente de artefatos e dependência fixa de janeiro a junho. Também encontrou mudanças de runtime em Login, sessão da carteira e entitlement de relatório.
 
-## Testes criados
+Arquivos e áreas alterados:
 
-- contrato arquitetural de QA, isolamento, matriz, evidências e sessão;
-- autenticação válida e inválida, persistência, logout e bloqueio;
-- histórico de janeiro a junho, recálculo, gráfico, navegação, reload, falha de rede e cleanup;
-- consulta válida, inexistente e inválida, percentuais e responsividade;
-- acesso, geração, persistência, PDF e conteúdo de relatório;
-- axe nas telas principais, bloqueando impactos `serious` e `critical`.
+- `src/app/components/Login.tsx` e `src/app/carteira/page.tsx`;
+- nova rota/controller/política de sessão Firebase da carteira;
+- Playwright, fixture de evidências, redator e teste sentinela;
+- suíte funcional remota, helper de competências e regressões de calendário;
+- workflow `functional-qa.yml`;
+- testes arquiteturais e de política de sessão;
+- documentação operacional, governança e este relatório.
 
-## Jornadas cobertas
+A ampliação de entitlement nos controllers de relatório de risco foi removida. A mudança de sessão permaneceu na PR porque a autenticação real da carteira depende dela; isso constitui alteração funcional para todos os usuários e exige revisão explícita antes de qualquer merge.
 
-As jornadas A a G são executadas em Playwright. Preview usa o bypass da Vercel exclusivamente por header. A matriz cobre Desktop Chromium, Mobile Chrome e Mobile Safari/WebKit. O mesmo workflow atende Preview, smoke pós-deploy, smoke diário e suíte semanal completa.
+## Lista real de testes criados
 
-## Secrets necessários
+Testes Node:
 
-- `E2E_USER_EMAIL`, em `Preview` e `Production`;
-- `E2E_USER_PASSWORD`, em `Preview` e `Production`;
-- `VERCEL_AUTOMATION_BYPASS_SECRET`, em `Preview`.
+- contrato arquitetural de isolamento, matriz, fail-closed, tags, Home e sessão;
+- sentinela recursivo de `.trace`, `.network`, HAR, cookies, headers, storage e ZIP aninhado;
+- competências encerradas em janeiro, fevereiro e virada dezembro/janeiro;
+- duração de 12 horas, expiração, revogação lógica e isolamento por e-mail/token.
 
-O usuário deve ser Firebase verificado, exclusivo de QA, não administrativo e incluído em `PREMIUM_PREVIEW_EMAILS` na Vercel.
+Jornadas Playwright remotas:
+
+- `@smoke @critical` login válido, persistência, logout e bloqueio não autorizado;
+- `@preview @full` login inválido, fora do smoke;
+- `@preview @full` prova de usuário sem admin, isolamento, revogação e rejeição de identidade cliente;
+- `@critical` carteira, histórico adaptativo, cards, gráfico, falha de rede, navegação, reload, persistência e cleanup;
+- `@smoke @critical` consulta válida/inexistente/inválida e responsividade;
+- `@full` relatório, persistência, PDF, erro sanitizado e ausência de recomendação;
+- `@smoke @critical` axe nas telas principais.
+
+## Jornadas e proteções cobertas
+
+- Autenticação começa em `/carteira`; Login permanece oculto na Home.
+- Preview executa crítico e os testes `@preview`; produção diária nunca usa senha incorreta.
+- Histórico usa somente meses efetivamente encerrados no fuso de São Paulo.
+- Em janeiro a jornada não grava competência aberta; em fevereiro grava somente janeiro; quando fevereiro encerra, a exclusão/reinserção e o valor de R$ 450,03 são executados.
+- A tentativa de criar sessão admin com o token real de QA deve retornar `403`.
+- Trocar e-mail em localStorage mantendo o token deve retornar `401`; o token revogado no logout deve retornar `401`.
+- Entitlement do relatório da carteira depende de `User.isVip === true` no servidor.
+- `workers=1`, um retry somente na CI, cleanup idempotente e gate fail-closed permanecem.
+
+## Secrets e provisionamento pendentes
+
+- `E2E_USER_EMAIL` em `Preview` e `Production`;
+- `E2E_USER_PASSWORD` em `Preview` e `Production`;
+- `VERCEL_AUTOMATION_BYPASS_SECRET` em `Preview`.
+
+O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAILS` e de claims administrativos. O documento server-side pode receber `isVip: true` exclusivamente para a jornada de relatório. Nenhuma identidade enviada pelo cliente concede entitlement.
 
 ## Resultados
 
-| Gate | Resultado |
+| Gate | Resultado da nova rodada |
 |---|---|
+| Teste sentinela de artefatos | aprovado |
 | TypeScript | aprovado |
-| ESLint | aprovado |
-| Governança de workflows | aprovado |
-| Contrato arquitetural de QA | aprovado |
-| Testes completos | aprovado: 602/602 |
-| Firestore rules | aprovado: 3/3 no Emulator |
-| Cobertura crítica | aprovado: linhas 100%, branches 93,66%, funções 98,53% |
+| ESLint | aprovado, zero warnings |
+| `test:all` | aprovado: 614/614 |
+| Firestore Rules | aprovado: 3/3 no Emulator |
+| Cobertura crítica | aprovado: 100% linhas, 93,36% branches, 98,53% funções |
 | Mutation sanity | aprovado |
-| Secret scan | aprovado: 627 arquivos |
-| Auditoria de dependências de produção | aprovado: 0 vulnerabilidades |
-| Build | aprovado com credencial Firebase sintética |
-| HTTP smoke | aprovado |
-| E2E local | aprovado: 16 testes em Desktop Chromium e Mobile Chrome; 10 jornadas remotas corretamente ignoradas sem `E2E_BASE_URL` |
-| E2E Preview real | gate acionado e reprovado na validação de configuração: secrets ainda ausentes; Playwright não iniciou |
+| Build | aprovado com Firebase sintético em memória |
+| HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
+| E2E local | aprovado: 16/16 em Desktop Chromium e Mobile Chrome; 14 jornadas remotas ignoradas sem `E2E_BASE_URL` |
+| E2E Preview real | bloqueado até provisionamento; não executar como substituto dos gates locais |
 
-## Riscos
+A primeira execução E2E revelou timeout do painel administrativo porque o teste local aguardava o rate limit/Firebase externo. O teste foi corrigido para simular explicitamente `401` no endpoint de sessão, mantendo o contrato de UI sem sessão, e a execução local foi serializada. A segunda execução completa passou sem retry.
 
-- Os três secrets ainda não existem nos environments consultados.
-- A branch `main` ainda não possui proteção configurada.
-- O evento `deployment_status` só passa a carregar este workflow automaticamente quando ele existir na branch padrão; o primeiro PR requer dispatch controlado após configurar secrets.
-- A geração completa de relatório depende de disponibilidade da OpenAI e dos serviços regulatórios.
-- Safari móvel pode revelar diferenças reais de layout ou acessibilidade que hoje não aparecem na regressão Chromium.
+## Riscos restantes
+
+- A PR ainda contém alteração funcional de autenticação/sessão para todos os usuários; idealmente ela seria revisada ou separada antes do merge.
+- Secrets, usuário QA e entitlement server-side ainda não foram provisionados/confirmados.
+- `Functional QA Preview` ainda não está comprovado como required check de `main`.
+- Vídeo é um formato binário e não pode ser redigido depois; a proteção depende da máscara visual instalada antes de qualquer preenchimento. O teste verifica a máscara, mas a execução real de Preview ainda é obrigatória.
+- Serviços externos podem afetar consulta de fundos e geração do relatório.
+- Em janeiro não existem competências do ano corrente encerradas; a jornada valida esse estado sem fabricar dados retroativos.
 
 ## Custo estimado de CI
 
-Estimativa inicial: aproximadamente 520 minutos por mês, considerando 26 smokes diários, quatro suítes semanais e até 12 Previews. A projeção deve ser recalibrada após 30 dias usando duração real dos jobs. Artefatos existem somente em falha e são retidos por sete dias.
+Estimativa inicial: cerca de 520 minutos/mês para 26 smokes diários, quatro suítes semanais e até 12 Previews. O sentinela adiciona menos de um segundo de CPU por job na medição local. Recalibrar após 30 dias. Artefatos são gerados somente em falha e retidos por sete dias.
 
 ## Limitações
 
-- Credenciais e entitlement do usuário de QA não são criados pelo repositório; o provisionamento permanece em Firebase, Vercel e GitHub environments.
-- O smoke de produção é intencionalmente não destrutivo; mutações completas ficam no usuário isolado durante Preview e na suíte semanal.
-- Vídeos são protegidos visualmente por máscara; traces e relatórios passam por redação antes de qualquer upload.
+- Credenciais, conta Firebase e `User.isVip` não são criados pelo repositório.
+- A prova real de `403` administrativo depende do usuário provisionado.
+- O smoke de produção é curto e não executa senha inválida nem a jornada destrutiva completa.
+- A suíte semanal continua mutando somente o usuário isolado e sempre executa cleanup.
 
 ## Recomendação de merge
 
-Não fazer merge enquanto qualquer gate falhar ou estiver ausente. A recomendação muda para favorável somente após os gates locais completos, o Preview real nos três dispositivos, a configuração dos secrets e a proteção de `main` exigindo `Functional QA Preview`.
+Não fazer merge e não marcar a PR como pronta. A recomendação permanece negativa até todos os gates passarem, a suíte de Preview real comprovar os três dispositivos e a segurança do usuário de QA, e `Functional QA Preview` estar configurado como gate obrigatório.

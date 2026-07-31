@@ -1,18 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "./fixtures";
 import type { Page } from "@playwright/test";
+import {
+  closedQaDividendMonths,
+  saoPauloCalendarPeriod,
+  type QaDividendMonth,
+} from "./support/closedCompetences";
 
 const remoteRun = Boolean(process.env.E2E_BASE_URL);
-const currentYear = new Date().getFullYear();
-const artificialCompetences = Array.from({ length: 6 }, (_, index) => `${currentYear}-${String(index + 1).padStart(2, "0")}`);
-const qaMonths = [
-  { month: "1", value: "47,00" },
-  { month: "2", value: "450,03" },
-  { month: "3", value: "87,06" },
-  { month: "4", value: "40,00" },
-  { month: "5", value: "50,00" },
-  { month: "6", value: "60,00" },
-] as const;
+const qaPeriod = saoPauloCalendarPeriod();
+const currentYear = qaPeriod.year;
+const qaMonths = closedQaDividendMonths(qaPeriod);
+const artificialCompetences = qaMonths.map((entry) => entry.competence);
 
 test.skip(!remoteRun, "A suíte funcional remota exige E2E_BASE_URL e roda contra Preview ou produção.");
 test.describe.configure({ mode: "serial", timeout: 180_000 });
@@ -30,22 +29,36 @@ function qaCredentials() {
 
 async function login(page: Page) {
   const credentials = qaCredentials();
-  await page.goto("/");
-  if (await page.getByRole("button", { name: "Sair da conta" }).isVisible().catch(() => false)) return;
+  await page.goto("/carteira");
+  if (await page.getByRole("button", { name: "Sair da conta" }).isVisible().catch(() => false)) return "";
   await page.getByRole("button", { name: "Login" }).click();
   const dialog = page.getByRole("dialog", { name: "Entrar" });
-  await dialog.getByLabel("E-mail").fill(credentials.email);
-  await dialog.getByLabel("Senha").fill(credentials.password);
+  const emailInput = dialog.getByLabel("E-mail");
+  const passwordInput = dialog.getByLabel("Senha");
+  await expect.poll(() => emailInput.evaluate((element) => (
+    getComputedStyle(element).getPropertyValue("-webkit-text-security")
+  ))).toBe("disc");
+  await expect.poll(() => passwordInput.evaluate((element) => (
+    getComputedStyle(element).getPropertyValue("-webkit-text-security")
+  ))).toBe("disc");
+  await emailInput.fill(credentials.email);
+  await passwordInput.fill(credentials.password);
+  const profileRequest = page.waitForRequest((request) => (
+    request.url().includes("/api/user-profile")
+    && request.method() === "POST"
+  ));
   await dialog.getByRole("button", { name: "Entrar", exact: true }).click();
+  const authorization = (await profileRequest).headers().authorization || "";
   await expect(page.getByRole("button", { name: "Sair da conta" })).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => page.evaluate(() => Boolean(
     window.localStorage.getItem("dados-fii-wallet-email")
     && window.localStorage.getItem("dados-fii-wallet-session"),
   ))).toBe(true);
+  return authorization.replace(/^Bearer\s+/i, "");
 }
 
 async function logout(page: Page) {
-  await page.goto("/");
+  await page.goto("/carteira");
   const button = page.getByRole("button", { name: "Sair da conta" });
   if (await button.isVisible().catch(() => false)) await button.click();
   await expect(page.getByRole("button", { name: "Login" })).toBeVisible();
@@ -53,6 +66,8 @@ async function logout(page: Page) {
     window.localStorage.getItem("dados-fii-wallet-email")
     || window.localStorage.getItem("dados-fii-wallet-session"),
   ))).toBe(false);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Login" })).toHaveCount(0);
 }
 
 async function cleanArtificialHistory(page: Page) {
@@ -106,6 +121,25 @@ function summarySection(page: Page) {
   return page.getByRole("heading", { name: "Leitura rápida dos números" }).locator("..").locator("..");
 }
 
+function brl(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function expectedSummary(entries: readonly QaDividendMonth[]) {
+  if (!entries.length) throw new Error("Resumo exige ao menos uma competência encerrada.");
+  const total = entries.reduce((sum, entry) => sum + entry.numericValue, 0);
+  const best = [...entries].sort((left, right) => right.numericValue - left.numericValue)[0];
+  const worst = [...entries].sort((left, right) => left.numericValue - right.numericValue)[0];
+  return {
+    bestMonth: `${best.shortLabel}/${currentYear}`,
+    bestValue: brl(best.numericValue),
+    worstMonth: `${worst.shortLabel}/${currentYear}`,
+    worstValue: brl(worst.numericValue),
+    total: brl(total),
+    average: `Média mensal em ${currentYear}: ${brl(total / entries.length)}`,
+  };
+}
+
 async function expectSummary(page: Page, expected: {
   bestMonth: string;
   bestValue: string;
@@ -135,13 +169,27 @@ async function expectNoHighImpactAccessibilityViolations(page: Page) {
   expect(blocking).toEqual([]);
 }
 
-test("@smoke @critical autenticação válida, inválida, persistente, logout e bloqueio", async ({ page }) => {
-  const credentials = qaCredentials();
+test("@smoke @critical autenticação válida, persistente, logout e acesso não autorizado bloqueado", async ({ page }) => {
   await page.goto("/fii/TGAR11");
   await page.getByRole("button", { name: "Acessar Premium" }).click();
   await expect(page.getByText(/Entre na sua conta Premium/i)).toBeVisible();
 
   await page.goto("/");
+  await expect(page.getByRole("button", { name: "Login" })).toHaveCount(0);
+  await login(page);
+  await page.reload();
+  await expect(page).toHaveURL(/\/carteira$/);
+  await expect(page.getByRole("button", { name: "Sair da conta" })).toBeVisible();
+  await logout(page);
+
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/admin\/sistema$/);
+  await expect(page.getByRole("heading", { name: "Acesso administrativo" })).toBeVisible();
+});
+
+test("@preview @full login inválido permanece fora do smoke de produção", async ({ page }) => {
+  const credentials = qaCredentials();
+  await page.goto("/carteira");
   await page.getByRole("button", { name: "Login" }).click();
   const dialog = page.getByRole("dialog", { name: "Entrar" });
   await dialog.getByLabel("E-mail").fill(credentials.email);
@@ -149,15 +197,63 @@ test("@smoke @critical autenticação válida, inválida, persistente, logout e 
   await dialog.getByRole("button", { name: "Entrar", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText(/Falha ao autenticar|Senha incorreta|Muitas tentativas/i);
   await dialog.getByRole("button", { name: "Fechar login" }).click();
+});
 
-  await login(page);
-  await page.reload();
-  await expect(page.getByRole("button", { name: "Sair da conta" })).toBeVisible();
+test("@preview @full usuário de QA não é admin e sessão não aceita identidade trocada", async ({ page }) => {
+  const idToken = await login(page);
+  expect(idToken).not.toBe("");
+  const securityProof = await page.evaluate(async (firebaseToken) => {
+    const email = window.localStorage.getItem("dados-fii-wallet-email") || "";
+    const walletToken = window.localStorage.getItem("dados-fii-wallet-session") || "";
+    const admin = await fetch("/api/admin/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "login", idToken: firebaseToken }),
+    });
+    const isolated = await fetch("/api/portfolio/history?portfolioId=default", {
+      headers: {
+        "x-wallet-email": `different-${email}`,
+        "x-wallet-session": walletToken,
+      },
+    });
+    const originalEmail = email;
+    window.localStorage.setItem("dados-fii-wallet-email", "client-entitlement@example.test");
+    const clientEscalation = await fetch("/api/wallet-risk-report/status", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-wallet-email": "client-entitlement@example.test",
+        "x-wallet-session": walletToken,
+      },
+      body: JSON.stringify({ email: "client-entitlement@example.test" }),
+    });
+    window.localStorage.setItem("dados-fii-wallet-email", originalEmail);
+    return {
+      adminStatus: admin.status,
+      isolatedStatus: isolated.status,
+      clientEscalationStatus: clientEscalation.status,
+    };
+  }, idToken);
+  expect(securityProof).toEqual({
+    adminStatus: 403,
+    isolatedStatus: 401,
+    clientEscalationStatus: 401,
+  });
+
+  const revoked = await page.evaluate(() => ({
+    email: window.localStorage.getItem("dados-fii-wallet-email") || "",
+    token: window.localStorage.getItem("dados-fii-wallet-session") || "",
+  }));
   await logout(page);
-
-  await page.goto("/admin");
-  await expect(page).toHaveURL(/\/admin\/sistema$/);
-  await expect(page.getByRole("heading", { name: "Acesso administrativo" })).toBeVisible();
+  const revokedStatus = await page.evaluate(async (identity) => (
+    fetch("/api/portfolio/history?portfolioId=default", {
+      headers: {
+        "x-wallet-email": identity.email,
+        "x-wallet-session": identity.token,
+      },
+    }).then((response) => response.status)
+  ), revoked);
+  expect(revokedStatus).toBe(401);
 });
 
 test("@critical carteira mantém cards, gráfico, rede e persistência sincronizados", async ({ page }) => {
@@ -167,44 +263,39 @@ test("@critical carteira mantém cards, gráfico, rede e persistência sincroniz
   await page.reload();
 
   try {
+    const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
+    if (!qaMonths.length) {
+      await expect(history.getByLabel("Mês do histórico").locator("option")).toHaveCount(0);
+      await page.goto("/fontes-dos-dados");
+      await page.goBack();
+      await page.reload();
+      await expect(history.getByLabel("Mês do histórico").locator("option")).toHaveCount(0);
+      return;
+    }
+
     for (const entry of qaMonths) await saveMonth(page, entry.month, entry.value);
     await flushHistory(page);
 
-    await expectSummary(page, {
-      bestMonth: `Fev/${currentYear}`,
-      bestValue: "R$ 450,03",
-      worstMonth: `Abr/${currentYear}`,
-      worstValue: "R$ 40,00",
-      total: "R$ 734,09",
-      average: `Média mensal em ${currentYear}: R$ 122,35`,
-    });
+    const completeSummary = expectedSummary(qaMonths);
+    await expectSummary(page, completeSummary);
     const chart = page.getByRole("heading", { name: `Dividendos pagos em ${currentYear}` }).locator("..");
-    await expect(chart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
-    await expect(chart.locator("svg text").filter({ hasText: "R$ 450" })).toBeVisible();
+    const best = [...qaMonths].sort((left, right) => right.numericValue - left.numericValue)[0];
+    await expect(chart.locator("svg text").filter({ hasText: best.shortLabel })).toBeVisible();
+    await expect(chart.locator("svg text").filter({ hasText: new RegExp(String(Math.trunc(best.numericValue))) })).toBeVisible();
 
-    const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
-    await history.getByRole("button", { name: `Excluir Fevereiro / ${currentYear}` }).click();
-    await flushHistory(page);
-    await expectSummary(page, {
-      bestMonth: `Mar/${currentYear}`,
-      bestValue: "R$ 87,06",
-      worstMonth: `Abr/${currentYear}`,
-      worstValue: "R$ 40,00",
-      total: "R$ 284,06",
-      average: `Média mensal em ${currentYear}: R$ 56,81`,
-    });
-    await expect(chart.locator("svg text").filter({ hasText: "Fev" })).toHaveCount(0);
+    const february = qaMonths.find((entry) => entry.monthNumber === 2);
+    if (february) {
+      await history.getByRole("button", { name: `Excluir Fevereiro / ${currentYear}` }).click();
+      await flushHistory(page);
+      const withoutFebruary = qaMonths.filter((entry) => entry.monthNumber !== 2);
+      await expectSummary(page, expectedSummary(withoutFebruary));
+      await expect(chart.locator("svg text").filter({ hasText: "Fev" })).toHaveCount(0);
 
-    await saveMonth(page, "2", "450,03");
-    await flushHistory(page);
-    await expectSummary(page, {
-      bestMonth: `Fev/${currentYear}`,
-      bestValue: "R$ 450,03",
-      worstMonth: `Abr/${currentYear}`,
-      worstValue: "R$ 40,00",
-      total: "R$ 734,09",
-      average: `Média mensal em ${currentYear}: R$ 122,35`,
-    });
+      await saveMonth(page, february.month, february.value);
+      await flushHistory(page);
+      await expectSummary(page, completeSummary);
+      await expect(chart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
+    }
 
     let failedOnce = false;
     const historyPattern = "**/api/portfolio/history?portfolioId=default";
@@ -216,35 +307,22 @@ test("@critical carteira mantém cards, gráfico, rede e persistência sincroniz
       }
       await route.continue();
     });
-    await saveMonth(page, "6", "61,00");
+    const networkMonth = qaMonths.at(-1)!;
+    await saveMonth(page, networkMonth.month, brl(networkMonth.numericValue + 1).replace("R$", "").trim());
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
     await expect(history.getByText("Falha ao sincronizar", { exact: true })).toBeVisible({ timeout: 30_000 });
     await page.unroute(historyPattern);
     await page.evaluate(() => window.dispatchEvent(new Event("online")));
     await expect(history.getByText("Sincronizado", { exact: true })).toBeVisible({ timeout: 30_000 });
-    await saveMonth(page, "6", "60,00");
+    await saveMonth(page, networkMonth.month, networkMonth.value);
     await flushHistory(page);
 
     await page.goto("/fontes-dos-dados");
     await page.goBack();
-    await expectSummary(page, {
-      bestMonth: `Fev/${currentYear}`,
-      bestValue: "R$ 450,03",
-      worstMonth: `Abr/${currentYear}`,
-      worstValue: "R$ 40,00",
-      total: "R$ 734,09",
-      average: `Média mensal em ${currentYear}: R$ 122,35`,
-    });
+    await expectSummary(page, completeSummary);
     await page.reload();
-    await expectSummary(page, {
-      bestMonth: `Fev/${currentYear}`,
-      bestValue: "R$ 450,03",
-      worstMonth: `Abr/${currentYear}`,
-      worstValue: "R$ 40,00",
-      total: "R$ 734,09",
-      average: `Média mensal em ${currentYear}: R$ 122,35`,
-    });
-    await expect(chart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
+    await expectSummary(page, completeSummary);
+    await expect(chart.locator("svg text").filter({ hasText: best.shortLabel })).toBeVisible();
   } finally {
     await page.unrouteAll({ behavior: "ignoreErrors" });
     await page.goto("/carteira").catch(() => undefined);

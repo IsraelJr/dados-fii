@@ -20,7 +20,9 @@ export function sanitizeEvidence(value: unknown) {
   return safe
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [REDACTED]")
-    .replace(/([?&](?:token|code|secret|key|password)=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, "[REDACTED_TOKEN]")
+    .replace(/([?&](?:token|code|secret|key|password|session)=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/(\b(?:Authorization|Cookie|Set-Cookie|x-wallet-session)\s*:\s*)[^\r\n]+/gi, "$1[REDACTED]")
     .replace(/R\$\s*\d[\d.]*,\d{2}/g, "R$ [REDACTED]");
 }
 
@@ -61,7 +63,15 @@ export const test = base.extend<{ runtimeEvidence: RuntimeEvidence }>({
       const installCredentialMask = () => {
         const style = document.createElement("style");
         style.dataset.e2eCredentialMask = "true";
-        style.textContent = "input[type='email'],input[type='password']{-webkit-text-security:disc!important}";
+        style.textContent = [
+          "input[type='email'],",
+          "input[type='password'],",
+          "input[autocomplete='email'],",
+          "input[autocomplete='username'],",
+          "[data-sensitive='true']",
+          "{-webkit-text-security:disc!important;color:transparent!important;",
+          "text-shadow:none!important;caret-color:transparent!important}",
+        ].join("");
         document.documentElement.appendChild(style);
       };
       if (document.readyState === "loading") {
@@ -96,7 +106,7 @@ export const test = base.extend<{ runtimeEvidence: RuntimeEvidence }>({
       await page.screenshot({
         path: screenshotPath,
         fullPage: true,
-        mask: [page.locator("input[type='email'], input[type='password'], [data-sensitive='true']")],
+        mask: [page.locator("input[type='email'], input[type='password'], input[autocomplete='email'], input[autocomplete='username'], [data-sensitive='true']")],
       }).catch(() => undefined);
       await testInfo.attach("failure-screenshot", {
         path: screenshotPath,

@@ -9,6 +9,7 @@ import {
     signOut,
     type User,
 } from "firebase/auth";
+import { usePathname } from "next/navigation";
 import { app } from "@/lib/firebase";
 import { X } from "lucide-react";
 
@@ -17,6 +18,7 @@ const WALLET_EMAIL_KEY = "dados-fii-wallet-email";
 const WALLET_SESSION_KEY = "dados-fii-wallet-session";
 
 export default function LoginButton() {
+    const pathname = usePathname();
     const [showModal, setShowModal] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState("");
@@ -183,6 +185,8 @@ export default function LoginButton() {
         setUser(null);
         setMessage("");
     };
+
+    if (pathname === "/") return null;
 
     return (
         <div className="relative">

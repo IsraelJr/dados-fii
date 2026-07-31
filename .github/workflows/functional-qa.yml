@@ -112,6 +112,10 @@ jobs:
       - name: Install frozen dependencies
         run: npm ci --silent
 
+      - name: Prove artifact redaction before authenticated browsing
+        id: artifact-sentinel
+        run: npm run test:artifact-redaction
+
       - name: Install supported browsers
         run: npx playwright install --with-deps chromium webkit
 
@@ -122,10 +126,11 @@ jobs:
           REQUESTED_SUITE: ${{ inputs.suite }}
           DEPLOYMENT_ENVIRONMENT: ${{ github.event.deployment.environment }}
           SCHEDULE_EXPRESSION: ${{ github.event.schedule }}
+          MANUAL_ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == "deployment_status" && "${DEPLOYMENT_ENVIRONMENT}" == "Preview" ]]; then
-            echo "args=--grep @critical" >> "$GITHUB_OUTPUT"
+            echo "args=--grep=@critical|@preview" >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_EVENT_NAME}" == "deployment_status" ]]; then
             echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_EVENT_NAME}" == "schedule" && "${SCHEDULE_EXPRESSION}" == "23 09 * * 0" ]]; then
@@ -134,6 +139,8 @@ jobs:
             echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
           elif [[ "${REQUESTED_SUITE}" == "smoke" ]]; then
             echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
+          elif [[ "${REQUESTED_SUITE}" == "critical" && "${MANUAL_ENVIRONMENT}" == "Preview" ]]; then
+            echo "args=--grep=@critical|@preview" >> "$GITHUB_OUTPUT"
           elif [[ "${REQUESTED_SUITE}" == "critical" ]]; then
             echo "args=--grep @critical" >> "$GITHUB_OUTPUT"
           else

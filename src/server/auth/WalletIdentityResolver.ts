@@ -1,8 +1,11 @@
-import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { adminDb } from "@/lib/firebaseAdmin";
-
-const SESSION_COLLECTION = "WalletSessions";
+import {
+  normalizeWalletSessionEmail,
+  WALLET_SESSION_COLLECTION,
+  walletSessionDocumentId,
+  walletSessionMatches,
+} from "@/server/auth/WalletSessionPolicy";
 const USER_COLLECTION = "User";
 
 export type WalletIdentity = Readonly<{
@@ -27,39 +30,24 @@ export class WalletIdentityError extends Error {
   }
 }
 
-function sha256(value: string) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function normalizeEmail(value: unknown) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function isExpired(value: unknown) {
-  if (!value) return true;
-  const timestamp = value as { toDate?: () => Date };
-  const date = typeof timestamp.toDate === "function" ? timestamp.toDate() : new Date(String(value));
-  return Number.isNaN(date.getTime()) || date.getTime() < Date.now();
-}
-
 async function resolveEmailSession(request: Request): Promise<WalletIdentity | null> {
-  const email = normalizeEmail(request.headers.get("x-wallet-email"));
+  const email = normalizeWalletSessionEmail(request.headers.get("x-wallet-email"));
   const token = String(request.headers.get("x-wallet-session") ?? "");
   if (!email && !token) return null;
   if (!isEmail(email) || !token) {
     throw new WalletIdentityError(401, "WALLET_SESSION_REQUIRED", "Sessão da carteira inválida.");
   }
 
-  const session = await adminDb.collection(SESSION_COLLECTION).doc(sha256(`${email}:${token}`)).get();
+  const session = await adminDb.collection(WALLET_SESSION_COLLECTION).doc(walletSessionDocumentId(email, token)).get();
   if (!session.exists) {
     throw new WalletIdentityError(401, "WALLET_SESSION_REQUIRED", "Sessão da carteira inválida.");
   }
   const sessionData = session.data() || {};
-  if (normalizeEmail(sessionData.email) !== email || isExpired(sessionData.expiresAt)) {
+  if (!walletSessionMatches(sessionData, email)) {
     throw new WalletIdentityError(401, "WALLET_SESSION_REQUIRED", "Sessão da carteira expirada.");
   }
 
