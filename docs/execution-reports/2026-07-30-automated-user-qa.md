@@ -53,7 +53,7 @@ O usuário deve ser Firebase verificado, exclusivo de QA, não administrativo e 
 | Build | aprovado com credencial Firebase sintética |
 | HTTP smoke | aprovado |
 | E2E local | aprovado: 16 testes em Desktop Chromium e Mobile Chrome; 10 jornadas remotas corretamente ignoradas sem `E2E_BASE_URL` |
-| E2E Preview real | bloqueado até provisionamento dos secrets |
+| E2E Preview real | gate acionado e reprovado na validação de configuração: secrets ainda ausentes; Playwright não iniciou |
 
 ## Riscos
 

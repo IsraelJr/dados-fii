@@ -149,11 +149,11 @@ jobs:
 
       - name: Redact sensitive artifact content
         id: redact
-        if: failure()
+        if: failure() && steps.playwright.outcome != 'skipped'
         run: npm run test:e2e:redact
 
       - name: Upload auditable failure evidence
-        if: failure() && steps.redact.outcome == 'success'
+        if: failure() && steps.playwright.outcome != 'skipped' && steps.redact.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: functional-qa-${{ github.run_id }}-${{ github.run_attempt }}
