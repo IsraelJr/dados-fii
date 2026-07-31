@@ -42,10 +42,11 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.2\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.3\.0/);
   assert.match(body, /Produto Validável/);
-  assert.match(body, /PV-1 — Jornada principal da carteira e histórico manual/);
-  assert.match(body, /Google AdSense está congelado/);
+  assert.match(body, /PV-2A — Inteligência da Carteira: núcleo determinístico/);
+  assert.match(body, /PV-1 está concluída funcionalmente/);
+  assert.match(body, /Google AdSense continua congelado/);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -72,6 +73,14 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
+test("estado atual protege fonte única e próxima sprint", () => {
+  const body = text();
+  assert.match(body, /PR `#166` consolidou gráfico e resumo sobre `consolidatedSnapshots`/);
+  assert.match(body, /PR `#167` restaurou o layout original dos seis cards/);
+  assert.match(body, /IA nunca é fonte de verdade para cálculo financeiro/);
+  assert.match(body, /Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand`/);
+});
+
 test("regras críticas de arquitetura e conclusão permanecem explícitas", () => {
   const body = text();
   assert.match(body, /Nenhum `route\.ts` importa Firestore diretamente/);
@@ -80,9 +89,10 @@ test("regras críticas de arquitetura e conclusão permanecem explícitas", () =
   assert.match(body, /Nenhuma validação manual substitui esses gates/);
 });
 
-test("documentos auxiliares canônicos existem", () => {
+test("documentos auxiliares canônicos existem e estão atualizados", () => {
   for (const file of [PRODUCT_DIRECTION, ENV_INVENTORY]) assert.equal(existsSync(file), true, file);
-  assert.match(text(PRODUCT_DIRECTION), /Produto Validável/);
+  assert.match(text(PRODUCT_DIRECTION), /PV-2A — Inteligência da Carteira: núcleo determinístico/);
+  assert.match(text(PRODUCT_DIRECTION), /Codex: implementação, testes, commits, PR e relatório técnico/);
   assert.match(text(ENV_INVENTORY), /Inventário de variáveis de ambiente/);
 });
 
