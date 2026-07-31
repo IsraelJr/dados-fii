@@ -16,7 +16,7 @@ Configure nos environments `Preview` e `Production` do GitHub:
 - `E2E_USER_PASSWORD`;
 - `VERCEL_AUTOMATION_BYPASS_SECRET`, somente em `Preview`.
 
-Configure também a variável não secreta `VERCEL_PREVIEW_HOST_SUFFIX` no environment `Preview`. Ela deve conter somente o sufixo exato do projeto/equipe Vercel, começando por `-` e terminando em `.vercel.app`. O alvo manual não aceita URL livre: recebe um SHA de deployment e resolve a origem pelo registro de Deployments do GitHub, exigindo deployment e status criados por `vercel[bot]`.
+O sufixo exato do projeto/equipe Vercel está fixado no runner imutável e coberto por teste arquitetural. O alvo manual não aceita URL livre: recebe um SHA de deployment e resolve a origem pelo registro de Deployments do GitHub, exigindo deployment e status criados por `vercel[bot]`. Execuções locais diretas continuam obrigadas a informar o mesmo sufixo explicitamente.
 
 Para a jornada do relatório de risco da carteira, o documento server-side desse usuário deve ter `isVip: true`. Não use `PREMIUM_PREVIEW_EMAILS` para conceder esse acesso: o controller da carteira aceita somente o entitlement persistido pelo servidor. E-mail ou conteúdo de `localStorage` enviado pelo cliente não concede plano, VIP ou administração.
 

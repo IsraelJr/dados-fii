@@ -65,7 +65,6 @@ Jornadas Playwright remotas:
 - `E2E_USER_EMAIL` em `Preview` e `Production`;
 - `E2E_USER_PASSWORD` em `Preview` e `Production`;
 - `VERCEL_AUTOMATION_BYPASS_SECRET` em `Preview`.
-- `VERCEL_PREVIEW_HOST_SUFFIX` como variável protegida do environment `Preview`, com o sufixo exato do projeto/time Vercel.
 
 O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAILS` e de claims administrativos. O documento server-side pode receber `isVip: true` exclusivamente para a jornada de relatório. Nenhuma identidade enviada pelo cliente concede entitlement.
 
@@ -88,13 +87,12 @@ O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAI
 
 A validação nova incluiu 17 testes direcionados de arquitetura, origem, renovação, falha, logout e múltiplas abas. A bateria completa passou sem retry. O primeiro build local falhou pela ausência intencional de configuração Firebase; a repetição com a mesma credencial sintética e as mesmas variáveis públicas usadas pela CI oficial passou.
 
-Na rodada anterior, os workflows Phase 2 Closure CI, Risk Lab CI e Portfolio Notifications CI passaram e o Preview da Vercel concluiu. `Functional QA Preview` falhou em oito segundos na validação de configuração, antes da instalação do navegador ou de qualquer autenticação, porque `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET` não estão provisionados. A rodada atual preserva o preflight fail-closed e ainda exige `VERCEL_PREVIEW_HOST_SUFFIX`; a execução real só poderá ser comprovada após o push e o provisionamento autorizado.
+Na rodada anterior, os workflows Phase 2 Closure CI, Risk Lab CI e Portfolio Notifications CI passaram e o Preview da Vercel concluiu. `Functional QA Preview` falhou em oito segundos na validação de configuração, antes da instalação do navegador ou de qualquer autenticação, porque `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET` não estão provisionados. A primeira execução da rodada atual comprovou o checkout imutável e falhou antes do navegador porque o sufixo protegido ainda não estava configurado; o sufixo oficial foi então fixado no próprio runner imutável, sem criar um novo item de provisionamento.
 
 ## Riscos restantes
 
 - A PR ainda contém alteração funcional de autenticação/sessão para todos os usuários; idealmente ela seria revisada ou separada antes do merge.
 - Secrets, usuário QA e entitlement server-side ainda não foram provisionados/confirmados.
-- O sufixo exato do Preview ainda precisa ser configurado como variável protegida do environment.
 - `Functional QA Preview` ainda não está comprovado como required check de `main`.
 - Vídeo é um formato binário e não pode ser redigido depois; a proteção depende da máscara visual instalada antes de qualquer preenchimento. O teste verifica a máscara, mas a execução real de Preview ainda é obrigatória.
 - Serviços externos podem afetar consulta de fundos e geração do relatório.

@@ -42,6 +42,8 @@ test("runner privilegiado é imutável e trata o deployment somente como alvo", 
   assert.match(trustedWorkflow, /deployments\?sha=\$\{DEPLOYMENT_SHA\}/);
   assert.match(trustedWorkflow, /creator\.login == "vercel\[bot\]"/);
   assert.match(trustedWorkflow, /scripts\/validate-functional-qa-target\.mjs/);
+  assert.match(trustedWorkflow, /VERCEL_PREVIEW_HOST_SUFFIX:\s*"-israel-alves-projects-aee7aa56\.vercel\.app"/);
+  assert.doesNotMatch(trustedWorkflow, /vars\.VERCEL_PREVIEW_HOST_SUFFIX/);
   assert.match(trustedWorkflow, /secrets\.E2E_USER_EMAIL/);
   assert.match(trustedWorkflow, /secrets\.E2E_USER_PASSWORD/);
   assert.match(trustedWorkflow, /secrets\.VERCEL_AUTOMATION_BYPASS_SECRET/);
