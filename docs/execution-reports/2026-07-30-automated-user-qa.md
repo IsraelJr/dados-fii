@@ -73,9 +73,11 @@ O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAI
 | Build | aprovado com Firebase sintético em memória |
 | HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
 | E2E local | aprovado: 16/16 em Desktop Chromium e Mobile Chrome; 14 jornadas remotas ignoradas sem `E2E_BASE_URL` |
-| E2E Preview real | bloqueado até provisionamento; não executar como substituto dos gates locais |
+| E2E Preview real | bloqueado em preflight fail-closed: os três secrets obrigatórios não estão provisionados |
 
 A primeira execução E2E revelou timeout do painel administrativo porque o teste local aguardava o rate limit/Firebase externo. O teste foi corrigido para simular explicitamente `401` no endpoint de sessão, mantendo o contrato de UI sem sessão, e a execução local foi serializada. A segunda execução completa passou sem retry.
+
+Após o push de `ec42c17`, os workflows Phase 2 Closure CI, Risk Lab CI e Portfolio Notifications CI passaram. O Preview da Vercel também concluiu. `Functional QA Preview` falhou em oito segundos na validação de configuração, antes da instalação do navegador ou de qualquer autenticação, porque `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET` não estão provisionados. A PR permaneceu draft, aberta, não mesclada e com merge bloqueado pelo check vermelho.
 
 ## Riscos restantes
 
