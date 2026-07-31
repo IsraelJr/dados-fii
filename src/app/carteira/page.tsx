@@ -24,6 +24,12 @@ import AppToast from "../components/AppToast";
 import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
 import PortfolioNotificationPreferences from "../components/PortfolioNotificationPreferences";
 import Login from "../components/Login";
+import PortfolioIntelligencePanel from "../components/PortfolioIntelligencePanel";
+import {
+  intelligencePositionsFromCurrentWallet,
+  intelligenceSnapshotsFromConsolidated,
+  portfolioIntelligenceService,
+} from "@/lib/portfolio-intelligence";
 
 type WalletItem = { ticker: string; quotas: number };
 type LoadedFii = WalletItem & { data?: any; error?: string };
@@ -367,6 +373,7 @@ export default function WalletPage() {
   const [snapshots, setSnapshots] = useState<WalletSnapshot[]>([]);
   const [manualHistory, setManualHistory] = useState<readonly ManualHistoryEntry[]>([]);
   const quotasInputRef = useRef<HTMLInputElement | null>(null);
+  const [portfolioIntelligenceAsOf] = useState(() => new Date().toISOString());
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -553,6 +560,23 @@ export default function WalletPage() {
     });
     return [...byCompetence.values()].sort((left, right) => left.monthKey.localeCompare(right.monthKey));
   }, [snapshots, manualHistory, items.length]);
+  const portfolioIntelligence = useMemo(() => {
+    const positions = intelligencePositionsFromCurrentWallet(insights.enriched.map((item) => {
+      const price = parseCurrency(item.data?.price);
+      return {
+        ticker: item.ticker,
+        quotas: item.quotas,
+        price: price > 0 ? price : null,
+        estimatedIncome: item.lastDividend ? item.estimatedIncome : null,
+        segment: item.data?.segment_new || item.data?.segment || null,
+      };
+    }));
+    return portfolioIntelligenceService.analyzeSafely({
+      snapshots: intelligenceSnapshotsFromConsolidated(consolidatedSnapshots),
+      positions,
+    }, { asOf: portfolioIntelligenceAsOf });
+  }, [consolidatedSnapshots, insights.enriched, portfolioIntelligenceAsOf]);
+
   function addItem() {
     const code = ticker.trim().toUpperCase();
     const totalQuotas = Number(quotas.replace(",", "."));
@@ -619,6 +643,7 @@ export default function WalletPage() {
       <DailyWalletPanel insights={insights} firstPayment={firstPayment} />
       <WalletRiskReportCard walletCount={items.length} />
       <AttentionSection insights={insights} />
+      <PortfolioIntelligencePanel result={portfolioIntelligence} />
       <VisualHistorySection snapshots={consolidatedSnapshots} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
       <SimpleMonthlySummary snapshots={consolidatedSnapshots} />

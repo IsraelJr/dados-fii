@@ -331,6 +331,84 @@ test("@critical carteira mantém cards, gráfico, rede e persistência sincroniz
   }
 });
 
+test("@critical PV-2A recalcula sinais determinísticos, persiste e mantém acessibilidade", async ({ page }) => {
+  await login(page);
+  await page.goto("/carteira");
+  await cleanArtificialHistory(page);
+  await page.evaluate(() => window.localStorage.setItem(
+    "dados-fii-wallet-v1",
+    JSON.stringify([{ ticker: "TGAR11", quotas: 1 }]),
+  ));
+  await page.reload();
+
+  const intelligence = page.getByTestId("portfolio-intelligence");
+  const history = page.locator('section[aria-labelledby="portfolio-history-title"]');
+  const signal = (code: string) => intelligence.locator(`[data-signal-code="${code}"]`);
+
+  try {
+    await expect(intelligence.getByRole("heading", {
+      name: "O que merece atenção na sua carteira",
+    })).toBeVisible();
+    await expect(signal("DADOS_INSUFICIENTES")).toBeVisible();
+    await expect(signal("CONCENTRACAO_ELEVADA")).toBeVisible({ timeout: 30_000 });
+    const showAll = intelligence.getByRole("button", { name: /Ver todos os \d+ sinais/ });
+    if (await showAll.isVisible().catch(() => false)) await showAll.click();
+
+    for (const entry of qaMonths) await saveMonth(page, entry.month, entry.value);
+    if (qaMonths.length) await flushHistory(page);
+
+    if (qaMonths.length >= 6) {
+      await expect(signal("RENDA_EM_QUEDA")).toBeVisible();
+      await expect(signal("DADOS_INSUFICIENTES")).toHaveCount(0);
+
+      const latest = qaMonths.at(-1)!;
+      await saveMonth(page, latest.month, "600,00");
+      await expect(signal("RENDA_EM_ALTA")).toBeVisible();
+      await expect(signal("RENDA_EM_QUEDA")).toHaveCount(0);
+      await flushHistory(page);
+
+      await history.getByRole("button", {
+        name: `Excluir ${latest.fullLabel} / ${currentYear}`,
+      }).click();
+      await expect(signal("DADOS_INSUFICIENTES")).toBeVisible();
+      await expect(signal("RENDA_EM_ALTA")).toHaveCount(0);
+      await expect(signal("RENDA_EM_QUEDA")).toHaveCount(0);
+      await flushHistory(page);
+
+      await saveMonth(page, latest.month, latest.value);
+      await flushHistory(page);
+      await expect(signal("RENDA_EM_QUEDA")).toBeVisible();
+    } else {
+      await expect(signal("DADOS_INSUFICIENTES")).toBeVisible();
+      if (qaMonths.length) {
+        const latest = qaMonths.at(-1)!;
+        await saveMonth(page, latest.month, latest.value);
+        await flushHistory(page);
+        await expect(signal("DADOS_INSUFICIENTES")).toBeVisible();
+      }
+    }
+
+    await page.goto("/fontes-dos-dados");
+    await page.goBack();
+    await expect(intelligence).toBeVisible();
+    await page.reload();
+    await expect(intelligence).toBeVisible();
+    await expect(signal("CONCENTRACAO_ELEVADA")).toBeVisible({ timeout: 30_000 });
+    await expectNoHighImpactAccessibilityViolations(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  } finally {
+    await page.goto("/carteira").catch(() => undefined);
+    await cleanArtificialHistory(page);
+    await page.evaluate(() => window.localStorage.setItem("dados-fii-wallet-v1", "[]")).catch(() => undefined);
+    const walletCleanup = page.waitForResponse((response) => (
+      response.url().includes("/api/wallet-save-clean") && response.request().method() === "POST"
+    )).catch(() => null);
+    await page.evaluate(() => window.dispatchEvent(new Event("pagehide"))).catch(() => undefined);
+    await walletCleanup;
+    await logout(page);
+  }
+});
+
 test("@smoke @critical consulta de fundos trata ticker válido, ausente, inválido e responsividade", async ({ page }) => {
   await page.goto("/");
   await page.getByPlaceholder("Digite o ticker, ex: ABCD11").fill("TGAR11");
