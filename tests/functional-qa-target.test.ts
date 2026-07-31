@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   validateQaTarget,
   vercelBypassHeadersForOrigin,
+// @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
 } from "./e2e/support/qaTarget.ts";
 
 const suffix = "-israel-alves-projects-aee7aa56.vercel.app";

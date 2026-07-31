@@ -9,6 +9,7 @@ import {
   WALLET_SESSION_KEY,
   WALLET_SESSION_LOGOUT_KEY,
   walletSessionIsUsable,
+// @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
 } from "../src/lib/users/WalletSessionClient.ts";
 
 function memoryStorage(initial: Record<string, string> = {}) {
