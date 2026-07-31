@@ -2,6 +2,24 @@ export type PortfolioIntelligenceConfidence = "low" | "medium" | "high";
 export type PortfolioIntelligenceQualityState = "sufficient" | "partial" | "insufficient";
 export type PortfolioIntelligenceSeverity = "info" | "attention" | "warning";
 
+export type PortfolioIntelligenceDataQualityReasonCode =
+  | "EMPTY_PORTFOLIO"
+  | "MISSING_QUOTES"
+  | "MISSING_SEGMENTS"
+  | "MISSING_ESTIMATED_INCOME"
+  | "ZERO_ESTIMATED_INCOME_TOTAL"
+  | "INSUFFICIENT_CLOSED_MONTHS"
+  | "NON_CONSECUTIVE_HISTORY"
+  | "INVALID_INPUT_REJECTED";
+
+export type PortfolioIntelligenceDataQualityReason = Readonly<{
+  code: PortfolioIntelligenceDataQualityReasonCode;
+  conclusion: "analysis" | "trend" | "concentration" | "segments" | "income";
+  impact: "suppressed" | "reduced_confidence";
+  message: string;
+  evidence: Readonly<Record<string, string | number | boolean | null>>;
+}>;
+
 export type PortfolioIntelligenceSignalCode =
   | "RENDA_EM_ALTA"
   | "RENDA_EM_QUEDA"
@@ -128,6 +146,7 @@ export type PortfolioIntelligenceDataQuality = Readonly<{
   incomeCoveragePercent: number | null;
   monthsAvailable: number;
   monthsRequired: number;
+  reasons: readonly PortfolioIntelligenceDataQualityReason[];
   missingFields: readonly string[];
   confidence: Readonly<{
     trend: PortfolioIntelligenceConfidence;

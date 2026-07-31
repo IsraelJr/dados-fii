@@ -36,10 +36,9 @@ export function buildPortfolioIntelligenceSignals(args: {
   const insufficientDomains = Object.values(dataQuality.confidence).filter((confidence) => confidence === "low").length;
 
   if (insufficientDomains > 0) {
-    const trendMissing = Math.max(dataQuality.monthsRequired - dataQuality.monthsAvailable, 0);
-    const summary = trendMissing > 0
-      ? `São necessários pelo menos ${dataQuality.monthsRequired} meses encerrados para identificar tendência de renda. Atualmente existem ${dataQuality.monthsAvailable} meses válidos.`
-      : "Algumas conclusões foram suprimidas porque a cobertura de cotações, segmentos ou renda estimada não pôde ser comprovada.";
+    const suppressedReasons = dataQuality.reasons.filter((reason) => reason.impact === "suppressed");
+    const summary = suppressedReasons[0]?.message
+      ?? "A evidência disponível não permite calcular todas as conclusões da carteira.";
     signals.push(signal(policy, {
       code: "DADOS_INSUFICIENTES",
       severity: "attention",
@@ -53,6 +52,8 @@ export function buildPortfolioIntelligenceSignals(args: {
         totalPositions: metrics.portfolio.fundCount,
         segmentCoveragePercent: dataQuality.segmentCoveragePercent,
         incomeKnownPositions: dataQuality.incomeKnownPositionCount,
+        reasonCode: suppressedReasons[0]?.code ?? null,
+        suppressedReasonCount: suppressedReasons.length,
       },
     }));
   }

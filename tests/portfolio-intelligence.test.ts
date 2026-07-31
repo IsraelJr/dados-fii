@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   PortfolioIntelligenceService,
   PortfolioIntelligenceValidationError,
+  PORTFOLIO_INTELLIGENCE_POLICY,
   intelligenceSnapshotsFromConsolidated,
   type PortfolioIntelligenceInput,
   type PortfolioIntelligencePositionInput,
@@ -50,6 +51,10 @@ function signal(result: ReturnType<typeof analyze>, code: PortfolioIntelligenceS
   return result.signals.find((item) => item.code === code);
 }
 
+function reasonCodes(result: ReturnType<typeof analyze>) {
+  return result.dataQuality.reasons.map((reason) => reason.code);
+}
+
 test("caso A: identifica renda em alta pela média dos dois blocos de três meses", () => {
   const result = analyze(history([100, 100, 100, 110, 110, 110]));
   assert.equal(result.metrics.income.previousThreeMonthAverage, 100);
@@ -81,11 +86,134 @@ test("caso D: calcula desvio-padrão populacional e identifica renda instável",
 });
 
 test("caso E: dois meses geram dados insuficientes e nenhuma tendência forte", () => {
-  const result = analyze(history([100, 110]));
+  const result = analyze(history([100, 110]), [position("AAAA11", 10)]);
   assert.equal(result.dataQuality.monthsAvailable, 2);
   assert.ok(codes(result).includes("DADOS_INSUFICIENTES"));
   assert.ok(!codes(result).some((code) => ["RENDA_EM_ALTA", "RENDA_EM_QUEDA", "RENDA_ESTAVEL"].includes(code)));
-  assert.match(signal(result, "DADOS_INSUFICIENTES")?.summary ?? "", /Atualmente existem 2 meses válidos/);
+  assert.match(signal(result, "DADOS_INSUFICIENTES")?.summary ?? "", /há 2 de 6/);
+});
+
+test("política 1.0.0 inclui exatamente +5% e -5% e mantém valores internos estáveis", () => {
+  const rising = analyze(history([100, 100, 100, 105, 105, 105]));
+  const falling = analyze(history([100, 100, 100, 95, 95, 95]));
+  const justInsideUpper = analyze(history([100, 100, 100, 104.999, 104.999, 104.999]));
+  const justInsideLower = analyze(history([100, 100, 100, 95.001, 95.001, 95.001]));
+
+  assert.equal(rising.metrics.income.blockVariationPercent, 5);
+  assert.ok(codes(rising).includes("RENDA_EM_ALTA"));
+  assert.equal(falling.metrics.income.blockVariationPercent, -5);
+  assert.ok(codes(falling).includes("RENDA_EM_QUEDA"));
+  assert.ok(codes(justInsideUpper).includes("RENDA_ESTAVEL"));
+  assert.ok(codes(justInsideLower).includes("RENDA_ESTAVEL"));
+});
+
+test("política 1.0.0 inclui CV de 20% e exclui valor imediatamente inferior", () => {
+  const exact = analyze(history([80, 80, 80, 120, 120, 120]));
+  const justBelow = analyze(history([80.001, 80.001, 80.001, 119.999, 119.999, 119.999]));
+
+  assert.equal(exact.metrics.income.sixMonthCoefficientOfVariationPercent, 20);
+  assert.ok(codes(exact).includes("RENDA_INSTAVEL"));
+  assert.equal(justBelow.metrics.income.sixMonthCoefficientOfVariationPercent, 19.999);
+  assert.ok(!codes(justBelow).includes("RENDA_INSTAVEL"));
+});
+
+test("política 1.0.0 inclui maior posição de 30% e top 3 de 70%", () => {
+  const largestExact = analyze(history([100, 100, 100, 100, 100, 100]), [
+    position("AAAA11", 30),
+    ...Array.from({ length: 7 }, (_, index) => position(`FND${index}11`, 10)),
+  ]);
+  const topThreeExact = analyze(history([100, 100, 100, 100, 100, 100]), [
+    position("AAAA11", 25),
+    position("BBBB11", 23),
+    position("CCCC11", 22),
+    position("DDDD11", 10),
+    position("EEEE11", 10),
+    position("FFFF11", 10),
+  ]);
+
+  assert.equal(largestExact.metrics.portfolio.largestPosition?.sharePercent, 30);
+  assert.ok(codes(largestExact).includes("CONCENTRACAO_ELEVADA"));
+  assert.equal(topThreeExact.metrics.portfolio.largestPosition?.sharePercent, 25);
+  assert.equal(topThreeExact.metrics.portfolio.topThreeSharePercent, 70);
+  assert.ok(codes(topThreeExact).includes("CONCENTRACAO_ELEVADA"));
+});
+
+test("política 1.0.0 inclui HHI exatamente igual a 2.500", () => {
+  const hhiOnlyService = new PortfolioIntelligenceService({
+    ...PORTFOLIO_INTELLIGENCE_POLICY,
+    concentration: {
+      ...PORTFOLIO_INTELLIGENCE_POLICY.concentration,
+      largestPositionThresholdPercent: 101,
+      topThreeThresholdPercent: 101,
+    },
+  });
+  const result = hhiOnlyService.analyze({
+    snapshots: history([100, 100, 100, 100, 100, 100]),
+    positions: ["AAAA11", "BBBB11", "CCCC11", "DDDD11"].map((ticker) => position(ticker, 25)),
+  }, { asOf: AS_OF_JULY, generatedAt: GENERATED_AT });
+
+  assert.equal(result.metrics.portfolio.patrimonyHhi, 2_500);
+  assert.ok(result.signals.some((item) => item.code === "CONCENTRACAO_ELEVADA"));
+});
+
+test("política 1.0.0 inclui dependência de renda exatamente igual a 35%", () => {
+  const result = analyze(history([100, 100, 100, 100, 100, 100]), [
+    position("AAAA11", 25, { estimatedIncome: 35 }),
+    position("BBBB11", 25, { estimatedIncome: 25 }),
+    position("CCCC11", 25, { estimatedIncome: 20 }),
+    position("DDDD11", 25, { estimatedIncome: 20 }),
+  ]);
+
+  assert.equal(result.metrics.portfolio.largestIncomeContributor?.sharePercent, 35);
+  assert.ok(codes(result).includes("DEPENDENCIA_DE_UM_FUNDO"));
+});
+
+test("política 1.0.0 inclui cobertura de segmento de 70% e concentração de 50%", () => {
+  const result = analyze(history([100, 100, 100, 100, 100, 100]), [
+    position("AAAA11", 50, { segment: "Papel" }),
+    position("BBBB11", 20, { segment: "Tijolo" }),
+    position("CCCC11", 30, { segment: null }),
+  ]);
+
+  assert.equal(result.dataQuality.segmentCoveragePercent, 70);
+  assert.equal(result.dataQuality.confidence.segments, "medium");
+  assert.equal(result.metrics.portfolio.patrimonyBySegment[0]?.sharePercent, 50);
+  assert.ok(codes(result).includes("CONCENTRACAO_POR_SEGMENTO"));
+});
+
+test("dados insuficientes expõem motivos estruturados e específicos sem converter ausência em zero", () => {
+  const fullHistory = history([100, 100, 100, 100, 100, 100]);
+  const empty = analyze([]);
+  const missingQuote = analyze(fullHistory, [position("AAAA11", 10, { price: null })]);
+  const missingSegment = analyze(fullHistory, [position("AAAA11", 10, { segment: null })]);
+  const missingIncome = analyze(fullHistory, [position("AAAA11", 10, { estimatedIncome: null })]);
+  const zeroIncome = analyze(fullHistory, [position("AAAA11", 10, { estimatedIncome: 0 })]);
+  const shortHistory = analyze(history([100, 110]), [position("AAAA11", 10)]);
+  const gappedHistory = analyze([
+    { competence: "2026-01", dividends: 100 },
+    { competence: "2026-02", dividends: 100 },
+    { competence: "2026-03", dividends: 100 },
+    { competence: "2026-05", dividends: 100 },
+    { competence: "2026-06", dividends: 100 },
+    { competence: "2026-07", dividends: 100 },
+  ], [position("AAAA11", 10)], "2026-08-15T12:00:00.000Z");
+  const rejected = service.analyzeSafely({
+    snapshots: [{ competence: "2026-13", dividends: 1 }],
+    positions: [],
+  }, { asOf: AS_OF_JULY, generatedAt: GENERATED_AT });
+
+  assert.ok(reasonCodes(empty).includes("EMPTY_PORTFOLIO"));
+  assert.ok(reasonCodes(missingQuote).includes("MISSING_QUOTES"));
+  assert.ok(reasonCodes(missingSegment).includes("MISSING_SEGMENTS"));
+  assert.ok(reasonCodes(missingIncome).includes("MISSING_ESTIMATED_INCOME"));
+  assert.equal(missingIncome.metrics.portfolio.estimatedIncomeTotal, null);
+  assert.ok(reasonCodes(zeroIncome).includes("ZERO_ESTIMATED_INCOME_TOTAL"));
+  assert.equal(zeroIncome.metrics.portfolio.estimatedIncomeTotal, 0);
+  assert.ok(reasonCodes(shortHistory).includes("INSUFFICIENT_CLOSED_MONTHS"));
+  assert.ok(reasonCodes(gappedHistory).includes("NON_CONSECUTIVE_HISTORY"));
+  assert.equal(gappedHistory.dataQuality.confidence.trend, "medium");
+  assert.deepEqual(rejected.dataQuality.reasons.map((reason) => reason.code), ["INVALID_INPUT_REJECTED"]);
+  assert.match(signal(rejected, "DADOS_INSUFICIENTES")?.summary ?? "", /rejeitada pelo modo seguro/);
 });
 
 test("caso F: ausência não vira zero e zero explícito permanece válido", () => {

@@ -1,5 +1,6 @@
 import type {
   PortfolioIntelligenceDataQuality,
+  PortfolioIntelligenceDataQualityReason,
   PortfolioIntelligenceIncomeMetrics,
   PortfolioIntelligencePortfolioMetrics,
   PortfolioIntelligenceWarning,
@@ -35,20 +36,88 @@ export function assessPortfolioIntelligenceDataQuality(args: {
     ? segmentCoveragePercent >= policy.segments.highConfidenceCoveragePercent ? "high" : "medium"
     : "low";
   const incomeConfidence = allIncomeKnown && (portfolio.estimatedIncomeTotal ?? 0) > 0 ? "high" : "low";
-  const missingFields: string[] = [];
-  if (unpricedPositionCount > 0) missingFields.push(`cotação válida em ${unpricedPositionCount} posição(ões)`);
-  const missingSegments = positions.length - knownSegmentPositionCount;
-  if (missingSegments > 0) missingFields.push(`segmento conhecido em ${missingSegments} posição(ões)`);
-  const missingIncome = positions.length - incomeKnownPositionCount;
-  if (missingIncome > 0) missingFields.push(`renda estimada em ${missingIncome} posição(ões)`);
-  if (income.validMonthCount < policy.trend.minimumMonths) {
-    missingFields.push(`${policy.trend.minimumMonths - income.validMonthCount} mês(es) encerrado(s) para tendência`);
+  const reasons: PortfolioIntelligenceDataQualityReason[] = [];
+  const addReason = (reason: PortfolioIntelligenceDataQualityReason) => {
+    reasons.push(Object.freeze({ ...reason, evidence: Object.freeze({ ...reason.evidence }) }));
+  };
+
+  if (positions.length === 0) {
+    addReason({
+      code: "EMPTY_PORTFOLIO",
+      conclusion: "analysis",
+      impact: "suppressed",
+      message: "A carteira está vazia; adicione ao menos uma posição para avaliar concentração, segmentos e renda estimada.",
+      evidence: { totalPositions: 0 },
+    });
   }
+  if (unpricedPositionCount > 0) {
+    addReason({
+      code: "MISSING_QUOTES",
+      conclusion: "concentration",
+      impact: "suppressed",
+      message: `${unpricedPositionCount} posição(ões) estão sem cotação válida; a concentração patrimonial não pode ser comprovada.`,
+      evidence: { affectedPositions: unpricedPositionCount, totalPositions: positions.length },
+    });
+  }
+  const missingSegments = positions.length - knownSegmentPositionCount;
+  if (missingSegments > 0) {
+    addReason({
+      code: "MISSING_SEGMENTS",
+      conclusion: "segments",
+      impact: "suppressed",
+      message: `${missingSegments} posição(ões) estão sem segmento conhecido; a concentração por segmento pode ficar indisponível.`,
+      evidence: { affectedPositions: missingSegments, totalPositions: positions.length },
+    });
+  }
+  const missingIncome = positions.length - incomeKnownPositionCount;
+  if (missingIncome > 0) {
+    addReason({
+      code: "MISSING_ESTIMATED_INCOME",
+      conclusion: "income",
+      impact: "suppressed",
+      message: `${missingIncome} posição(ões) estão sem renda estimada; a dependência de renda por fundo não pode ser comprovada.`,
+      evidence: { affectedPositions: missingIncome, totalPositions: positions.length },
+    });
+  }
+  if (allIncomeKnown && portfolio.estimatedIncomeTotal === 0) {
+    addReason({
+      code: "ZERO_ESTIMATED_INCOME_TOTAL",
+      conclusion: "income",
+      impact: "suppressed",
+      message: "Todas as rendas estimadas são conhecidas, mas o total é zero; não existe base positiva para calcular participação por fundo.",
+      evidence: { incomeKnownPositions: incomeKnownPositionCount, estimatedIncomeTotal: 0 },
+    });
+  }
+  if (income.validMonthCount < policy.trend.minimumMonths) {
+    const missingMonths = policy.trend.minimumMonths - income.validMonthCount;
+    addReason({
+      code: "INSUFFICIENT_CLOSED_MONTHS",
+      conclusion: "trend",
+      impact: "suppressed",
+      message: `São necessários mais ${missingMonths} mês(es) encerrado(s) para calcular a tendência; há ${income.validMonthCount} de ${policy.trend.minimumMonths}.`,
+      evidence: {
+        monthsAvailable: income.validMonthCount,
+        monthsRequired: policy.trend.minimumMonths,
+        missingMonths,
+      },
+    });
+  } else if (!latestSixConsecutive) {
+    addReason({
+      code: "NON_CONSECUTIVE_HISTORY",
+      conclusion: "trend",
+      impact: "reduced_confidence",
+      message: "Os seis meses disponíveis têm lacunas; a tendência foi mantida com confiança reduzida.",
+      evidence: { monthsAvailable: income.validMonthCount, latestSixMonthsAreConsecutive: false },
+    });
+  }
+
+  const missingFields = reasons.map((reason) => reason.message);
 
   const allSufficient = trendConfidence !== "low"
     && concentrationConfidence !== "low"
     && segmentsConfidence !== "low"
-    && incomeConfidence !== "low";
+    && incomeConfidence !== "low"
+    && reasons.length === 0;
   const hasAnyUsableData = income.validMonthCount > 0 || pricedPositionCount > 0;
   const state = allSufficient ? "sufficient" : hasAnyUsableData ? "partial" : "insufficient";
   const warnings: PortfolioIntelligenceWarning[] = [];
@@ -87,6 +156,7 @@ export function assessPortfolioIntelligenceDataQuality(args: {
     incomeCoveragePercent,
     monthsAvailable: income.validMonthCount,
     monthsRequired: policy.trend.minimumMonths,
+    reasons: Object.freeze(reasons),
     missingFields: Object.freeze(missingFields),
     confidence: Object.freeze({
       trend: trendConfidence,

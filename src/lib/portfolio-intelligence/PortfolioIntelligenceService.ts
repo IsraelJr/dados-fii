@@ -228,8 +228,28 @@ export class PortfolioIntelligenceService {
     } catch (error) {
       if (!(error instanceof PortfolioIntelligenceValidationError)) throw error;
       const empty = this.analyze({ snapshots: [], positions: [] }, options);
+      const invalidReason = Object.freeze({
+        code: "INVALID_INPUT_REJECTED" as const,
+        conclusion: "analysis" as const,
+        impact: "suppressed" as const,
+        message: "A entrada foi rejeitada pelo modo seguro; nenhuma conclusão financeira foi calculada.",
+        evidence: Object.freeze({ validationCode: error.code }),
+      });
+      const dataQuality = Object.freeze({
+        ...empty.dataQuality,
+        state: "insufficient" as const,
+        reasons: Object.freeze([invalidReason]),
+        missingFields: Object.freeze([invalidReason.message]),
+      });
+      const signals = buildPortfolioIntelligenceSignals({
+        metrics: empty.metrics,
+        dataQuality,
+        policy: this.policy,
+      });
       return Object.freeze({
         ...empty,
+        signals,
+        dataQuality,
         warnings: Object.freeze([
           ...empty.warnings,
           Object.freeze({
