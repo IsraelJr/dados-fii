@@ -33,6 +33,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - O `main` de referência está em `e2f8c6a076e7e1f88b443a06556afde9a5bfea6b`.
 - A PR `#168` permanece aberta, em draft e não mesclada na branch `agent/functional-qa-automation`, com referência `1b9e8837fa681d734c3fa007e9a01e397c6b5354`.
 - PV-2A implementada e validada localmente em PR draft `#169`, empilhada sobre a PR `#168`.
+- PV-2B implementada e validada localmente na PR draft `#170`, empilhada sobre a PR `#169`, sem alterar autenticação, entitlement ou infraestrutura de QA.
 - Functional QA remoto pendente por provisionamento.
 - Liberação final ainda não validada.
 
@@ -47,6 +48,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | Sincronização gráfico/cards | Concluída |
 | Persistência local + servidor | Concluída |
 | Inteligência da Carteira determinística | Implementada e validada localmente na PR draft `#169`; liberação pendente |
+| Experiência da Inteligência da Carteira | Implementada e validada localmente na PR draft `#170`; QA remoto e liberação pendentes |
 | Explicação por IA dos sinais | Pendente após núcleo determinístico |
 | Descoberta Premium/beta | Pendente |
 | Checkout/cobrança | Não iniciado |
@@ -228,7 +230,8 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - PR `#167`: restauração do layout dos cards.
 - PR `#165`: fechada sem merge; tentativa substituída por `#166`.
 - PR `#168`: automação funcional, aberta, draft e não mesclada; branch `agent/functional-qa-automation`, SHA de base da PV-2A `1b9e8837fa681d734c3fa007e9a01e397c6b5354`.
-- PR `#169`: PV-2A, aberta em draft e empilhada sobre `agent/functional-qa-automation`; branch `feat/portfolio-intelligence-core`, commit de implementação `5b7c07f5c6c833013be82f416248c332125e9bd6`.
+- PR `#169`: PV-2A, aberta em draft e empilhada sobre `agent/functional-qa-automation`; branch `feat/portfolio-intelligence-core`, HEAD corretivo usado pela PV-2B `654abbba45e99c1093d56aa54cad1aad55e1dc88`.
+- PR `#170`: PV-2B, aberta em draft e empilhada sobre `feat/portfolio-intelligence-core`; branch `feat/portfolio-intelligence-experience`, commit técnico validado localmente `e0f189dc4cd13ec76b4473528eefc80d081714be`.
 
 ### Arquivos centrais da carteira/histórico
 
@@ -271,14 +274,14 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 
 ### Parciais
 
-- inteligência da carteira: núcleo, política `1.0.0`, painel mínimo e cobertura local implementados na PR draft `#169`; Functional QA remoto e liberação final permanecem pendentes;
+- inteligência da carteira: núcleo e política `1.0.0` na PR draft `#169`, com experiência determinística, evidências, estados e cobertura local na PR draft `#170`; Functional QA remoto e liberação final permanecem pendentes;
 - Premium: relatório existe, mas descoberta, beta e cobrança não estão finalizados;
 - notificações: existem, mas ainda precisam seguir rigorosamente mudança material e deduplicação.
 
 ### Pendentes
 
 - liberação final do núcleo determinístico após sincronização com `main` e Functional QA Preview autenticado;
-- apresentação “O que mudou”;
+- validação remota da experiência “O que mudou” nos três projetos Playwright;
 - IA explicativa sobre sinais;
 - descoberta Premium e beta externo;
 - relatório incremental;
@@ -351,11 +354,11 @@ Para carteira/histórico/inteligência, adicionar obrigatoriamente:
 
 ### Imediatas
 
-- revisar a PR draft `#169` sem mesclar enquanto os gates remotos estiverem pendentes;
+- revisar as PRs draft `#169` e `#170` sem mesclar enquanto os gates remotos estiverem pendentes;
 - provisionar o usuário e os secrets de QA em fluxo separado;
 - executar o Functional QA Preview autenticado nos três dispositivos;
 - após integração ou substituição da PR `#168`, sincronizar a PV-2A com `main` e repetir todos os gates;
-- somente então validar liberação final e avançar a apresentação da PV-2B.
+- depois da integração das PRs anteriores, retargetar a PR `#170` para `main`, repetir os gates e somente então avaliar a liberação final.
 
 ### Comerciais
 
