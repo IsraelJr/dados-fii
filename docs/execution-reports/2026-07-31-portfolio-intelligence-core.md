@@ -5,7 +5,9 @@
 **Base empilhada:** `agent/functional-qa-automation`
 **HEAD inicial:** `1b9e8837fa681d734c3fa007e9a01e397c6b5354`
 **HEAD final da implementação:** `5b7c07f5c6c833013be82f416248c332125e9bd6`
-**HEAD com reconciliação documental auditado remotamente:** `1954bbb55350f7bef53cd7557c52454fff404864`
+**SHA da primeira atualização documental:** `1954bbb55350f7bef53cd7557c52454fff404864`
+**SHA da reconciliação documental anterior:** `cf1c5c44d3953c5ec4865e223252a961dee74d97`
+**SHA da correção técnica da auditoria:** `e344d039b8162405781ac69293c21f45ad4f771e`
 **PR:** `#169`, aberta e em draft
 **Estado:** implementação validada localmente; liberação final não validada
 
@@ -34,6 +36,7 @@ A branch foi criada limpa sobre o HEAD remoto mais recente da PR #168, conforme 
 - nenhuma API, repository, coleção, workflow, usuário ou credencial foi criado;
 - componentes React apenas adaptam entrada e apresentam o resultado;
 - valores ausentes permanecem `null`;
+- motivos de insuficiência são estruturados por código, conclusão afetada, impacto, mensagem e evidências;
 - qualquer cotação ausente torna a cobertura patrimonial percentual indeterminada e suprime concentração forte;
 - qualquer renda por posição ausente suprime dependência de renda;
 - o domínio não importa React, Next.js, Firestore ou OpenAI;
@@ -74,27 +77,31 @@ Sinais:
 
 ## Gates locais executados
 
-| Gate | Resultado |
-|---|---|
-| `npm ci` | aprovado: 1.120 pacotes instalados pelo lockfile |
-| Governança de workflows | aprovado: 10/10 |
-| Handoff canônico | aprovado: 8/8 após a reconciliação factual final |
-| Auditoria de produção | aprovado: 0 vulnerabilidades |
-| Secret scan | aprovado: 649 arquivos versionados |
-| ESLint | aprovado, zero warnings |
-| TypeScript | aprovado |
-| `test:all` | aprovado: 659/659 |
-| Testes específicos PV-2A | aprovado: 36/36 |
-| Firestore Rules | aprovado: 3/3 com JDK 21 |
-| Cobertura crítica | aprovado: 100% linhas, 93,66% branches, 98,53% funções |
-| Cobertura dedicada PV-2A | aprovado: 97,25% linhas, 90,48% branches, 95,52% funções |
-| Mutation sanity | aprovado |
-| Build Next.js 16.2.12 | aprovado: 47 páginas estáticas e rotas dinâmicas |
-| HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
-| E2E local | aprovado: 16/16; 16 remotos ignorados corretamente |
-| Descoberta E2E | aprovado: 48 testes, 16 por projeto, em três dispositivos |
+Os gates completos da implementação original pertencem ao SHA `5b7c07f5c6c833013be82f416248c332125e9bd6`. Após a auditoria, somente os gates exigidos para a correção foram reexecutados sobre o conteúdo que se tornou `e344d039b8162405781ac69293c21f45ad4f771e`; os demais não são implicitamente promovidos para esse SHA.
 
-Os cenários específicos cobrem alta, queda, estabilidade, instabilidade, insuficiência, ausência diferente de zero, mês corrente/futuro, concentração, dependência, cobertura de segmentos, determinismo, valores inválidos, divisão por zero, HHI, MAD zero, busca de atípico anterior, imutabilidade, ordenação, empates, carteira vazia/única, integração e performance com 200 posições e 120 meses.
+| Gate | Resultado | SHA local comprovado |
+|---|---|---|
+| `npm ci` | aprovado: 1.120 pacotes instalados pelo lockfile | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Governança de workflows | aprovado: 10/10 | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Handoff canônico | aprovado: 8/8 | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Auditoria de produção | aprovado: 0 vulnerabilidades | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Secret scan | aprovado: 663 arquivos versionados | `e344d039b8162405781ac69293c21f45ad4f771e` |
+| ESLint | aprovado, zero warnings | `e344d039b8162405781ac69293c21f45ad4f771e` |
+| TypeScript | aprovado | `e344d039b8162405781ac69293c21f45ad4f771e` |
+| `test:all` | aprovado: 659/659 | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Testes específicos PV-2A | aprovado: 43/43 | `e344d039b8162405781ac69293c21f45ad4f771e` |
+| Firestore Rules | aprovado: 3/3 com JDK 21 | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Cobertura crítica | aprovado: 100% linhas, 93,66% branches, 98,53% funções | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Cobertura dedicada PV-2A | aprovado: 97,25% linhas, 90,48% branches, 95,52% funções | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Mutation sanity | aprovado | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Build Next.js 16.2.12 | aprovado: 47 páginas estáticas e rotas dinâmicas, com credencial sintética de build | `e344d039b8162405781ac69293c21f45ad4f771e` |
+| HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| E2E local | aprovado: 16/16; 16 remotos ignorados corretamente | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+| Descoberta E2E | aprovado: 48 testes, 16 por projeto, em três dispositivos | `5b7c07f5c6c833013be82f416248c332125e9bd6` |
+
+Os cenários específicos cobrem os limites inclusivos exatos de +5%, -5%, CV 20%, maior posição 30%, top 3 70%, HHI 2.500, dependência 35%, cobertura de segmentos 70% e concentração por segmento 50%. Também cobrem valores imediatamente internos aos limites de tendência e instabilidade, ausência diferente de zero, mês corrente/futuro, determinismo, valores inválidos, divisão por zero, MAD zero, busca de atípico anterior, imutabilidade, ordenação, empates, integração e performance com 200 posições e 120 meses.
+
+Os motivos estruturados de dados insuficientes foram comprovados para carteira vazia, cotação ausente, segmento ausente, renda estimada ausente, rendas conhecidas com total zero, menos de seis meses, seis meses com lacunas e entrada rejeitada pelo modo seguro.
 
 ## E2E e acessibilidade
 
@@ -114,21 +121,23 @@ A execução local utilizou `desktop-chromium` e `mobile-chrome`, `workers=1`, s
 
 ## Preview e Functional QA
 
-Implementação validada localmente; Functional QA remoto pendente por provisionamento.
+O SHA corretivo `e344d039b8162405781ac69293c21f45ad4f771e` recebeu status Vercel `success` depois da publicação. O alvo auditável do status é `https://vercel.com/israel-alves-projects-aee7aa56/dados-fii/ALdFqKmBZTHqsA87a1ZVnBYjuidD`. O conector não forneceu uma URL pública de Preview para esse SHA, portanto este relatório não inventa uma.
 
-O Preview Vercel do HEAD `1954bbb55350f7bef53cd7557c52454fff404864` foi aprovado em:
+O SHA efetivamente validado pelo Preview antes da correção foi `cf1c5c44d3953c5ec4865e223252a961dee74d97`, em:
 
-`https://dados-fxkdzr343-israel-alves-projects-aee7aa56.vercel.app`
+`https://dados-lc884vjop-israel-alves-projects-aee7aa56.vercel.app`
 
 O `Functional QA Preview` associado falhou corretamente no preflight fail-closed:
 
-- execução `30646437030`;
+- execução `30646629307`;
 - implementação privilegiada fixada em `18995c079d53848c5ac8e6205d220c2149e02f9b`;
 - alvo confirmado como o Preview HTTPS do SHA auditado;
 - variáveis de QA vazias;
 - nenhum navegador instalado;
 - nenhuma autenticação executada;
 - nenhum artefato autenticado enviado.
+
+Após a correção, a execução `30651071190` repetiu o mesmo comportamento fail-closed no SHA `e344d039b8162405781ac69293c21f45ad4f771e`: checkout do runner imutável, prova da identidade e resolução do deployment passaram; `Validate isolated QA configuration` falhou; instalação de dependências, redator sentinela, navegadores, Playwright autenticado, redação e upload foram ignorados. O status Vercel passou e o Functional QA permaneceu vermelho pelos secrets ausentes.
 
 Secrets ausentes:
 
@@ -137,6 +146,8 @@ Secrets ausentes:
 - `VERCEL_AUTOMATION_BYPASS_SECRET`.
 
 Não houve autenticação real, evidência autenticada nos três dispositivos ou validação de produção nesta entrega.
+
+Assim, a URL pública de Preview comprovada pertence a `cf1c5c44d3953c5ec4865e223252a961dee74d97`; o status Vercel e o preflight remoto mais recentes pertencem a `e344d039b8162405781ac69293c21f45ad4f771e`. O commit que contém esta atualização documental é posterior aos dois e não é declarado como Preview-validado neste relatório.
 
 ## Riscos próprios
 

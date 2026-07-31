@@ -73,6 +73,8 @@ type PortfolioIntelligencePositionInput = Readonly<{
 
 Cada sinal possui código, severidade, título, resumo, confiança categórica, evidências primitivas e versão da política. Não existe confiança numérica inventada.
 
+`dataQuality.reasons` preserva motivos estruturados, ordenados e apresentáveis. Cada motivo contém código, conclusão afetada, impacto (`suppressed` ou `reduced_confidence`), mensagem e evidências primitivas. Os códigos atuais distinguem carteira vazia, cotação ausente, segmento ausente, renda estimada ausente, total conhecido igual a zero, histórico curto, histórico com lacunas e entrada rejeitada pelo modo seguro. Ausência continua sendo `null`; total explicitamente conhecido como zero continua sendo `0`.
+
 ## Política versionada
 
 Versão atual: `1.0.0`.
@@ -181,8 +183,8 @@ Se qualquer posição não tiver renda estimada disponível, o total e o sinal d
 
 Estado geral:
 
-- `sufficient`: tendência, concentração, segmentos e renda têm evidência suficiente;
-- `partial`: existe dado utilizável, mas pelo menos uma conclusão foi suprimida;
+- `sufficient`: tendência, concentração, segmentos e renda têm evidência suficiente e não existe ressalva estruturada;
+- `partial`: existe dado utilizável, mas pelo menos uma conclusão foi suprimida ou teve confiança reduzida;
 - `insufficient`: não há histórico encerrado nem posição cotada utilizável.
 
 Confiança:
@@ -208,7 +210,7 @@ Não existe score de qualidade de 0 a 100.
 - lacunas não são preenchidas;
 - competências e posições duplicadas são rejeitadas;
 - `NaN`, infinito, valor negativo, quantidade inválida e competência inválida falham fechado;
-- o modo seguro da interface converte erro validado em resultado vazio e warning, sem métrica contaminada;
+- o modo seguro da interface converte erro validado em resultado vazio, motivo `INVALID_INPUT_REJECTED` e warning, sem métrica contaminada;
 - arrays recebidos não são alterados.
 
 ## Sinais e ordem
