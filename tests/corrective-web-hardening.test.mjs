@@ -33,7 +33,8 @@ test("canonical usa www e páginas privadas ou programáticas ficam fora do índ
   const robots = readFileSync("src/app/robots.ts", "utf8");
 
   assert.match(site, /https:\/\/www\.dadosfii\.com\.br/);
-  assert.match(walletLayout, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/s);
+  assert.doesNotMatch(walletLayout, /robots\s*:/);
+  assert.match(config, /\{ source: "\/carteira\/:path\*", headers: noIndexHeaders \}/);
   assert.match(adminLayout, /index:\s*false/);
   assert.match(fundLayout, /index:\s*false,\s*follow:\s*true/);
   assert.doesNotMatch(sitemap, /\/fii\//);

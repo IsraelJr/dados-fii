@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
+import { saoPauloCalendarPeriod } from "./support/closedCompetences";
 
 test.skip(Boolean(process.env.E2E_BASE_URL), "Suíte determinística local; jornadas remotas ficam em functional-qa.spec.ts.");
 
@@ -11,6 +12,15 @@ test.beforeEach(async ({ page }) => {
 async function expectNoHighImpactAccessibilityViolations(page: Page) {
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact || ""))).toEqual([]);
+}
+
+function latestClosedCompetences(count: number) {
+  const period = saoPauloCalendarPeriod();
+  return Array.from({ length: count }, (_, index) => {
+    const offset = count - index;
+    const date = new Date(Date.UTC(period.year, period.month - 1 - offset, 1));
+    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+  });
 }
 
 test("página pública possui estrutura, navegação e acessibilidade essenciais", async ({ page }) => {
@@ -285,6 +295,102 @@ test("resumo e gráfico usam o mesmo histórico consolidado e preservam fevereir
   await expect(bestMonth).toContainText("R$ 450,03");
   await expect(yearTotal).toContainText("R$ 550,03");
   await expect(dividendChart.locator("svg text").filter({ hasText: "Fev" })).toBeVisible();
+});
+
+test("inteligência apresenta carregamento, resumo, três prioridades, evidências e expansão acessível", async ({ page }) => {
+  const now = new Date().toISOString();
+  const entries = latestClosedCompetences(6).map((competence, index) => ({
+    schemaVersion: 1,
+    portfolioId: "default",
+    competence,
+    totalValue: null,
+    dividends: index < 3 ? 100 : 110,
+    source: "manual",
+    createdAt: now,
+    updatedAt: now,
+  }));
+  const currentYear = new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "America/Sao_Paulo" }).format(new Date());
+  const currentMonth = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "America/Sao_Paulo" }).format(new Date());
+  let releaseBatch: () => void = () => {};
+  const batchBarrier = new Promise<void>((resolve) => { releaseBatch = resolve; });
+
+  await page.addInitScript(({ historyEntries }) => {
+    window.localStorage.setItem("dados-fii-wallet-email", "intelligence-e2e@example.com");
+    window.localStorage.setItem("dados-fii-wallet-session", "intelligence-session-e2e");
+    window.localStorage.setItem("dados-fii-wallet-v1", JSON.stringify([{ ticker: "TGAR11", quotas: 10 }]));
+    window.localStorage.setItem("dados-fii-portfolio-history-cache-v2", JSON.stringify(historyEntries));
+  }, { historyEntries: entries });
+
+  await page.route("**/api/portfolio/history?portfolioId=default", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, entries }),
+  }));
+  await page.route("**/api/fii/batch", async (route) => {
+    await batchBarrier;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        items: {
+          TGAR11: {
+            code: "TGAR11",
+            name: "TG Ativo Real",
+            segment: "Híbrido",
+            price: "R$ 10,00",
+            [`earnings${currentYear}`]: {
+              [currentMonth]: { earnings: "R$ 1,00", payment_date: "31/12/2099", date_with: "15/12/2099" },
+            },
+          },
+        },
+        errors: {},
+      }),
+    });
+  });
+
+  await page.goto("/carteira");
+  const loading = page.getByTestId("portfolio-intelligence-loading");
+  await expect(loading).toBeVisible();
+  await expect(loading).toHaveAttribute("aria-busy", "true");
+  await expect(page.locator('[data-signal-code="DADOS_INSUFICIENTES"]')).toHaveCount(0);
+  releaseBatch();
+
+  const intelligence = page.getByTestId("portfolio-intelligence");
+  await expect(intelligence).toBeVisible();
+  await expect(intelligence).toHaveAttribute("data-analysis-state", "complete");
+  await expect(intelligence.getByTestId("portfolio-income-state")).toHaveText("Alta");
+  await expect(intelligence.getByTestId("portfolio-quality-state")).toHaveText("Suficiente");
+  await expect(intelligence.getByTestId("portfolio-attention-count")).toHaveText("3 pontos");
+  await expect(intelligence.locator("[data-signal-code]")).toHaveCount(3);
+  await expect(intelligence.locator('[data-signal-code="RENDA_EM_ALTA"]')).toHaveCount(0);
+  await expect(intelligence.getByText("Confiança alta").first()).toBeVisible();
+  await expect(intelligence.getByText("Alerta").first()).toBeVisible();
+
+  const expand = intelligence.locator('button[aria-controls="portfolio-intelligence-signals"]');
+  await expect(expand).toHaveAccessibleName("Ver todos os 4 sinais");
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expect(expand).toHaveAttribute("aria-controls", "portfolio-intelligence-signals");
+  await expand.focus();
+  await page.keyboard.press("Enter");
+  await expect(expand).toHaveAttribute("aria-expanded", "true");
+  await expect(expand).toHaveAccessibleName("Recolher sinais");
+  await expect(intelligence.locator("[data-signal-code]")).toHaveCount(4);
+  await expect(intelligence.locator('[data-signal-code="RENDA_EM_ALTA"]')).toBeVisible();
+  await expect(intelligence.getByText("R$ 100,00", { exact: true }).first()).toBeVisible();
+  await expect(intelligence.getByText("10%", { exact: true }).first()).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expect(intelligence.locator("[data-signal-code]")).toHaveCount(3);
+
+  await expect(intelligence.getByRole("heading", { name: "Dados usados nesta análise" })).toBeVisible();
+  await expect(intelligence.getByText("6 de 6 meses encerrados necessários")).toBeVisible();
+  await expect(intelligence.getByText("1 com cotação e 0 sem cotação, de 1 posição(ões)")).toBeVisible();
+  await expect(intelligence.getByText("Cobertura de segmentos").locator("..")).toContainText("100%");
+  await expect(intelligence.getByText("Cobertura de renda").locator("..")).toContainText("100%");
+  await expect(intelligence).toHaveClass(/dark:bg-gray-950/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await expectNoHighImpactAccessibilityViolations(page);
 });
 
 test("área administrativa permanece fechada sem sessão", async ({ page }) => {

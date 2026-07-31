@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   PortfolioIntelligenceService,
+  buildPortfolioIntelligencePresentation,
   intelligencePositionsFromCurrentWallet,
   intelligenceSnapshotsFromConsolidated,
 } from "../src/lib/portfolio-intelligence/index";
@@ -107,4 +108,41 @@ test("adapter preserva zero explícito e null de renda por posição", () => {
   const result = service.analyze({ snapshots: [], positions }, options);
   assert.equal(result.metrics.portfolio.estimatedIncomeTotal, null);
   assert.equal(result.dataQuality.incomeCoveragePercent, null);
+});
+
+test("alterações de histórico e posições recalculam também o modelo de apresentação", () => {
+  const diversified = ["AAAA11", "BBBB11", "CCCC11", "DDDD11", "EEEE11"].map((ticker) => ({
+    ticker,
+    quotas: 20,
+    price: 1,
+    estimatedIncome: 20,
+    segment: ticker === "AAAA11" ? "Papel" : "Tijolo",
+  }));
+  const concentrated = diversified.map((item, index) => ({
+    ...item,
+    quotas: index === 0 ? 30 : 17.5,
+  }));
+  const rising = service.analyze({
+    snapshots: snapshots([100, 100, 100, 110, 110, 110]),
+    positions: intelligencePositionsFromCurrentWallet(diversified),
+  }, options);
+  const afterMonthChange = service.analyze({
+    snapshots: snapshots([100, 100, 100, 95, 95, 95]),
+    positions: intelligencePositionsFromCurrentWallet(diversified),
+  }, options);
+  const afterMonthDelete = service.analyze({
+    snapshots: snapshots([100, 100, 100, 95, 95]),
+    positions: intelligencePositionsFromCurrentWallet(diversified),
+  }, options);
+  const afterPositionChange = service.analyze({
+    snapshots: snapshots([100, 100, 100, 110, 110, 110]),
+    positions: intelligencePositionsFromCurrentWallet(concentrated),
+  }, options);
+
+  assert.equal(buildPortfolioIntelligencePresentation(rising).summary.incomeState, "rising");
+  assert.equal(buildPortfolioIntelligencePresentation(afterMonthChange).summary.incomeState, "falling");
+  assert.equal(buildPortfolioIntelligencePresentation(afterMonthDelete).summary.incomeState, "unavailable");
+  assert.ok(!rising.signals.some((item) => item.code === "CONCENTRACAO_ELEVADA"));
+  assert.ok(afterPositionChange.signals.some((item) => item.code === "CONCENTRACAO_ELEVADA"));
+  assert.ok(buildPortfolioIntelligencePresentation(afterPositionChange).summary.attentionCount > 0);
 });

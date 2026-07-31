@@ -50,6 +50,8 @@ test("carteira integra exatamente consolidatedSnapshots e posições do Regulato
   assert.match(page, /intelligenceSnapshotsFromConsolidated\(consolidatedSnapshots\)/);
   assert.match(page, /intelligencePositionsFromCurrentWallet\(insights\.enriched\.map/);
   assert.match(page, /<PortfolioIntelligencePanel result=\{portfolioIntelligence\}/);
+  assert.match(page, /<PortfolioIntelligenceLoading \/>/);
+  assert.match(page, /portfolioIntelligenceLoading/);
   assert.match(batchRoute, /regulatoryDataService\.getMany\(tickers\)/);
   assert.doesNotMatch(batchRoute, /firebase|Firestore|adminDb/i);
 });
@@ -80,10 +82,40 @@ test("painel é semântico, expansível, acessível e não calcula métricas", a
   assert.match(source, /aria-labelledby="portfolio-intelligence-title"/);
   assert.match(source, /<h2 id="portfolio-intelligence-title"/);
   assert.match(source, /aria-expanded=\{expanded\}/);
+  assert.match(source, /aria-controls="portfolio-intelligence-signals"/);
   assert.match(source, /focus-visible:ring-2/);
   assert.match(source, /dark:/);
+  assert.match(source, /Resumo da inteligência da carteira/);
+  assert.match(source, /Dados usados nesta análise/);
+  assert.match(source, /data-quality-reason/);
+  assert.match(source, /PortfolioIntelligenceLoading/);
+  assert.match(source, /aria-busy="true"/);
   assert.match(source, /Conteúdo informativo, sem recomendação de investimento\./);
   assert.doesNotMatch(source, /\.reduce\(|Math\.(?:max|min|sqrt|pow)|OpenAI|compre|venda/i);
+});
+
+test("modelo de apresentação recebe somente o resultado e não recalcula política financeira", async () => {
+  const source = await readFile(
+    path.join(DOMAIN_DIR, "PortfolioIntelligencePresentation.ts"),
+    "utf8",
+  );
+  const panel = await readFile(
+    path.join(ROOT, "src/app/components/PortfolioIntelligencePanel.tsx"),
+    "utf8",
+  );
+  assert.match(source, /buildPortfolioIntelligencePresentation\(\s*result: PortfolioIntelligenceResult/);
+  assert.match(panel, /buildPortfolioIntelligencePresentation\(result\)/);
+  assert.match(panel, /useMemo\(\(\) => buildPortfolioIntelligencePresentation\(result\), \[result\]\)/);
+  assert.doesNotMatch(source, /PortfolioIntelligencePolicy|PORTFOLIO_INTELLIGENCE_POLICY/);
+  assert.doesNotMatch(source, /Math\.(?:max|min|sqrt|pow)|\.reduce\(|fetch\(|localStorage|sessionStorage|OpenAI/i);
+  assert.doesNotMatch(panel, /(?:estimatedIncomeTotal|hhi|average|sharePercent)\s*[+*/-]/i);
+});
+
+test("inteligência continua sem fetch, persistência ou estado derivado durável", async () => {
+  const model = await readFile(path.join(DOMAIN_DIR, "PortfolioIntelligencePresentation.ts"), "utf8");
+  const panel = await readFile(path.join(ROOT, "src/app/components/PortfolioIntelligencePanel.tsx"), "utf8");
+  const combined = `${model}\n${panel}`;
+  assert.doesNotMatch(combined, /fetch\(|localStorage|sessionStorage|indexedDB|analytics|telemetry|console\./i);
 });
 
 test("arquitetura não altera autenticação, entitlement, Risk Lab ou relatório Premium", async () => {

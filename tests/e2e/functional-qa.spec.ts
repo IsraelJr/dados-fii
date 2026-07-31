@@ -331,7 +331,7 @@ test("@critical carteira mantém cards, gráfico, rede e persistência sincroniz
   }
 });
 
-test("@critical PV-2A recalcula sinais determinísticos, persiste e mantém acessibilidade", async ({ page }) => {
+test("@critical PV-2A/PV-2B recalcula sinais e apresentação, persiste e mantém acessibilidade", async ({ page }) => {
   await login(page);
   await page.goto("/carteira");
   await cleanArtificialHistory(page);
@@ -349,10 +349,19 @@ test("@critical PV-2A recalcula sinais determinísticos, persiste e mantém aces
     await expect(intelligence.getByRole("heading", {
       name: "O que merece atenção na sua carteira",
     })).toBeVisible();
+    await expect(intelligence.getByTestId("portfolio-income-state")).toHaveText("Indisponível");
+    await expect(intelligence).toHaveAttribute("data-analysis-state", "insufficient_history");
     await expect(signal("DADOS_INSUFICIENTES")).toBeVisible();
     await expect(signal("CONCENTRACAO_ELEVADA")).toBeVisible({ timeout: 30_000 });
+    await expect(intelligence.getByRole("heading", { name: "Dados usados nesta análise" })).toBeVisible();
+    await expect(intelligence.locator('[data-quality-reason="INSUFFICIENT_CLOSED_MONTHS"]')).toBeVisible();
+    await expect(intelligence.locator("[data-signal-code]")).toHaveCount(3);
     const showAll = intelligence.getByRole("button", { name: /Ver todos os \d+ sinais/ });
-    if (await showAll.isVisible().catch(() => false)) await showAll.click();
+    if (await showAll.isVisible().catch(() => false)) {
+      await expect(showAll).toHaveAttribute("aria-expanded", "false");
+      await showAll.click();
+      await expect(showAll).toHaveAttribute("aria-expanded", "true");
+    }
 
     for (const entry of qaMonths) await saveMonth(page, entry.month, entry.value);
     if (qaMonths.length) await flushHistory(page);
@@ -360,11 +369,16 @@ test("@critical PV-2A recalcula sinais determinísticos, persiste e mantém aces
     if (qaMonths.length >= 6) {
       await expect(signal("RENDA_EM_QUEDA")).toBeVisible();
       await expect(signal("DADOS_INSUFICIENTES")).toHaveCount(0);
+      await expect(intelligence.getByTestId("portfolio-income-state")).toHaveText("Queda");
+      await expect(intelligence.getByTestId("portfolio-quality-state")).toHaveText("Suficiente");
+      await expect(intelligence).toHaveAttribute("data-analysis-state", "complete");
+      await expect(intelligence.getByText("6 de 6 meses encerrados necessários")).toBeVisible();
 
       const latest = qaMonths.at(-1)!;
       await saveMonth(page, latest.month, "600,00");
       await expect(signal("RENDA_EM_ALTA")).toBeVisible();
       await expect(signal("RENDA_EM_QUEDA")).toHaveCount(0);
+      await expect(intelligence.getByTestId("portfolio-income-state")).toHaveText("Alta");
       await flushHistory(page);
 
       await history.getByRole("button", {
@@ -373,11 +387,14 @@ test("@critical PV-2A recalcula sinais determinísticos, persiste e mantém aces
       await expect(signal("DADOS_INSUFICIENTES")).toBeVisible();
       await expect(signal("RENDA_EM_ALTA")).toHaveCount(0);
       await expect(signal("RENDA_EM_QUEDA")).toHaveCount(0);
+      await expect(intelligence.getByTestId("portfolio-income-state")).toHaveText("Indisponível");
+      await expect(intelligence).toHaveAttribute("data-analysis-state", "insufficient_history");
       await flushHistory(page);
 
       await saveMonth(page, latest.month, latest.value);
       await flushHistory(page);
       await expect(signal("RENDA_EM_QUEDA")).toBeVisible();
+      await expect(intelligence.getByTestId("portfolio-income-state")).toHaveText("Queda");
     } else {
       await expect(signal("DADOS_INSUFICIENTES")).toBeVisible();
       if (qaMonths.length) {

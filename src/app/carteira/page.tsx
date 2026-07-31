@@ -24,7 +24,7 @@ import AppToast from "../components/AppToast";
 import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
 import PortfolioNotificationPreferences from "../components/PortfolioNotificationPreferences";
 import Login from "../components/Login";
-import PortfolioIntelligencePanel from "../components/PortfolioIntelligencePanel";
+import PortfolioIntelligencePanel, { PortfolioIntelligenceLoading } from "../components/PortfolioIntelligencePanel";
 import {
   intelligencePositionsFromCurrentWallet,
   intelligenceSnapshotsFromConsolidated,
@@ -372,19 +372,22 @@ export default function WalletPage() {
   const [editingQuotas, setEditingQuotas] = useState<Record<string, string>>({});
   const [snapshots, setSnapshots] = useState<WalletSnapshot[]>([]);
   const [manualHistory, setManualHistory] = useState<readonly ManualHistoryEntry[]>([]);
+  const [walletHydrated, setWalletHydrated] = useState(false);
   const quotasInputRef = useRef<HTMLInputElement | null>(null);
   const [portfolioIntelligenceAsOf] = useState(() => new Date().toISOString());
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     setSnapshots(readSnapshots());
-    if (!stored) return;
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) setItems(parsed);
-    } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) setItems(parsed);
+      } catch {
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
     }
+    setWalletHydrated(true);
   }, []);
 
   useEffect(() => {
@@ -576,6 +579,8 @@ export default function WalletPage() {
       positions,
     }, { asOf: portfolioIntelligenceAsOf });
   }, [consolidatedSnapshots, insights.enriched, portfolioIntelligenceAsOf]);
+  const portfolioIntelligenceLoading = !walletHydrated
+    || (items.length > 0 && (loading || loaded.length !== items.length));
 
   function addItem() {
     const code = ticker.trim().toUpperCase();
@@ -643,7 +648,9 @@ export default function WalletPage() {
       <DailyWalletPanel insights={insights} firstPayment={firstPayment} />
       <WalletRiskReportCard walletCount={items.length} />
       <AttentionSection insights={insights} />
-      <PortfolioIntelligencePanel result={portfolioIntelligence} />
+      {portfolioIntelligenceLoading
+        ? <PortfolioIntelligenceLoading />
+        : <PortfolioIntelligencePanel result={portfolioIntelligence} />}
       <VisualHistorySection snapshots={consolidatedSnapshots} />
       <PortfolioCharts assetWeights={insights.assetWeights} incomeByFii={insights.incomeByFii} segmentWeights={insights.segmentWeights} />
       <SimpleMonthlySummary snapshots={consolidatedSnapshots} />
