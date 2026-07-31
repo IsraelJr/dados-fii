@@ -5,6 +5,7 @@
 **Base empilhada:** `agent/functional-qa-automation`
 **HEAD inicial:** `1b9e8837fa681d734c3fa007e9a01e397c6b5354`
 **HEAD final da implementação:** `5b7c07f5c6c833013be82f416248c332125e9bd6`
+**HEAD com reconciliação documental auditado remotamente:** `1954bbb55350f7bef53cd7557c52454fff404864`
 **PR:** `#169`, aberta e em draft
 **Estado:** implementação validada localmente; liberação final não validada
 
@@ -115,13 +116,27 @@ A execução local utilizou `desktop-chromium` e `mobile-chrome`, `workers=1`, s
 
 Implementação validada localmente; Functional QA remoto pendente por provisionamento.
 
+O Preview Vercel do HEAD `1954bbb55350f7bef53cd7557c52454fff404864` foi aprovado em:
+
+`https://dados-fxkdzr343-israel-alves-projects-aee7aa56.vercel.app`
+
+O `Functional QA Preview` associado falhou corretamente no preflight fail-closed:
+
+- execução `30646437030`;
+- implementação privilegiada fixada em `18995c079d53848c5ac8e6205d220c2149e02f9b`;
+- alvo confirmado como o Preview HTTPS do SHA auditado;
+- variáveis de QA vazias;
+- nenhum navegador instalado;
+- nenhuma autenticação executada;
+- nenhum artefato autenticado enviado.
+
 Secrets ausentes:
 
 - `E2E_USER_EMAIL`;
 - `E2E_USER_PASSWORD`;
 - `VERCEL_AUTOMATION_BYPASS_SECRET`.
 
-O Preview Vercel será criado pela publicação da PR draft. Não houve autenticação real, evidência autenticada nos três dispositivos ou validação de produção nesta entrega.
+Não houve autenticação real, evidência autenticada nos três dispositivos ou validação de produção nesta entrega.
 
 ## Riscos próprios
 
@@ -142,8 +157,7 @@ Nenhum desses pontos foi reescrito ou ampliado pela PV-2A.
 
 ## Pendências
 
-- publicar a atualização documental factual no mesmo head;
-- observar o Preview Vercel e os checks remotos;
+- revisar a PR draft empilhada;
 - provisionar o QA isolado em fluxo separado;
 - executar Functional QA Preview nos três dispositivos;
 - após a integração/substituição da PR #168, rebasear em `main` e repetir os gates.
