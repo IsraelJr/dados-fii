@@ -4,8 +4,8 @@
 **Branch:** `feat/portfolio-intelligence-core`
 **Base empilhada:** `agent/functional-qa-automation`
 **HEAD inicial:** `1b9e8837fa681d734c3fa007e9a01e397c6b5354`
-**HEAD final da implementação:** a registrar após o commit
-**PR:** a registrar após a abertura como draft
+**HEAD final da implementação:** `5b7c07f5c6c833013be82f416248c332125e9bd6`
+**PR:** `#169`, aberta e em draft
 **Estado:** implementação validada localmente; liberação final não validada
 
 ## Objetivo
@@ -14,7 +14,7 @@ Construir o núcleo determinístico, reproduzível e independente de OpenAI que 
 
 ## Estratégia de branch
 
-A branch foi criada limpa sobre o HEAD remoto mais recente da PR #168, conforme a decisão explícita da tarefa. A PR será empilhada com base `agent/functional-qa-automation`. A PR #168 não foi mesclada, fechada ou marcada como pronta e nenhum secret foi provisionado.
+A branch foi criada limpa sobre o HEAD remoto mais recente da PR #168, conforme a decisão explícita da tarefa. A PR #169 foi aberta em draft, com base `agent/functional-qa-automation` e head `feat/portfolio-intelligence-core`. A PR #168 não foi mesclada, fechada ou marcada como pronta e nenhum secret foi provisionado.
 
 ## Arquivos e áreas
 
@@ -77,7 +77,7 @@ Sinais:
 |---|---|
 | `npm ci` | aprovado: 1.120 pacotes instalados pelo lockfile |
 | Governança de workflows | aprovado: 10/10 |
-| Handoff canônico | aprovado: 8/8 antes da reconciliação factual final |
+| Handoff canônico | aprovado: 8/8 após a reconciliação factual final |
 | Auditoria de produção | aprovado: 0 vulnerabilidades |
 | Secret scan | aprovado: 649 arquivos versionados |
 | ESLint | aprovado, zero warnings |
@@ -142,10 +142,8 @@ Nenhum desses pontos foi reescrito ou ampliado pela PV-2A.
 
 ## Pendências
 
-- publicar commit e PR draft empilhada;
-- registrar commit e PR no Handoff por atualização documental;
+- publicar a atualização documental factual no mesmo head;
 - observar o Preview Vercel e os checks remotos;
-- obter Preview Vercel;
 - provisionar o QA isolado em fluxo separado;
 - executar Functional QA Preview nos três dispositivos;
 - após a integração/substituição da PR #168, rebasear em `main` e repetir os gates.

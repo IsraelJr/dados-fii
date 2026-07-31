@@ -31,7 +31,10 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - PR `#167` restaurou o layout original dos seis cards sem reintroduzir fontes paralelas.
 - O usuário confirmou em produção que os cards são atualizados corretamente conforme os meses são inseridos.
 - O `main` de referência está em `e2f8c6a076e7e1f88b443a06556afde9a5bfea6b`.
-- A próxima entrega funcional é o núcleo determinístico da Inteligência da Carteira.
+- A PR `#168` permanece aberta, em draft e não mesclada na branch `agent/functional-qa-automation`, com referência `1b9e8837fa681d734c3fa007e9a01e397c6b5354`.
+- PV-2A implementada e validada localmente em PR draft `#169`, empilhada sobre a PR `#168`.
+- Functional QA remoto pendente por provisionamento.
+- Liberação final ainda não validada.
 
 ### Matriz atual
 
@@ -43,7 +46,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | Histórico manual do ano corrente | Concluído |
 | Sincronização gráfico/cards | Concluída |
 | Persistência local + servidor | Concluída |
-| Inteligência da Carteira determinística | Próxima sprint |
+| Inteligência da Carteira determinística | Implementada e validada localmente na PR draft `#169`; liberação pendente |
 | Explicação por IA dos sinais | Pendente após núcleo determinístico |
 | Descoberta Premium/beta | Pendente |
 | Checkout/cobrança | Não iniciado |
@@ -80,6 +83,8 @@ Inclui cadastro manual de dividendos de meses encerrados, inclusão, sobrescrita
 ### PV-2A — Inteligência da Carteira: núcleo determinístico
 
 **Objetivo:** transformar a carteira de um painel de números em um copiloto que identifica mudanças materiais com cálculos reproduzíveis e sem depender de IA generativa.
+
+**Estado comprovado em 31/07/2026:** implementação validada localmente na PR draft `#169`; Functional QA remoto pendente por provisionamento e liberação final ainda não validada.
 
 ### Escopo
 
@@ -222,6 +227,8 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - PR `#166`: consolidação do resumo com a série do gráfico.
 - PR `#167`: restauração do layout dos cards.
 - PR `#165`: fechada sem merge; tentativa substituída por `#166`.
+- PR `#168`: automação funcional, aberta, draft e não mesclada; branch `agent/functional-qa-automation`, SHA de base da PV-2A `1b9e8837fa681d734c3fa007e9a01e397c6b5354`.
+- PR `#169`: PV-2A, aberta em draft e empilhada sobre `agent/functional-qa-automation`; branch `feat/portfolio-intelligence-core`, commit de implementação `5b7c07f5c6c833013be82f416248c332125e9bd6`.
 
 ### Arquivos centrais da carteira/histórico
 
@@ -233,7 +240,10 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - `src/server/repositories/FirestorePortfolioHistoryRepository.ts`;
 - `src/server/controllers/PortfolioHistoryController.ts`;
 - `src/app/api/portfolio/history/route.ts`;
+- `src/lib/portfolio-intelligence/`;
+- `src/app/components/PortfolioIntelligencePanel.tsx`;
 - `tests/portfolio-history*.test.*`;
+- `tests/portfolio-intelligence*.test.*`;
 - `tests/e2e/critical-journeys.spec.ts`.
 
 ### Documentos canônicos
@@ -261,13 +271,13 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 
 ### Parciais
 
-- inteligência da carteira: existem dados e relatórios, mas falta o motor unificado de métricas e sinais;
+- inteligência da carteira: núcleo, política `1.0.0`, painel mínimo e cobertura local implementados na PR draft `#169`; Functional QA remoto e liberação final permanecem pendentes;
 - Premium: relatório existe, mas descoberta, beta e cobrança não estão finalizados;
 - notificações: existem, mas ainda precisam seguir rigorosamente mudança material e deduplicação.
 
 ### Pendentes
 
-- núcleo determinístico da Inteligência da Carteira;
+- liberação final do núcleo determinístico após sincronização com `main` e Functional QA Preview autenticado;
 - apresentação “O que mudou”;
 - IA explicativa sobre sinais;
 - descoberta Premium e beta externo;
@@ -341,11 +351,11 @@ Para carteira/histórico/inteligência, adicionar obrigatoriamente:
 
 ### Imediatas
 
-- fechar escopo numérico e limiares da PV-2A;
-- decidir janela de média móvel e critério de tendência;
-- decidir limites de concentração por fundo e segmento;
-- decidir regra de mês atípico;
-- definir formato final do contrato de sinais.
+- revisar a PR draft `#169` sem mesclar enquanto os gates remotos estiverem pendentes;
+- provisionar o usuário e os secrets de QA em fluxo separado;
+- executar o Functional QA Preview autenticado nos três dispositivos;
+- após integração ou substituição da PR `#168`, sincronizar a PV-2A com `main` e repetir todos os gates;
+- somente então validar liberação final e avançar a apresentação da PV-2B.
 
 ### Comerciais
 
