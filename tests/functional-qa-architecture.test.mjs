@@ -24,6 +24,7 @@ const reportStatusController = read("src/server/controllers/WalletRiskReportStat
 
 test("dispatcher não recebe secrets nem executa código do SHA implantado", () => {
   assert.match(workflow, /uses:\s*IsraelJr\/dados-fii\/\.github\/workflows\/functional-qa-runner\.yml@[0-9a-f]{40}/);
+  assert.doesNotMatch(workflow, /@0{40}/);
   assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit|^\s{4}environment:/m);
   assert.doesNotMatch(workflow, /actions\/checkout|npm\s+(?:ci|run)|github\.event\.deployment\.sha[^]*ref:/);
   assert.match(workflow, /deployment\.creator\.login == 'vercel\[bot\]'/);
@@ -33,6 +34,7 @@ test("dispatcher não recebe secrets nem executa código do SHA implantado", () 
 
 test("runner privilegiado é imutável e trata o deployment somente como alvo", () => {
   assert.match(trustedWorkflow, /QA_RUNNER_REF:\s*"[0-9a-f]{40}"/);
+  assert.doesNotMatch(trustedWorkflow, /QA_RUNNER_REF:\s*"0{40}"/);
   assert.match(trustedWorkflow, /ref:\s*\$\{\{ env\.QA_RUNNER_REF \}\}/);
   assert.match(trustedWorkflow, /persist-credentials:\s*false/);
   assert.doesNotMatch(trustedWorkflow, /ref:\s*\$\{\{\s*inputs\.deployment_sha/);
