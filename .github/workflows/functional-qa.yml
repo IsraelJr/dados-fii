@@ -52,7 +52,7 @@ jobs:
           github.event.deployment.environment == 'production'
         )
       )
-    uses: IsraelJr/dados-fii/.github/workflows/functional-qa-runner.yml@5b5b3ba1bcc5371a48a73da1410a0f3680236b38
+    uses: IsraelJr/dados-fii/.github/workflows/functional-qa-runner.yml@6cc666c25eb8d2750efd7eced86a1ae32997381f
     with:
       trigger_event: ${{ github.event_name }}
       deployment_environment: ${{ github.event.deployment.environment || '' }}
@@ -63,3 +63,7 @@ jobs:
       requested_environment: ${{ inputs.environment || 'Production' }}
       requested_suite: ${{ inputs.suite || 'critical' }}
       schedule_expression: ${{ github.event.schedule || '' }}
+    secrets:
+      E2E_USER_EMAIL: github-environment-secret-required
+      E2E_USER_PASSWORD: github-environment-secret-required
+      VERCEL_AUTOMATION_BYPASS_SECRET: github-environment-secret-required

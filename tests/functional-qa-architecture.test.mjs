@@ -32,6 +32,7 @@ test("dispatcher não recebe secrets nem executa código do SHA implantado", () 
   assert.match(workflow, /uses:\s*IsraelJr\/dados-fii\/\.github\/workflows\/functional-qa-runner\.yml@[0-9a-f]{40}/);
   assert.doesNotMatch(workflow, /@0{40}/);
   assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit|^\s{4}environment:/m);
+  assert.match(workflow, /secrets:\s*\n\s+E2E_USER_EMAIL:\s*github-environment-secret-required\s*\n\s+E2E_USER_PASSWORD:\s*github-environment-secret-required\s*\n\s+VERCEL_AUTOMATION_BYPASS_SECRET:\s*github-environment-secret-required/);
   assert.doesNotMatch(workflow, /actions\/checkout|npm\s+(?:ci|run)|github\.event\.deployment\.sha[^]*ref:/);
   assert.match(workflow, /deployment\.creator\.login == 'vercel\[bot\]'/);
   assert.match(workflow, /deployment_status\.creator\.login == 'vercel\[bot\]'/);
@@ -72,6 +73,8 @@ test("runner separa Preview e Production com environments literais e secrets mí
 
   for (const job of [previewJob, productionJob]) {
     assert.match(job, /missing=\(\)/);
+    assert.match(job, /caller_placeholder="github-environment-secret-required"/);
+    assert.match(job, /!= "\$\{caller_placeholder\}"/);
     assert.match(job, /printf 'Missing required QA configuration: %s\\n' "\$\{missing\[@\]\}" >&2/);
     assert.match(job, /if \(\( \$\{#missing\[@\]\} > 0 \)\); then[^]*exit 1/);
     assert.doesNotMatch(job, /printf[^\n]*\$\{E2E_USER_(?:EMAIL|PASSWORD)/);
