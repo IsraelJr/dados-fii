@@ -51,6 +51,12 @@ O workflow usa `workers=1`. Há um retry somente na CI; localmente não há retr
 
 `functional-qa.yml` é apenas um dispatcher sem acesso a secrets. Ele chama `functional-qa-runner.yml` por SHA imutável. O workflow chamado é o único que declara os environments e lê as credenciais. O runner também faz checkout de um SHA imutável próprio; `deployment_sha` nunca é usado como `ref`, comando, dependência ou código executável.
 
+### Bloqueio comprovado de Environment secrets em 02/08/2026
+
+Os três registros existem no environment literal `Preview`, mas execuções novas do reusable workflow receberam os nomes como strings vazias. Também foram testados, sem sucesso, contrato `workflow_call.secrets`, marcador homônimo, marcador de namespace separado e `deployment: false`. O preflight falhou fechado em todas as variantes antes de instalar navegadores, autenticar ou gerar artefatos.
+
+Não foi adotado repasse pelo dispatcher, `secrets: inherit`, Repository secrets nem um runner direto mutável, pois essas alternativas quebrariam a separação de confiança desta PR. O gate remoto permanece bloqueado até o GitHub disponibilizar os Environment secrets ao job chamado ou até uma nova topologia de runner direto e separadamente confiável ser aprovada e auditada.
+
 Para Preview manual, o operador informa somente o SHA. O runner consulta os Deployments do próprio repositório, aceita apenas registros do `vercel[bot]` e extrai a URL do status bem-sucedido correspondente. A origem ainda precisa passar pela política de hostname do projeto.
 
 ## Competências, isolamento e limpeza

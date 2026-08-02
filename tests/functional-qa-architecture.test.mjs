@@ -32,7 +32,6 @@ test("dispatcher não recebe secrets nem executa código do SHA implantado", () 
   assert.match(workflow, /uses:\s*IsraelJr\/dados-fii\/\.github\/workflows\/functional-qa-runner\.yml@[0-9a-f]{40}/);
   assert.doesNotMatch(workflow, /@0{40}/);
   assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit|^\s{4}environment:/m);
-  assert.match(workflow, /secrets:\s*\n\s+QA_ENVIRONMENT_GATE:\s*github-environment-secret-required/);
   assert.doesNotMatch(workflow, /actions\/checkout|npm\s+(?:ci|run)|github\.event\.deployment\.sha[^]*ref:/);
   assert.match(workflow, /deployment\.creator\.login == 'vercel\[bot\]'/);
   assert.match(workflow, /deployment_status\.creator\.login == 'vercel\[bot\]'/);
@@ -58,11 +57,9 @@ test("runner privilegiado é imutável e trata o deployment somente como alvo", 
 });
 
 test("runner separa Preview e Production com environments literais e secrets mínimos", () => {
-  assert.match(trustedWorkflow, /workflow_call:[^]*secrets:[^]*QA_ENVIRONMENT_GATE:[^]*required:\s*true/);
-  assert.doesNotMatch(trustedWorkflow.slice(0, previewJobStart), /E2E_USER_EMAIL:|E2E_USER_PASSWORD:|VERCEL_AUTOMATION_BYPASS_SECRET:/);
   assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit/);
-  assert.match(previewJob, /^\s{4}environment:\s*\n\s{6}name:\s*Preview\s*\n\s{6}deployment:\s*false$/m);
-  assert.match(productionJob, /^\s{4}environment:\s*\n\s{6}name:\s*Production\s*\n\s{6}deployment:\s*false$/m);
+  assert.match(previewJob, /^\s{4}environment:\s*Preview$/m);
+  assert.match(productionJob, /^\s{4}environment:\s*Production$/m);
   assert.doesNotMatch(trustedWorkflow, /^\s{4}environment:\s*\$\{\{/m);
 
   assert.match(previewJob, /E2E_USER_EMAIL:\s*\$\{\{ secrets\.E2E_USER_EMAIL \}\}/);

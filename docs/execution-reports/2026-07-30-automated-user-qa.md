@@ -60,11 +60,9 @@ Jornadas Playwright remotas:
 - Entitlement do relatório da carteira depende de `User.isVip === true` no servidor.
 - `workers=1`, um retry somente na CI, cleanup idempotente e gate fail-closed permanecem.
 
-## Secrets e provisionamento pendentes
+## Secrets e provisionamento
 
-- `E2E_USER_EMAIL` em `Preview` e `Production`;
-- `E2E_USER_PASSWORD` em `Preview` e `Production`;
-- `VERCEL_AUTOMATION_BYPASS_SECRET` em `Preview`.
+Em 02/08/2026, a API do GitHub confirmou no environment literal `Preview` os registros `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET`, com timestamps posteriores às tentativas iniciais. Valores, tamanhos, hashes e fragmentos não foram lidos nem registrados. O provisionamento de `Production` não fez parte desta rodada.
 
 O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAILS` e de claims administrativos. O documento server-side pode receber `isVip: true` exclusivamente para a jornada de relatório. Nenhuma identidade enviada pelo cliente concede entitlement.
 
@@ -81,18 +79,20 @@ O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAI
 | Mutation sanity | aprovado |
 | Build | aprovado com Firebase sintético em memória |
 | HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
-| Secret scan | aprovado: 641 arquivos versionados |
+| Secret scan | aprovado: 649 arquivos versionados |
 | E2E local | 30 descobertos: 16 aprovados em Desktop Chromium e Mobile Chrome; 14 remotos ignorados sem `E2E_BASE_URL` |
-| E2E Preview real | bloqueado em preflight fail-closed: os três secrets obrigatórios não estão provisionados |
+| E2E Preview real | bloqueado em preflight fail-closed: os registros existem em `Preview`, mas o reusable workflow os recebeu vazios |
 
 A validação nova incluiu 17 testes direcionados de arquitetura, origem, renovação, falha, logout e múltiplas abas. A bateria completa passou sem retry. O primeiro build local falhou pela ausência intencional de configuração Firebase; a repetição com a mesma credencial sintética e as mesmas variáveis públicas usadas pela CI oficial passou.
 
-Na rodada anterior, os workflows Phase 2 Closure CI, Risk Lab CI e Portfolio Notifications CI passaram e o Preview da Vercel concluiu. `Functional QA Preview` falhou em oito segundos na validação de configuração, antes da instalação do navegador ou de qualquer autenticação, porque `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET` não estão provisionados. A primeira execução da rodada atual comprovou o checkout imutável e falhou antes do navegador porque o sufixo protegido ainda não estava configurado; o sufixo oficial foi então fixado no próprio runner imutável, sem criar um novo item de provisionamento.
+Na rodada de 02/08/2026, quatro Previews novos comprovaram o mesmo bloqueio sem reutilizar cache: runs `30756572076`, `30756849179`, `30757027145` e `30757186956`. Foram testados contrato explícito, marcador homônimo, environment sem auto-deployment e marcador de namespace separado. Em todos, o runner imutável e o alvo Vercel foram validados, Production ficou ignorado e o preflight parou antes de dependências, sentinela, Chromium/WebKit, autenticação ou artefatos. O log informou somente os nomes ausentes; nenhum valor sensível foi exposto.
+
+Os gates diretamente afetados passaram: sintaxe YAML, 21 testes de arquitetura/governança, ESLint, TypeScript e secret scan. A bateria completa local desta data manteve uma falha temporal preexistente e fora do diff em `corrective-data-quality.test.ts` (623/624), reproduzida porque a fixture usa o mês corrente antes do dia de pagamento. Firestore Rules, mutation, build, HTTP e E2E local continuaram aprovados na rodada de fechamento; a cobertura gerada atingiu 100% de linhas, 93,66% de branches e 98,53% de funções.
 
 ## Riscos restantes
 
 - A PR ainda contém alteração funcional de autenticação/sessão para todos os usuários; idealmente ela seria revisada ou separada antes do merge.
-- Secrets, usuário QA e entitlement server-side ainda não foram provisionados/confirmados.
+- Os registros de `Preview` estão provisionados, mas a entrega pelo reusable workflow continua bloqueada; usuário QA e entitlement server-side não foram exercitados remotamente.
 - `Functional QA Preview` ainda não está comprovado como required check de `main`.
 - Vídeo é um formato binário e não pode ser redigido depois; a proteção depende da máscara visual instalada antes de qualquer preenchimento. O teste verifica a máscara, mas a execução real de Preview ainda é obrigatória.
 - Serviços externos podem afetar consulta de fundos e geração do relatório.
