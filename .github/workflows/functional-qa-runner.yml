@@ -41,10 +41,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  browser-qa:
+  browser-qa-preview:
+    if: >-
+      (inputs.trigger_event == 'deployment_status' && inputs.deployment_environment == 'Preview') ||
+      (inputs.trigger_event != 'deployment_status' && inputs.requested_environment == 'Preview')
     runs-on: ubuntu-latest
     timeout-minutes: 30 # governance-exception: Playwright cross-browser remoto com vídeo e trace
-    environment: ${{ inputs.trigger_event == 'deployment_status' && (inputs.deployment_environment == 'Preview' && 'Preview' || 'Production') || inputs.requested_environment }}
+    environment: Preview
     env:
       CI: "true"
       E2E_REMOTE: "1"
@@ -52,7 +55,6 @@ jobs:
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       VERCEL_PREVIEW_HOST_SUFFIX: "-israel-alves-projects-aee7aa56.vercel.app"
-      CONFIGURED_PRODUCTION_URL: ${{ vars.PRODUCTION_BASE_URL }}
       QA_RUNNER_REF: "18995c079d53848c5ac8e6205d220c2149e02f9b"
     steps:
       - name: Checkout immutable QA runner
@@ -84,22 +86,15 @@ jobs:
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
           DEPLOYMENT_CREATOR: ${{ inputs.deployment_creator }}
           DEPLOYMENT_STATUS_CREATOR: ${{ inputs.deployment_status_creator }}
-          REQUESTED_ENVIRONMENT: ${{ inputs.requested_environment }}
         run: |
           set -euo pipefail
           [[ "${DEPLOYMENT_SHA}" =~ ^[0-9a-f]{40}$ ]]
-          production="${CONFIGURED_PRODUCTION_URL:-https://www.dadosfii.com.br}"
           if [[ "${TRIGGER_EVENT}" == "deployment_status" ]]; then
+            test "${DEPLOYMENT_ENVIRONMENT}" = "Preview"
             test "${DEPLOYMENT_CREATOR}" = "vercel[bot]"
             test "${DEPLOYMENT_STATUS_CREATOR}" = "vercel[bot]"
-            if [[ "${DEPLOYMENT_ENVIRONMENT}" == "Preview" ]]; then
-              target="${DEPLOYMENT_URL}"
-              environment="Preview"
-            else
-              target="${production}"
-              environment="Production"
-            fi
-          elif [[ "${TRIGGER_EVENT}" == "workflow_dispatch" && "${REQUESTED_ENVIRONMENT}" == "Preview" ]]; then
+            target="${DEPLOYMENT_URL}"
+          elif [[ "${TRIGGER_EVENT}" == "workflow_dispatch" ]]; then
             deployments=$(curl --fail-with-body --silent --show-error \
               --header "Accept: application/vnd.github+json" \
               --header "Authorization: Bearer ${GH_TOKEN}" \
@@ -112,27 +107,33 @@ jobs:
               --header "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses?per_page=20")
             target=$(jq -er '[.[] | select(.state == "success" and .creator.login == "vercel[bot]" and (.environment_url | type == "string"))][0].environment_url' <<<"${statuses}")
-            environment="Preview"
           else
-            target="${production}"
-            environment="Production"
+            echo "Unsupported QA trigger" >&2
+            exit 1
           fi
-          E2E_TARGET_URL="${target}" E2E_TARGET_ENVIRONMENT="${environment}" \
+          E2E_TARGET_URL="${target}" E2E_TARGET_ENVIRONMENT="Preview" \
             node --experimental-strip-types scripts/validate-functional-qa-target.mjs
           printf 'E2E_BASE_URL=%s\n' "${target}" >> "$GITHUB_ENV"
-          printf 'E2E_ENVIRONMENT=%s\n' "${environment}" >> "$GITHUB_ENV"
+          printf 'E2E_ENVIRONMENT=Preview\n' >> "$GITHUB_ENV"
           printf 'E2E_TARGET_SHA=%s\n' "${DEPLOYMENT_SHA}" >> "$GITHUB_ENV"
 
       - name: Validate isolated QA configuration
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${E2E_USER_EMAIL}"
-          test -n "${E2E_USER_PASSWORD}"
-          [[ "${E2E_BASE_URL}" == https://* ]]
-          if [[ "${E2E_ENVIRONMENT}" == "Preview" ]]; then
-            test -n "${VERCEL_AUTOMATION_BYPASS_SECRET}"
-            test -n "${VERCEL_PREVIEW_HOST_SUFFIX}"
+          missing=()
+          [[ -n "${E2E_USER_EMAIL:-}" ]] || missing+=("E2E_USER_EMAIL")
+          [[ -n "${E2E_USER_PASSWORD:-}" ]] || missing+=("E2E_USER_PASSWORD")
+          [[ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]] || missing+=("VERCEL_AUTOMATION_BYPASS_SECRET")
+          [[ -n "${VERCEL_PREVIEW_HOST_SUFFIX:-}" ]] || missing+=("VERCEL_PREVIEW_HOST_SUFFIX")
+          [[ -n "${E2E_BASE_URL:-}" ]] || missing+=("E2E_BASE_URL")
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required QA configuration: %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+          if [[ "${E2E_BASE_URL}" != https://* ]]; then
+            echo "Invalid QA target scheme" >&2
+            exit 1
           fi
 
       - name: Install frozen dependencies
@@ -151,14 +152,165 @@ jobs:
         env:
           TRIGGER_EVENT: ${{ inputs.trigger_event }}
           REQUESTED_SUITE: ${{ inputs.requested_suite }}
-          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
           SCHEDULE_EXPRESSION: ${{ inputs.schedule_expression }}
-          MANUAL_ENVIRONMENT: ${{ inputs.requested_environment }}
         run: |
           set -euo pipefail
-          if [[ "${TRIGGER_EVENT}" == "deployment_status" && "${DEPLOYMENT_ENVIRONMENT}" == "Preview" ]]; then
+          if [[ "${TRIGGER_EVENT}" == "deployment_status" ]]; then
             echo "args=--grep=@critical|@preview" >> "$GITHUB_OUTPUT"
-          elif [[ "${TRIGGER_EVENT}" == "deployment_status" ]]; then
+          elif [[ "${REQUESTED_SUITE}" == "smoke" ]]; then
+            echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
+          elif [[ "${REQUESTED_SUITE}" == "critical" ]]; then
+            echo "args=--grep=@critical|@preview" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Execute Playwright as the QA user
+        id: playwright
+        shell: bash
+        env:
+          PLAYWRIGHT_ARGS: ${{ steps.scope.outputs.args }}
+        run: npm run test:e2e -- ${PLAYWRIGHT_ARGS}
+
+      - name: Redact sensitive artifact content
+        id: redact
+        if: failure() && steps.playwright.outcome != 'skipped'
+        run: npm run test:e2e:redact
+
+      - name: Upload auditable failure evidence
+        if: failure() && steps.playwright.outcome != 'skipped' && steps.redact.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-qa-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Publish deployment gate
+        if: always() && inputs.trigger_event == 'deployment_status'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ inputs.deployment_sha }}
+          QA_STATE: ${{ steps.playwright.outcome == 'success' && 'success' || 'failure' }}
+          QA_CONTEXT: Functional QA Preview
+          QA_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -nc \
+            --arg state "${QA_STATE}" \
+            --arg context "${QA_CONTEXT}" \
+            --arg description "Playwright funcional isolado, com evidências redigidas" \
+            --arg target_url "${QA_URL}" \
+            '{state: $state, context: $context, description: $description, target_url: $target_url}')
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" \
+            --data "${payload}"
+
+  browser-qa-production:
+    if: >-
+      (inputs.trigger_event == 'deployment_status' &&
+        (inputs.deployment_environment == 'Production' || inputs.deployment_environment == 'production')) ||
+      (inputs.trigger_event != 'deployment_status' && inputs.requested_environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # governance-exception: Playwright cross-browser remoto com vídeo e trace
+    environment: Production
+    env:
+      CI: "true"
+      E2E_REMOTE: "1"
+      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      CONFIGURED_PRODUCTION_URL: ${{ vars.PRODUCTION_BASE_URL }}
+      QA_RUNNER_REF: "18995c079d53848c5ac8e6205d220c2149e02f9b"
+    steps:
+      - name: Checkout immutable QA runner
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QA_RUNNER_REF }}
+          persist-credentials: false
+
+      - name: Prove immutable runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${QA_RUNNER_REF}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "${QA_RUNNER_REF}"
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Resolve registered deployment target
+        shell: bash
+        env:
+          TRIGGER_EVENT: ${{ inputs.trigger_event }}
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
+          DEPLOYMENT_SHA: ${{ inputs.deployment_sha }}
+          DEPLOYMENT_CREATOR: ${{ inputs.deployment_creator }}
+          DEPLOYMENT_STATUS_CREATOR: ${{ inputs.deployment_status_creator }}
+        run: |
+          set -euo pipefail
+          [[ "${DEPLOYMENT_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "${TRIGGER_EVENT}" == "deployment_status" ]]; then
+            [[ "${DEPLOYMENT_ENVIRONMENT}" == "Production" || "${DEPLOYMENT_ENVIRONMENT}" == "production" ]]
+            test "${DEPLOYMENT_CREATOR}" = "vercel[bot]"
+            test "${DEPLOYMENT_STATUS_CREATOR}" = "vercel[bot]"
+          elif [[ "${TRIGGER_EVENT}" != "workflow_dispatch" && "${TRIGGER_EVENT}" != "schedule" ]]; then
+            echo "Unsupported QA trigger" >&2
+            exit 1
+          fi
+          target="${CONFIGURED_PRODUCTION_URL:-https://www.dadosfii.com.br}"
+          E2E_TARGET_URL="${target}" E2E_TARGET_ENVIRONMENT="Production" \
+            node --experimental-strip-types scripts/validate-functional-qa-target.mjs
+          printf 'E2E_BASE_URL=%s\n' "${target}" >> "$GITHUB_ENV"
+          printf 'E2E_ENVIRONMENT=Production\n' >> "$GITHUB_ENV"
+          printf 'E2E_TARGET_SHA=%s\n' "${DEPLOYMENT_SHA}" >> "$GITHUB_ENV"
+
+      - name: Validate isolated QA configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${E2E_USER_EMAIL:-}" ]] || missing+=("E2E_USER_EMAIL")
+          [[ -n "${E2E_USER_PASSWORD:-}" ]] || missing+=("E2E_USER_PASSWORD")
+          [[ -n "${E2E_BASE_URL:-}" ]] || missing+=("E2E_BASE_URL")
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required QA configuration: %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+          if [[ "${E2E_BASE_URL}" != https://* ]]; then
+            echo "Invalid QA target scheme" >&2
+            exit 1
+          fi
+
+      - name: Install frozen dependencies
+        run: npm ci --silent
+
+      - name: Prove artifact redaction before authenticated browsing
+        id: artifact-sentinel
+        run: npm run test:artifact-redaction
+
+      - name: Install supported browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Select functional journey
+        id: scope
+        shell: bash
+        env:
+          TRIGGER_EVENT: ${{ inputs.trigger_event }}
+          REQUESTED_SUITE: ${{ inputs.requested_suite }}
+          SCHEDULE_EXPRESSION: ${{ inputs.schedule_expression }}
+        run: |
+          set -euo pipefail
+          if [[ "${TRIGGER_EVENT}" == "deployment_status" ]]; then
             echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
           elif [[ "${TRIGGER_EVENT}" == "schedule" && "${SCHEDULE_EXPRESSION}" == "23 09 * * 0" ]]; then
             echo "args=" >> "$GITHUB_OUTPUT"
@@ -166,8 +318,6 @@ jobs:
             echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
           elif [[ "${REQUESTED_SUITE}" == "smoke" ]]; then
             echo "args=--grep @smoke --project=desktop-chromium" >> "$GITHUB_OUTPUT"
-          elif [[ "${REQUESTED_SUITE}" == "critical" && "${MANUAL_ENVIRONMENT}" == "Preview" ]]; then
-            echo "args=--grep=@critical|@preview" >> "$GITHUB_OUTPUT"
           elif [[ "${REQUESTED_SUITE}" == "critical" ]]; then
             echo "args=--grep @critical" >> "$GITHUB_OUTPUT"
           else
@@ -190,7 +340,7 @@ jobs:
         if: failure() && steps.playwright.outcome != 'skipped' && steps.redact.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: functional-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          name: functional-qa-production-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             playwright-report
             test-results
@@ -204,7 +354,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ inputs.deployment_sha }}
           QA_STATE: ${{ steps.playwright.outcome == 'success' && 'success' || 'failure' }}
-          QA_CONTEXT: ${{ inputs.deployment_environment == 'Preview' && 'Functional QA Preview' || 'Functional QA Production Smoke' }}
+          QA_CONTEXT: Functional QA Production Smoke
           QA_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
