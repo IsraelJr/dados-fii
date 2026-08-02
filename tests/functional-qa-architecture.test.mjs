@@ -60,8 +60,8 @@ test("runner privilegiado é imutável e trata o deployment somente como alvo", 
 test("runner separa Preview e Production com environments literais e secrets mínimos", () => {
   assert.match(trustedWorkflow, /workflow_call:[^]*secrets:[^]*E2E_USER_EMAIL:[^]*E2E_USER_PASSWORD:[^]*VERCEL_AUTOMATION_BYPASS_SECRET:/);
   assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit/);
-  assert.match(previewJob, /^\s{4}environment:\s*Preview$/m);
-  assert.match(productionJob, /^\s{4}environment:\s*Production$/m);
+  assert.match(previewJob, /^\s{4}environment:\s*\n\s{6}name:\s*Preview\s*\n\s{6}deployment:\s*false$/m);
+  assert.match(productionJob, /^\s{4}environment:\s*\n\s{6}name:\s*Production\s*\n\s{6}deployment:\s*false$/m);
   assert.doesNotMatch(trustedWorkflow, /^\s{4}environment:\s*\$\{\{/m);
 
   assert.match(previewJob, /E2E_USER_EMAIL:\s*\$\{\{ secrets\.E2E_USER_EMAIL \}\}/);
