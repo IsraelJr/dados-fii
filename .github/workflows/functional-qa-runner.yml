@@ -128,10 +128,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          caller_placeholder="github-environment-secret-required"
           missing=()
-          [[ -n "${E2E_USER_EMAIL:-}" ]] || missing+=("E2E_USER_EMAIL")
-          [[ -n "${E2E_USER_PASSWORD:-}" ]] || missing+=("E2E_USER_PASSWORD")
-          [[ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]] || missing+=("VERCEL_AUTOMATION_BYPASS_SECRET")
+          [[ -n "${E2E_USER_EMAIL:-}" && "${E2E_USER_EMAIL}" != "${caller_placeholder}" ]] || missing+=("E2E_USER_EMAIL")
+          [[ -n "${E2E_USER_PASSWORD:-}" && "${E2E_USER_PASSWORD}" != "${caller_placeholder}" ]] || missing+=("E2E_USER_PASSWORD")
+          [[ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" && "${VERCEL_AUTOMATION_BYPASS_SECRET}" != "${caller_placeholder}" ]] || missing+=("VERCEL_AUTOMATION_BYPASS_SECRET")
           [[ -n "${VERCEL_PREVIEW_HOST_SUFFIX:-}" ]] || missing+=("VERCEL_PREVIEW_HOST_SUFFIX")
           [[ -n "${E2E_BASE_URL:-}" ]] || missing+=("E2E_BASE_URL")
           if (( ${#missing[@]} > 0 )); then
@@ -285,9 +286,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          caller_placeholder="github-environment-secret-required"
           missing=()
-          [[ -n "${E2E_USER_EMAIL:-}" ]] || missing+=("E2E_USER_EMAIL")
-          [[ -n "${E2E_USER_PASSWORD:-}" ]] || missing+=("E2E_USER_PASSWORD")
+          [[ -n "${E2E_USER_EMAIL:-}" && "${E2E_USER_EMAIL}" != "${caller_placeholder}" ]] || missing+=("E2E_USER_EMAIL")
+          [[ -n "${E2E_USER_PASSWORD:-}" && "${E2E_USER_PASSWORD}" != "${caller_placeholder}" ]] || missing+=("E2E_USER_PASSWORD")
           [[ -n "${E2E_BASE_URL:-}" ]] || missing+=("E2E_BASE_URL")
           if (( ${#missing[@]} > 0 )); then
             printf 'Missing required QA configuration: %s\n' "${missing[@]}" >&2
