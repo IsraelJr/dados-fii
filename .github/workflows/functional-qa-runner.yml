@@ -54,7 +54,9 @@ jobs:
       (inputs.trigger_event != 'deployment_status' && inputs.requested_environment == 'Preview')
     runs-on: ubuntu-latest
     timeout-minutes: 30 # governance-exception: Playwright cross-browser remoto com vídeo e trace
-    environment: Preview
+    environment:
+      name: Preview
+      deployment: false
     env:
       CI: "true"
       E2E_REMOTE: "1"
@@ -228,7 +230,9 @@ jobs:
       (inputs.trigger_event != 'deployment_status' && inputs.requested_environment == 'Production')
     runs-on: ubuntu-latest
     timeout-minutes: 30 # governance-exception: Playwright cross-browser remoto com vídeo e trace
-    environment: Production
+    environment:
+      name: Production
+      deployment: false
     env:
       CI: "true"
       E2E_REMOTE: "1"
