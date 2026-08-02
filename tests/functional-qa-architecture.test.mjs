@@ -5,6 +5,12 @@ import test from "node:test";
 const read = (file) => readFileSync(file, "utf8");
 const workflow = read(".github/workflows/functional-qa.yml");
 const trustedWorkflow = read(".github/workflows/functional-qa-runner.yml");
+const previewJobStart = trustedWorkflow.indexOf("  browser-qa-preview:");
+const productionJobStart = trustedWorkflow.indexOf("  browser-qa-production:");
+assert.ok(previewJobStart >= 0, "job literal de Preview precisa existir");
+assert.ok(productionJobStart > previewJobStart, "job literal de Production precisa existir");
+const previewJob = trustedWorkflow.slice(previewJobStart, productionJobStart);
+const productionJob = trustedWorkflow.slice(productionJobStart);
 const config = read("playwright.config.ts");
 const globalSetup = read("tests/e2e/global-setup.ts");
 const targetPolicy = read("tests/e2e/support/qaTarget.ts");
@@ -48,6 +54,31 @@ test("runner privilegiado é imutável e trata o deployment somente como alvo", 
   assert.match(trustedWorkflow, /secrets\.E2E_USER_PASSWORD/);
   assert.match(trustedWorkflow, /secrets\.VERCEL_AUTOMATION_BYPASS_SECRET/);
   assert.doesNotMatch(trustedWorkflow, /E2E_ADMIN_UPDATE_SECRET|ADMIN_EMAIL|ADMIN_PASSWORD/);
+});
+
+test("runner separa Preview e Production com environments literais e secrets mínimos", () => {
+  assert.match(previewJob, /^\s{4}environment:\s*Preview$/m);
+  assert.match(productionJob, /^\s{4}environment:\s*Production$/m);
+  assert.doesNotMatch(trustedWorkflow, /^\s{4}environment:\s*\$\{\{/m);
+
+  assert.match(previewJob, /E2E_USER_EMAIL:\s*\$\{\{ secrets\.E2E_USER_EMAIL \}\}/);
+  assert.match(previewJob, /E2E_USER_PASSWORD:\s*\$\{\{ secrets\.E2E_USER_PASSWORD \}\}/);
+  assert.match(previewJob, /VERCEL_AUTOMATION_BYPASS_SECRET:\s*\$\{\{ secrets\.VERCEL_AUTOMATION_BYPASS_SECRET \}\}/);
+  assert.match(productionJob, /E2E_USER_EMAIL:\s*\$\{\{ secrets\.E2E_USER_EMAIL \}\}/);
+  assert.match(productionJob, /E2E_USER_PASSWORD:\s*\$\{\{ secrets\.E2E_USER_PASSWORD \}\}/);
+  assert.doesNotMatch(productionJob, /VERCEL_AUTOMATION_BYPASS_SECRET|VERCEL_PREVIEW_HOST_SUFFIX/);
+
+  for (const job of [previewJob, productionJob]) {
+    assert.match(job, /missing=\(\)/);
+    assert.match(job, /printf 'Missing required QA configuration: %s\\n' "\$\{missing\[@\]\}" >&2/);
+    assert.match(job, /if \(\( \$\{#missing\[@\]\} > 0 \)\); then[^]*exit 1/);
+    assert.doesNotMatch(job, /printf[^\n]*\$\{E2E_USER_(?:EMAIL|PASSWORD)/);
+  }
+  assert.match(previewJob, /missing\+?=\("E2E_USER_EMAIL"\)/);
+  assert.match(previewJob, /missing\+?=\("E2E_USER_PASSWORD"\)/);
+  assert.match(previewJob, /missing\+?=\("VERCEL_AUTOMATION_BYPASS_SECRET"\)/);
+  assert.match(productionJob, /missing\+?=\("E2E_USER_EMAIL"\)/);
+  assert.match(productionJob, /missing\+?=\("E2E_USER_PASSWORD"\)/);
 });
 
 test("bypass nunca vira header global e só inicializa cookie na origem exata", () => {
@@ -122,8 +153,8 @@ test("login inválido não pertence ao smoke e Preview o executa", () => {
   assert.doesNotMatch(functionalSpec, /test\("@smoke[^"]*login inválido/);
   assert.match(trustedWorkflow, /--grep=@critical\|@preview/);
   assert.match(trustedWorkflow, /--grep @smoke --project=desktop-chromium/);
-  assert.match(trustedWorkflow, /REQUESTED_SUITE[^]*MANUAL_ENVIRONMENT[^]*== "Preview"[^]*--grep=@critical\|@preview/);
-  assert.match(trustedWorkflow, /REQUESTED_SUITE[^]*--grep @critical/);
+  assert.match(previewJob, /REQUESTED_SUITE[^]*== "critical"[^]*--grep=@critical\|@preview/);
+  assert.match(productionJob, /REQUESTED_SUITE[^]*== "critical"[^]*--grep @critical/);
   assert.match(functionalSpec, /test\("@critical @full relatórios/);
 });
 

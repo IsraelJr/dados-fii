@@ -52,7 +52,7 @@ jobs:
           github.event.deployment.environment == 'production'
         )
       )
-    uses: IsraelJr/dados-fii/.github/workflows/functional-qa-runner.yml@78e34d8d9f5f59402a136049e4d34349ccc91829
+    uses: IsraelJr/dados-fii/.github/workflows/functional-qa-runner.yml@9cf854709f3bd56c3d01f9d629047baaf6b4bd18
     with:
       trigger_event: ${{ github.event_name }}
       deployment_environment: ${{ github.event.deployment.environment || '' }}
