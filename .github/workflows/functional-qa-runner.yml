@@ -30,6 +30,13 @@ on:
       schedule_expression:
         required: false
         type: string
+    secrets:
+      E2E_USER_EMAIL:
+        required: false
+      E2E_USER_PASSWORD:
+        required: false
+      VERCEL_AUTOMATION_BYPASS_SECRET:
+        required: false
 
 permissions:
   contents: read
