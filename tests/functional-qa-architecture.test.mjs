@@ -4,7 +4,10 @@ import test from "node:test";
 
 const read = (file) => readFileSync(file, "utf8");
 const workflow = read(".github/workflows/functional-qa.yml");
+const workflowJobs = workflow.slice(workflow.indexOf("\njobs:\n"));
 const trustedWorkflow = read(".github/workflows/functional-qa-runner.yml");
+const workflowCall = trustedWorkflow.slice(0, trustedWorkflow.indexOf("permissions:"));
+const workflowCallSecrets = workflowCall.slice(workflowCall.indexOf("    secrets:"));
 const previewJobStart = trustedWorkflow.indexOf("  browser-qa-preview:");
 const productionJobStart = trustedWorkflow.indexOf("  browser-qa-production:");
 assert.ok(previewJobStart >= 0, "job literal de Preview precisa existir");
@@ -28,14 +31,60 @@ const identityResolver = read("src/server/auth/WalletIdentityResolver.ts");
 const reportController = read("src/server/controllers/WalletRiskReportController.ts");
 const reportStatusController = read("src/server/controllers/WalletRiskReportStatusController.ts");
 
-test("dispatcher não recebe secrets nem executa código do SHA implantado", () => {
+test("dispatcher transmite somente os três Repository secrets nomeados e não executa código", () => {
   assert.match(workflow, /uses:\s*IsraelJr\/dados-fii\/\.github\/workflows\/functional-qa-runner\.yml@[0-9a-f]{40}/);
   assert.doesNotMatch(workflow, /@0{40}/);
-  assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit|^\s{4}environment:/m);
+  assert.doesNotMatch(workflow, /secrets:\s*inherit|^\s{4}environment:/m);
+  assert.deepEqual(
+    [...workflow.matchAll(/^\s{6}(E2E_USER_EMAIL|E2E_USER_PASSWORD|VERCEL_AUTOMATION_BYPASS_SECRET):\s*\$\{\{\s*secrets\.([A-Z_]+)\s*\}\}$/gm)]
+      .map(([, target, source]) => [target, source]),
+    [
+      ["E2E_USER_EMAIL", "QA_PREVIEW_USER_EMAIL"],
+      ["E2E_USER_PASSWORD", "QA_PREVIEW_USER_PASSWORD"],
+      ["VERCEL_AUTOMATION_BYPASS_SECRET", "QA_PREVIEW_VERCEL_BYPASS_SECRET"],
+    ],
+  );
+  assert.deepEqual(
+    [...workflow.matchAll(/secrets\.([A-Z_]+)/g)].map((match) => match[1]),
+    ["QA_PREVIEW_USER_EMAIL", "QA_PREVIEW_USER_PASSWORD", "QA_PREVIEW_VERCEL_BYPASS_SECRET"],
+  );
   assert.doesNotMatch(workflow, /actions\/checkout|npm\s+(?:ci|run)|github\.event\.deployment\.sha[^]*ref:/);
   assert.match(workflow, /deployment\.creator\.login == 'vercel\[bot\]'/);
   assert.match(workflow, /deployment_status\.creator\.login == 'vercel\[bot\]'/);
   assert.doesNotMatch(workflow, /target_url/);
+});
+
+test("contrato reutilizável exige os três secrets e falha fechado quando ausentes", () => {
+  for (const name of ["E2E_USER_EMAIL", "E2E_USER_PASSWORD", "VERCEL_AUTOMATION_BYPASS_SECRET"]) {
+    assert.match(workflowCall, new RegExp(`${name}:\\n\\s+required: true`));
+  }
+  assert.equal((workflowCallSecrets.match(/required:\s*true/g) || []).length, 3);
+  assert.doesNotMatch(`${workflow}\n${trustedWorkflow}`, /secrets:\s*inherit/);
+});
+
+test("secrets não chegam a jobs não privilegiados nem aparecem em comandos ou logs", () => {
+  assert.deepEqual(
+    [...workflowJobs.matchAll(/^\s{2}([a-z][a-z0-9-]+):$/gm)].map((match) => match[1]),
+    ["browser-qa"],
+  );
+  assert.doesNotMatch(workflow, /^\s{4}(?:runs-on|steps|environment):/m);
+
+  const allowedDispatcherLines = workflow
+    .split("\n")
+    .filter((line) => line.includes("secrets."));
+  assert.equal(allowedDispatcherLines.length, 3);
+  for (const line of allowedDispatcherLines) {
+    assert.match(line, /^\s{6}(?:E2E_USER_EMAIL|E2E_USER_PASSWORD|VERCEL_AUTOMATION_BYPASS_SECRET): \$\{\{ secrets\.QA_PREVIEW_[A-Z_]+ \}\}$/);
+  }
+
+  const allowedRunnerLines = trustedWorkflow
+    .split("\n")
+    .filter((line) => line.includes("secrets."));
+  assert.equal(allowedRunnerLines.length, 5);
+  for (const line of allowedRunnerLines) {
+    assert.match(line, /^\s{6}(?:E2E_USER_EMAIL|E2E_USER_PASSWORD|VERCEL_AUTOMATION_BYPASS_SECRET): \$\{\{ secrets\.(?:E2E_USER_EMAIL|E2E_USER_PASSWORD|VERCEL_AUTOMATION_BYPASS_SECRET) \}\}$/);
+  }
+  assert.doesNotMatch(`${workflow}\n${trustedWorkflow}`, /(?:run:|echo|printf)[^\n]*\$\{\{\s*secrets\./);
 });
 
 test("runner privilegiado é imutável e trata o deployment somente como alvo", () => {
@@ -57,7 +106,7 @@ test("runner privilegiado é imutável e trata o deployment somente como alvo", 
 });
 
 test("runner separa Preview e Production com environments literais e secrets mínimos", () => {
-  assert.doesNotMatch(workflow, /secrets\.|secrets:\s*inherit/);
+  assert.doesNotMatch(workflow, /secrets:\s*inherit/);
   assert.match(previewJob, /^\s{4}environment:\s*Preview$/m);
   assert.match(productionJob, /^\s{4}environment:\s*Production$/m);
   assert.doesNotMatch(trustedWorkflow, /^\s{4}environment:\s*\$\{\{/m);

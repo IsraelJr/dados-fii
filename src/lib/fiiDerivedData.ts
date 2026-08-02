@@ -222,9 +222,9 @@ function stddev(values: number[]) {
   return Math.sqrt(variance);
 }
 
-function buildDividendSummary(data: any, price?: number) {
+function buildDividendSummary(data: any, price?: number, asOf = new Date()) {
   const entries = getEarningsEntries(data);
-  const now = new Date();
+  const now = new Date(asOf.getTime());
   const oneYearAgo = new Date(now);
   oneYearAgo.setFullYear(now.getFullYear() - 1);
   const sixMonthsAgo = new Date(now);
@@ -337,11 +337,11 @@ function buildValuation(data: any, price?: number) {
   });
 }
 
-export function deriveFiiRiskData(data: any) {
+export function deriveFiiRiskData(data: any, options: { asOf?: Date } = {}) {
   const price = firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
   const legacyDividendYield = firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]);
   const valuation = buildValuation(data, price);
-  const dividendSummary = buildDividendSummary(data, price);
+  const dividendSummary = buildDividendSummary(data, price, options.asOf);
   const sector = cleanText(firstValue(data, ["sector", "setor"])) || classifySector(data);
   const fundType = cleanText(firstValue(data, ["fundType", "type", "tipo", "tipoFundo"])) || classifyFundType(data);
   const total12m = dividendSummary.totalDividend12m || null;

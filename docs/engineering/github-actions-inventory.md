@@ -22,7 +22,7 @@
 |---|---|---|---:|---|---|
 | `phase-2-closure.yml` | CI central completa: audit, segredos, lint, typecheck, suíte, Emulator, cobertura, build, HTTP e E2E | PRs relevantes e configuração em `main` | 30 min, exceção documentada | nenhuma | Essencial |
 | `functional-qa.yml` | Playwright funcional isolado em Preview e produção, com evidências redigidas | deploy Vercel bem-sucedido, smoke diário, suíte semanal e execução manual | 30 min, exceção documentada | somente commit status do gate | Essencial |
-| `functional-qa-runner.yml` | Executor reutilizável imutável do QA funcional, com acesso aos environments somente dentro do workflow confiável | chamado exclusivamente pelo dispatcher em SHA fixo | 30 min, exceção documentada | somente commit status do gate | Essencial |
+| `functional-qa-runner.yml` | Executor reutilizável imutável do QA funcional; recebe somente três aliases obrigatórios mapeados nominalmente pelo dispatcher | chamado exclusivamente pelo dispatcher em SHA fixo | 30 min, exceção documentada | somente commit status do gate | Essencial |
 | `portfolio-notifications-ci.yml` | Regressões específicas de notificações | PR do domínio e execução manual | 8 min | nenhuma | Essencial |
 | `production-premium-smoke.yml` | Geração Premium real e releitura da auditoria com identidade OIDC vinculada ao SHA publicado | evento único `status` do Vercel bem-sucedido em `main`; `workflow_dispatch` como fallback | 10 min | evidência no backend e commit status auditável | Gate pós-deploy |
 | `risk-lab.yml` | Suíte completa e especializada do Risk Lab | PR do domínio e execução manual | 20 min | nenhuma | Essencial |

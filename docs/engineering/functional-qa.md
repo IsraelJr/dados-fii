@@ -10,11 +10,13 @@ A Home `/` mantém o botão flutuante de Login oculto, conforme a decisão da PR
 
 Crie uma conta Firebase Authentication exclusiva para QA, com e-mail verificado e sem e-mail, claim ou papel administrativo. O usuário não pode constar em `ADMIN_EMAILS`.
 
-Configure nos environments `Preview` e `Production` do GitHub:
+Configure como Repository secrets dedicados ao QA:
 
-- `E2E_USER_EMAIL`;
-- `E2E_USER_PASSWORD`;
-- `VERCEL_AUTOMATION_BYPASS_SECRET`, somente em `Preview`.
+- `QA_PREVIEW_USER_EMAIL`;
+- `QA_PREVIEW_USER_PASSWORD`;
+- `QA_PREVIEW_VERCEL_BYPASS_SECRET`.
+
+O dispatcher mapeia explicitamente esses três nomes para `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e `VERCEL_AUTOMATION_BYPASS_SECRET` no contrato do reusable workflow. Não se usa `secrets: inherit`. O bypass só é injetado no job literal de Preview; o job de produção não possui essa variável nem o sufixo do Preview.
 
 O sufixo exato do projeto/equipe Vercel está fixado no runner imutável e coberto por teste arquitetural. O alvo manual não aceita URL livre: recebe um SHA de deployment e resolve a origem pelo registro de Deployments do GitHub, exigindo deployment e status criados por `vercel[bot]`. Execuções locais diretas continuam obrigadas a informar o mesmo sufixo explicitamente.
 
@@ -49,13 +51,13 @@ O workflow usa `workers=1`. Há um retry somente na CI; localmente não há retr
 
 ## Separação de confiança
 
-`functional-qa.yml` é apenas um dispatcher sem acesso a secrets. Ele chama `functional-qa-runner.yml` por SHA imutável. O workflow chamado é o único que declara os environments e lê as credenciais. O runner também faz checkout de um SHA imutável próprio; `deployment_sha` nunca é usado como `ref`, comando, dependência ou código executável.
+`functional-qa.yml` é apenas um dispatcher declarativo: não faz checkout, não possui `runs-on`, steps, shell, `npm` ou scripts. Ele referencia somente os três Repository secrets dedicados e os transmite nominalmente a `functional-qa-runner.yml`, chamado por SHA imutável. O runner declara os três aliases como obrigatórios e é o único que os injeta nos jobs privilegiados. Ele também faz checkout de um SHA imutável próprio; `deployment_sha` nunca é usado como `ref`, comando, dependência ou código executável.
 
-### Bloqueio comprovado de Environment secrets em 02/08/2026
+### Decisão após o bloqueio de Environment secrets em 02/08/2026
 
 Os três registros existem no environment literal `Preview`, mas execuções novas do reusable workflow receberam os nomes como strings vazias. Também foram testados, sem sucesso, contrato `workflow_call.secrets`, marcador homônimo, marcador de namespace separado e `deployment: false`. O preflight falhou fechado em todas as variantes antes de instalar navegadores, autenticar ou gerar artefatos.
 
-Não foi adotado repasse pelo dispatcher, `secrets: inherit`, Repository secrets nem um runner direto mutável, pois essas alternativas quebrariam a separação de confiança desta PR. O gate remoto permanece bloqueado até o GitHub disponibilizar os Environment secrets ao job chamado ou até uma nova topologia de runner direto e separadamente confiável ser aprovada e auditada.
+Por decisão arquitetural explícita, os valores passaram a Repository secrets dedicados, com mapeamento nominal no único job reutilizável. `secrets: inherit` continua proibido. Testes arquiteturais limitam o dispatcher aos três nomes, proíbem referências em comandos/logs e comprovam que a ausência falha fechado. Os antigos Environment secrets não participam dessa entrega.
 
 Para Preview manual, o operador informa somente o SHA. O runner consulta os Deployments do próprio repositório, aceita apenas registros do `vercel[bot]` e extrai a URL do status bem-sucedido correspondente. A origem ainda precisa passar pela política de hostname do projeto.
 
