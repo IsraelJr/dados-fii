@@ -61,7 +61,7 @@ jobs:
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       VERCEL_PREVIEW_HOST_SUFFIX: "-israel-alves-projects-aee7aa56.vercel.app"
-      QA_RUNNER_REF: "18995c079d53848c5ac8e6205d220c2149e02f9b"
+      QA_RUNNER_REF: "a8e605dfaf1a5451384502617d41d078f16a06a9"
     steps:
       - name: Checkout immutable QA runner
         uses: actions/checkout@v4
@@ -233,7 +233,7 @@ jobs:
       E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
       E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
       CONFIGURED_PRODUCTION_URL: ${{ vars.PRODUCTION_BASE_URL }}
-      QA_RUNNER_REF: "18995c079d53848c5ac8e6205d220c2149e02f9b"
+      QA_RUNNER_REF: "a8e605dfaf1a5451384502617d41d078f16a06a9"
     steps:
       - name: Checkout immutable QA runner
         uses: actions/checkout@v4
