@@ -178,6 +178,8 @@ test("redator cobre conteúdo dinâmico e o sentinela expande arquivos recursiva
     "storage-state.json",
     "nested.zip",
     "collectExpandedContent",
+    "playwright-report",
+    "data:application\\/zip;base64",
   ]) assert.match(sentinel, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(fixture, /-webkit-text-security:disc/);
   assert.match(fixture, /color:transparent/);

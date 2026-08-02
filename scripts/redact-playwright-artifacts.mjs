@@ -86,6 +86,17 @@ function looksLikeText(bytes) {
   return controlCharacters / sample.length < 0.01;
 }
 
+function redactEmbeddedReportArchives(value, secrets, depth) {
+  return value.replace(
+    /(data:application\/zip;base64,)([A-Za-z0-9+/=\r\n]+)(?=<\/template>)/g,
+    (match, prefix, encoded) => {
+      const archive = Buffer.from(encoded.replace(/\s/g, ""), "base64");
+      if (!looksLikeZip(archive)) return match;
+      return `${prefix}${Buffer.from(redactBytes(archive, secrets, depth + 1)).toString("base64")}`;
+    },
+  );
+}
+
 function redactBytes(bytes, secrets, depth = 0) {
   if (depth > 8) throw new Error("Profundidade máxima de arquivo compactado excedida.");
   if (looksLikeZip(bytes)) {
@@ -97,7 +108,8 @@ function redactBytes(bytes, secrets, depth = 0) {
     return zipSync(redactedEntries, { level: 6 });
   }
   if (!looksLikeText(bytes)) return bytes;
-  return Buffer.from(redactArtifactText(Buffer.from(bytes).toString("utf8"), secrets));
+  const expanded = redactEmbeddedReportArchives(Buffer.from(bytes).toString("utf8"), secrets, depth);
+  return Buffer.from(redactArtifactText(expanded, secrets));
 }
 
 async function visit(target, secrets) {

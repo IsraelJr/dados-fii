@@ -82,7 +82,7 @@ O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAI
 | HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
 | Secret scan | aprovado: 649 arquivos versionados |
 | E2E local | 30 descobertos: 16 aprovados em Desktop Chromium e Mobile Chrome; 14 remotos ignorados sem `E2E_BASE_URL` |
-| E2E Preview real | bloqueado em preflight fail-closed: os registros existem em `Preview`, mas o reusable workflow os recebeu vazios |
+| E2E Preview real | run `30758552638`: preflight, sentinela e instalação Chromium/WebKit aprovados; bloqueado antes do login porque a Vercel recusou o bypass recebido |
 
 A validação nova incluiu 17 testes direcionados de arquitetura, origem, renovação, falha, logout e múltiplas abas. A bateria completa passou sem retry. O primeiro build local falhou pela ausência intencional de configuração Firebase; a repetição com a mesma credencial sintética e as mesmas variáveis públicas usadas pela CI oficial passou.
 
@@ -90,10 +90,14 @@ Na rodada de 02/08/2026, quatro Previews novos comprovaram o mesmo bloqueio sem 
 
 Na rodada da decisão por Repository secrets, os testes diretamente afetados passaram: 26/26 regressões de dados e arquitetura, sentinela de artefatos, ESLint, TypeScript e secret scan de 649 arquivos. A expectativa temporal de `REG-DEF-04` foi substituída por um `asOf` explícito, sem mudar a regra funcional; fevereiro e a virada dezembro/janeiro possuem regressões determinísticas. A bateria completa passou em 628/628, Firestore Rules em 3/3, mutation, build, HTTP e E2E local também passaram. A cobertura atingiu 100% de linhas, 93,66% de branches e 98,53% de funções.
 
+O run novo `30758552638`, no HEAD `d7030611676effb2d2d66b3fa56e458470815163`, comprovou a entrega dos três Repository secrets: o preflight passou, o sentinela passou e Chromium/WebKit foram instalados. A inicialização segura recebeu redirecionamento para o SSO da Vercel, em vez do cookie `_vercel_jwt`; assim, nenhum teste, login ou cleanup autenticado iniciou. A falha publicou o gate vermelho corretamente.
+
+A auditoria independente do artefato dessa falha expandiu o ZIP base64 interno do relatório HTML e encontrou uma categoria de e-mail que o redator anterior não alcançava. O artefato remoto `8836716154` foi removido de forma irreversível; o run permanece como registro. O redator e o sentinela agora expandem também o HTML Playwright, e a reaplicação local ao mesmo relatório retornou zero categorias sensíveis.
+
 ## Riscos restantes
 
 - A PR ainda contém alteração funcional de autenticação/sessão para todos os usuários; idealmente ela seria revisada ou separada antes do merge.
-- A nova entrega por Repository secrets ainda precisa ser comprovada por um run inteiramente novo após o provisionamento dos três nomes dedicados; usuário QA e entitlement server-side permanecem sem nova evidência remota nesta revisão.
+- A entrega por Repository secrets foi comprovada, mas `QA_PREVIEW_VERCEL_BYPASS_SECRET` não foi aceito pelo deployment protegido; o valor precisa ser substituído pela chave vigente do Automation Bypass antes do próximo run. Usuário QA e entitlement server-side permanecem sem evidência remota porque o login não iniciou.
 - `Functional QA Preview` ainda não está comprovado como required check de `main`.
 - Vídeo é um formato binário e não pode ser redigido depois; a proteção depende da máscara visual instalada antes de qualquer preenchimento. O teste verifica a máscara, mas a execução real de Preview ainda é obrigatória.
 - Serviços externos podem afetar consulta de fundos e geração do relatório.

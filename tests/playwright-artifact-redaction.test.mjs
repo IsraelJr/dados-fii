@@ -13,6 +13,10 @@ function collectExpandedContent(bytes, output, depth = 0) {
   assert.ok(depth <= 8, "artefato sentinela excedeu a profundidade segura");
   const buffer = Buffer.from(bytes);
   output.push(buffer);
+  const text = buffer.toString("utf8");
+  for (const match of text.matchAll(/data:application\/zip;base64,([A-Za-z0-9+/=\r\n]+)(?=<\/template>)/g)) {
+    collectExpandedContent(Buffer.from(match[1].replace(/\s/g, ""), "base64"), output, depth + 1);
+  }
   if (buffer.length < 4 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) return;
   for (const entry of Object.values(unzipSync(buffer))) collectExpandedContent(entry, output, depth + 1);
 }
@@ -28,7 +32,9 @@ async function collectFiles(directory, output) {
 test("redator elimina sentinelas de trace, network, HAR, cookies, headers e storage", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "dados-fii-redaction-"));
   const resultDirectory = path.join(root, "test-results");
+  const reportDirectory = path.join(root, "playwright-report");
   await mkdir(resultDirectory);
+  await mkdir(reportDirectory);
 
   const sentinels = {
     email: ["qa", "artifact", "sentinel"].join(".") + "@example.test",
@@ -98,8 +104,21 @@ test("redator elimina sentinelas de trace, network, HAR, cookies, headers e stor
       bypass: sentinels.bypass,
     }),
   );
+  const embeddedReport = zipSync({
+    "report.json": Buffer.from(JSON.stringify({
+      metadata: { authorEmail: sentinels.email },
+      error: `Authorization: Bearer ${sentinels.jwt}`,
+      storage: { localStorage: [{ name: "wallet", value: sentinels.wallet }] },
+      password: sentinels.password,
+      bypass: sentinels.bypass,
+    })),
+  });
+  await writeFile(
+    path.join(reportDirectory, "index.html"),
+    `<html><body><template id="playwrightReportBase64">data:application/zip;base64,${Buffer.from(embeddedReport).toString("base64")}</template></body></html>`,
+  );
 
-  await execute(process.execPath, ["scripts/redact-playwright-artifacts.mjs", resultDirectory], {
+  await execute(process.execPath, ["scripts/redact-playwright-artifacts.mjs", reportDirectory, resultDirectory], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -110,7 +129,7 @@ test("redator elimina sentinelas de trace, network, HAR, cookies, headers e stor
   });
 
   const expanded = [];
-  await collectFiles(resultDirectory, expanded);
+  await collectFiles(root, expanded);
   const allContent = Buffer.concat(expanded).toString("utf8");
   for (const [kind, sentinel] of Object.entries(sentinels)) {
     assert.equal(allContent.includes(sentinel), false, `sentinela ${kind} permaneceu após a redação`);

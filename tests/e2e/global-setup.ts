@@ -31,6 +31,10 @@ export default async function globalSetup(_config: FullConfig) {
       failOnStatusCode: false,
       maxRedirects: 0,
     });
+    const redirect = response.headers().location;
+    if (redirect && new URL(redirect, targetOrigin).hostname === "vercel.com") {
+      throw new Error("A Vercel não aceitou a configuração de bypass do Preview.");
+    }
     if (![200, 301, 302, 303, 307, 308].includes(response.status())) {
       throw new Error(`A origem do Preview recusou a inicialização segura (${response.status()}).`);
     }

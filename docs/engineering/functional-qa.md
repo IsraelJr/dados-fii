@@ -74,7 +74,7 @@ Para Preview manual, o operador informa somente o SHA. O runner consulta os Depl
 
 ## Evidências e sigilo
 
-Antes de instalar os navegadores ou iniciar uma navegação autenticada, a CI executa `test:artifact-redaction`. O teste sentinela cria `.trace`, `.network`, HAR, cookies, headers, localStorage e ZIP aninhado com valores falsos, executa o redator, descompacta recursivamente todo o conteúdo e falha se qualquer sentinela permanecer.
+Antes de instalar os navegadores ou iniciar uma navegação autenticada, a CI executa `test:artifact-redaction`. O teste sentinela cria `.trace`, `.network`, HAR, cookies, headers, localStorage, ZIP aninhado e um relatório HTML Playwright com ZIP embutido em base64, executa o redator, descompacta recursivamente todo o conteúdo e falha se qualquer sentinela permanecer.
 
 Em falha, o Playwright conserva trace e vídeo. A fixture salva screenshot mascarado, console e requests sanitizados, SHA, ambiente e origem. O redator trata:
 
@@ -86,6 +86,7 @@ Em falha, o Playwright conserva trace e vídeo. A fixture salva screenshot masca
 - bypass da Vercel;
 - query parameters sensíveis;
 - `.trace`, `.network`, HAR, JSONL e arquivos compactados aninhados.
+- o ZIP base64 incorporado pelo Playwright no relatório HTML.
 
 E-mail e senha ficam visualmente transparentes durante toda a captura de vídeo e são mascarados nos screenshots. Se o sentinela ou a redação pós-falha falhar, o upload não acontece. Artefatos ficam retidos por até sete dias.
 
