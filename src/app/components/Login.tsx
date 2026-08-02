@@ -23,6 +23,7 @@ import {
     WALLET_SESSION_LOGOUT_KEY,
     WALLET_SESSION_UPDATED_EVENT,
 } from "@/lib/users/WalletSessionClient";
+import { isWalletPasswordFormatValid } from "@/lib/users/WalletLoginPolicy";
 import { X } from "lucide-react";
 
 const auth = getAuth(app);
@@ -43,7 +44,6 @@ export default function LoginButton() {
     const dialogRef = useRef<HTMLDivElement>(null);
     const userRef = useRef<User | null>(null);
 
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     useEffect(() => {
@@ -166,7 +166,7 @@ export default function LoginButton() {
             return;
         }
 
-        if (!passwordRegex.test(password)) {
+        if (!isWalletPasswordFormatValid(password)) {
             setMessage("A senha deve ter ao menos 6 caracteres, incluindo letras e números.");
             if (passwordRef.current) {
                 passwordRef.current.classList.add("shake");

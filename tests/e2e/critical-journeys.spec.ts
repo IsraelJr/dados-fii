@@ -1,11 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
-import { expect, test } from "./fixtures";
-
-test.skip(Boolean(process.env.E2E_BASE_URL), "Suíte determinística local; jornadas remotas ficam em functional-qa.spec.ts.");
+import { configurePersistedCookieConsent, expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
-  await page.route(/^https:\/\//, (route) => route.abort());
+  await configurePersistedCookieConsent(page);
+  const qaOrigin = process.env.E2E_BASE_URL ? new URL(process.env.E2E_BASE_URL).origin : "";
+  await page.route(/^https:\/\//, (route) => {
+    if (qaOrigin && new URL(route.request().url()).origin === qaOrigin) {
+      return route.continue();
+    }
+    return route.abort();
+  });
 });
 
 async function expectNoHighImpactAccessibilityViolations(page: Page) {

@@ -96,8 +96,45 @@ A auditoria independente do artefato dessa falha expandiu o ZIP base64 interno d
 
 ## Riscos restantes
 
+### Correção das falhas funcionais observadas em 02/08/2026
+
+O run full `30766752729`, no HEAD `6c67e467b6a6571daf597983b2bc1056fb9cfa7a`, comprovou entrega dos secrets, resolução do Preview, `_vercel_jwt`, preflight, instalação de Chromium/WebKit e redação segura, mas falhou na primeira jornada autenticada dos três projetos.
+
+Causa raiz por navegador:
+
+- **Desktop Chromium:** o `waitForRequest` aguardava `/api/user-profile`, porém a UI havia rejeitado a senha antes do submit por permitir somente letras e dígitos. A senha permaneceu mascarada e nenhum valor foi inspecionado ou registrado. A política do produto agora aceita caracteres especiais, mantendo letra, número e mínimo de seis caracteres.
+- **Mobile Chrome:** o banner de consentimento permaneceu acima do formulário e interceptou o clique.
+- **Mobile Safari/WebKit:** o mesmo banner e a relação do alvo com o header sticky impediam o clique normal em `Acessar Premium`.
+
+Arquivos desta correção:
+
+- `src/lib/users/WalletLoginPolicy.ts` e `src/app/components/Login.tsx`;
+- `tests/e2e/fixtures.ts`, `functional-qa.spec.ts`, `critical-journeys.spec.ts` e `functional-qa-fixtures.spec.ts`;
+- `playwright.config.ts`;
+- `tests/wallet-login-policy.test.ts` e `tests/functional-qa-architecture.test.mjs`;
+- `docs/engineering/functional-qa.md` e este relatório.
+
+Regressões adicionadas:
+
+- consentimento ainda não informado e consentimento já salvo/idempotente;
+- clique sem `force` em viewport mobile com header fixo;
+- resposta de perfil rápida e resposta ocorrida antes da espera funcional tardia;
+- rejeição de resposta de rede sem UI e sessão autenticadas;
+- senha Firebase com letra, número e caractere especial;
+- contrato arquitetural proibindo `waitForRequest` exclusivo e `force: true` na jornada.
+
+Resultados locais desta etapa:
+
+- fixture: 12/12 em Desktop Chromium e Mobile Chrome;
+- suíte local completa nesses dois projetos: 28 aprovados e 14 jornadas remotas ignoradas por ausência deliberada de credenciais locais;
+- descoberta remota: 45 casos, exatamente 15 por projeto, sem ignorar as oito jornadas determinísticas;
+- Mobile Safari local: WebKit instalado, mas a build congelada do host falhou antes de criar a página com `Unknown setting: PushAPIEnabled`; nenhuma jornada WebKit foi considerada aprovada localmente;
+- TypeScript, ESLint e 16 testes focados de arquitetura/política: aprovados.
+
+O resultado remoto final desta correção ainda depende de um novo Functional QA Preview full no HEAD publicado. A recomendação permanece negativa até 15/15 passarem nos três projetos e login, persistência, logout, renovação, isolamento e cleanup serem comprovados.
+
 - A PR ainda contém alteração funcional de autenticação/sessão para todos os usuários; idealmente ela seria revisada ou separada antes do merge.
-- A entrega por Repository secrets foi comprovada, mas `QA_PREVIEW_VERCEL_BYPASS_SECRET` não foi aceito pelo deployment protegido; o valor precisa ser substituído pela chave vigente do Automation Bypass antes do próximo run. Usuário QA e entitlement server-side permanecem sem evidência remota porque o login não iniciou.
+- A entrega dos três Repository secrets, o Automation Bypass vigente, a emissão de `_vercel_jwt` e o acesso ao Preview protegido já foram comprovados. A jornada autenticada corrigida ainda precisa ser repetida no runner remoto antes de qualquer recomendação positiva.
 - `Functional QA Preview` ainda não está comprovado como required check de `main`.
 - Vídeo é um formato binário e não pode ser redigido depois; a proteção depende da máscara visual instalada antes de qualquer preenchimento. O teste verifica a máscara, mas a execução real de Preview ainda é obrigatória.
 - Serviços externos podem afetar consulta de fundos e geração do relatório.

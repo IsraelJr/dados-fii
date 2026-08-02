@@ -49,6 +49,18 @@ Não há mudança de entitlement Premium nos controllers de relatório: a amplia
 
 O workflow usa `workers=1`. Há um retry somente na CI; localmente não há retry.
 
+## Estabilização da interface autenticada
+
+As jornadas autenticadas usam uma fixture única para estabilizar o consentimento. Ela detecta o diálogo `Privacidade e cookies`, registra uma escolha explícita quando necessário, aguarda a remoção do diálogo e comprova que o overlay deixou de interceptar cliques. O procedimento é idempotente e não remove o banner do produto, não injeta CSS para ocultá-lo e não usa `force: true`.
+
+Alvos móveis são localizados semanticamente, centralizados na viewport, observados por dois frames de layout e validados com `elementFromPoint` antes do clique normal. Isso cobre o botão `Acessar Premium` sob viewport estreita e header fixo sem coordenadas absolutas.
+
+O login registra `waitForResponse` para `POST /api/user-profile` antes do submit, mas não considera a rede isoladamente como autenticação. O estado só é aceito quando o formulário desaparece, `Sair da conta` fica visível, a sessão existe sem leitura ou impressão dos valores e uma chamada protegida da carteira retorna `200`. A resposta obrigatória do perfil também precisa ser bem-sucedida. Assim, uma resposta rápida continua capturada mesmo quando a validação funcional ocorre depois.
+
+A falha de desktop observada no run `30766752729` não era uma corrida do listener: a validação do produto restringia a senha a letras e dígitos e barrava credenciais Firebase válidas com caractere especial antes de qualquer request. A política continua exigindo seis caracteres, letra e número, mas não limita o restante do alfabeto da senha. Em Mobile Chrome e WebKit, a causa comprovada foi a sobreposição do consentimento e, no WebKit, também a posição relativa ao header.
+
+As oito jornadas determinísticas também rodam no Preview com chamadas externas bloqueadas e APIs mutáveis simuladas. Somadas às sete jornadas reais, a suíte remota full possui exatamente 15 testes por projeto. As regressões autocontidas da fixture são exclusivas do ambiente local e não alteram essa matriz remota.
+
 ## Separação de confiança
 
 `functional-qa.yml` é apenas um dispatcher declarativo: não faz checkout, não possui `runs-on`, steps, shell, `npm` ou scripts. Ele referencia somente os três Repository secrets dedicados e os transmite nominalmente a `functional-qa-runner.yml`, chamado por SHA imutável. O runner declara os três aliases como obrigatórios e é o único que os injeta nos jobs privilegiados. Ele também faz checkout de um SHA imutável próprio; `deployment_sha` nunca é usado como `ref`, comando, dependência ou código executável.
@@ -109,6 +121,14 @@ Execução local determinística:
 ```bash
 npm run test:e2e:local
 ```
+
+Para incluir explicitamente o projeto WebKit local:
+
+```bash
+npx playwright test --workers=1 --project=mobile-safari
+```
+
+Em hosts macOS antigos, a build congelada disponibilizada pelo Playwright pode falhar antes de criar a página com `Page.overrideSetting: Unknown setting: PushAPIEnabled`. Esse erro é uma limitação do binário/host, não uma aprovação nem uma falha de jornada; Mobile Safari continua obrigatório no runner Linux do GitHub Actions.
 
 Execução remota direta de desenvolvimento:
 

@@ -18,6 +18,8 @@ const config = read("playwright.config.ts");
 const globalSetup = read("tests/e2e/global-setup.ts");
 const targetPolicy = read("tests/e2e/support/qaTarget.ts");
 const functionalSpec = read("tests/e2e/functional-qa.spec.ts");
+const criticalSpec = read("tests/e2e/critical-journeys.spec.ts");
+const fixtureRegression = read("tests/e2e/functional-qa-fixtures.spec.ts");
 const competenceHelper = read("tests/e2e/support/closedCompetences.ts");
 const fixture = read("tests/e2e/fixtures.ts");
 const redactor = read("scripts/redact-playwright-artifacts.mjs");
@@ -225,6 +227,28 @@ test("Home oculta Login e autenticação funcional começa na carteira", () => {
   assert.match(walletPage, /<Login \/>/);
   assert.match(functionalSpec, /await page\.goto\("\/carteira"\)/);
   assert.match(functionalSpec, /page\.goto\("\/"\)[^]*name: "Login"[^]*toHaveCount\(0\)/);
+});
+
+test("consentimento, clique mobile e login funcional possuem regressões sem atalhos", () => {
+  assert.match(fixture, /stabilizeCookieConsent/);
+  assert.match(fixture, /clickStableSemanticTarget/);
+  assert.match(fixture, /elementFromPoint/);
+  assert.match(fixture, /scrollIntoView\(\{ block: "center", inline: "center" \}\)/);
+  assert.match(fixture, /observeWalletAuthentication/);
+  assert.match(fixture, /expectAuthenticatedWallet/);
+  assert.match(fixture, /waitForResponse/);
+  assert.doesNotMatch(functionalSpec, /waitForRequest/);
+  assert.doesNotMatch(`${fixture}\n${functionalSpec}`, /force:\s*true/);
+  assert.doesNotMatch(criticalSpec, /test\.skip\(Boolean\(process\.env\.E2E_BASE_URL\)/);
+  assert.match(config, /testIgnore:\s*isRemoteRun[^]*functional-qa-fixtures\.spec\.ts/);
+  for (const title of [
+    "consentimento ainda não informado",
+    "consentimento já salvo",
+    "viewport mobile com header fixo",
+    "resposta rápida registrada antes da ação",
+    "resposta ocorrida antes de uma espera tardia",
+    "rede sem UI e sessão não determina autenticação",
+  ]) assert.match(fixtureRegression, new RegExp(title));
 });
 
 test("sessão curta é revogável, isolada e rejeita expiração", () => {

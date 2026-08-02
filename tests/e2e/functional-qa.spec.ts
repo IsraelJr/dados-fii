@@ -1,5 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "./fixtures";
+import {
+  clickStableSemanticTarget,
+  expect,
+  expectAuthenticatedWallet,
+  observeWalletAuthentication,
+  stabilizeCookieConsent,
+  test,
+} from "./fixtures";
 import type { Page } from "@playwright/test";
 import {
   closedQaDividendMonths,
@@ -30,8 +37,9 @@ function qaCredentials() {
 async function login(page: Page) {
   const credentials = qaCredentials();
   await page.goto("/carteira");
+  await stabilizeCookieConsent(page);
   if (await page.getByRole("button", { name: "Sair da conta" }).isVisible().catch(() => false)) return "";
-  await page.getByRole("button", { name: "Login" }).click();
+  await clickStableSemanticTarget(page, page.getByRole("button", { name: "Login" }));
   const dialog = page.getByRole("dialog", { name: "Entrar" });
   const emailInput = dialog.getByLabel("E-mail");
   const passwordInput = dialog.getByLabel("Senha");
@@ -43,18 +51,9 @@ async function login(page: Page) {
   ))).toBe("disc");
   await emailInput.fill(credentials.email);
   await passwordInput.fill(credentials.password);
-  const profileRequest = page.waitForRequest((request) => (
-    request.url().includes("/api/user-profile")
-    && request.method() === "POST"
-  ));
-  await dialog.getByRole("button", { name: "Entrar", exact: true }).click();
-  const authorization = (await profileRequest).headers().authorization || "";
-  await expect(page.getByRole("button", { name: "Sair da conta" })).toBeVisible({ timeout: 30_000 });
-  await expect.poll(() => page.evaluate(() => Boolean(
-    window.localStorage.getItem("dados-fii-wallet-email")
-    && window.localStorage.getItem("dados-fii-wallet-session"),
-  ))).toBe(true);
-  return authorization.replace(/^Bearer\s+/i, "");
+  const authentication = observeWalletAuthentication(page);
+  await clickStableSemanticTarget(page, dialog.getByRole("button", { name: "Entrar", exact: true }));
+  return (await expectAuthenticatedWallet(page, authentication)).idToken;
 }
 
 async function logout(page: Page) {
@@ -171,7 +170,8 @@ async function expectNoHighImpactAccessibilityViolations(page: Page) {
 
 test("@smoke @critical autenticação válida, persistente, logout e acesso não autorizado bloqueado", async ({ page }) => {
   await page.goto("/fii/TGAR11");
-  await page.getByRole("button", { name: "Acessar Premium" }).click();
+  await stabilizeCookieConsent(page);
+  await clickStableSemanticTarget(page, page.getByRole("button", { name: "Acessar Premium" }));
   await expect(page.getByText(/Entre na sua conta Premium/i)).toBeVisible();
 
   await page.goto("/");
@@ -190,11 +190,12 @@ test("@smoke @critical autenticação válida, persistente, logout e acesso não
 test("@preview @full login inválido permanece fora do smoke de produção", async ({ page }) => {
   const credentials = qaCredentials();
   await page.goto("/carteira");
-  await page.getByRole("button", { name: "Login" }).click();
+  await stabilizeCookieConsent(page);
+  await clickStableSemanticTarget(page, page.getByRole("button", { name: "Login" }));
   const dialog = page.getByRole("dialog", { name: "Entrar" });
   await dialog.getByLabel("E-mail").fill(credentials.email);
   await dialog.getByLabel("Senha").fill("InvalidQa123456");
-  await dialog.getByRole("button", { name: "Entrar", exact: true }).click();
+  await clickStableSemanticTarget(page, dialog.getByRole("button", { name: "Entrar", exact: true }));
   await expect(dialog.getByRole("alert")).toContainText(/Falha ao autenticar|Senha incorreta|Muitas tentativas/i);
   await dialog.getByRole("button", { name: "Fechar login" }).click();
 });

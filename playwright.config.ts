@@ -35,6 +35,7 @@ const bypassStorageState = isRemoteRun
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  testIgnore: isRemoteRun ? ["**/functional-qa-fixtures.spec.ts"] : [],
   outputDir: "test-results",
   globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
