@@ -85,12 +85,11 @@ export async function DELETE(request: Request) {
   try {
     const identity = await resolveWalletIdentity(request);
     const body = await jsonBody(request);
-    const entries = await service.list({ ownerId: identity.ownerId }, portfolioIdFrom(request, body));
-    const competence = String(body.competence ?? "");
-    const current = entries.find((entry) => entry.competence === competence);
-    if (!current) throw new Error("HISTORY_ENTRY_NOT_FOUND");
-
-    await service.deleteManual({ ownerId: identity.ownerId }, current);
+    await service.deleteManualByCompetence(
+      { ownerId: identity.ownerId },
+      portfolioIdFrom(request, body),
+      body.competence,
+    );
     return NextResponse.json({ ok: true });
   } catch (error) {
     return publicError(error);

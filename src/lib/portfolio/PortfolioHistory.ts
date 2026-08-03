@@ -36,6 +36,7 @@ export type PortfolioHistoryValidationCode =
   | "INVALID_PORTFOLIO_ID"
   | "INVALID_YEAR"
   | "INVALID_MONTH"
+  | "INVALID_COMPETENCE"
   | "FUTURE_COMPETENCE"
   | "INVALID_MONEY"
   | "EMPTY_ENTRY"
@@ -86,6 +87,18 @@ export function buildCompetence(year: unknown, month: unknown): PortfolioHistory
   }
 
   return `${normalizedYear}-${String(normalizedMonth).padStart(2, "0")}` as PortfolioHistoryCompetence;
+}
+
+export function requirePortfolioHistoryCompetence(value: unknown): PortfolioHistoryCompetence {
+  const normalized = String(value ?? "").trim();
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(normalized);
+  if (!match || Number(match[1]) < 2000) {
+    throw new PortfolioHistoryValidationError(
+      "INVALID_COMPETENCE",
+      "Competência inválida.",
+    );
+  }
+  return normalized as PortfolioHistoryCompetence;
 }
 
 export function isFutureCompetence(

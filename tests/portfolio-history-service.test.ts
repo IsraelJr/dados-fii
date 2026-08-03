@@ -132,6 +132,17 @@ test("exclui registro manual sem afetar outro owner", async () => {
   });
 
   await context.service.deleteManual({ ownerId: "user-a" }, userA);
+  await context.service.deleteManualByCompetence({ ownerId: "user-a" }, "default", "2026-06");
   assert.deepEqual(await context.service.list({ ownerId: "user-a" }, "default"), []);
   assert.equal((await context.service.list({ ownerId: "user-b" }, "default")).length, 1);
+});
+
+test("cleanup por competência é idempotente e valida entrada antes do repository", async () => {
+  const context = service();
+  await context.service.deleteManualByCompetence({ ownerId: "user-a" }, "default", "2026-02");
+  await context.service.deleteManualByCompetence({ ownerId: "user-a" }, "default", "2026-02");
+  await assert.rejects(
+    context.service.deleteManualByCompetence({ ownerId: "user-a" }, "default", "2026-2"),
+    (error: unknown) => error instanceof Error && "code" in error && error.code === "INVALID_COMPETENCE",
+  );
 });

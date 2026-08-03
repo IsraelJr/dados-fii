@@ -8,6 +8,7 @@ import {
   insertPortfolioHistoryEntry,
   parseOptionalMoney,
   PortfolioHistoryValidationError,
+  requirePortfolioHistoryCompetence,
   type PortfolioHistoryEntry,
 } from "../src/lib/portfolio/PortfolioHistory";
 
@@ -27,6 +28,16 @@ test("normaliza competência para YYYY-MM", () => {
   expectCode(() => buildCompetence(2026, 0), "INVALID_MONTH");
   expectCode(() => buildCompetence(2026, 13), "INVALID_MONTH");
   expectCode(() => buildCompetence("ano", 1), "INVALID_YEAR");
+});
+
+test("valida competência estrita de persistência entre os meses 01 e 12", () => {
+  for (let month = 1; month <= 12; month += 1) {
+    const competence = `2026-${String(month).padStart(2, "0")}`;
+    assert.equal(requirePortfolioHistoryCompetence(competence), competence);
+  }
+  for (const invalid of ["2026-00", "2026-13", "2026-2", "26-02", "1999-12", "2026-02-extra", ""]) {
+    expectCode(() => requirePortfolioHistoryCompetence(invalid), "INVALID_COMPETENCE");
+  }
 });
 
 test("normaliza moeda pt-BR sem converter erro em zero", () => {

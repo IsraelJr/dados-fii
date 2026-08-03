@@ -32,13 +32,15 @@ test("migração também resolve ownership no servidor", () => {
 
 test("repository server-side é a única camada do histórico que importa Firestore", () => {
   const repository = text("src/server/repositories/FirestorePortfolioHistoryRepository.ts");
+  const repositoryCore = text("src/server/repositories/FirestorePortfolioHistoryRepositoryCore.ts");
   const service = text("src/lib/portfolio/PortfolioHistoryService.ts");
   assert.match(repository, /firebaseAdmin/);
+  assert.match(repositoryCore, /runTransaction/);
   assert.doesNotMatch(service, /firebaseAdmin|adminDb|\.collection\(/);
 });
 
 test("listagem do histórico não depende de índice composto implantado separadamente", () => {
-  const repository = text("src/server/repositories/FirestorePortfolioHistoryRepository.ts");
+  const repository = text("src/server/repositories/FirestorePortfolioHistoryRepositoryCore.ts");
   assert.doesNotMatch(repository, /\.orderBy\("competence"/);
   assert.match(repository, /localeCompare\(right\.competence\)/);
 });

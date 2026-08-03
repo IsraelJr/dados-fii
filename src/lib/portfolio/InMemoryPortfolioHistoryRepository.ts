@@ -57,7 +57,7 @@ export class InMemoryPortfolioHistoryRepository implements PortfolioHistoryRepos
   async deleteManual(key: PortfolioHistoryKey): Promise<void> {
     const id = portfolioHistoryDocumentId(key);
     const current = this.records.get(id);
-    if (!current) throw new Error("HISTORY_ENTRY_NOT_FOUND");
+    if (!current) return;
     assertCanEditPortfolioHistory(current.entry);
     this.records.delete(id);
   }
