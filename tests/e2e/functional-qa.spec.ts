@@ -113,6 +113,10 @@ function brl(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function normalizeDisplayedWhitespace(value: string) {
+  return value.replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function expectedSummary(entries: readonly QaDividendMonth[]) {
   if (!entries.length) throw new Error("Resumo exige ao menos uma competência encerrada.");
   const total = entries.reduce((sum, entry) => sum + entry.numericValue, 0);
@@ -145,8 +149,8 @@ async function expectSummary(page: Page, expected: {
   await expect(worst).toContainText(expected.worstMonth);
   await expect(worst).toContainText(expected.worstValue);
   await expect(total).toContainText(expected.total);
-  const title = (await summary.locator("div.mt-5.grid").first().getAttribute("title"))?.replace(/\u00a0/g, " ");
-  expect(title).toContain(expected.average);
+  const title = await summary.locator("div.mt-5.grid").first().getAttribute("title");
+  expect(normalizeDisplayedWhitespace(title || "")).toContain(normalizeDisplayedWhitespace(expected.average));
 }
 
 async function expectNoHighImpactAccessibilityViolations(page: Page) {

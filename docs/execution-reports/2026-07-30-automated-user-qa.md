@@ -117,7 +117,7 @@ Evidência local desta correção no worktree limpo de dados sensíveis:
 - cobertura crítica: 100% linhas, 93,66% branches e 98,53% funções;
 - mutation, build, HTTP smoke e auditoria de produção: aprovados;
 - sentinela de redação: 1/1; secret scan: 659 arquivos;
-- E2E local: 45 aprovados, 15 por projeto, com 21 jornadas remotas corretamente ignoradas sem Preview e credenciais; Desktop Chromium, Mobile Chrome e Mobile Safari/WebKit concluíram com exit code zero e `workers=1`.
+- E2E local: Desktop Chromium e Mobile Chrome aprovaram 15/15 cada, com 14 jornadas remotas corretamente ignoradas sem Preview e credenciais. O Mobile Safari/WebKit local foi executado, mas o runtime congelado do host falhou antes de criar a página com `Unknown setting: PushAPIEnabled`: 6 falhas, 1 interrompido e 15 não executados. Essa limitação não ocorre no WebKit suportado do runner Ubuntu.
 
 O HEAD imutável `1a30fb474a04ccf1eeaad639e2e52d1730f1aa3f` foi publicado e o run crítico `30833831080` comprovou resolução do deployment, preflight, Automation Bypass, instalação de Chromium/WebKit, descoberta de 21 testes críticos, execução serial e redação fail-closed. O resultado foi vermelho: 3 falhas, 2 flaky, 4 aprovados e 12 interrompidos pelo limite de falhas. O smoke manual e o full não foram disparados, preservando a ordem fail-closed.
 
@@ -126,6 +126,12 @@ A causa raiz adicional foi uma corrida no observador cliente de `401`. Ele ident
 A auditoria recursiva do artefato redigido `8864104024` expandiu os ZIPs e o relatório HTML e retornou zero e-mails, JWTs, Bearer tokens, campos de senha, valores monetários capturados e headers sensíveis não redigidos. As screenshots dos três projetos mantiveram as regiões de credenciais sob máscara. O artefato foi preservado como evidência redigida da falha; nenhum valor de secret foi impresso.
 
 O próximo smoke e o full remoto permanecem condicionados à publicação da cadeia imutável com essa correção. Nenhuma aprovação remota é inferida da execução vermelha.
+
+O run crítico seguinte, `30835290347`, executou no HEAD `8bf3a04fa3af392745fcd88a5783964dc5e3481f` e comprovou que a corrida de sessão foi eliminada. Em Desktop Chromium, Mobile Chrome e Mobile Safari/WebKit passaram login válido, persistência, logout server-side, acesso não autorizado, login inválido, isolamento, ausência de administração e entitlement cliente, renovação A→B e revogação A=401/B=401. Foram 9 testes aprovados, 3 falhas idênticas e 9 interrompidos pelo limite fail-closed.
+
+A falha restante era exclusiva da asserção do teste de carteira. `Intl.NumberFormat` no Node produziu espaço não separável entre a moeda e o valor esperado, enquanto o atributo renderizado pelo navegador expôs espaço comum; os números e a formatação visual estavam corretos. A infraestrutura agora normaliza espaço comum, não separável e não separável estreito nos dois operandos antes da comparação. Nenhum valor, layout ou formatação funcional da interface foi alterado.
+
+O artefato redigido `8864781194` foi auditado recursivamente: 1.967 blobs, 956 conteúdos textuais e aproximadamente 172 MB expandidos. O resultado foi zero e-mails, JWTs, Bearer tokens, passwords e valores não redigidos de `Authorization`, cookies, `x-wallet-session` ou bypass. As ocorrências monetárias textuais pertencem somente aos dados artificiais determinísticos e à mensagem dessa asserção; as screenshots inspecionadas não exibem credenciais nem dados pessoais. O redator registrou marcadores de e-mail e token no lugar dos valores reais.
 
 ## Riscos restantes
 
@@ -158,9 +164,10 @@ Regressões adicionadas:
 
 Resultados locais desta etapa, substituídos pela rodada completa de 03/08:
 
-- fixture e jornadas determinísticas: 15/15 em cada um de Desktop Chromium, Mobile Chrome e Mobile Safari/WebKit;
-- suíte local completa: 45 aprovados e 21 jornadas remotas ignoradas por ausência deliberada de credenciais locais;
+- fixture e jornadas determinísticas: 15/15 em Desktop Chromium e 15/15 em Mobile Chrome;
+- suíte local: 30 aprovados e 14 jornadas remotas ignoradas; Mobile Safari/WebKit foi tentado e bloqueado antes da página pela incompatibilidade `PushAPIEnabled` do runtime local;
 - descoberta remota: 45 casos, exatamente 15 por projeto, sem ignorar as oito jornadas determinísticas;
+- o runner Ubuntu suportado instalou WebKit e executou as jornadas autenticadas do Mobile Safari, comprovando que a limitação é exclusiva do host local;
 - TypeScript, ESLint e 30 testes focados de arquitetura, política, concorrência e parser: aprovados.
 
 O resultado remoto final desta correção ainda depende de um novo Functional QA Preview full no HEAD publicado. A recomendação permanece negativa até 15/15 passarem nos três projetos e login, persistência, logout, renovação, isolamento e cleanup serem comprovados.
