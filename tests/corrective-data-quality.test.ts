@@ -19,11 +19,10 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-function recentDividendHistory(monthlyValue: number, priceAtDateWith = 90) {
+function recentDividendHistory(monthlyValue: number, asOf: Date, priceAtDateWith = 90) {
   const result: Record<string, Record<string, unknown>> = {};
-  const now = new Date();
   for (let offset = 0; offset < 12; offset += 1) {
-    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 15));
+    const date = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth() - offset, 15));
     const yearKey = `earnings${date.getUTCFullYear()}`;
     result[yearKey] ||= {};
     result[yearKey][MONTHS[date.getUTCMonth()]] = {
@@ -37,12 +36,13 @@ function recentDividendHistory(monthlyValue: number, priceAtDateWith = 90) {
 }
 
 test("[REG-DEF-04] DY canônico usa dividendos de 12 meses e preço atual, nunca o campo legado", () => {
+  const asOf = new Date("2026-08-20T12:00:00.000Z");
   const result = deriveFiiRiskData({
     price: 100,
     vpCota: 80,
     dividendYield: 99,
-    ...recentDividendHistory(1),
-  });
+    ...recentDividendHistory(1, asOf),
+  }, { asOf });
 
   assert.equal(result.canonicalDividendMetrics.dy12mCurrentPrice.value, 12);
   assert.equal(result.canonicalDividendMetrics.distributionOnNav12m.value, 15);
@@ -52,13 +52,38 @@ test("[REG-DEF-04] DY canônico usa dividendos de 12 meses e preço atual, nunca
   assert.equal(result.canonicalDividendMetrics.legacyConflict.detected, true);
 });
 
+test("[REG-DEF-04-A] fechamento mensal é determinado pelo asOf, inclusive em fevereiro", () => {
+  const beforePayment = new Date("2028-02-14T12:00:00.000Z");
+  const onPayment = new Date("2028-02-15T12:00:00.000Z");
+  const history = recentDividendHistory(1, onPayment);
+
+  assert.equal(deriveFiiRiskData(history, { asOf: beforePayment }).dividends.monthsPaidLast12, 11);
+  assert.equal(deriveFiiRiskData(history, { asOf: onPayment }).dividends.monthsPaidLast12, 12);
+});
+
+test("[REG-DEF-04-B] virada dezembro/janeiro não antecipa dividendo futuro", () => {
+  const paymentDay = new Date("2027-01-15T12:00:00.000Z");
+  const history = recentDividendHistory(1, paymentDay);
+
+  assert.equal(
+    deriveFiiRiskData(history, { asOf: new Date("2026-12-31T23:59:59.000Z") }).dividends.monthsPaidLast12,
+    11,
+  );
+  assert.equal(
+    deriveFiiRiskData(history, { asOf: new Date("2027-01-01T00:00:00.000Z") }).dividends.monthsPaidLast12,
+    11,
+  );
+  assert.equal(deriveFiiRiskData(history, { asOf: paymentDay }).dividends.monthsPaidLast12, 12);
+});
+
 test("[REG-DEF-05] ausência de cotação invalida todos os derivados dependentes de preço", () => {
+  const asOf = new Date("2026-08-20T12:00:00.000Z");
   const result = deriveFiiRiskData({
     price: "-",
     dividendYield: 11.5,
     pvp: 0.9,
-    ...recentDividendHistory(1),
-  });
+    ...recentDividendHistory(1, asOf),
+  }, { asOf });
 
   assert.equal(result.dividendYield, null);
   assert.equal(result.pvp, undefined);
@@ -106,7 +131,11 @@ test("métricas canônicas nunca produzem NaN ou Infinity", () => {
     fc.double({ min: 0.01, max: 10_000, noNaN: true, noDefaultInfinity: true }),
     fc.double({ min: 0, max: 100, noNaN: true, noDefaultInfinity: true }),
     (price, monthlyDividend) => {
-      const result = deriveFiiRiskData({ price, ...recentDividendHistory(monthlyDividend) });
+      const asOf = new Date("2026-08-20T12:00:00.000Z");
+      const result = deriveFiiRiskData(
+        { price, ...recentDividendHistory(monthlyDividend, asOf) },
+        { asOf },
+      );
       const value = result.canonicalDividendMetrics.dy12mCurrentPrice.value;
       return value === null || Number.isFinite(value);
     },

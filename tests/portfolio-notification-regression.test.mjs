@@ -37,7 +37,7 @@ test("unchanged dividends suppress scheduled summaries and patrimony uses a stab
 
 test("paid patrimony threshold is authenticated, resolved on the server and configurable in the wallet", () => {
   const implementation = `${preferencesRoute}\n${preferencesController}`;
-  assert.match(implementation, /WalletSessions/);
+  assert.match(implementation, /walletSessionStore\.verify/);
   assert.match(implementation, /paidPlanFromRecord\(user\.data\)/);
   assert.match(implementation, /notificationPreferences\.patrimonyChangeThresholdPercent/);
   assert.doesNotMatch(implementation, /body\?\.(?:isPaid|isPremium|isVip)/);

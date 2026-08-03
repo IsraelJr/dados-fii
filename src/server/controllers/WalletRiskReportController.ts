@@ -20,12 +20,12 @@ import {
   walletRiskReportAutomaticEnabled,
   WALLET_RISK_REPORT_AUTOMATIC_SOURCE,
 } from "@/lib/reports/WalletRiskReportAutomationPolicy";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const REPORT_COLLECTION = "UserRiskReports";
-const SESSION_COLLECTION = "WalletSessions";
 const USER_COLLECTION = "User";
 const TIME_ZONE = "America/Sao_Paulo";
 const PROCESSING_TIMEOUT_MS = 15 * 60 * 1000;
@@ -48,13 +48,6 @@ function emailOf(value: unknown) {
 
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function isExpired(value: unknown) {
-  if (!value) return true;
-  const timestamp = value as { toDate?: () => Date };
-  const date = typeof timestamp.toDate === "function" ? timestamp.toDate() : new Date(String(value));
-  return Number.isNaN(date.getTime()) || date.getTime() < Date.now();
 }
 
 function timestampMs(value: unknown) {
@@ -92,17 +85,7 @@ function reportCredits(data: Record<string, unknown>) {
 }
 
 async function hasSession(email: string, token: unknown) {
-  const sessionToken = String(token || "");
-  if (!sessionToken) return false;
-
-  const snap = await adminDb
-    .collection(SESSION_COLLECTION)
-    .doc(sha256(`${email}:${sessionToken}`))
-    .get();
-  if (!snap.exists) return false;
-
-  const data = snap.data() || {};
-  return data.email === email && !isExpired(data.expiresAt);
+  return walletSessionStore.verify(email, token);
 }
 
 async function findUserByEmail(email: string): Promise<LoadedUser | null> {

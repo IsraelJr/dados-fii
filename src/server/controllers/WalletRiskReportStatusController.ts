@@ -9,6 +9,7 @@ import {
   walletRiskReportAutomaticEnabled,
   walletRiskReportManualFallbackEnabled,
 } from "@/lib/reports/WalletRiskReportAutomationPolicy";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,13 +27,6 @@ function emailOf(value: unknown) {
 
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function isExpired(value: unknown) {
-  if (!value) return true;
-  const timestamp = value as { toDate?: () => Date };
-  const date = typeof timestamp.toDate === "function" ? timestamp.toDate() : new Date(String(value));
-  return Number.isNaN(date.getTime()) || date.getTime() < Date.now();
 }
 
 function currentMonthKey() {
@@ -70,14 +64,7 @@ function walletCount(data: Record<string, unknown>) {
 }
 
 async function hasSession(email: string, token: unknown) {
-  const sessionToken = String(token || "");
-  if (!sessionToken) return false;
-
-  const snap = await adminDb.collection("WalletSessions").doc(sha256(`${email}:${sessionToken}`)).get();
-  if (!snap.exists) return false;
-
-  const data = snap.data() || {};
-  return data.email === email && !isExpired(data.expiresAt);
+  return walletSessionStore.verify(email, token);
 }
 
 async function findUserByEmail(email: string) {

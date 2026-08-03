@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
 import type { ProductPlan } from "@/lib/productPlans";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export type UserRecord = {
   id: string;
@@ -14,26 +14,11 @@ export type MonitoredFund = {
   percentDown: number;
 };
 
-function hash(value: string) {
-  return createHash("sha256").update(value, "utf8").digest("hex");
-}
-
-function expired(value: unknown) {
-  if (!value) return true;
-  const date = typeof (value as { toDate?: unknown }).toDate === "function"
-    ? (value as { toDate(): Date }).toDate()
-    : new Date(value as string | number | Date);
-  return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
-}
-
 export class UserRepository {
   private readonly users = adminDb.collection("User");
 
   async verifyWalletSession(email: string, token: string) {
-    const snapshot = await adminDb.collection("WalletSessions").doc(hash(`${email}:${token}`)).get();
-    if (!snapshot.exists) return false;
-    const data = snapshot.data() || {};
-    return data.email === email && !expired(data.expiresAt);
+    return walletSessionStore.verify(email, token);
   }
 
   async find(options: { uid?: string | null; email?: string | null; anonId?: string | null }): Promise<UserRecord> {

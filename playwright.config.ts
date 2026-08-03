@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
+import { VERCEL_BYPASS_STORAGE_STATE } from "./tests/e2e/global-setup";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -22,31 +23,46 @@ const buildOnlyServiceAccount = JSON.stringify({
 });
 
 const port = 3100;
-const baseURL = `http://127.0.0.1:${port}`;
+const localBaseURL = `http://127.0.0.1:${port}`;
+const configuredBaseURL = process.env.E2E_BASE_URL?.trim();
+const baseURL = configuredBaseURL || localBaseURL;
+const isRemoteRun = Boolean(configuredBaseURL);
+const bypassStorageState = isRemoteRun
+  && process.env.E2E_ENVIRONMENT === "Preview"
+  && process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+  ? VERCEL_BYPASS_STORAGE_STATE
+  : undefined;
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  testIgnore: isRemoteRun ? ["**/functional-qa-fixtures.spec.ts"] : [],
+  outputDir: "test-results",
+  globalSetup: "./tests/e2e/global-setup.ts",
+  globalTeardown: "./tests/e2e/global-teardown.ts",
+  fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [["line"], ["html", { open: "never" }]] : "line",
   use: {
     baseURL,
+    storageState: bypassStorageState,
     locale: "pt-BR",
     timezoneId: "America/Sao_Paulo",
     trace: "retain-on-failure",
-    screenshot: "only-on-failure",
+    screenshot: "off",
+    video: "retain-on-failure",
   },
   projects: [
-    { name: "chromium-desktop", use: { ...devices["Desktop Chrome"] } },
-    { name: "chromium-mobile", use: { ...devices["Pixel 7"] } },
+    { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile-chrome", use: { ...devices["Pixel 7"] } },
+    { name: "mobile-safari", use: { ...devices["iPhone 13"] } },
   ],
-  webServer: {
+  webServer: isRemoteRun ? undefined : {
     command: process.env.CI
       ? `npm run start -- --hostname 127.0.0.1 --port ${port}`
       : `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
-    url: baseURL,
+    url: localBaseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {

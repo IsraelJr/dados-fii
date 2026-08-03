@@ -6,6 +6,7 @@ import type { NextRequest } from "next/server";
 
 export type WalletIdentity = {
   uid: string | null;
+  firebaseAuthTime: number | null;
   email: string;
   plan: ProductPlan;
   source: "firebase" | "wallet_session";
@@ -38,7 +39,10 @@ export class WalletIdentityService {
     try {
       const decoded = await admin.auth().verifyIdToken(token, true);
       const email = normalizedEmail(decoded.email);
-      if (!decoded.email_verified || !email) return { ok: false, status: 403, error: "E-mail autenticado e verificado é obrigatório." };
+      const firebaseAuthTime = Number(decoded.auth_time);
+      if (!decoded.email_verified || !email || !Number.isSafeInteger(firebaseAuthTime) || firebaseAuthTime <= 0) {
+        return { ok: false, status: 403, error: "E-mail autenticado e verificado é obrigatório." };
+      }
       if (requestedEmail && requestedEmail !== email) return { ok: false, status: 403, error: "O e-mail informado não pertence à sessão." };
       const anonId = request.cookies.get("anonId")?.value || null;
       const user = await this.repository.find({ uid: decoded.uid, email, anonId });
@@ -47,6 +51,7 @@ export class WalletIdentityService {
         ok: true,
         identity: {
           uid: decoded.uid,
+          firebaseAuthTime,
           email,
           plan,
           source: "firebase",
@@ -67,6 +72,7 @@ export class WalletIdentityService {
         ok: true,
         identity: {
           uid: null,
+          firebaseAuthTime: null,
           email: requestedEmail,
           plan: paidPlanFromRecord(user.data) || "free",
           source: "wallet_session",

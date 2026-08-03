@@ -130,7 +130,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Critical end-to-end journeys
-        run: npm run test:e2e
+        run: npm run test:e2e:local
 
       - name: Upload failure diagnostics
         if: failure()

@@ -11,6 +11,7 @@ import {
   type RiskReportInput,
   type RiskReportPortfolioItem,
 } from "@/lib/prompts/fiiRiskReport";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,12 +29,6 @@ function emailOf(value: unknown) {
 
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function isExpired(value: any) {
-  if (!value) return true;
-  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
-  return !date || Number.isNaN(date.getTime()) || date.getTime() < Date.now();
 }
 
 function currentMonthKey() {
@@ -155,14 +150,7 @@ function buildPortfolioDataQuality(portfolio: RiskReportPortfolioItem[]) {
 }
 
 async function hasSession(email: string, token: unknown) {
-  const sessionToken = String(token || "");
-  if (!sessionToken) return false;
-
-  const snap = await adminDb.collection("WalletSessions").doc(sha256(`${email}:${sessionToken}`)).get();
-  if (!snap.exists) return false;
-
-  const data = snap.data() || {};
-  return data.email === email && !isExpired(data.expiresAt);
+  return walletSessionStore.verify(email, token);
 }
 
 async function findUserByEmail(email: string) {

@@ -1,9 +1,29 @@
 "use client";
 
 import { useState, useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
+import {
+    createUserWithEmailAndPassword,
+    getAuth,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    type User,
+} from "firebase/auth";
 import { usePathname } from "next/navigation";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { app } from "@/lib/firebase";
+import {
+    clearWalletSession,
+    ensureWalletSession,
+    installWalletUnauthorizedObserver,
+    markWalletLogout,
+    WALLET_EMAIL_KEY,
+    WALLET_SESSION_EXPIRES_AT_KEY,
+    WALLET_SESSION_INVALID_EVENT,
+    WALLET_SESSION_KEY,
+    WALLET_SESSION_LOGOUT_KEY,
+    WALLET_SESSION_UPDATED_EVENT,
+} from "@/lib/users/WalletSessionClient";
+import { isWalletPasswordFormatValid } from "@/lib/users/WalletLoginPolicy";
 import { X } from "lucide-react";
 
 const auth = getAuth(app);
@@ -11,6 +31,7 @@ const auth = getAuth(app);
 export default function LoginButton() {
     const pathname = usePathname();
     const [showModal, setShowModal] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -21,13 +42,71 @@ export default function LoginButton() {
     const passwordRef = useRef<HTMLInputElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
+    const userRef = useRef<User | null>(null);
 
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     useEffect(() => {
         if (showModal) emailRef.current?.focus();
     }, [showModal]);
+
+    useEffect(() => {
+        let active = true;
+
+        const recover = async (nextUser: User, rejectedToken = "") => {
+            try {
+                await ensureWalletSession(nextUser, {
+                    force: Boolean(rejectedToken),
+                    rejectedToken,
+                });
+            } catch {
+                clearWalletSession();
+                await signOut(auth).catch(() => undefined);
+                if (!active) return;
+                userRef.current = null;
+                setUser(null);
+                setMessage("Sua sessão expirou. Entre novamente para continuar.");
+            }
+        };
+
+        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+            userRef.current = nextUser;
+            setUser(nextUser);
+            if (nextUser) void recover(nextUser);
+        });
+
+        const onInvalidSession = (event: Event) => {
+            const rejectedToken = (event as CustomEvent<{ rejectedToken?: string }>).detail?.rejectedToken || "";
+            if (userRef.current) void recover(userRef.current, rejectedToken);
+        };
+        const removeFetchObserver = installWalletUnauthorizedObserver((rejectedToken) => {
+            window.dispatchEvent(new CustomEvent(WALLET_SESSION_INVALID_EVENT, {
+                detail: { rejectedToken },
+            }));
+        });
+        const onStorage = (event: StorageEvent) => {
+            if (![WALLET_EMAIL_KEY, WALLET_SESSION_KEY, WALLET_SESSION_EXPIRES_AT_KEY, WALLET_SESSION_LOGOUT_KEY].includes(event.key || "")) return;
+            if (event.key === WALLET_SESSION_LOGOUT_KEY) {
+                clearWalletSession();
+                window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
+                window.dispatchEvent(new Event("wallet-session-updated"));
+                return;
+            }
+            window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
+            window.dispatchEvent(new Event("wallet-session-updated"));
+            if (userRef.current) void recover(userRef.current);
+        };
+
+        window.addEventListener(WALLET_SESSION_INVALID_EVENT, onInvalidSession);
+        window.addEventListener("storage", onStorage);
+        return () => {
+            active = false;
+            unsubscribe();
+            removeFetchObserver();
+            window.removeEventListener(WALLET_SESSION_INVALID_EVENT, onInvalidSession);
+            window.removeEventListener("storage", onStorage);
+        };
+    }, []);
 
     const closeModal = () => {
         setShowModal(false);
@@ -87,7 +166,7 @@ export default function LoginButton() {
             return;
         }
 
-        if (!passwordRegex.test(password)) {
+        if (!isWalletPasswordFormatValid(password)) {
             setMessage("A senha deve ter ao menos 6 caracteres, incluindo letras e números.");
             if (passwordRef.current) {
                 passwordRef.current.classList.add("shake");
@@ -115,11 +194,11 @@ export default function LoginButton() {
             });
             if (!profileResponse.ok) throw new Error("Falha ao sincronizar o perfil autenticado.");
 
+            await ensureWalletSession(userCred.user, { force: true });
+
             setMessage("✅ Login realizado com sucesso!");
             closeModal();
         } catch (err: any) {
-            console.error(err);
-
             let friendlyMessage = "❌ Falha ao autenticar. Tente novamente.";
             if (err.code === "auth/wrong-password") {
                 friendlyMessage = "❌ Senha incorreta. Verifique e tente novamente.";
@@ -140,21 +219,55 @@ export default function LoginButton() {
         }
     };
 
+    const handleLogout = async () => {
+        const walletEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
+        const walletToken = window.localStorage.getItem(WALLET_SESSION_KEY) || "";
+        const publishLogout = () => {
+            markWalletLogout();
+            window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
+            window.dispatchEvent(new Event("wallet-session-updated"));
+        };
+        publishLogout();
+        if (walletEmail && walletToken) {
+            await fetch("/api/wallet/session/firebase", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: walletEmail, token: walletToken }),
+            }).catch(() => undefined);
+        }
+        await signOut(auth).catch(() => undefined);
+        publishLogout();
+        setUser(null);
+        setMessage("");
+    };
+
     if (pathname === "/") return null;
 
     return (
         <div className="relative">
-            <button
-                ref={triggerRef}
-                type="button"
-                onClick={() => setShowModal(true)}
-                aria-haspopup="dialog"
-                aria-expanded={showModal}
-                aria-controls="login-dialog"
-                className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
-            >
-                Login
-            </button>
+            {user ? (
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    onClick={handleLogout}
+                    aria-label="Sair da conta"
+                    className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
+                >
+                    Sair
+                </button>
+            ) : (
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    onClick={() => setShowModal(true)}
+                    aria-haspopup="dialog"
+                    aria-expanded={showModal}
+                    aria-controls="login-dialog"
+                    className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-2 rounded-xl shadow-md hover:bg-blue-800"
+                >
+                    Login
+                </button>
+            )}
 
             {showModal && (
                 <div

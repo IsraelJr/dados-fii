@@ -1,6 +1,6 @@
 # Dados FII — Inventário de variáveis de ambiente
 
-**Data:** 27/07/2026  
+**Data:** 30/07/2026
 **Política:** este inventário contém somente nomes, finalidade e classificação. Valores secretos nunca são versionados.
 
 ## Públicas e não autorizativas
@@ -38,6 +38,17 @@
 - `MONITOR_ALERT_EMAILS`
 - `MONITOR_EMAIL_FROM`
 - `PREMIUM_PREVIEW_EMAILS`
+- `E2E_USER_EMAIL`
+- `E2E_USER_PASSWORD`
+- `VERCEL_AUTOMATION_BYPASS_SECRET`
+
+### GitHub Actions — Repository secrets dedicados ao QA
+
+- `QA_PREVIEW_USER_EMAIL`
+- `QA_PREVIEW_USER_PASSWORD`
+- `QA_PREVIEW_VERCEL_BYPASS_SECRET`
+
+Os três nomes são mapeados explicitamente para os aliases `E2E_*` do reusable workflow. O dispatcher não usa `secrets: inherit` nem referencia esses valores em steps, comandos ou logs.
 
 ## Configuração de IA e cache
 
@@ -83,8 +94,12 @@
 - `VERCEL_ENV`
 - `VERCEL_GIT_COMMIT_SHA`
 - `VERCEL_PROJECT_PRODUCTION_URL`
+- `VERCEL_PREVIEW_HOST_SUFFIX`
 - `NODE_ENV`
 - `CI`
+- `E2E_BASE_URL`
+- `E2E_ENVIRONMENT`
+- `E2E_REMOTE`
 
 ## Regras obrigatórias
 

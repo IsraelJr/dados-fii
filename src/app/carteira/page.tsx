@@ -23,6 +23,7 @@ import WalletRiskReportCard from "../components/WalletRiskReportCard";
 import AppToast from "../components/AppToast";
 import WalletEmailVerifiedSync from "../components/WalletEmailVerifiedSync";
 import PortfolioNotificationPreferences from "../components/PortfolioNotificationPreferences";
+import Login from "../components/Login";
 
 type WalletItem = { ticker: string; quotas: number };
 type LoadedFii = WalletItem & { data?: any; error?: string };
@@ -605,6 +606,7 @@ export default function WalletPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl overflow-x-hidden px-4 py-8">
+      <Login />
       <AppToast message={message} variant={toastVariant(message)} onClose={() => setMessage("")} />
       <PageHeader
         title="Minha Carteira"

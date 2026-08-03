@@ -1,0 +1,69 @@
+name: Functional QA
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "23 09 * * 1-6"
+    - cron: "23 09 * * 0"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Ambiente com os secrets do usuário de QA"
+        required: true
+        type: choice
+        options:
+          - Preview
+          - Production
+        default: Preview
+      deployment_sha:
+        description: "SHA de 40 caracteres de um deployment Vercel registrado no GitHub"
+        required: true
+        type: string
+      suite:
+        description: "Abrangência da execução"
+        required: true
+        type: choice
+        options:
+          - smoke
+          - critical
+          - full
+        default: critical
+
+permissions:
+  contents: read
+  deployments: read
+  statuses: write
+
+concurrency:
+  group: functional-qa-${{ github.event_name }}-${{ github.event.deployment.sha || inputs.deployment_sha || github.sha }}-${{ github.event.deployment.environment || inputs.environment || 'Production' }}
+  cancel-in-progress: true
+
+jobs:
+  browser-qa:
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (
+        github.event.deployment_status.state == 'success' &&
+        github.event.deployment.creator.login == 'vercel[bot]' &&
+        github.event.deployment_status.creator.login == 'vercel[bot]' &&
+        (
+          github.event.deployment.environment == 'Preview' ||
+          github.event.deployment.environment == 'Production' ||
+          github.event.deployment.environment == 'production'
+        )
+      )
+    uses: IsraelJr/dados-fii/.github/workflows/functional-qa-runner.yml@08800f4c74c2b22b77495c62c3ca01b862849f9e
+    with:
+      trigger_event: ${{ github.event_name }}
+      deployment_environment: ${{ github.event.deployment.environment || '' }}
+      deployment_sha: ${{ github.event.deployment.sha || inputs.deployment_sha || github.sha }}
+      deployment_url: ${{ github.event.deployment_status.environment_url || '' }}
+      deployment_creator: ${{ github.event.deployment.creator.login || '' }}
+      deployment_status_creator: ${{ github.event.deployment_status.creator.login || '' }}
+      requested_environment: ${{ inputs.environment || 'Production' }}
+      requested_suite: ${{ inputs.suite || 'critical' }}
+      schedule_expression: ${{ github.event.schedule || '' }}
+    secrets:
+      E2E_USER_EMAIL: ${{ secrets.QA_PREVIEW_USER_EMAIL }}
+      E2E_USER_PASSWORD: ${{ secrets.QA_PREVIEW_USER_PASSWORD }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.QA_PREVIEW_VERCEL_BYPASS_SECRET }}

@@ -1,6 +1,6 @@
 # Inventário e orçamento do GitHub Actions
 
-**Atualizado em:** 27/07/2026
+**Atualizado em:** 30/07/2026
 **Política associada:** `docs/engineering/github-actions-policy.md`  
 **Gate automatizado:** `tests/github-actions-governance.test.mjs`
 
@@ -21,6 +21,8 @@
 | Workflow | Finalidade oficial | Gatilho | Timeout | Escrita | Classificação |
 |---|---|---|---:|---|---|
 | `phase-2-closure.yml` | CI central completa: audit, segredos, lint, typecheck, suíte, Emulator, cobertura, build, HTTP e E2E | PRs relevantes e configuração em `main` | 30 min, exceção documentada | nenhuma | Essencial |
+| `functional-qa.yml` | Playwright funcional isolado em Preview e produção, com evidências redigidas | deploy Vercel bem-sucedido, smoke diário, suíte semanal e execução manual | 30 min, exceção documentada | somente commit status do gate | Essencial |
+| `functional-qa-runner.yml` | Executor reutilizável imutável do QA funcional; recebe somente três aliases obrigatórios mapeados nominalmente pelo dispatcher | chamado exclusivamente pelo dispatcher em SHA fixo | 30 min, exceção documentada | somente commit status do gate | Essencial |
 | `portfolio-notifications-ci.yml` | Regressões específicas de notificações | PR do domínio e execução manual | 8 min | nenhuma | Essencial |
 | `production-premium-smoke.yml` | Geração Premium real e releitura da auditoria com identidade OIDC vinculada ao SHA publicado | evento único `status` do Vercel bem-sucedido em `main`; `workflow_dispatch` como fallback | 10 min | evidência no backend e commit status auditável | Gate pós-deploy |
 | `risk-lab.yml` | Suíte completa e especializada do Risk Lab | PR do domínio e execução manual | 20 min | nenhuma | Essencial |
@@ -54,6 +56,7 @@ A projeção é comparativa e deve ser recalibrada com uso real:
 | Workflow | Referência mensal |
 |---|---:|
 | CI central | 420 min |
+| QA funcional | cerca de 520 min (26 smokes diários, 4 suítes semanais e até 12 previews/mês) |
 | Notificações | 18 min |
 | Risk Lab | 64 min |
 | Backtest kickoff | 2 min |
@@ -106,7 +109,7 @@ Devem permanecer ausentes:
 - timeout fora do orçamento;
 - instalação mutável;
 - falta de `concurrency` cancelável;
-- schedule de aplicação;
+- schedule de aplicação e qualquer cron fora dos dois schedules auditáveis de QA;
 - permissões excessivas de escrita;
 - retenção excessiva de artefatos;
 - gatilho automático em workflows pesados.
