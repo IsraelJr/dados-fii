@@ -84,7 +84,7 @@ O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAI
 | Mutation sanity | aprovado |
 | Build | aprovado com Firebase sintético em memória |
 | HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
-| Secret scan | aprovado: 654 arquivos versionados |
+| Secret scan | aprovado: 659 arquivos versionados |
 | E2E local | aprovado: 30 casos em Desktop Chromium e Mobile Chrome; 14 casos remotos ignorados sem `E2E_BASE_URL` |
 | E2E Preview real | run `30758552638`: preflight, sentinela e instalação Chromium/WebKit aprovados; bloqueado antes do login porque a Vercel recusou o bypass recebido |
 
@@ -116,7 +116,7 @@ Evidência local desta correção no worktree limpo de dados sensíveis:
 - Firestore Rules: 3/3 com JDK 21;
 - cobertura crítica: 100% linhas, 93,66% branches e 98,53% funções;
 - mutation, build, HTTP smoke e auditoria de produção: aprovados;
-- sentinela de redação: 1/1; secret scan: 654 arquivos;
+- sentinela de redação: 1/1; secret scan: 659 arquivos;
 - E2E local: 30 aprovados, com 14 jornadas remotas corretamente ignoradas sem Preview e credenciais.
 
 O novo smoke e o full remoto permanecem pendentes até a publicação do HEAD imutável. Nenhuma aprovação remota é inferida desta evidência local.
