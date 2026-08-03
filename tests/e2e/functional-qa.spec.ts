@@ -3,6 +3,7 @@ import {
   clickStableSemanticTarget,
   expect,
   expectAuthenticatedWallet,
+  logoutWallet,
   observeWalletAuthentication,
   stabilizeCookieConsent,
   test,
@@ -54,19 +55,6 @@ async function login(page: Page) {
   const authentication = observeWalletAuthentication(page);
   await clickStableSemanticTarget(page, dialog.getByRole("button", { name: "Entrar", exact: true }));
   return (await expectAuthenticatedWallet(page, authentication)).idToken;
-}
-
-async function logout(page: Page) {
-  await page.goto("/carteira");
-  const button = page.getByRole("button", { name: "Sair da conta" });
-  if (await button.isVisible().catch(() => false)) await button.click();
-  await expect(page.getByRole("button", { name: "Login" })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => Boolean(
-    window.localStorage.getItem("dados-fii-wallet-email")
-    || window.localStorage.getItem("dados-fii-wallet-session"),
-  ))).toBe(false);
-  await page.goto("/");
-  await expect(page.getByRole("button", { name: "Login" })).toHaveCount(0);
 }
 
 async function cleanArtificialHistory(page: Page) {
@@ -180,7 +168,8 @@ test("@smoke @critical autenticação válida, persistente, logout e acesso não
   await page.reload();
   await expect(page).toHaveURL(/\/carteira$/);
   await expect(page.getByRole("button", { name: "Sair da conta" })).toBeVisible();
-  await logout(page);
+  const logout = await logoutWallet(page);
+  expect(logout.deleteStatus, "O smoke autenticado deve comprovar a revogação no servidor.").toBe(200);
 
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/sistema$/);
@@ -245,7 +234,7 @@ test("@preview @full usuário de QA não é admin e sessão não aceita identida
     email: window.localStorage.getItem("dados-fii-wallet-email") || "",
     token: window.localStorage.getItem("dados-fii-wallet-session") || "",
   }));
-  await logout(page);
+  await logoutWallet(page);
   const revokedStatus = await page.evaluate(async (identity) => (
     fetch("/api/portfolio/history?portfolioId=default", {
       headers: {
@@ -328,7 +317,7 @@ test("@critical carteira mantém cards, gráfico, rede e persistência sincroniz
     await page.unrouteAll({ behavior: "ignoreErrors" });
     await page.goto("/carteira").catch(() => undefined);
     await cleanArtificialHistory(page);
-    await logout(page);
+    await logoutWallet(page);
   }
 });
 
@@ -410,7 +399,7 @@ test("@critical @full relatórios controlam acesso, persistem, geram PDF e não 
     )).catch(() => null);
     await page.evaluate(() => window.dispatchEvent(new Event("pagehide"))).catch(() => undefined);
     await walletCleanup;
-    await logout(page);
+    await logoutWallet(page);
   }
 });
 

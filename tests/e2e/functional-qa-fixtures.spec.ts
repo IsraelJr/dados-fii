@@ -4,6 +4,7 @@ import {
   configurePersistedCookieConsent,
   expect,
   expectAuthenticatedWallet,
+  logoutWallet,
   observeWalletAuthentication,
   stabilizeCookieConsent,
   test,
@@ -129,4 +130,49 @@ test("resposta de rede sem UI e sessão não determina autenticação", async ({
     rejected = true;
   }
   expect(rejected).toBe(true);
+});
+
+test("logout aguarda navegação seguida de reidratação antes de clicar", async ({ page }) => {
+  await configurePersistedCookieConsent(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("dados-fii-wallet-email", "fixture@example.test");
+    localStorage.setItem("dados-fii-wallet-session", "fixture-session");
+  });
+  let deleteRequests = 0;
+  await page.route("**/api/wallet/session/firebase", async (route) => {
+    if (route.request().method() === "DELETE") deleteRequests += 1;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  await page.route("**/api/portfolio/history?portfolioId=default", (route) => route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    body: JSON.stringify({ error: "unauthorized" }),
+  }));
+  await page.route("**/carteira", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: `<!doctype html><html lang="pt-BR"><body>
+      <button type="button" id="login">Login</button>
+      <button type="button" id="logout" aria-label="Sair da conta" hidden>Sair</button>
+      <script>
+        setTimeout(() => {
+          document.querySelector('#login').hidden = true;
+          document.querySelector('#logout').hidden = false;
+        }, 200);
+        document.querySelector('#logout').addEventListener('click', async () => {
+          const response = await fetch('/api/wallet/session/firebase', { method: 'DELETE' });
+          if (!response.ok) return;
+          localStorage.removeItem('dados-fii-wallet-email');
+          localStorage.removeItem('dados-fii-wallet-session');
+          document.querySelector('#logout').hidden = true;
+          document.querySelector('#login').hidden = false;
+        });
+      </script>
+    </body></html>`,
+  }));
+
+  const result = await logoutWallet(page);
+  expect(result.deleteStatus).toBe(200);
+  expect(result.protectedStatus).toBe(401);
+  expect(deleteRequests).toBe(1);
 });

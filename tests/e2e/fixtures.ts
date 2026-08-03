@@ -21,6 +21,8 @@ type AuthenticationResult = {
   protectedStatus: 200;
 };
 
+type WalletUiState = "authenticated" | "logged-out" | "transitioning";
+
 type RuntimeEvidence = {
   console: Array<{ type: string; text: string }>;
   failedRequests: Array<{ method: string; url: string; failure: string }>;
@@ -150,6 +152,77 @@ export async function expectAuthenticatedWallet(
     profileObserved: true,
     protectedStatus: 200,
   };
+}
+
+async function observeWalletUiState(page: Page): Promise<WalletUiState> {
+  const [logoutVisible, loginVisible, hasSession] = await Promise.all([
+    page.getByRole("button", { name: "Sair da conta" }).isVisible().catch(() => false),
+    page.getByRole("button", { name: "Login" }).isVisible().catch(() => false),
+    page.evaluate(() => Boolean(
+      window.localStorage.getItem("dados-fii-wallet-email")
+      && window.localStorage.getItem("dados-fii-wallet-session"),
+    )),
+  ]);
+  if (logoutVisible && !loginVisible && hasSession) return "authenticated";
+  if (!logoutVisible && loginVisible && !hasSession) return "logged-out";
+  return "transitioning";
+}
+
+async function waitForStableWalletUiState(page: Page, timeout = 5_000) {
+  let previous: WalletUiState = "transitioning";
+  let consecutiveObservations = 0;
+
+  await expect.poll(async () => {
+    const current = await observeWalletUiState(page);
+    consecutiveObservations = current !== "transitioning" && current === previous
+      ? consecutiveObservations + 1
+      : current === "transitioning" ? 0 : 1;
+    previous = current;
+    return current !== "transitioning" && consecutiveObservations >= 3;
+  }, {
+    timeout,
+    intervals: [150, 200, 250],
+    message: "A UI e a sessão devem estabilizar após a reidratação do Firebase.",
+  }).toBe(true);
+
+  const state = await observeWalletUiState(page);
+  if (state === "transitioning") throw new Error("Estado estável da carteira não observado.");
+  return state;
+}
+
+export async function logoutWallet(page: Page) {
+  await page.goto("/carteira");
+  await stabilizeCookieConsent(page);
+  const initialState = await waitForStableWalletUiState(page);
+  const credentials = await page.evaluate(() => ({
+    email: window.localStorage.getItem("dados-fii-wallet-email") || "",
+    token: window.localStorage.getItem("dados-fii-wallet-session") || "",
+  }));
+
+  let deleteStatus: number | null = null;
+  if (initialState === "authenticated") {
+    const deletion = page.waitForResponse((response) => (
+      new URL(response.url()).pathname === "/api/wallet/session/firebase"
+      && response.request().method() === "DELETE"
+    ), { timeout: 5_000 });
+    await clickStableSemanticTarget(page, page.getByRole("button", { name: "Sair da conta" }), 5_000);
+    const response = await deletion;
+    deleteStatus = response.status();
+    expect(response.ok(), "O servidor deve revogar a sessão durante o logout.").toBe(true);
+  }
+
+  const finalState = await waitForStableWalletUiState(page);
+  expect(finalState, "A UI deve permanecer no estado deslogado após a revogação.").toBe("logged-out");
+
+  const protectedStatus = await page.evaluate(async ({ email, token }) => fetch(
+    "/api/portfolio/history?portfolioId=default",
+    { headers: { "x-wallet-email": email, "x-wallet-session": token } },
+  ).then((response) => response.status).catch(() => 0), credentials);
+  expect(protectedStatus, "A sessão anterior não pode continuar acessando a rota protegida.").not.toBe(200);
+
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Login" })).toHaveCount(0);
+  return { deleteStatus, protectedStatus };
 }
 
 function secretValues() {

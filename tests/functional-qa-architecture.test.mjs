@@ -236,6 +236,9 @@ test("consentimento, clique mobile e login funcional possuem regressões sem ata
   assert.match(fixture, /scrollIntoView\(\{ block: "center", inline: "center" \}\)/);
   assert.match(fixture, /observeWalletAuthentication/);
   assert.match(fixture, /expectAuthenticatedWallet/);
+  assert.match(fixture, /logoutWallet/);
+  assert.match(fixture, /request\(\)\.method\(\) === "DELETE"/);
+  assert.match(fixture, /waitForStableWalletUiState/);
   assert.match(fixture, /waitForResponse/);
   assert.doesNotMatch(functionalSpec, /waitForRequest/);
   assert.doesNotMatch(`${fixture}\n${functionalSpec}`, /force:\s*true/);
@@ -248,6 +251,7 @@ test("consentimento, clique mobile e login funcional possuem regressões sem ata
     "resposta rápida registrada antes da ação",
     "resposta ocorrida antes de uma espera tardia",
     "rede sem UI e sessão não determina autenticação",
+    "logout aguarda navegação seguida de reidratação antes de clicar",
   ]) assert.match(fixtureRegression, new RegExp(title));
 });
 
