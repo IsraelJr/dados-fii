@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomInt } from "crypto";
 import { NextResponse } from "next/server";
 import { adminDb, adminFieldValue } from "@/lib/firebaseAdmin";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -157,14 +158,7 @@ function legacyEmailCandidates(email: string) {
 }
 
 async function requireVerifiedSession(email: string, token: unknown) {
-  const sessionToken = String(token || "");
-  if (!sessionToken) return false;
-
-  const snap = await adminDb.collection("WalletSessions").doc(hash(`${email}:${sessionToken}`)).get();
-  if (!snap.exists) return false;
-
-  const data = snap.data() || {};
-  return data.email === email && !isExpired(data.expiresAt);
+  return walletSessionStore.verify(email, token);
 }
 
 async function sendWalletCode(email: string, code: string) {

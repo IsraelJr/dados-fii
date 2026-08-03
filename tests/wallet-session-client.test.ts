@@ -101,6 +101,108 @@ test("401 força renovação, mas reutiliza a sessão que outra aba já renovou"
   assert.equal(exchanges, 0);
 });
 
+test("duas abas no mesmo contexto compartilham uma única renovação", async () => {
+  const storage = memoryStorage();
+  let exchanges = 0;
+  let releaseResponse!: () => void;
+  const responseReady = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  const user = {
+    uid: "qa-shared-tabs",
+    email: "qa@example.test",
+    getIdToken: async () => "firebase-id-token",
+  };
+  const fetcher = (async () => {
+    exchanges += 1;
+    await responseReady;
+    return response({
+      ok: true,
+      token: "shared-wallet-token",
+      expiresAt: "2026-08-04T00:00:00.000Z",
+    });
+  }) as typeof fetch;
+
+  const firstTab = ensureWalletSession(user, { storage, fetcher, notify: () => undefined });
+  const secondTab = ensureWalletSession(user, { storage, fetcher, notify: () => undefined });
+  releaseResponse();
+
+  assert.deepEqual(await Promise.all([firstTab, secondTab]), [true, true]);
+  assert.equal(exchanges, 1);
+  assert.equal(storage.getItem(WALLET_SESSION_KEY), "shared-wallet-token");
+});
+
+test("logout durante reidratação impede persistência tardia da sessão", async () => {
+  const storage = memoryStorage();
+  let releaseResponse!: () => void;
+  let signalRequestStarted!: () => void;
+  const responseReady = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  const requestStarted = new Promise<void>((resolve) => {
+    signalRequestStarted = resolve;
+  });
+  const user = {
+    uid: "qa-logout-race",
+    email: "qa@example.test",
+    getIdToken: async () => "firebase-id-token",
+  };
+  const fetcher = (async () => {
+    signalRequestStarted();
+    await responseReady;
+    return response({
+      ok: true,
+      token: "late-wallet-token",
+      expiresAt: "2026-08-04T00:00:00.000Z",
+    });
+  }) as typeof fetch;
+
+  const renewal = ensureWalletSession(user, { storage, fetcher });
+  await requestStarted;
+  markWalletLogout(storage);
+  releaseResponse();
+
+  await assert.rejects(renewal, /Logout ocorreu durante a renovação/);
+  assert.equal(storage.getItem(WALLET_SESSION_KEY), null);
+  assert.equal(storage.getItem(WALLET_SESSION_EXPIRES_AT_KEY), null);
+});
+
+test("segunda marca de logout encerra renovação iniciada durante a saída", async () => {
+  const storage = memoryStorage();
+  markWalletLogout(storage);
+  let releaseResponse!: () => void;
+  let signalRequestStarted!: () => void;
+  const responseReady = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  const requestStarted = new Promise<void>((resolve) => {
+    signalRequestStarted = resolve;
+  });
+  const renewal = ensureWalletSession({
+    uid: "qa-rehydrating-after-logout",
+    email: "qa@example.test",
+    getIdToken: async () => "firebase-id-token",
+  }, {
+    storage,
+    fetcher: (async () => {
+      signalRequestStarted();
+      await responseReady;
+      return response({
+        ok: true,
+        token: "late-wallet-token",
+        expiresAt: "2026-08-04T00:00:00.000Z",
+      });
+    }) as typeof fetch,
+  });
+  await requestStarted;
+  markWalletLogout(storage);
+  releaseResponse();
+
+  await assert.rejects(renewal, /Logout ocorreu durante a renovação/);
+  assert.equal(storage.getItem(WALLET_SESSION_KEY), null);
+  assert.equal(storage.getItem(WALLET_SESSION_EXPIRES_AT_KEY), null);
+});
+
 test("falha de renovação não persiste token parcial e limpeza remove toda a sessão", async () => {
   const storage = memoryStorage({
     [WALLET_EMAIL_KEY]: "qa@example.test",

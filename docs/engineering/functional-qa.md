@@ -30,10 +30,15 @@ A PR mantém, por dependência direta da jornada, uma alteração de autenticaç
 
 - o componente de Login observa a sessão Firebase e oferece logout em `/carteira`;
 - um token Firebase verificado pode ser trocado por uma sessão aleatória da carteira;
-- a sessão dura no máximo 12 horas, é vinculada ao par e-mail/token e é revogada no logout;
+- a sessão dura no máximo 12 horas e pertence a uma família server-side derivada de `uid` e do `auth_time` verificado pelo Firebase;
+- cada troca avança atomicamente uma geração monotônica no Firestore; somente a geração mais recente da família permanece válida;
+- o logout revoga a família inteira com um limite monotônico, de modo que o token vigente e todos os tokens anteriores da mesma autenticação passam a retornar `401`;
+- uma autenticação Firebase explícita posterior cria outra família, e um token da família antiga não pode revogá-la;
 - a expiração ou um `401` autenticado força nova troca de ID token; falha de renovação limpa a sessão e volta a exibir Login;
-- a renovação usa lock entre abas e eventos de storage para impedir que uma aba continue com credenciais antigas;
+- a renovação usa lock entre abas e eventos de storage; o logout publica um marcador antes e depois do `signOut` para impedir persistência tardia durante reidratação;
 - a Home continua sem o botão flutuante.
+
+Emissão e revogação usam transações. O documento da sessão registra somente a referência da família, a geração, a identidade técnica e a expiração; não carrega plano, VIP ou entitlement. Todos os consumidores server-side validam sessão e família pelo mesmo store. O `DELETE` é idempotente. Sessões legadas emitidas por código de e-mail preservam o contrato anterior e não recebem privilégios adicionais.
 
 Não há mudança de entitlement Premium nos controllers de relatório: a ampliação originalmente incluída na PR foi removida durante a auditoria. Se a mudança de sessão for separada em outra PR, a suíte funcional deve apontar para um Preview que contenha essa dependência.
 
@@ -60,6 +65,10 @@ O login registra `waitForResponse` para `POST /api/user-profile` antes do submit
 A falha de desktop observada no run `30766752729` não era uma corrida do listener: a validação do produto restringia a senha a letras e dígitos e barrava credenciais Firebase válidas com caractere especial antes de qualquer request. A política continua exigindo seis caracteres, letra e número, mas não limita o restante do alfabeto da senha. Em Mobile Chrome e WebKit, a causa comprovada foi a sobreposição do consentimento e, no WebKit, também a posição relativa ao header.
 
 As oito jornadas determinísticas também rodam no Preview com chamadas externas bloqueadas e APIs mutáveis simuladas. Somadas às sete jornadas reais, a suíte remota full possui exatamente 15 testes por projeto. As regressões autocontidas da fixture são exclusivas do ambiente local e não alteram essa matriz remota.
+
+A prova remota de isolamento emite um token A, renova a mesma família para o token B, exige A=`401` e B=`200`, faz logout usando B e então exige A=`401` e B=`401`. Os valores ficam restritos ao contexto autenticado e passam obrigatoriamente pelo redator; somente os status HTTP são retornados à asserção.
+
+O teste de percentuais exibidos usa um parser próprio de evidência, sem alterar a interface. Ele preserva sinal, identifica vírgula ou ponto decimal e valida agrupamentos de milhar antes da conversão. Assim, `20,91%` e `20.91%` são ambos `20.91`, nunca `2091`.
 
 ## Separação de confiança
 

@@ -222,9 +222,12 @@ export default function LoginButton() {
     const handleLogout = async () => {
         const walletEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
         const walletToken = window.localStorage.getItem(WALLET_SESSION_KEY) || "";
-        markWalletLogout();
-        window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
-        window.dispatchEvent(new Event("wallet-session-updated"));
+        const publishLogout = () => {
+            markWalletLogout();
+            window.dispatchEvent(new Event(WALLET_SESSION_UPDATED_EVENT));
+            window.dispatchEvent(new Event("wallet-session-updated"));
+        };
+        publishLogout();
         if (walletEmail && walletToken) {
             await fetch("/api/wallet/session/firebase", {
                 method: "DELETE",
@@ -233,6 +236,7 @@ export default function LoginButton() {
             }).catch(() => undefined);
         }
         await signOut(auth).catch(() => undefined);
+        publishLogout();
         setUser(null);
         setMessage("");
     };

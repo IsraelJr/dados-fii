@@ -19,7 +19,9 @@ Arquivos e áreas alterados:
 - runner privilegiado imutável em `functional-qa-runner.yml`, com três secrets obrigatórios mapeados nominalmente pelo dispatcher;
 - política de origem e setup isolado do cookie de bypass da Vercel;
 - cliente de sessão com renovação após ausência, expiração ou `401`, coordenação entre abas e logout propagado;
-- testes arquiteturais e de política de sessão;
+- família server-side de sessão com geração monotônica, revogação atômica e validação centralizada;
+- parser localizado de percentuais exibidos, sem alteração da formatação do produto;
+- testes arquiteturais, de política de sessão, concorrência e parser;
 - relógio `asOf` determinístico para derivados de dividendos, com regressões de fevereiro e da virada dezembro/janeiro;
 - documentação operacional, governança e este relatório.
 
@@ -33,6 +35,8 @@ Testes Node:
 - sentinela recursivo de `.trace`, `.network`, HAR, cookies, headers, storage e ZIP aninhado;
 - competências encerradas em janeiro, fevereiro e virada dezembro/janeiro;
 - duração de 12 horas, expiração, revogação lógica e isolamento por e-mail/token.
+- geração monotônica A/B, revogação da família, logout idempotente, novo login, corrida de renovação/logout e múltiplas abas;
+- percentuais com vírgula ou ponto decimal, sinais e agrupamentos de milhar válidos e inválidos.
 
 Jornadas Playwright remotas:
 
@@ -74,14 +78,14 @@ O usuário deve ser Firebase verificado, exclusivo de QA, ausente de `ADMIN_EMAI
 | Teste sentinela de artefatos | aprovado |
 | TypeScript | aprovado |
 | ESLint | aprovado, zero warnings |
-| `test:all` | aprovado: 628/628 |
+| `test:all` | aprovado: 654/654 |
 | Firestore Rules | aprovado: 3/3 no Emulator |
 | Cobertura crítica | aprovado: 100% linhas, 93,66% branches, 98,53% funções |
 | Mutation sanity | aprovado |
 | Build | aprovado com Firebase sintético em memória |
 | HTTP smoke | aprovado: 200/400/401/403/404/405/503 e headers defensivos |
-| Secret scan | aprovado: 649 arquivos versionados |
-| E2E local | 30 descobertos: 16 aprovados em Desktop Chromium e Mobile Chrome; 14 remotos ignorados sem `E2E_BASE_URL` |
+| Secret scan | aprovado: 654 arquivos versionados |
+| E2E local | aprovado: 30 casos em Desktop Chromium e Mobile Chrome; 14 casos remotos ignorados sem `E2E_BASE_URL` |
 | E2E Preview real | run `30758552638`: preflight, sentinela e instalação Chromium/WebKit aprovados; bloqueado antes do login porque a Vercel recusou o bypass recebido |
 
 A validação nova incluiu 17 testes direcionados de arquitetura, origem, renovação, falha, logout e múltiplas abas. A bateria completa passou sem retry. O primeiro build local falhou pela ausência intencional de configuração Firebase; a repetição com a mesma credencial sintética e as mesmas variáveis públicas usadas pela CI oficial passou.
@@ -93,6 +97,29 @@ Na rodada da decisão por Repository secrets, os testes diretamente afetados pas
 O run novo `30758552638`, no HEAD `d7030611676effb2d2d66b3fa56e458470815163`, comprovou a entrega dos três Repository secrets: o preflight passou, o sentinela passou e Chromium/WebKit foram instalados. A inicialização segura recebeu redirecionamento para o SSO da Vercel, em vez do cookie `_vercel_jwt`; assim, nenhum teste, login ou cleanup autenticado iniciou. A falha publicou o gate vermelho corretamente.
 
 A auditoria independente do artefato dessa falha expandiu o ZIP base64 interno do relatório HTML e encontrou uma categoria de e-mail que o redator anterior não alcançava. O artefato remoto `8836716154` foi removido de forma irreversível; o run permanece como registro. O redator e o sentinela agora expandem também o HTML Playwright, e a reaplicação local ao mesmo relatório retornou zero categorias sensíveis.
+
+### Correção limitada de 03/08/2026 — família de sessão e parser de percentuais
+
+O full remoto `30829752223` comprovou uma falha funcional e de segurança: o logout removia somente o documento do token observado naquele instante. Como cada rota protegida validava isoladamente o documento de `WalletSessions`, um token anterior da mesma sequência continuava autorizado depois que o token renovado era revogado. O smoke `30830301466` também comprovou fragilidade do teste de fundos: o parser apagava todos os pontos antes da conversão e transformava um valor com ponto decimal, como `20.91%`, em `2091`.
+
+A política escolhida cria `WalletSessionFamilies` server-side. A família é vinculada ao `uid` e ao `auth_time` do ID token validado pelo Firebase. Em uma transação, cada emissão incrementa `currentGeneration` e grava a geração no documento aleatório da sessão. A validação centralizada exige família ativa, mesma identidade, validade temporal, geração corrente e respeito a `revokedBeforeGeneration`. Outra transação torna o logout idempotente e revoga a família inteira. Depois disso, A, B e qualquer geração da mesma família retornam `401`; nova autenticação com novo `auth_time` cria família independente, e token antigo não a revoga. Nenhum campo de plano, VIP ou entitlement é aceito ou persistido nesse mecanismo.
+
+O cliente mantém o lock e a coordenação entre abas. O marcador de logout é publicado antes e depois do `signOut`, impedindo que uma resposta iniciada antes ou durante a reidratação volte a persistir sessão local. A implementação não registra e-mail, token, conteúdo de headers nem identificadores derivados.
+
+O parser de evidência passou a tratar sinal, espaços, símbolo `%`, separador decimal e agrupamentos localizados de forma explícita. A interface e seus valores não foram alterados. As regressões cobrem `20,91%`, `20.91%`, valores negativos e positivos, milhar pt-BR/internacional e formatos inválidos.
+
+Evidência local desta correção no worktree limpo de dados sensíveis:
+
+- ESLint e TypeScript: aprovados;
+- política, concorrência, múltiplas abas, arquitetura e parser: 32/32;
+- `test:all`: 654/654;
+- Firestore Rules: 3/3 com JDK 21;
+- cobertura crítica: 100% linhas, 93,66% branches e 98,53% funções;
+- mutation, build, HTTP smoke e auditoria de produção: aprovados;
+- sentinela de redação: 1/1; secret scan: 654 arquivos;
+- E2E local: 30 aprovados, com 14 jornadas remotas corretamente ignoradas sem Preview e credenciais.
+
+O novo smoke e o full remoto permanecem pendentes até a publicação do HEAD imutável. Nenhuma aprovação remota é inferida desta evidência local.
 
 ## Riscos restantes
 
@@ -134,6 +161,7 @@ Resultados locais desta etapa:
 O resultado remoto final desta correção ainda depende de um novo Functional QA Preview full no HEAD publicado. A recomendação permanece negativa até 15/15 passarem nos três projetos e login, persistência, logout, renovação, isolamento e cleanup serem comprovados.
 
 - A PR ainda contém alteração funcional de autenticação/sessão para todos os usuários; idealmente ela seria revisada ou separada antes do merge.
+- `WalletSessionFamilies` acumula um documento por autenticação Firebase; a limpeza operacional desse histórico não participa desta correção e deve ser acompanhada como custo de armazenamento, sem efeito na validade das sessões.
 - A entrega dos três Repository secrets, o Automation Bypass vigente, a emissão de `_vercel_jwt` e o acesso ao Preview protegido já foram comprovados. A jornada autenticada corrigida ainda precisa ser repetida no runner remoto antes de qualquer recomendação positiva.
 - `Functional QA Preview` ainda não está comprovado como required check de `main`.
 - Vídeo é um formato binário e não pode ser redigido depois; a proteção depende da máscara visual instalada antes de qualquer preenchimento. O teste verifica a máscara, mas a execução real de Preview ainda é obrigatória.

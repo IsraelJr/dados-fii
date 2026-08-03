@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,12 +32,6 @@ function isEmail(value: string) {
 
 function stripAccents(value: string) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function isExpired(value: any) {
-  if (!value) return true;
-  const date = typeof value.toDate === "function" ? value.toDate() : new Date(value);
-  return !date || Number.isNaN(date.getTime()) || date.getTime() < Date.now();
 }
 
 function currentMonthKey() {
@@ -264,14 +259,7 @@ function pieSlicePath(cx: number, cy: number, radius: number, startAngle: number
 }
 
 async function hasSession(email: string, token: unknown) {
-  const sessionToken = String(token || "");
-  if (!sessionToken) return false;
-
-  const snap = await adminDb.collection("WalletSessions").doc(sha256(`${email}:${sessionToken}`)).get();
-  if (!snap.exists) return false;
-
-  const data = snap.data() || {};
-  return data.email === email && !isExpired(data.expiresAt);
+  return walletSessionStore.verify(email, token);
 }
 
 async function findUserByEmail(email: string) {

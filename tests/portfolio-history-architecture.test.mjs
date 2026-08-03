@@ -49,7 +49,7 @@ test("identidade por e-mail exige sessão validada e cookie anônimo exige usuá
   assert.match(policy, /WalletSessions/);
   assert.match(policy, /createHash\("sha256"\).*`\$\{normalizeWalletSessionEmail\(email\)\}:\$\{token\}`/s);
   assert.match(policy, /walletSessionIsExpired\(session\.expiresAt, nowMs\)/);
-  assert.match(body, /walletSessionMatches\(sessionData, email\)/);
+  assert.match(body, /walletSessionStore\.verify\(email, token\)/);
   assert.match(body, /cookieStore\.get\("anonId"\)/);
   assert.match(body, /USER_NOT_FOUND/);
 });

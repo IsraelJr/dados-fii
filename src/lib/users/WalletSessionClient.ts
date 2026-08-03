@@ -52,7 +52,10 @@ export function clearWalletSession(storage: StorageLike = browserStorage()) {
 }
 
 export function markWalletLogout(storage: StorageLike = browserStorage()) {
-  storage.setItem(WALLET_SESSION_LOGOUT_KEY, new Date().toISOString());
+  const entropy = typeof globalThis.crypto?.randomUUID === "function"
+    ? globalThis.crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+  storage.setItem(WALLET_SESSION_LOGOUT_KEY, `${new Date().toISOString()}:${entropy}`);
   clearWalletSession(storage);
 }
 
@@ -94,6 +97,7 @@ async function exchangeFirebaseToken(
 ) {
   const email = String(user.email || "").trim().toLowerCase();
   if (!email) throw new Error("Usuário Firebase sem e-mail válido.");
+  const logoutMarker = storage.getItem(WALLET_SESSION_LOGOUT_KEY);
   const idToken = await user.getIdToken(true);
   const response = await fetcher("/api/wallet/session/firebase", {
     method: "POST",
@@ -105,6 +109,10 @@ async function exchangeFirebaseToken(
   });
   const payload = await response.json().catch(() => ({})) as WalletSessionPayload;
   if (!response.ok) throw new Error("Falha ao renovar a sessão segura da carteira.");
+  const latestLogoutMarker = storage.getItem(WALLET_SESSION_LOGOUT_KEY);
+  if (latestLogoutMarker && latestLogoutMarker !== logoutMarker) {
+    throw new Error("Logout ocorreu durante a renovação da sessão.");
+  }
   persistWalletSession(storage, email, payload);
   notify();
   return true;

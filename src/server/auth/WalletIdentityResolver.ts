@@ -2,10 +2,8 @@ import { cookies } from "next/headers";
 import { adminDb } from "@/lib/firebaseAdmin";
 import {
   normalizeWalletSessionEmail,
-  WALLET_SESSION_COLLECTION,
-  walletSessionDocumentId,
-  walletSessionMatches,
 } from "@/server/auth/WalletSessionPolicy";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 const USER_COLLECTION = "User";
 
 export type WalletIdentity = Readonly<{
@@ -42,12 +40,7 @@ async function resolveEmailSession(request: Request): Promise<WalletIdentity | n
     throw new WalletIdentityError(401, "WALLET_SESSION_REQUIRED", "Sessão da carteira inválida.");
   }
 
-  const session = await adminDb.collection(WALLET_SESSION_COLLECTION).doc(walletSessionDocumentId(email, token)).get();
-  if (!session.exists) {
-    throw new WalletIdentityError(401, "WALLET_SESSION_REQUIRED", "Sessão da carteira inválida.");
-  }
-  const sessionData = session.data() || {};
-  if (!walletSessionMatches(sessionData, email)) {
+  if (!await walletSessionStore.verify(email, token)) {
     throw new WalletIdentityError(401, "WALLET_SESSION_REQUIRED", "Sessão da carteira expirada.");
   }
 

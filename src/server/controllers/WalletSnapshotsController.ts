@@ -1,5 +1,4 @@
 // Controlador de aplicação; o Route Handler permanece sem acesso à persistência.
-import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminDb } from "@/lib/firebaseAdmin";
@@ -7,13 +6,10 @@ import {
   walletSnapshotNumber,
   type WalletSnapshotRecord,
 } from "@/lib/walletHistory";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function hash(value: string) {
-  return createHash("sha256").update(value).digest("hex");
-}
 
 function emailOf(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -23,21 +19,8 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function isExpired(value: unknown) {
-  if (!value) return true;
-  const date = typeof (value as { toDate?: unknown }).toDate === "function"
-    ? (value as { toDate(): Date }).toDate()
-    : new Date(value as string | number | Date);
-  return Number.isNaN(date.getTime()) || date.getTime() < Date.now();
-}
-
 async function hasSession(email: string, token: unknown) {
-  const sessionToken = String(token || "");
-  if (!sessionToken) return false;
-  const snapshot = await adminDb.collection("WalletSessions").doc(hash(`${email}:${sessionToken}`)).get();
-  if (!snapshot.exists) return false;
-  const data = snapshot.data() || {};
-  return data.email === email && !isExpired(data.expiresAt);
+  return walletSessionStore.verify(email, token);
 }
 
 async function findUserByEmail(email: string) {

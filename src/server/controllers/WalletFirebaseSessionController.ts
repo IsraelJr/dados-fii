@@ -1,13 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebaseAdmin";
 import { walletIdentityService } from "@/lib/users/WalletIdentityService";
 import {
   normalizeWalletSessionEmail,
-  WALLET_SESSION_COLLECTION,
-  walletSessionDocumentId,
   walletSessionExpiration,
 } from "@/server/auth/WalletSessionPolicy";
+import {
+  WalletSessionFamilyRevokedError,
+} from "@/server/auth/WalletSessionStore";
+import { walletSessionStore } from "@/server/auth/FirebaseWalletSessionStore";
 
 export async function POST(request: NextRequest) {
   const authorization = await walletIdentityService.require(request);
@@ -21,13 +22,23 @@ export async function POST(request: NextRequest) {
   const token = randomBytes(32).toString("base64url");
   const email = authorization.identity.email;
   const expiresAt = walletSessionExpiration();
-  await adminDb.collection(WALLET_SESSION_COLLECTION).doc(walletSessionDocumentId(email, token)).set({
-    email,
-    uid: authorization.identity.uid,
-    source: "firebase",
-    createdAt: new Date(),
-    expiresAt,
-  });
+  try {
+    await walletSessionStore.issueFirebaseSession({
+      email,
+      uid: authorization.identity.uid || "",
+      firebaseAuthTime: authorization.identity.firebaseAuthTime || 0,
+      token,
+      expiresAt,
+    });
+  } catch (error) {
+    if (error instanceof WalletSessionFamilyRevokedError) {
+      return NextResponse.json({ ok: false, error: "Faça login novamente para iniciar uma nova sessão." }, {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+    throw error;
+  }
 
   return NextResponse.json({
     ok: true,
@@ -46,11 +57,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Sessão da carteira inválida." }, { status: 400 });
   }
 
-  const reference = adminDb.collection(WALLET_SESSION_COLLECTION).doc(walletSessionDocumentId(email, token));
-  const snapshot = await reference.get();
-  if (snapshot.exists && normalizeWalletSessionEmail(snapshot.data()?.email) === email) {
-    await reference.delete();
-  }
+  await walletSessionStore.revokeFamily(email, token);
 
   return NextResponse.json({ ok: true }, {
     headers: { "Cache-Control": "no-store" },

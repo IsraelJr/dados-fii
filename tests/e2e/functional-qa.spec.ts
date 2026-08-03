@@ -9,6 +9,7 @@ import {
   test,
 } from "./fixtures";
 import type { Page } from "@playwright/test";
+import { parseDisplayedPercentage } from "./support/parse-displayed-percentage";
 import {
   closedQaDividendMonths,
   saoPauloCalendarPeriod,
@@ -230,20 +231,67 @@ test("@preview @full usuário de QA não é admin e sessão não aceita identida
     clientEscalationStatus: 401,
   });
 
-  const revoked = await page.evaluate(() => ({
-    email: window.localStorage.getItem("dados-fii-wallet-email") || "",
-    token: window.localStorage.getItem("dados-fii-wallet-session") || "",
-  }));
+  const generations = await page.evaluate(async (firebaseToken) => {
+    const email = window.localStorage.getItem("dados-fii-wallet-email") || "";
+    const tokenA = window.localStorage.getItem("dados-fii-wallet-session") || "";
+    const renewal = await fetch("/api/wallet/session/firebase", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${firebaseToken}` },
+    });
+    const payload = await renewal.json() as { token?: string; expiresAt?: string };
+    const tokenB = payload.token || "";
+    const statusFor = (token: string) => new Promise<number>((resolve) => {
+      const request = new XMLHttpRequest();
+      request.open("GET", "/api/portfolio/history?portfolioId=default");
+      request.setRequestHeader("x-wallet-email", email);
+      request.setRequestHeader("x-wallet-session", token);
+      request.onload = () => resolve(request.status);
+      request.onerror = () => resolve(0);
+      request.send();
+    });
+
+    window.sessionStorage.setItem("dados-fii-e2e-family-email", email);
+    window.sessionStorage.setItem("dados-fii-e2e-family-token-a", tokenA);
+    window.sessionStorage.setItem("dados-fii-e2e-family-token-b", tokenB);
+    window.localStorage.setItem("dados-fii-wallet-session", tokenB);
+    window.localStorage.setItem("dados-fii-wallet-session-expires-at", payload.expiresAt || "");
+
+    return {
+      renewalStatus: renewal.status,
+      tokenAStatus: await statusFor(tokenA),
+      tokenBStatus: await statusFor(tokenB),
+    };
+  }, idToken);
+  expect(generations).toEqual({
+    renewalStatus: 200,
+    tokenAStatus: 401,
+    tokenBStatus: 200,
+  });
+
   await logoutWallet(page);
-  const revokedStatus = await page.evaluate(async (identity) => (
-    fetch("/api/portfolio/history?portfolioId=default", {
-      headers: {
-        "x-wallet-email": identity.email,
-        "x-wallet-session": identity.token,
-      },
-    }).then((response) => response.status)
-  ), revoked);
-  expect(revokedStatus).toBe(401);
+  const revokedStatuses = await page.evaluate(async () => {
+    const email = window.sessionStorage.getItem("dados-fii-e2e-family-email") || "";
+    const tokenA = window.sessionStorage.getItem("dados-fii-e2e-family-token-a") || "";
+    const tokenB = window.sessionStorage.getItem("dados-fii-e2e-family-token-b") || "";
+    const statusFor = (token: string) => new Promise<number>((resolve) => {
+      const request = new XMLHttpRequest();
+      request.open("GET", "/api/portfolio/history?portfolioId=default");
+      request.setRequestHeader("x-wallet-email", email);
+      request.setRequestHeader("x-wallet-session", token);
+      request.onload = () => resolve(request.status);
+      request.onerror = () => resolve(0);
+      request.send();
+    });
+    const statuses = {
+      tokenAStatus: await statusFor(tokenA),
+      tokenBStatus: await statusFor(tokenB),
+    };
+    window.sessionStorage.removeItem("dados-fii-e2e-family-email");
+    window.sessionStorage.removeItem("dados-fii-e2e-family-token-a");
+    window.sessionStorage.removeItem("dados-fii-e2e-family-token-b");
+    return statuses;
+  });
+  expect(revokedStatuses).toEqual({ tokenAStatus: 401, tokenBStatus: 401 });
 });
 
 test("@critical carteira mantém cards, gráfico, rede e persistência sincronizados", async ({ page }) => {
@@ -329,10 +377,11 @@ test("@smoke @critical consulta de fundos trata ticker válido, ausente, inváli
 
   await page.goto("/fii/TGAR11");
   await expect(page.getByRole("heading", { name: /TGAR11: preço, dividendos, DY e P\/VP/ })).toBeVisible();
-  const percentages = (await page.locator("body").innerText()).match(/-?\d+(?:[.,]\d+)?%/g) || [];
+  const percentages = (await page.locator("body").innerText()).match(/[+-]?\s*\d+(?:[.,]\d+)?\s*%/g) || [];
   for (const percentage of percentages) {
-    const parsed = Number(percentage.replace("%", "").replace(/\./g, "").replace(",", "."));
-    expect(Math.abs(parsed)).toBeLessThanOrEqual(1_000);
+    const parsed = parseDisplayedPercentage(percentage);
+    expect(parsed, `Percentual exibido em formato inválido: ${percentage}`).not.toBeNull();
+    expect(Math.abs(parsed!)).toBeLessThanOrEqual(1_000);
   }
 
   await page.goto("/fii/ZZZZ11");
