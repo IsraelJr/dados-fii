@@ -36,6 +36,7 @@ A PR mantém, por dependência direta da jornada, uma alteração de autenticaç
 - uma autenticação Firebase explícita posterior cria outra família, e um token da família antiga não pode revogá-la;
 - a expiração ou um `401` autenticado força nova troca de ID token; falha de renovação limpa a sessão e volta a exibir Login;
 - a renovação usa lock entre abas e eventos de storage; o logout publica um marcador antes e depois do `signOut` para impedir persistência tardia durante reidratação;
+- o observador de `401` captura a sessão realmente enviada no instante de cada requisição; uma resposta tardia de uma geração substituída não pode invalidar a geração corrente nem provocar renovações em cascata;
 - a Home continua sem o botão flutuante.
 
 Emissão e revogação usam transações. O documento da sessão registra somente a referência da família, a geração, a identidade técnica e a expiração; não carrega plano, VIP ou entitlement. Todos os consumidores server-side validam sessão e família pelo mesmo store. O `DELETE` é idempotente. Sessões legadas emitidas por código de e-mail preservam o contrato anterior e não recebem privilégios adicionais.

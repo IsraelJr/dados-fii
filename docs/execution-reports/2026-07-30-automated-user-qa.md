@@ -111,15 +111,21 @@ O parser de evidência passou a tratar sinal, espaços, símbolo `%`, separador 
 Evidência local desta correção no worktree limpo de dados sensíveis:
 
 - ESLint e TypeScript: aprovados;
-- política, concorrência, múltiplas abas, arquitetura e parser: 32/32;
-- `test:all`: 654/654;
+- política, concorrência, múltiplas abas, arquitetura e parser: 30/30 no agrupamento focado atual;
+- `test:all`: 655/655;
 - Firestore Rules: 3/3 com JDK 21;
 - cobertura crítica: 100% linhas, 93,66% branches e 98,53% funções;
 - mutation, build, HTTP smoke e auditoria de produção: aprovados;
 - sentinela de redação: 1/1; secret scan: 659 arquivos;
-- E2E local: 30 aprovados, com 14 jornadas remotas corretamente ignoradas sem Preview e credenciais.
+- E2E local: 45 aprovados, 15 por projeto, com 21 jornadas remotas corretamente ignoradas sem Preview e credenciais; Desktop Chromium, Mobile Chrome e Mobile Safari/WebKit concluíram com exit code zero e `workers=1`.
 
-O novo smoke e o full remoto permanecem pendentes até a publicação do HEAD imutável. Nenhuma aprovação remota é inferida desta evidência local.
+O HEAD imutável `1a30fb474a04ccf1eeaad639e2e52d1730f1aa3f` foi publicado e o run crítico `30833831080` comprovou resolução do deployment, preflight, Automation Bypass, instalação de Chromium/WebKit, descoberta de 21 testes críticos, execução serial e redação fail-closed. O resultado foi vermelho: 3 falhas, 2 flaky, 4 aprovados e 12 interrompidos pelo limite de falhas. O smoke manual e o full não foram disparados, preservando a ordem fail-closed.
+
+A causa raiz adicional foi uma corrida no observador cliente de `401`. Ele identificava o token rejeitado lendo o `localStorage` somente depois da resposta. Se uma requisição enviada com A retornasse `401` após outra aba ou requisição já ter persistido B, o callback tratava B como rejeitado e emitia C. Respostas antigas subsequentes repetiam o avanço de geração até a UI perder a sessão. A correção captura o header `x-wallet-session` no despacho da requisição e associa a resposta exclusivamente àquela geração. Uma regressão determinística atrasa o `401` de A, avança o storage para B e comprova que somente A é informado ao renovador.
+
+A auditoria recursiva do artefato redigido `8864104024` expandiu os ZIPs e o relatório HTML e retornou zero e-mails, JWTs, Bearer tokens, campos de senha, valores monetários capturados e headers sensíveis não redigidos. As screenshots dos três projetos mantiveram as regiões de credenciais sob máscara. O artefato foi preservado como evidência redigida da falha; nenhum valor de secret foi impresso.
+
+O próximo smoke e o full remoto permanecem condicionados à publicação da cadeia imutável com essa correção. Nenhuma aprovação remota é inferida da execução vermelha.
 
 ## Riscos restantes
 
@@ -150,13 +156,12 @@ Regressões adicionadas:
 - senha Firebase com letra, número e caractere especial;
 - contrato arquitetural proibindo `waitForRequest` exclusivo e `force: true` na jornada.
 
-Resultados locais desta etapa:
+Resultados locais desta etapa, substituídos pela rodada completa de 03/08:
 
-- fixture: 12/12 em Desktop Chromium e Mobile Chrome;
-- suíte local completa nesses dois projetos: 28 aprovados e 14 jornadas remotas ignoradas por ausência deliberada de credenciais locais;
+- fixture e jornadas determinísticas: 15/15 em cada um de Desktop Chromium, Mobile Chrome e Mobile Safari/WebKit;
+- suíte local completa: 45 aprovados e 21 jornadas remotas ignoradas por ausência deliberada de credenciais locais;
 - descoberta remota: 45 casos, exatamente 15 por projeto, sem ignorar as oito jornadas determinísticas;
-- Mobile Safari local: WebKit instalado, mas a build congelada do host falhou antes de criar a página com `Unknown setting: PushAPIEnabled`; nenhuma jornada WebKit foi considerada aprovada localmente;
-- TypeScript, ESLint e 16 testes focados de arquitetura/política: aprovados.
+- TypeScript, ESLint e 30 testes focados de arquitetura, política, concorrência e parser: aprovados.
 
 O resultado remoto final desta correção ainda depende de um novo Functional QA Preview full no HEAD publicado. A recomendação permanece negativa até 15/15 passarem nos três projetos e login, persistência, logout, renovação, isolamento e cleanup serem comprovados.
 

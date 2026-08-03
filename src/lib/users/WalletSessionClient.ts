@@ -157,12 +157,18 @@ function walletAuthenticatedRequest(input: RequestInfo | URL, init?: RequestInit
   return /^\/api\/(?:portfolio\/|wallet(?:\/|-)|product\/events|user-notifications)/.test(url.pathname);
 }
 
+function walletSessionTokenAtRequest(input: RequestInfo | URL, init?: RequestInit) {
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+  return String(headers.get("x-wallet-session") || window.localStorage.getItem(WALLET_SESSION_KEY) || "");
+}
+
 export function installWalletUnauthorizedObserver(onUnauthorized: (rejectedToken: string) => void) {
   const originalFetch = window.fetch.bind(window);
   const observedFetch: typeof window.fetch = async (input, init) => {
+    const authenticatedRequest = walletAuthenticatedRequest(input, init);
+    const rejectedToken = authenticatedRequest ? walletSessionTokenAtRequest(input, init) : "";
     const response = await originalFetch(input, init);
-    if (response.status === 401 && walletAuthenticatedRequest(input, init)) {
-      const rejectedToken = String(window.localStorage.getItem(WALLET_SESSION_KEY) || "");
+    if (response.status === 401 && authenticatedRequest && rejectedToken) {
       queueMicrotask(() => onUnauthorized(rejectedToken));
     }
     return response;

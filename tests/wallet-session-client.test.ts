@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   clearWalletSession,
   ensureWalletSession,
+  installWalletUnauthorizedObserver,
   markWalletLogout,
   WALLET_EMAIL_KEY,
   WALLET_SESSION_EXPIRES_AT_KEY,
@@ -99,6 +100,52 @@ test("401 força renovação, mas reutiliza a sessão que outra aba já renovou"
     nowMs: now,
   }), true);
   assert.equal(exchanges, 0);
+});
+
+test("401 tardio identifica o token enviado, não a geração corrente", async () => {
+  const storage = memoryStorage({ [WALLET_SESSION_KEY]: "token-a" });
+  let releaseResponse!: () => void;
+  let signalRequestStarted!: () => void;
+  const responseReady = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  const requestStarted = new Promise<void>((resolve) => {
+    signalRequestStarted = resolve;
+  });
+  const previousWindow = typeof window === "undefined" ? undefined : window;
+  const browser = {
+    location: { origin: "https://qa.example.test" },
+    localStorage: storage,
+    fetch: async () => {
+      signalRequestStarted();
+      await responseReady;
+      return response({ ok: false }, 401);
+    },
+  };
+  Object.defineProperty(globalThis, "window", { configurable: true, value: browser, writable: true });
+
+  try {
+    const rejected: string[] = [];
+    const remove = installWalletUnauthorizedObserver((token) => rejected.push(token));
+    const pending = window.fetch("/api/portfolio/history?portfolioId=default", {
+      headers: { "x-wallet-session": "token-a" },
+    });
+    await requestStarted;
+    storage.setItem(WALLET_SESSION_KEY, "token-b");
+    releaseResponse();
+    await pending;
+    await Promise.resolve();
+
+    assert.deepEqual(rejected, ["token-a"]);
+    assert.equal(storage.getItem(WALLET_SESSION_KEY), "token-b");
+    remove();
+  } finally {
+    if (previousWindow) {
+      Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow, writable: true });
+    } else {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+  }
 });
 
 test("duas abas no mesmo contexto compartilham uma única renovação", async () => {
