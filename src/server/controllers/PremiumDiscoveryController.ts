@@ -24,14 +24,6 @@ function unavailable() {
   }, { status: 503, headers: { "Cache-Control": "private, no-store" } });
 }
 
-function authorizationError(result: Awaited<ReturnType<typeof resolvePremiumRequestIdentity>>) {
-  if (result.ok) return null;
-  return NextResponse.json({ ok: false, error: result.error }, {
-    status: result.status,
-    headers: { "Cache-Control": "private, no-store" },
-  });
-}
-
 function discoveryEntitlement(identity: PremiumIdentity | null): PremiumDiscoveryEntitlement {
   if (!identity) return null;
   if (identity.role === "admin") return { access: "owner" };
@@ -39,23 +31,30 @@ function discoveryEntitlement(identity: PremiumIdentity | null): PremiumDiscover
   return { access: "premium" };
 }
 
-async function context(request: NextRequest) {
+async function resolveContext(request: NextRequest) {
   const verified = await resolvePremiumRequestIdentity(request);
-  const error = authorizationError(verified);
-  if (error || !verified.ok) return { error } as const;
+  if (!verified.ok) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ ok: false, error: verified.error }, {
+        status: verified.status,
+        headers: { "Cache-Control": "private, no-store" },
+      }),
+    };
+  }
   const entitlement = await resolvePremiumEntitlement(verified.identity);
   return {
-    error: null,
+    ok: true as const,
     subject: { uid: verified.identity.uid, email: verified.identity.email },
     entitlement: discoveryEntitlement(entitlement),
-  } as const;
+  };
 }
 
 export async function GET(request: NextRequest) {
   if (!featureEnabled("ENABLE_PREMIUM_DISCOVERY", false)) return unavailable();
   try {
-    const resolved = await context(request);
-    if (resolved.error) return resolved.error;
+    const resolved = await resolveContext(request);
+    if (!resolved.ok) return resolved.response;
     const origin = createPremiumDiscoveryRequest({
       origin: request.nextUrl.searchParams.get("origin") || "premium_page",
       motivation: "portfolio_analysis",
@@ -75,8 +74,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!featureEnabled("ENABLE_PREMIUM_DISCOVERY", false)) return unavailable();
   try {
-    const resolved = await context(request);
-    if (resolved.error) return resolved.error;
+    const resolved = await resolveContext(request);
+    if (!resolved.ok) return resolved.response;
     const body = await request.json().catch(() => ({}));
     const discoveryRequest = createPremiumDiscoveryRequest(body);
     const status = await service.requestAccess(resolved.subject, resolved.entitlement, discoveryRequest);
