@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
@@ -9,10 +9,13 @@ import {
   CircleAlert,
   Info,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import {
+  buildPortfolioIntelligenceAIFallback,
   buildPortfolioIntelligencePresentation,
   visiblePortfolioIntelligenceSignals,
+  type PortfolioIntelligenceAIExplanation,
   type PortfolioIntelligenceResult,
   type PortfolioIntelligenceSignalView,
 } from "@/lib/portfolio-intelligence";
@@ -58,6 +61,54 @@ function SignalCard({ signal }: { signal: PortfolioIntelligenceSignalView }) {
   );
 }
 
+function isExplanation(value: unknown): value is PortfolioIntelligenceAIExplanation {
+  if (!value || typeof value !== "object") return false;
+  const explanation = value as Partial<PortfolioIntelligenceAIExplanation>;
+  return (explanation.mode === "ai" || explanation.mode === "deterministic_fallback")
+    && typeof explanation.headline === "string"
+    && typeof explanation.summary === "string"
+    && Array.isArray(explanation.keyPoints)
+    && Array.isArray(explanation.limitations)
+    && typeof explanation.disclaimer === "string";
+}
+
+function ExplanationCard({ explanation }: { explanation: PortfolioIntelligenceAIExplanation }) {
+  const isAi = explanation.mode === "ai";
+  return (
+    <section
+      aria-labelledby="portfolio-intelligence-explanation-title"
+      data-testid="portfolio-intelligence-explanation"
+      data-explanation-mode={explanation.mode}
+      className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-800 dark:bg-indigo-950/30"
+    >
+      <p className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wide text-indigo-700 dark:text-indigo-200">
+        <Sparkles size={14} aria-hidden="true" /> {isAi ? "Explicação por IA" : "Resumo determinístico"}
+      </p>
+      <h3 id="portfolio-intelligence-explanation-title" className="mt-2 text-lg font-black text-slate-950 dark:text-white">
+        {explanation.headline}
+      </h3>
+      <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">{explanation.summary}</p>
+      <ul aria-label="Pontos explicados" className="mt-3 grid gap-2 text-sm text-slate-700 dark:text-slate-200">
+        {explanation.keyPoints.map((item, index) => (
+          <li key={`${index}-${item}`} className="rounded-lg bg-white/75 px-3 py-2 ring-1 ring-black/5 dark:bg-slate-950/50 dark:ring-white/10">{item}</li>
+        ))}
+      </ul>
+      <div className="mt-4">
+        <h4 className="text-sm font-extrabold text-slate-950 dark:text-white">Limitações desta explicação</h4>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-600 dark:text-slate-300">
+          {explanation.limitations.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
+        </ul>
+      </div>
+      <p className="mt-4 border-t border-indigo-200 pt-3 text-xs font-semibold leading-5 text-slate-600 dark:border-indigo-800 dark:text-slate-300">
+        {explanation.disclaimer}
+      </p>
+      {explanation.metadata.cached && (
+        <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Explicação reutilizada do cache.</p>
+      )}
+    </section>
+  );
+}
+
 export function PortfolioIntelligenceLoading() {
   return (
     <section
@@ -81,8 +132,38 @@ export function PortfolioIntelligenceLoading() {
 
 export default function PortfolioIntelligencePanel({ result }: { result: PortfolioIntelligenceResult }) {
   const [expanded, setExpanded] = useState(false);
+  const [explanation, setExplanation] = useState<PortfolioIntelligenceAIExplanation | null>(null);
+  const [explanationLoading, setExplanationLoading] = useState(false);
   const presentation = useMemo(() => buildPortfolioIntelligencePresentation(result), [result]);
   const visibleSignals = visiblePortfolioIntelligenceSignals(presentation, expanded);
+
+  useEffect(() => {
+    setExplanation(null);
+    setExplanationLoading(false);
+  }, [result]);
+
+  async function explainWithAI() {
+    if (explanationLoading) return;
+    setExplanationLoading(true);
+    try {
+      if (presentation.state === "invalid" || result.dataQuality.state === "insufficient") {
+        setExplanation(buildPortfolioIntelligenceAIFallback(result, { fallbackReason: "insufficient_data" }));
+        return;
+      }
+      const response = await fetch("/api/portfolio/intelligence/explanation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ result }),
+      });
+      const payload = await response.json().catch(() => null) as { explanation?: unknown } | null;
+      if (!response.ok || !isExplanation(payload?.explanation)) throw new Error("invalid_explanation_response");
+      setExplanation(payload.explanation);
+    } catch {
+      setExplanation(buildPortfolioIntelligenceAIFallback(result, { fallbackReason: "client_request_failed" }));
+    } finally {
+      setExplanationLoading(false);
+    }
+  }
 
   return (
     <section
@@ -124,6 +205,26 @@ export default function PortfolioIntelligencePanel({ result }: { result: Portfol
       >
         {presentation.stateMessage}
       </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void explainWithAI()}
+          disabled={explanationLoading}
+          aria-describedby="portfolio-intelligence-ai-help"
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-extrabold text-white outline-none hover:bg-indigo-800 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+        >
+          {explanationLoading
+            ? <Loader2 className="motion-safe:animate-spin" size={17} aria-hidden="true" />
+            : <Sparkles size={17} aria-hidden="true" />}
+          {explanationLoading ? "Explicando..." : explanation?.mode === "deterministic_fallback" ? "Tentar explicação por IA novamente" : "Explicar com IA"}
+        </button>
+        <p id="portfolio-intelligence-ai-help" className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+          A IA recebe somente os sinais e métricas já calculados. Nenhum número é recalculado.
+        </p>
+      </div>
+
+      {explanation && <ExplanationCard explanation={explanation} />}
 
       <div className="mt-6">
         <h3 className="text-base font-black text-slate-950 dark:text-white">Sinais prioritários</h3>
