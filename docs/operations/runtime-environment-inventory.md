@@ -78,6 +78,7 @@
 - `ENABLE_WALLET_RISK_REPORT_AUTOMATIC`
 - `ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK`
 - `ENABLE_PREMIUM_DISCOVERY`: habilita a proposta e a lista de interesse; o código falha fechado quando ausente ou falso. Rollback: definir `false` sem remover entitlements Premium existentes.
+- `ENABLE_INCREMENTAL_PORTFOLIO_REPORT`: habilita a comparação server-side com a última referência válida. Padrão operacional: habilitado quando ausente. Rollback: definir `false`; a rota retorna indisponibilidade sem apagar referências ou dados da carteira. Owner: produto/engenharia. Ambientes: preview e produção. Condição de remoção: após estabilização da PV-4 e substituição por configuração persistida, caso aprovada.
 
 ## Runtime e deployment
 
