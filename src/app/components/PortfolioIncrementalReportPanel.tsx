@@ -18,6 +18,7 @@ import type {
   PortfolioIncrementalComparison,
   PortfolioIntelligenceResult,
 } from "@/lib/portfolio-intelligence";
+import PortfolioIncrementalExplanationPanel from "./PortfolioIncrementalExplanationPanel";
 
 const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
@@ -294,6 +295,10 @@ export default function PortfolioIncrementalReportPanel({ result }: { result: Po
               {expanded ? "Mostrar somente as principais" : `Ver todas as ${comparison.materialChanges.length} mudanças`}
             </button>
           )}
+          <PortfolioIncrementalExplanationPanel
+            key={`incremental-explanation:${comparison.current.fingerprint}`}
+            comparison={comparison}
+          />
         </div>
       )}
 
