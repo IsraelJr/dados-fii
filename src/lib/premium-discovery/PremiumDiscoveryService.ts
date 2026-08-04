@@ -1,5 +1,6 @@
 import {
   createPremiumDiscoveryEvent,
+  premiumDiscoveryAudience,
   premiumDiscoveryStatus,
   type PremiumDiscoveryAccess,
   type PremiumDiscoveryRequest,
@@ -36,14 +37,16 @@ export class PremiumDiscoveryService {
   ): Promise<PremiumDiscoveryStatus> {
     const access = entitlement?.access
       ?? (await this.repository.hasInterest(subject.uid) ? "requested" : "eligible");
+    const audience = premiumDiscoveryAudience(access);
+    const correlationId = this.correlationId();
     await this.repository.appendEvent(
       subject.uid,
-      createPremiumDiscoveryEvent("premium_discovery_viewed", origin, this.correlationId(), this.now()),
+      createPremiumDiscoveryEvent("premium_discovery_viewed", origin, audience, correlationId, this.now()),
     );
     if (access === "beta") {
       await this.repository.appendEvent(
         subject.uid,
-        createPremiumDiscoveryEvent("premium_beta_accessed", origin, this.correlationId(), this.now()),
+        createPremiumDiscoveryEvent("premium_beta_accessed", origin, audience, correlationId, this.now()),
       );
     }
     return premiumDiscoveryStatus(access, access === "requested");
@@ -66,7 +69,13 @@ export class PremiumDiscoveryService {
     });
     await this.repository.appendEvent(
       subject.uid,
-      createPremiumDiscoveryEvent("premium_interest_requested", request.origin, this.correlationId(), this.now()),
+      createPremiumDiscoveryEvent(
+        "premium_interest_requested",
+        request.origin,
+        "external",
+        this.correlationId(),
+        this.now(),
+      ),
     );
     return premiumDiscoveryStatus("requested", true);
   }
