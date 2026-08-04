@@ -76,7 +76,15 @@ test("manifest service remains pure and runtime composes its infrastructure depe
   assert.match(service, /new RegulatoryCache<FundSeoManifest>/);
   assert.match(service, /this\.rebuildPromise/);
   assert.doesNotMatch(service, /constructor\([^)]*private readonly/s);
-  assert.doesNotMatch(service, /fundSeoManifestRepository|regulatoryDataService|firebaseAdmin|adminDb/);
+  assert.doesNotMatch(
+    service,
+    /^import (?!type\b).*from ["']@\/lib\/regulatoryDataService["'];?$/m,
+  );
+  assert.doesNotMatch(
+    service,
+    /^import (?!type\b).*from ["']\.\/FundSeoManifestRepository["'];?$/m,
+  );
+  assert.doesNotMatch(service, /fundSeoManifestRepository|firebaseAdmin|adminDb/);
   assert.match(service, /import type \{ RegulatoryDataService \}/);
   assert.match(service, /import type \{ FundSeoManifestRepository \}/);
 
