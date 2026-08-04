@@ -52,9 +52,19 @@ function isoDate(value: unknown) {
   const normalized = text(value);
   if (!normalized) return null;
   const br = normalized.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  const date = br
-    ? new Date(Date.UTC(Number(br[3]), Number(br[2]) - 1, Number(br[1])))
-    : new Date(normalized);
+  if (br) {
+    const day = Number(br[1]);
+    const month = Number(br[2]);
+    const year = Number(br[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() !== year
+      || date.getUTCMonth() !== month - 1
+      || date.getUTCDate() !== day
+    ) return null;
+    return date.toISOString();
+  }
+  const date = new Date(normalized);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
@@ -105,7 +115,13 @@ function latestDividend(fund: PublicFundData | null) {
         competence: `${year}-${String(month).padStart(2, "0")}`,
         value,
         source: text(info?.source) || defaultSource,
-        asOf: isoDate(info?.payment_date) || isoDate(info?.date_with),
+        asOf: isoDate(
+          info?.announced_at
+          || info?.announcement_date
+          || info?.updatedAt
+          || info?.reference_date
+          || info?.date_with,
+        ),
       });
     }
   }
@@ -180,7 +196,7 @@ export function buildFundSeoEligibilityInput(
     catalog: officialCatalogProjection(fund),
     market: fund ? {
       price,
-      asOf: isoDate(fund.marketDataUpdatedAt),
+      asOf: isoDate(fund.marketDataReferenceDate ?? fund.quoteReferenceDate),
       plausible: price !== null ? price > 0 && price < 1_000_000 : null,
     } : null,
     dividend: dividend ? {
