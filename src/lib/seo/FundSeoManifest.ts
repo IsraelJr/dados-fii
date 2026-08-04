@@ -50,7 +50,7 @@ export function isFundSeoManifestFresh(
   manifest: FundSeoManifest | null,
   now: string | Date | number = Date.now(),
   maxAgeMs = FUND_SEO_MANIFEST_MAX_AGE_MS,
-) {
+): manifest is FundSeoManifest {
   if (!manifest || !Number.isFinite(maxAgeMs) || maxAgeMs <= 0) return false;
   const generatedAt = new Date(manifest.generatedAt).getTime();
   const current = now instanceof Date ? now.getTime() : typeof now === "number" ? now : new Date(now).getTime();
