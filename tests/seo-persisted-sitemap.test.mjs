@@ -17,13 +17,14 @@ test("sitemap reads one persisted manifest and never queries funds individually"
   assert.doesNotMatch(sitemap, /adminDb|firebase-admin|RegulatoryRepository/);
 });
 
-test("sitemap fails closed to static routes when the manifest is absent, stale or unreadable", () => {
+test("sitemap fails closed to reviewed editorial routes when the fund manifest is absent, stale or unreadable", () => {
   const sitemap = read("src/app/sitemap.ts");
 
-  assert.match(sitemap, /if \(!isFundSeoManifestFresh\(manifest\)\) return staticRoutes/);
+  assert.match(sitemap, /const editorialRoutes = \[\.\.\.staticRoutes, \.\.\.marketRoutes\]/);
+  assert.match(sitemap, /if \(!isFundSeoManifestFresh\(manifest\)\) return editorialRoutes/);
   assert.match(sitemap, /try\s*\{/);
   assert.match(sitemap, /catch \(error\)/);
-  assert.match(sitemap, /return staticRoutes/);
+  assert.match(sitemap, /return editorialRoutes/);
   assert.doesNotMatch(sitemap, /FALLBACK_TICKERS/);
 });
 
