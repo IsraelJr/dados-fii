@@ -36,6 +36,7 @@ export class FirestorePremiumDiscoveryRepository implements PremiumDiscoveryRepo
       name: event.name,
       schemaVersion: event.schemaVersion,
       origin: event.origin,
+      audience: event.audience,
       correlationId: event.correlationId,
       retentionDays: event.retentionDays,
       occurredAt: event.occurredAt,
