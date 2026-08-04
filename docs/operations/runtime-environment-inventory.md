@@ -1,6 +1,6 @@
 # Dados FII — Inventário de variáveis de ambiente
 
-**Data:** 27/07/2026  
+**Data:** 04/08/2026  
 **Política:** este inventário contém somente nomes, finalidade e classificação. Valores secretos nunca são versionados.
 
 ## Públicas e não autorizativas
@@ -38,6 +38,8 @@
 - `MONITOR_ALERT_EMAILS`
 - `MONITOR_EMAIL_FROM`
 - `PREMIUM_PREVIEW_EMAILS`
+- `PREMIUM_BETA_EMAILS`: lista server-only de e-mails verificados liberados manualmente no beta; vazia significa nenhuma liberação por e-mail.
+- `PREMIUM_BETA_UIDS`: lista server-only de UIDs Firebase liberados manualmente no beta; vazia significa nenhuma liberação por UID.
 
 ## Configuração de IA e cache
 
@@ -75,6 +77,7 @@
 - `ENABLE_RISK_LAB_ADMIN`
 - `ENABLE_WALLET_RISK_REPORT_AUTOMATIC`
 - `ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK`
+- `ENABLE_PREMIUM_DISCOVERY`: habilita a proposta e a lista de interesse; o código falha fechado quando ausente ou falso. Rollback: definir `false` sem remover entitlements Premium existentes.
 
 ## Runtime e deployment
 
@@ -93,3 +96,4 @@
 3. Toda variável nova exige classificação, owner, ambientes, fallback, rollback e teste.
 4. Alias legado deve possuir plano de remoção explícito.
 5. Feature flag temporária deve possuir condição de remoção.
+6. `PREMIUM_BETA_EMAILS` e `PREMIUM_BETA_UIDS` são administradas somente no servidor e devem ser removidas após a substituição por entitlement comercial persistido.
