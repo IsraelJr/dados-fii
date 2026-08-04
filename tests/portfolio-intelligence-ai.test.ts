@@ -1,16 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-// @ts-expect-error Node strip-types exige extensão explícita.
-import { PortfolioIntelligenceService } from "../src/lib/portfolio-intelligence/PortfolioIntelligenceService.ts";
-// @ts-expect-error Node strip-types exige extensão explícita.
+import { PortfolioIntelligenceService } from "../src/lib/portfolio-intelligence/PortfolioIntelligenceService";
 import {
   PORTFOLIO_INTELLIGENCE_AI_DISCLAIMER,
   PortfolioIntelligenceAIValidationError,
   buildPortfolioIntelligenceAISafeInput,
-} from "../src/lib/portfolio-intelligence/PortfolioIntelligenceAIContract.ts";
-// @ts-expect-error Node strip-types exige extensão explícita.
-import { PortfolioIntelligenceAIService } from "../src/lib/portfolio-intelligence/PortfolioIntelligenceAIService.ts";
-import type { AITextGeneration, AITextMessage } from "../src/types/ai-insights.ts";
+} from "../src/lib/portfolio-intelligence/PortfolioIntelligenceAIContract";
+import { PortfolioIntelligenceAIService } from "../src/lib/portfolio-intelligence/PortfolioIntelligenceAIService";
+import type { AITextGeneration, AITextMessage } from "../src/types/ai-insights";
 
 function analysis(offset = 0) {
   return new PortfolioIntelligenceService().analyze({
