@@ -2,7 +2,6 @@ export * from "./PortfolioIntelligence";
 export * from "./PortfolioIntelligenceAdapters";
 export * from "./PortfolioIntelligenceDataQuality";
 export * from "./PortfolioIntelligenceExplanation";
-export * from "./PortfolioIntelligenceExplanationService";
 export * from "./PortfolioIntelligenceMetrics";
 export * from "./PortfolioIntelligencePolicy";
 export * from "./PortfolioIntelligenceService";
