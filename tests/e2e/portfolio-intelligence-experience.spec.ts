@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
   await page.route(/^https:\/\//, (route) => route.abort());
 });
 
-test("carteira exibe loading, análise determinística, evidências e expansão acessível", async ({ page }) => {
+test("carteira exibe análise, evidências, expansão e explicação sob demanda acessíveis", async ({ page }) => {
   const competences = previousClosedCompetences(6);
   const currentMonth = new Intl.DateTimeFormat("en-US", {
     month: "long",
@@ -78,6 +78,46 @@ test("carteira exibe loading, análise determinística, evidências e expansão 
     });
   });
 
+  let explanationRequests = 0;
+  await page.route("**/api/portfolio/intelligence/explanation", async (route) => {
+    explanationRequests += 1;
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        degraded: false,
+        explanation: {
+          version: "1.0.0",
+          source: "ai",
+          summary: "Os sinais indicam estabilidade recente, acompanhada por concentração que merece atenção.",
+          signalExplanations: [{
+            code: "RENDA_ESTAVEL",
+            title: "Sua renda recente ficou estável",
+            explanation: "O fluxo de renda manteve um comportamento previsível no histórico observado.",
+            whyItMatters: "A estabilidade ajuda no planejamento, sem garantir que o mesmo padrão continuará.",
+            confidence: "high",
+          }],
+          overallConfidence: "high",
+          limitations: [
+            "A leitura depende do histórico disponível e não antecipa distribuições futuras.",
+            "A explicação não altera, completa ou recalcula as métricas determinísticas.",
+          ],
+          disclaimer: "Explicação informativa dos sinais calculados. Não é recomendação de compra, venda ou manutenção de ativos.",
+          metadata: {
+            engineVersion: "test-engine",
+            promptVersion: "portfolio-intelligence-explanation-v1",
+            model: "test-model",
+            fingerprint: "test-fingerprint",
+            generatedAt: "2026-08-04T15:00:00.000Z",
+            cached: false,
+          },
+        },
+      }),
+    });
+  });
+
   await page.goto("/carteira");
   await expect(page.getByTestId("portfolio-intelligence-loading")).toBeVisible();
 
@@ -98,6 +138,19 @@ test("carteira exibe loading, análise determinística, evidências e expansão 
   await expect(expansion).toHaveAttribute("aria-expanded", "true");
   await expect(expansion).toHaveAccessibleName("Recolher sinais");
   await expect.poll(() => panel.locator("[data-signal-code]").count()).toBeGreaterThan(3);
+
+  const explanationPanel = page.getByTestId("portfolio-intelligence-explanation");
+  const explanationButton = explanationPanel.getByRole("button", { name: "Explicar estes sinais" });
+  await expect(explanationButton).toBeVisible();
+  expect(explanationRequests).toBe(0);
+  await explanationButton.click();
+  await expect(explanationPanel.getByRole("status")).toContainText("Traduzindo os sinais");
+  await expect(explanationPanel.locator('[data-explanation-source="ai"]')).toBeVisible();
+  await expect(explanationPanel.getByText("Explicado por IA")).toBeVisible();
+  await expect(explanationPanel.getByText("Por que importa:")).toBeVisible();
+  await expect(explanationPanel.getByRole("heading", { name: "Limitações desta leitura" })).toBeVisible();
+  await expect(explanationPanel.getByText(/Não é recomendação de compra, venda ou manutenção/)).toBeVisible();
+  expect(explanationRequests).toBe(1);
 
   await expectNoHighImpactAccessibilityViolations(page);
 });

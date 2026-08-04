@@ -42,10 +42,11 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.3\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.4\.0/);
   assert.match(body, /Produto Validável/);
-  assert.match(body, /PV-2A — Inteligência da Carteira: núcleo determinístico/);
+  assert.match(body, /PV-3 — Descoberta Premium, beta controlado e telemetria de interesse/);
   assert.match(body, /PV-1 está concluída funcionalmente/);
+  assert.match(body, /PV-2A, PV-2B e PV-2C ficam formalmente concluídas/);
   assert.match(body, /Google AdSense continua congelado/);
 });
 
@@ -73,11 +74,15 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("estado atual protege fonte única e próxima sprint", () => {
+test("estado atual protege fonte única, IA explicativa e próxima sprint", () => {
   const body = text();
   assert.match(body, /PR `#166` consolidou gráfico e resumo sobre `consolidatedSnapshots`/);
   assert.match(body, /PR `#167` restaurou o layout original dos seis cards/);
+  assert.match(body, /PR `#177` integrou a PV-2A/);
+  assert.match(body, /PR `#178` integrou a PV-2B/);
+  assert.match(body, /PR `#180` encerra a PV-2C/);
   assert.match(body, /IA nunca é fonte de verdade para cálculo financeiro/);
+  assert.match(body, /A explicação por IA ocorre apenas após ação explícita do usuário/);
   assert.match(body, /Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand`/);
 });
 
@@ -87,6 +92,7 @@ test("regras críticas de arquitetura e conclusão permanecem explícitas", () =
   assert.match(body, /Logs e telemetria não contêm valores financeiros/);
   assert.match(body, /CI é gate de merge e deploy/);
   assert.match(body, /Nenhuma validação manual substitui esses gates/);
+  assert.match(body, /número novo ou recomendação falha fechado e usa fallback determinístico/);
 });
 
 test("documentos auxiliares canônicos existem e estão atualizados", () => {
