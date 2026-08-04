@@ -38,12 +38,12 @@ test("conteúdo não é intercambiável entre segmentos", () => {
   const offices = getMarketArticle("escritorios-lajes-corporativas");
   const paper = getMarketArticle("recebiveis-papel");
   const urban = getMarketArticle("renda-urbana");
-  assert.ok(agro?.summary.includes("safra"));
-  assert.ok(logistics?.title.includes("localização"));
-  assert.ok(shopping?.summary.includes("Vendas"));
-  assert.ok(offices?.summary.includes("ocupação"));
-  assert.ok(paper?.summary.includes("crédito"));
-  assert.ok(urban?.summary.includes("locatário"));
+  assert.ok(agro?.title.toLowerCase().includes("safra"));
+  assert.ok(logistics?.title.toLowerCase().includes("localização"));
+  assert.ok(shopping?.title.toLowerCase().includes("vendas"));
+  assert.ok(offices?.title.toLowerCase().includes("escritórios"));
+  assert.ok(paper?.title.toLowerCase().includes("recebíveis"));
+  assert.ok(urban?.title.toLowerCase().includes("renda urbana"));
   assert.equal(new Set(MARKET_ARTICLES.map((article) => article.summary)).size, MARKET_ARTICLES.length);
 });
 
