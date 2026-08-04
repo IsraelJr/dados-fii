@@ -44,14 +44,24 @@ test("política 1.0.0 centraliza os thresholds obrigatórios", async () => {
   ]) assert.match(source, contract);
 });
 
-test("carteira integra exatamente consolidatedSnapshots e posições do RegulatoryDataService", async () => {
-  const page = await readFile(path.join(ROOT, "src/app/carteira/page.tsx"), "utf8");
-  const batchRoute = await readFile(path.join(ROOT, "src/app/api/fii/batch/route.ts"), "utf8");
-  assert.match(page, /intelligenceSnapshotsFromConsolidated\(consolidatedSnapshots\)/);
-  assert.match(page, /intelligencePositionsFromCurrentWallet\(insights\.enriched\.map/);
-  assert.match(page, /<PortfolioIntelligencePanel result=\{portfolioIntelligence\}/);
-  assert.match(batchRoute, /regulatoryDataService\.getMany\(tickers\)/);
-  assert.doesNotMatch(batchRoute, /firebase|Firestore|adminDb/i);
+test("adaptadores mapeiam a série consolidada e as posições sem acoplamento de runtime", async () => {
+  const source = await readFile(
+    path.join(DOMAIN_DIR, "PortfolioIntelligenceAdapters.ts"),
+    "utf8",
+  );
+
+  assert.match(source, /intelligenceSnapshotsFromConsolidated/);
+  assert.match(source, /competence: snapshot\.monthKey/);
+  assert.match(source, /dividends: snapshot\.estimatedMonthlyIncome/);
+  assert.match(source, /intelligencePositionsFromCurrentWallet/);
+  assert.match(source, /quantity: position\.quotas/);
+  assert.match(source, /price: position\.price/);
+  assert.match(source, /estimatedIncome: position\.estimatedIncome/);
+  assert.match(source, /segment: position\.segment/);
+  assert.doesNotMatch(
+    source,
+    /RegulatoryDataService|fetch\(|from\s+["']react["']|from\s+["']next|firebase|Firestore|OpenAI/i,
+  );
 });
 
 test("não existe route handler, persistência ou chamada de IA para o diagnóstico", async () => {
@@ -72,18 +82,20 @@ test("não existe route handler, persistência ou chamada de IA para o diagnóst
   assert.doesNotMatch(combined, /fetch\(|generateText|AIInsights|adminDb|firebase-admin/i);
 });
 
-test("painel é semântico, expansível, acessível e não calcula métricas", async () => {
-  const source = await readFile(
-    path.join(ROOT, "src/app/components/PortfolioIntelligencePanel.tsx"),
-    "utf8",
-  );
-  assert.match(source, /aria-labelledby="portfolio-intelligence-title"/);
-  assert.match(source, /<h2 id="portfolio-intelligence-title"/);
-  assert.match(source, /aria-expanded=\{expanded\}/);
-  assert.match(source, /focus-visible:ring-2/);
-  assert.match(source, /dark:/);
-  assert.match(source, /Conteúdo informativo, sem recomendação de investimento\./);
-  assert.doesNotMatch(source, /\.reduce\(|Math\.(?:max|min|sqrt|pow)|OpenAI|compre|venda/i);
+test("barrel público expõe somente contratos e funções do núcleo determinístico", async () => {
+  const source = await readFile(path.join(DOMAIN_DIR, "index.ts"), "utf8");
+  for (const moduleName of [
+    "PortfolioIntelligence",
+    "PortfolioIntelligenceAdapters",
+    "PortfolioIntelligenceDataQuality",
+    "PortfolioIntelligenceMetrics",
+    "PortfolioIntelligencePolicy",
+    "PortfolioIntelligenceService",
+    "PortfolioIntelligenceSignals",
+  ]) {
+    assert.match(source, new RegExp(`export \\* from ["']\\./${moduleName}["']`));
+  }
+  assert.doesNotMatch(source, /Panel|Component|Page|Route|Repository/);
 });
 
 test("arquitetura não altera autenticação, entitlement, Risk Lab ou relatório Premium", async () => {
