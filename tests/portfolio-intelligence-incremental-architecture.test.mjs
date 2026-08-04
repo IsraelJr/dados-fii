@@ -6,22 +6,28 @@ const read = (path) => readFileSync(path, "utf8");
 
 const REQUIRED = [
   "src/lib/portfolio-intelligence/PortfolioIntelligenceIncremental.ts",
+  "src/lib/portfolio-intelligence/PortfolioIntelligenceIncrementalExplanation.ts",
   "src/lib/portfolio-intelligence/PortfolioIntelligenceIncrementalService.ts",
   "src/server/repositories/FirestorePortfolioIntelligenceReferenceRepositoryCore.ts",
   "src/server/repositories/FirestorePortfolioIntelligenceReferenceRepository.ts",
+  "src/server/services/PortfolioIncrementalExplanationService.ts",
   "src/server/controllers/PortfolioIncrementalAnalysisController.ts",
+  "src/server/controllers/PortfolioIncrementalExplanationController.ts",
   "src/app/api/portfolio/incremental-analysis/route.ts",
+  "src/app/api/portfolio/incremental-analysis/explanation/route.ts",
   "src/app/components/PortfolioIncrementalReportPanel.tsx",
+  "src/app/components/PortfolioIncrementalExplanationPanel.tsx",
 ];
 
-test("PV-4 possui domínio, persistência, controller, rota e apresentação próprios", () => {
+test("PV-4 possui domínio, persistência, controllers, rotas e apresentação próprios", () => {
   for (const path of REQUIRED) assert.equal(existsSync(path), true, `arquivo ausente: ${path}`);
 });
 
-test("comparação permanece pura e não conhece React, Next, Firestore ou IA", () => {
+test("comparação e contrato de explicação permanecem puros", () => {
   const domain = read("src/lib/portfolio-intelligence/PortfolioIntelligenceIncremental.ts");
+  const explanation = read("src/lib/portfolio-intelligence/PortfolioIntelligenceIncrementalExplanation.ts");
   const service = read("src/lib/portfolio-intelligence/PortfolioIntelligenceIncrementalService.ts");
-  const combined = `${domain}\n${service}`;
+  const combined = `${domain}\n${explanation}\n${service}`;
   assert.doesNotMatch(combined, /from\s+["']react|from\s+["']next|firebase|Firestore|OpenAI|AIInsights|fetch\(/i);
   assert.match(domain, /PORTFOLIO_INCREMENTAL_POLICY_VERSION = "1\.0\.0"/);
   assert.match(domain, /comparePortfolioIntelligenceReferences/);
@@ -29,14 +35,19 @@ test("comparação permanece pura e não conhece React, Next, Firestore ou IA", 
   assert.match(domain, /category: "rule"/);
   assert.match(domain, /category: "coverage"/);
   assert.match(domain, /category: "quality"/);
+  assert.match(explanation, /deterministicFieldsAreImmutable: true/);
+  assert.match(explanation, /introduziu números/);
+  assert.match(explanation, /introduziu recomendação/);
 });
 
-test("rota é fina e Firestore permanece isolado no repositório", () => {
+test("rotas são finas e Firestore permanece isolado no repositório", () => {
   const route = read("src/app/api/portfolio/incremental-analysis/route.ts");
+  const explanationRoute = read("src/app/api/portfolio/incremental-analysis/explanation/route.ts");
   const controller = read("src/server/controllers/PortfolioIncrementalAnalysisController.ts");
   const repository = read("src/server/repositories/FirestorePortfolioIntelligenceReferenceRepositoryCore.ts");
   assert.match(route, /export \{ POST \} from "@\/server\/controllers\/PortfolioIncrementalAnalysisController"/);
-  assert.doesNotMatch(route, /firebase|Firestore|adminDb|collection\(/i);
+  assert.match(explanationRoute, /PortfolioIncrementalExplanationController/);
+  assert.doesNotMatch(`${route}\n${explanationRoute}`, /firebase|Firestore|adminDb|collection\(/i);
   assert.match(controller, /resolveWalletIdentity/);
   assert.match(controller, /PortfolioIntelligenceIncrementalService/);
   assert.doesNotMatch(controller, /adminDb\.collection|firebase-admin/);
@@ -62,6 +73,23 @@ test("interface não recalcula diferenças e não persiste carteira no navegador
   assert.match(component, /credentials: "same-origin"/);
   assert.doesNotMatch(component, /localStorage\.setItem/);
   assert.doesNotMatch(component, /comparePortfolioIntelligenceReferences|calculate|Math\.(?:abs|max|min)/);
+});
+
+test("explicação incremental é opcional, server-only e falha em fallback determinístico", () => {
+  const component = read("src/app/components/PortfolioIncrementalExplanationPanel.tsx");
+  const controller = read("src/server/controllers/PortfolioIncrementalExplanationController.ts");
+  const service = read("src/server/services/PortfolioIncrementalExplanationService.ts");
+  assert.match(component, /onClick=\{explain\}/);
+  assert.match(component, /Explicar estas mudanças/);
+  assert.match(component, /\/api\/portfolio\/incremental-analysis\/explanation/);
+  assert.doesNotMatch(component, /useEffect\s*\([^)]*explain/);
+  assert.match(controller, /sameOrigin/);
+  assert.match(controller, /sanitizePortfolioIncrementalExplanationInput/);
+  assert.match(controller, /portfolioIncrementalExplanationService\.fallback/);
+  assert.match(service, /AIInsightsEngine/);
+  assert.match(service, /PORTFOLIO_INCREMENTAL_EXPLANATION_PROMPT_VERSION/);
+  assert.match(service, /RATE_MAX_REQUESTS/);
+  assert.doesNotMatch(service, /WalletIdentity|ownerId|positions|snapshots/);
 });
 
 test("rollback é server-side e não depende de variável pública", () => {
