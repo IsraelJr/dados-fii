@@ -1,0 +1,75 @@
+name: PV-2B One-shot Codemod
+
+on:
+  push:
+    branches: [agent/pv-2b-clean-main]
+    paths:
+      - ".github/workflows/pv-2b-one-shot.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout da branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Aplicar integração fail-closed
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          function replaceOnce(source, anchor, replacement, label) {
+            const first = source.indexOf(anchor);
+            const last = source.lastIndexOf(anchor);
+            if (first < 0 || first !== last) {
+              throw new Error(`${label}: âncora ausente ou não única`);
+            }
+            return source.slice(0, first) + replacement + source.slice(first + anchor.length);
+          }
+
+          const pagePath = 'src/app/carteira/page.tsx';
+          let page = fs.readFileSync(pagePath, 'utf8');
+
+          const importsAnchor = 'import PortfolioNotificationPreferences from "../components/PortfolioNotificationPreferences";\n';
+          page = replaceOnce(page, importsAnchor, `${importsAnchor}import PortfolioIntelligencePanel, { PortfolioIntelligenceLoading } from "../components/PortfolioIntelligencePanel";\nimport {\n  intelligencePositionsFromCurrentWallet,\n  intelligenceSnapshotsFromConsolidated,\n  portfolioIntelligenceService,\n} from "@/lib/portfolio-intelligence";\n`, 'imports');
+
+          const stateAnchor = '  const [manualHistory, setManualHistory] = useState<readonly ManualHistoryEntry[]>([]);\n  const quotasInputRef = useRef<HTMLInputElement | null>(null);';
+          const stateReplacement = '  const [manualHistory, setManualHistory] = useState<readonly ManualHistoryEntry[]>([]);\n  const [walletHydrated, setWalletHydrated] = useState(false);\n  const quotasInputRef = useRef<HTMLInputElement | null>(null);\n  const [portfolioIntelligenceAsOf] = useState(() => new Date().toISOString());';
+          page = replaceOnce(page, stateAnchor, stateReplacement, 'estado');
+
+          const hydrateAnchor = `  useEffect(() => {\n    const stored = window.localStorage.getItem(STORAGE_KEY);\n    setSnapshots(readSnapshots());\n    if (!stored) return;\n    try {\n      const parsed = JSON.parse(stored);\n      if (Array.isArray(parsed)) setItems(parsed);\n    } catch {\n      window.localStorage.removeItem(STORAGE_KEY);\n    }\n  }, []);`;
+          const hydrateReplacement = `  useEffect(() => {\n    const stored = window.localStorage.getItem(STORAGE_KEY);\n    setSnapshots(readSnapshots());\n    if (stored) {\n      try {\n        const parsed = JSON.parse(stored);\n        if (Array.isArray(parsed)) setItems(parsed);\n      } catch {\n        window.localStorage.removeItem(STORAGE_KEY);\n      }\n    }\n    setWalletHydrated(true);\n  }, []);`;
+          page = replaceOnce(page, hydrateAnchor, hydrateReplacement, 'hidratação');
+
+          const analysisAnchor = '  }, [snapshots, manualHistory, items.length]);\n  function addItem() {';
+          const analysisReplacement = `  }, [snapshots, manualHistory, items.length]);\n  const portfolioIntelligence = useMemo(() => {\n    const positions = intelligencePositionsFromCurrentWallet(insights.enriched.map((item) => {\n      const price = parseCurrency(item.data?.price);\n      return {\n        ticker: item.ticker,\n        quotas: item.quotas,\n        price: price > 0 ? price : null,\n        estimatedIncome: item.lastDividend ? item.estimatedIncome : null,\n        segment: item.data?.segment_new || item.data?.segment || null,\n      };\n    }));\n    return portfolioIntelligenceService.analyzeSafely({\n      snapshots: intelligenceSnapshotsFromConsolidated(consolidatedSnapshots),\n      positions,\n    }, { asOf: portfolioIntelligenceAsOf });\n  }, [consolidatedSnapshots, insights.enriched, portfolioIntelligenceAsOf]);\n  const portfolioIntelligenceLoading = !walletHydrated\n    || (items.length > 0 && (loading || loaded.length !== items.length));\n\n  function addItem() {`;
+          page = replaceOnce(page, analysisAnchor, analysisReplacement, 'análise');
+
+          const renderAnchor = '      <AttentionSection insights={insights} />\n      <VisualHistorySection snapshots={consolidatedSnapshots} />';
+          const renderReplacement = '      <AttentionSection insights={insights} />\n      {portfolioIntelligenceLoading\n        ? <PortfolioIntelligenceLoading />\n        : <PortfolioIntelligencePanel result={portfolioIntelligence} />}\n      <VisualHistorySection snapshots={consolidatedSnapshots} />';
+          page = replaceOnce(page, renderAnchor, renderReplacement, 'renderização');
+
+          fs.writeFileSync(pagePath, page);
+
+          const indexPath = 'src/lib/portfolio-intelligence/index.ts';
+          let index = fs.readFileSync(indexPath, 'utf8');
+          const presentationExport = 'export * from "./PortfolioIntelligencePresentation";';
+          if (!index.includes(presentationExport)) {
+            index = `${index.trimEnd()}\n${presentationExport}\n`;
+            fs.writeFileSync(indexPath, index);
+          }
+          NODE
+
+          git diff --check
+          git config user.name "dados-fii-dev-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/app/carteira/page.tsx src/lib/portfolio-intelligence/index.ts
+          git commit -m "feat: integrar experiência da inteligência da carteira [pv2b-applied]"
+          git push origin HEAD:${GITHUB_REF_NAME}
