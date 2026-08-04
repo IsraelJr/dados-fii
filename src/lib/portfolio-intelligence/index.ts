@@ -3,6 +3,7 @@ export * from "./PortfolioIntelligenceAdapters";
 export * from "./PortfolioIntelligenceDataQuality";
 export * from "./PortfolioIntelligenceExplanation";
 export * from "./PortfolioIntelligenceIncremental";
+export * from "./PortfolioIntelligenceIncrementalExplanation";
 export * from "./PortfolioIntelligenceIncrementalService";
 export * from "./PortfolioIntelligenceMetrics";
 export * from "./PortfolioIntelligencePolicy";
