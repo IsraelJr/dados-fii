@@ -402,11 +402,7 @@ export function sanitizePortfolioIntelligenceReference(value: unknown): Portfoli
         warningCodes: Object.freeze([...new Set(warningCodes)].sort()),
       }),
     };
-    const expectedFingerprint = fingerprint(canonicalReferenceContent({
-      ...referenceWithoutFingerprint,
-      generatedAt: "",
-      asOf: "",
-    }));
+    const expectedFingerprint = fingerprint(canonicalReferenceContent(referenceWithoutFingerprint));
     if (value.fingerprint !== expectedFingerprint) {
       throw new PortfolioIncrementalValidationError("INVALID_REFERENCE", "Fingerprint da referência incompatível.");
     }
