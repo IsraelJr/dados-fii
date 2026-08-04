@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { AIInsightsError } from "@/lib/ai/AIInsightsEngine";
+import { sanitizePortfolioExplanationInput } from "@/lib/portfolio-intelligence";
 import {
   PortfolioIntelligenceExplanationError,
   portfolioIntelligenceExplanationService,
-  sanitizePortfolioExplanationInput,
-} from "@/lib/portfolio-intelligence";
+} from "@/lib/portfolio-intelligence/PortfolioIntelligenceExplanationService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let input;
+  let input: ReturnType<typeof sanitizePortfolioExplanationInput>;
   try {
     const body = await request.json() as { result?: unknown };
     input = sanitizePortfolioExplanationInput(body?.result);
