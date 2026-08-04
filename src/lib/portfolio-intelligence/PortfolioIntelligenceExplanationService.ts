@@ -11,11 +11,11 @@ import {
 } from "./PortfolioIntelligenceExplanation";
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
-const CACHE_TTL_MS = positiveInt(process.env.PORTFOLIO_EXPLANATION_CACHE_TTL_MS, 6 * 60 * 60_000);
-const CACHE_MAX_ENTRIES = positiveInt(process.env.PORTFOLIO_EXPLANATION_CACHE_MAX_ENTRIES, 250);
-const RATE_WINDOW_MS = positiveInt(process.env.PORTFOLIO_EXPLANATION_RATE_WINDOW_MS, 10 * 60_000);
-const RATE_MAX_REQUESTS = positiveInt(process.env.PORTFOLIO_EXPLANATION_RATE_MAX_REQUESTS, 12);
-const MAX_OUTPUT_TOKENS = Math.min(positiveInt(process.env.OPENAI_PORTFOLIO_EXPLANATION_MAX_OUTPUT_TOKENS, 900), 1_200);
+const CACHE_TTL_MS = 6 * 60 * 60_000;
+const CACHE_MAX_ENTRIES = 250;
+const RATE_WINDOW_MS = 10 * 60_000;
+const RATE_MAX_REQUESTS = 12;
+const MAX_OUTPUT_TOKENS = Math.min(positiveInt(process.env.OPENAI_INSIGHTS_MAX_OUTPUT_TOKENS, 900), 1_200);
 
 export type PortfolioExplanationGenerationOptions = Readonly<{
   requestKey?: string | null;
@@ -58,10 +58,7 @@ function fingerprint(value: unknown) {
 }
 
 function modelForPortfolioExplanation() {
-  return process.env.OPENAI_PORTFOLIO_INTELLIGENCE_MODEL
-    || process.env.OPENAI_INSIGHTS_MODEL
-    || process.env.OPENAI_MODEL
-    || DEFAULT_MODEL;
+  return process.env.OPENAI_INSIGHTS_MODEL || process.env.OPENAI_MODEL || DEFAULT_MODEL;
 }
 
 function prompt(input: PortfolioExplanationInput): AITextMessage[] {
