@@ -13,6 +13,8 @@ import { buildFundSeoEligibilityInput } from "./FundSeoPagePolicy";
 const SEO_MANIFEST_CACHE_TTL_MS = 10 * 60_000;
 const MAX_EDITORIAL_FUNDS = 200;
 
+type EditorialReviewsProvider = typeof listFundSeoEditorialReviews;
+
 function editorialFingerprint(explanation: string) {
   const normalized = explanation
     .normalize("NFKC")
@@ -29,6 +31,7 @@ export class FundSeoManifestService {
   constructor(
     private readonly dataService: RegulatoryDataService = regulatoryDataService,
     private readonly repository: FundSeoManifestRepository = fundSeoManifestRepository,
+    private readonly reviewsProvider: EditorialReviewsProvider = listFundSeoEditorialReviews,
   ) {}
 
   async getCurrent(options?: { force?: boolean }) {
@@ -51,7 +54,7 @@ export class FundSeoManifestService {
   }
 
   private async rebuildInternal(actor: string) {
-    const reviews = listFundSeoEditorialReviews().slice(0, MAX_EDITORIAL_FUNDS);
+    const reviews = this.reviewsProvider().slice(0, MAX_EDITORIAL_FUNDS);
     const generatedAt = nowIso();
     if (!reviews.length) {
       const empty = buildFundSeoManifest([], generatedAt);
