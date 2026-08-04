@@ -6,7 +6,8 @@ export type Phase2Feature =
   | "ENABLE_AUTOMATIC_MONITOR"
   | "ENABLE_SCORE_ENGINE"
   | "ENABLE_RISK_LAB_ADMIN"
-  | "ENABLE_RISK_LAB_PREMIUM_READONLY";
+  | "ENABLE_RISK_LAB_PREMIUM_READONLY"
+  | "ENABLE_PREMIUM_DISCOVERY";
 
 export function featureEnabled(name: Phase2Feature, defaultValue = true) {
   const value = process.env[name];

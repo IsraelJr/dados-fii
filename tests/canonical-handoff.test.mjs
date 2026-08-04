@@ -42,11 +42,11 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.4\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.5\.0/);
   assert.match(body, /Produto Validável/);
-  assert.match(body, /PV-3 — Descoberta Premium, beta controlado e telemetria de interesse/);
+  assert.match(body, /PV-3\.5 — SEO e Conteúdo de Mercado/);
   assert.match(body, /PV-1 está concluída funcionalmente/);
-  assert.match(body, /PV-2A, PV-2B e PV-2C ficam formalmente concluídas/);
+  assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C e PV-3 ficam formalmente concluídas/);
   assert.match(body, /Google AdSense continua congelado/);
 });
 
@@ -74,22 +74,28 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("estado atual protege fonte única, IA explicativa e próxima sprint", () => {
+test("estado atual protege fonte única, IA explicativa, descoberta Premium e próxima sprint", () => {
   const body = text();
   assert.match(body, /PR `#166` consolidou gráfico e resumo sobre `consolidatedSnapshots`/);
   assert.match(body, /PR `#167` restaurou o layout original dos seis cards/);
   assert.match(body, /PR `#177` integrou a PV-2A/);
   assert.match(body, /PR `#178` integrou a PV-2B/);
-  assert.match(body, /PR `#180` encerra a PV-2C/);
+  assert.match(body, /PR `#180` encerrou a PV-2C/);
+  assert.match(body, /PR `#181` encerra a PV-3/);
   assert.match(body, /IA nunca é fonte de verdade para cálculo financeiro/);
   assert.match(body, /A explicação por IA ocorre apenas após ação explícita do usuário/);
+  assert.match(body, /Solicitar beta não concede entitlement/);
+  assert.match(body, /hub público sobre o mercado de fundos imobiliários/);
   assert.match(body, /Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand`/);
 });
 
-test("regras críticas de arquitetura e conclusão permanecem explícitas", () => {
+test("regras críticas de arquitetura, privacidade editorial e conclusão permanecem explícitas", () => {
   const body = text();
   assert.match(body, /Nenhum `route\.ts` importa Firestore diretamente/);
   assert.match(body, /Logs e telemetria não contêm valores financeiros/);
+  assert.match(body, /Eventos de produto usam identidade pseudonimizada/);
+  assert.match(body, /Conteúdo editorial conjuntural exige data-base, fonte e limitação explícitas/);
+  assert.match(body, /Página sem qualidade mínima não é indexada ou publicada/);
   assert.match(body, /CI é gate de merge e deploy/);
   assert.match(body, /Nenhuma validação manual substitui esses gates/);
   assert.match(body, /número novo ou recomendação falha fechado e usa fallback determinístico/);
@@ -100,6 +106,9 @@ test("documentos auxiliares canônicos existem e estão atualizados", () => {
   assert.match(text(PRODUCT_DIRECTION), /PV-2A — Inteligência da Carteira: núcleo determinístico/);
   assert.match(text(PRODUCT_DIRECTION), /Codex: implementação, testes, commits, PR e relatório técnico/);
   assert.match(text(ENV_INVENTORY), /Inventário de variáveis de ambiente/);
+  assert.match(text(ENV_INVENTORY), /`ENABLE_PREMIUM_DISCOVERY`/);
+  assert.match(text(ENV_INVENTORY), /`PREMIUM_BETA_UIDS`/);
+  assert.match(text(ENV_INVENTORY), /`PREMIUM_BETA_EMAILS`/);
 });
 
 test("evidência histórica permanece íntegra", () => {
