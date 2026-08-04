@@ -2,29 +2,28 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 10.5.0  
+**Versão:** 10.6.0  
 **Data:** 04/08/2026  
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**PR de encerramento desta versão:** `#181`  
-**SHA funcional da PV-3 antes da atualização documental:** `2a5ac46d1c7cd248be6c46d53d2bc463690c38cd`  
+**PR de encerramento desta versão:** `#182`  
+**SHA funcional da PV-3.5 antes da atualização documental:** `6a57d3dbcdc58ba0f7a2a19705d461ffe689a294`  
+**CI funcional:** `Phase 2 Closure CI` — run `30954725742` — sucesso  
 **Fase vigente:** `Produto Validável`  
-**Sprint atual após o merge deste documento:** `PV-3.5 — SEO e Conteúdo de Mercado`
+**Sprint atual após o merge deste documento:** `PV-4 — Relatório incremental: mudanças desde a última análise`
 
 ## Decisões vigentes que substituem decisões anteriores
 
 | Decisão vigente | Decisão substituída | Efeito |
 |---|---|---|
-| PV-1, PV-2A, PV-2B, PV-2C e PV-3 ficam formalmente concluídas com o merge da PR `#181`. | O Handoff v10.4.0 tratava PV-3 como sprint atual. | A descoberta Premium passa a existir com proposta honesta, lista de interesse, beta server-side e telemetria privada. |
-| PV-3.5 — SEO e Conteúdo de Mercado é a próxima sprint oficial. | SEO editorial estava adiado sem posição própria na sequência. | A aquisição orgânica começa antes de checkout, para amadurecer indexação e alimentar a validação comercial. |
-| A proposta Premium permanece “Em validação”. | Uma tela poderia sugerir produto, preço ou assinatura já disponíveis. | Não existe checkout, preço fictício, cobrança ou liberação automática após pedido de acesso. |
-| Interesse e entitlement são conceitos separados. | Pedido de participação poderia ser confundido com acesso Premium. | Somente o servidor concede beta, Premium, Super Premium ou acesso administrativo. |
-| O beta é controlado por allowlist server-side e pelo entitlement existente. | Estado do navegador ou variável pública poderia conceder privilégio. | Manipulação do cliente não libera conteúdo protegido. |
-| Telemetria comercial usa identidade pseudonimizada e audiência agregável. | Eventos legados podiam persistir `ownerId` bruto. | Eventos registram hash, nome, versão, origem, audiência, correlação e retenção, sem carteira ou identidade bruta. |
-| SEO editorial terá páginas próprias de mercado e segmentos. | A infraestrutura técnica de SEO existia sem expansão editorial oficial. | Mercado de FIIs, FIAGRO/agro, galpões/logística, shoppings, escritórios, recebíveis e renda urbana entram no escopo. |
-| Google AdSense continua congelado. | Anúncios poderiam ser antecipados junto com o SEO. | A prioridade é conteúdo útil, descoberta do produto e tráfego qualificado, não monetização por anúncios. |
-| Cobrança continua adiada até a PV-6. | Checkout poderia ser implementado antes de evidência comercial. | Preço, periodicidade e disposição a pagar serão validados antes da PV-7. |
-| O Handoff v10.5.0 é a única fonte canônica ativa. | Handoffs v10.4.0 e anteriores. | Este documento prevalece em caso de divergência. |
+| PV-1, PV-2A, PV-2B, PV-2C, PV-3 e PV-3.5 ficam formalmente concluídas com o merge da PR `#182`. | O Handoff v10.5.0 tratava PV-3.5 como sprint atual. | O produto passa a ter descoberta Premium validável e aquisição orgânica com conteúdo segmentado. |
+| PV-4 é a próxima sprint oficial. | A prioridade funcional anterior era SEO editorial. | O foco passa a ser mostrar somente mudanças materiais desde a última análise da carteira. |
+| O hub `/mercado` e sete páginas segmentadas são a superfície editorial oficial desta fase. | SEO editorial ainda não possuía rotas próprias. | Mercado de FIIs, FIAGRO, logística, shoppings, escritórios, recebíveis e renda urbana têm conteúdo específico, data-base e fontes. |
+| Página editorial desconhecida ou sem qualidade mínima não é publicada nem indexada. | Uma rota dinâmica poderia gerar conteúdo raso por fallback. | O registro editorial é allowlistado e slug desconhecido retorna 404 real. |
+| Telemetria editorial é anônima, mínima e retida por 90 dias. | Eventos editoriais poderiam reutilizar identidade ou dados financeiros. | Nenhum evento contém e-mail, `ownerId`, carteira, posição, ticker, dividendo, patrimônio, token ou cookie. |
+| Google AdSense continua congelado. | SEO poderia ser confundido com antecipação de anúncios. | O objetivo é tráfego qualificado e utilidade; publicidade não integra esta entrega. |
+| Cobrança continua adiada até a PV-6, e checkout permanece na PV-7. | Monetização poderia ser antecipada sem evidência comercial. | Interesse, beta e uso continuam separados de pagamento e entitlement comercial. |
+| O Handoff v10.6.0 é a única fonte canônica ativa. | Handoffs v10.5.0 e anteriores. | Este documento prevalece em caso de divergência. |
 
 ## 1. Estado atual do projeto
 
@@ -36,12 +35,13 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - PR `#177` integrou a PV-2A, com métricas, qualidade, sinais e evidências determinísticas.
 - PR `#178` integrou a PV-2B, com apresentação acessível dos sinais da carteira.
 - PR `#180` encerrou a PV-2C, com explicação opcional por IA, validação de saída e fallback determinístico.
-- PR `#181` encerra a PV-3 com proposta “Premium em validação”, lista de interesse, beta controlado no servidor, feature flag de rollback, telemetria pseudonimizada e testes desktop/mobile.
-- O SHA funcional `2a5ac46d1c7cd248be6c46d53d2bc463690c38cd` passou os workflows `Phase 2 Closure CI` e `Risk Lab CI`, incluindo governança, Handoff, auditoria, secret scan, lint, TypeScript, 729 testes, Firestore, cobertura crítica, mutation, build, smoke HTTP, Risk Lab e E2E.
-- PR `#170` foi fechada sem merge por ter sido substituída pela implementação limpa da PV-2B na PR `#178`.
+- PR `#181` encerrou a PV-3, com proposta “Premium em validação”, lista de interesse, beta server-side e telemetria pseudonimizada.
+- PR `#182` encerra a PV-3.5, com hub público, sete cenários segmentados, fontes oficiais, SEO técnico e telemetria editorial privada.
+- O SHA funcional `6a57d3dbcdc58ba0f7a2a19705d461ffe689a294` passou governança, Handoff vigente, auditoria, secret scan, lint, TypeScript, suíte completa, Firestore, cobertura crítica, mutation, build, smoke HTTP e E2E desktop/mobile no run `30954725742`.
+- PR `#170` continua fechada sem merge, substituída pela implementação limpa da PR `#178`.
 - PR `#168` permanece bloqueada e não deve ser mergeada enquanto houver risco de reintrodução de segredos ou alterações privilegiadas fora do escopo.
-- A próxima entrega funcional é a PV-3.5, voltada à aquisição orgânica e páginas editoriais úteis sobre o mercado de fundos.
-- Não há evidência de deploy em produção da PV-3 neste documento; merge e CI não substituem verificação posterior do ambiente produtivo.
+- A próxima entrega funcional é a PV-4, sem recalcular fatos por IA e sem repetir alertas quando nada mudou.
+- Não há evidência de deploy em produção da PV-3.5 neste documento; merge e CI não substituem verificação posterior do ambiente produtivo.
 
 ### Matriz atual
 
@@ -52,13 +52,12 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | Risk Lab read-only | Concluído |
 | Histórico manual do ano corrente | Concluído |
 | Sincronização gráfico/cards | Concluída |
-| Persistência local + servidor | Concluída |
 | PV-2A — núcleo determinístico | Concluída |
 | PV-2B — apresentação dos sinais | Concluída |
 | PV-2C — explicação por IA | Concluída |
-| PV-3 — descoberta Premium/beta | Concluída com o merge da PR `#181` |
-| PV-3.5 — SEO e Conteúdo de Mercado | Sprint atual após o merge |
-| PV-4 — relatório incremental | Planejada |
+| PV-3 — descoberta Premium/beta | Concluída |
+| PV-3.5 — SEO e Conteúdo de Mercado | Concluída com o merge da PR `#182` |
+| PV-4 — relatório incremental | Sprint atual após o merge |
 | PV-5 — acompanhar fundos | Planejada |
 | Checkout/cobrança | Não iniciado |
 | AdSense | Congelado |
@@ -67,173 +66,141 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 ### Fase 1 — Regulatory Engine
 
-**Estado:** concluída.
-
-Parser regulatório, normalização, reconciliação, QA, publicação, rollback, auditoria e suporte FII/FIAGRO.
+**Estado:** concluída. Inclui parser regulatório, normalização, reconciliação, QA, publicação, rollback, auditoria e suporte FII/FIAGRO.
 
 ### Fase 2 — Core Intelligence & Product Foundation
 
-**Estado:** concluída quanto à fundação.
-
-Inclui `RegulatoryDataService`, repositórios, cache, score, Health, Validation, Admin, relatórios, AI Insights, monitor, catálogo, carteira e jobs.
+**Estado:** concluída quanto à fundação. Inclui `RegulatoryDataService`, repositórios, cache, score, Health, Validation, Admin, relatórios, AI Insights, monitor, catálogo, carteira e jobs.
 
 ### Fase 3 — Risk Lab
 
-**Estado:** concluída.
-
-Inclui dataset, backtest, ruleset `0.2.0`, Premium read-only, bloqueio de efeitos externos, smoke OIDC e auditoria persistida.
+**Estado:** concluída. Inclui dataset, backtest, ruleset `0.2.0`, Premium read-only, bloqueio de efeitos externos, smoke OIDC e auditoria persistida.
 
 ### PV-1 — Jornada principal da carteira e histórico manual
 
-**Estado:** concluída.
-
-Inclui cadastro manual de dividendos de meses encerrados, inclusão, sobrescrita, exclusão, persistência, reconciliação, atualização imediata de gráficos e cards, navegação/reload e testes desktop/mobile.
+**Estado:** concluída. Inclui cadastro manual de dividendos de meses encerrados, inclusão, sobrescrita, exclusão, persistência, reconciliação, atualização imediata de gráficos e cards e testes desktop/mobile.
 
 ### PV-2A — Inteligência da Carteira: núcleo determinístico
 
-**Estado:** concluída pela PR `#177`.
-
-Inclui contrato versionado, métricas de renda, concentração, participação na renda, meses atípicos, qualidade dos dados, sinais estruturados, evidências e tratamento separado de ausência, zero e entrada inválida.
+**Estado:** concluída pela PR `#177`. Inclui contrato versionado, métricas, qualidade dos dados, sinais estruturados, evidências e tratamento separado de ausência, zero e entrada inválida.
 
 ### PV-2B — Apresentação dos sinais
 
-**Estado:** concluída pela PR `#178`.
-
-Inclui painel integrado à carteira, linguagem simples, três sinais prioritários, expansão dos demais, evidências visíveis, estados explícitos e acessibilidade desktop/mobile.
+**Estado:** concluída pela PR `#178`. Inclui painel integrado, linguagem simples, sinais prioritários, expansão acessível e estados explícitos.
 
 ### PV-2C — IA explicativa sobre sinais prontos
 
-**Estado:** concluída pela PR `#180`.
-
-A explicação por IA ocorre apenas após ação explícita do usuário. Inclui payload sanitizado, prompt versionado, fingerprint, cache, deduplicação concorrente, rate limit, teto de tokens, validação contra números novos e recomendações, confiança herdada do domínio e fallback determinístico.
+**Estado:** concluída pela PR `#180`. A explicação por IA ocorre apenas após ação explícita do usuário. A IA nunca é fonte de verdade para cálculo financeiro. Resposta incompatível, com número novo ou recomendação falha fechado e usa fallback determinístico.
 
 ### PV-3 — Descoberta Premium, beta controlado e telemetria de interesse
 
-**Estado:** concluída com o merge da PR `#181`.
-
-Inclui:
-
-- proposta “Premium em validação” integrada à jornada da carteira;
-- benefícios concretos sem simular preço, compra ou assinatura;
-- pedido de participação que não concede acesso automaticamente;
-- allowlist server-side por UID ou e-mail verificado;
-- integração do beta ao mesmo entitlement usado pelos recursos Premium;
-- lista de interesse separada da telemetria;
-- eventos com audiência `external`, `beta`, `premium` ou `owner`;
-- identidade de telemetria em SHA-256, sem `ownerId` bruto;
-- retenção declarada de 90 dias;
-- rollback pela flag `ENABLE_PREMIUM_DISCOVERY`;
-- testes de domínio, arquitetura, privacidade e E2E.
-
-## 3. Sprint atual
+**Estado:** concluída pela PR `#181`. Inclui proposta honesta, lista de interesse, allowlist server-side, feature flag e telemetria pseudonimizada. Solicitar beta não concede entitlement.
 
 ### PV-3.5 — SEO e Conteúdo de Mercado
 
-**Objetivo:** construir aquisição orgânica sustentável com conteúdo útil, confiável e conectado às jornadas de consulta, carteira e Premium, sem criar páginas rasas ou publicar cenários sem data e fonte.
+**Estado:** concluída com o merge da PR `#182`.
+
+Inclui:
+
+- hub público sobre o mercado de fundos imobiliários em `/mercado`;
+- páginas específicas para mercado de FIIs, FIAGRO/agro, galpões/logística, shoppings, escritórios/lajes, recebíveis/papel e renda urbana;
+- registro editorial tipado e allowlistado;
+- data-base, política de revisão, fontes oficiais e limitações em cada página;
+- indicadores macro/setoriais tratados como contexto, nunca como recomendação;
+- canonical, Open Graph, `Article`, `CollectionPage`, `ItemList` e `BreadcrumbList`;
+- sitemap com somente páginas registradas como indexáveis;
+- 404 real para slug desconhecido;
+- navegação pública com acesso ao hub;
+- telemetria editorial sem identidade ou valores financeiros, com retenção de 90 dias;
+- testes de conteúdo, arquitetura, privacidade, sitemap, acessibilidade e E2E desktop/mobile.
+
+## 3. Sprint atual
+
+### PV-4 — Relatório incremental: mudanças desde a última análise
+
+**Objetivo:** informar o que realmente mudou na carteira desde a análise anterior, reduzindo repetição e destacando somente alterações materiais e rastreáveis.
 
 ### Escopo
 
-- criar um hub público sobre o mercado de fundos imobiliários;
-- criar páginas editoriais próprias para:
-  - mercado de FIIs;
-  - FIAGRO e cenário do agronegócio;
-  - galpões e logística;
-  - shoppings;
-  - escritórios e lajes corporativas;
-  - fundos de recebíveis/papel;
-  - renda urbana e segmentos complementares com dados suficientes;
-- explicar como juros, inflação, crédito, atividade econômica e ciclos setoriais afetam cada categoria;
-- separar conteúdo estrutural duradouro de atualizações conjunturais datadas;
-- informar data-base, fontes, limitações e critérios de atualização;
-- conectar cada página aos fundos e relatórios relacionados, sem recomendação de compra;
-- implementar metadados, canonical, `Article`, `BreadcrumbList`, sitemap e links internos coerentes;
-- manter `noindex` ou não publicar quando a página não atingir qualidade mínima;
-- medir entrada orgânica e continuidade para consulta, carteira, relatório e descoberta Premium sem valores financeiros ou identidade bruta;
-- preparar monitoramento por Google Search Console sem expor credenciais;
-- manter AdSense fora do escopo.
+- persistir uma referência versionada da última análise válida;
+- comparar análise atual e anterior por sinais, métricas, qualidade e proveniência;
+- separar mudança de dado, mudança de regra, mudança de cobertura e mudança de qualidade;
+- classificar alterações como nova, agravada, reduzida, resolvida ou inalterada;
+- destacar apenas mudanças materiais conforme política determinística;
+- não repetir alertas sem alteração real;
+- permitir leitura resumida e expansão das evidências;
+- manter a IA apenas como explicadora opcional das mudanças já determinadas;
+- registrar versão da política, datas-base e fingerprints das duas análises;
+- preservar privacidade e não enviar carteira bruta ao provedor de IA;
+- manter rollback e compatibilidade com análises antigas ou ausentes.
 
 ### Critérios de aceite
 
-- hub e páginas prioritárias possuem conteúdo original, útil e específico para cada segmento;
-- nenhuma página usa texto genérico intercambiável entre agro, logística, shoppings, escritórios e recebíveis;
-- cenários conjunturais exibem data-base e fontes verificáveis;
-- conteúdo não inventa indicadores, fatos, dividendos, aquisições ou projeções;
-- página com dados insuficientes falha fechado, não é indexada ou não é publicada;
-- arquitetura evita conteúdo duplicado e canibalização entre rotas;
-- metadados, canonical, sitemap, dados estruturados e breadcrumbs são testados;
-- links internos conduzem a páginas de fundos, carteira e recursos do produto de forma contextual;
+- primeira análise informa honestamente que não existe base anterior;
+- comparação usa somente snapshots/análises válidos e pertencentes ao mesmo usuário;
+- mudança financeira é decidida por domínio determinístico, nunca por IA;
+- alertas inalterados não reaparecem como novidade;
+- alterações de regra ou qualidade não são apresentadas como mudança do fundo;
+- evidências permitem reproduzir o antes e o depois;
+- ausência não vira zero e dados inválidos falham fechado;
 - desktop e mobile passam acessibilidade e E2E;
-- performance e renderização server-side não degradam as jornadas existentes;
-- telemetria editorial respeita a mesma política de privacidade da PV-3;
 - todos os gates da CI ficam verdes no mesmo SHA;
-- publicação e produção somente são consideradas concluídas com evidência separada do ambiente produtivo.
+- produção somente é considerada concluída com evidência separada do ambiente produtivo.
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **PV-3.5 — SEO e Conteúdo de Mercado.**
-2. **PV-4 — Relatório incremental: mudanças desde a última análise.**
-3. **PV-5 — Radar/Acompanhar fundo fora da carteira: 1 grátis e 10 Premium.**
-4. **PV-6 — Validação de preço e cobrança.**
-5. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial.**
-6. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
-7. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
+1. **PV-4 — Relatório incremental: mudanças desde a última análise.**
+2. **PV-5 — Radar/Acompanhar fundo fora da carteira: 1 grátis e 10 Premium.**
+3. **PV-6 — Validação de preço e cobrança.**
+4. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial.**
+5. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
+6. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
 
-AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados. SEO editorial agora possui sprint própria e não deve ser confundido com publicação automática irrestrita.
+AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados.
 
 ## 5. Escopo e critérios de aceite de cada sprint
 
-### PV-3.5
-
-Aceite conforme a seção 3, com conteúdo segmentado, data-base, fontes, SEO técnico, links internos, privacidade, acessibilidade e nenhuma página rasa indexada.
-
 ### PV-4 — Relatório incremental
 
-- comparar a análise atual com a última análise persistida;
-- destacar somente mudanças materiais;
-- separar mudança de dado, mudança de regra e mudança de qualidade;
-- não repetir alertas sem alteração;
-- manter evidência e proveniência;
-- não usar IA para decidir se uma mudança financeira ocorreu.
+Aceite conforme a seção 3. Deve comparar estados versionados, destacar somente mudanças materiais, preservar evidência e não usar IA para decidir se uma mudança financeira ocorreu.
 
 ### PV-5 — Acompanhar fundo fora da carteira
 
-- permitir acompanhar fundo sem transformá-lo em posição da carteira;
-- limite inicial: 1 fundo no plano grátis e até 10 no Premium;
-- notícias, fatos relevantes, dividendos e sinais devem ser deduplicados;
-- usuário deve conseguir iniciar e encerrar o acompanhamento;
-- alertas não podem ser interpretados como recomendação de compra;
-- relatório de acompanhamento deve explicar segmento, fatores de risco, renda, eventos e qualidade dos dados.
+- permitir acompanhar fundo sem transformá-lo em posição;
+- limite inicial: 1 fundo no Grátis e até 10 no Premium;
+- deduplicar notícias, fatos relevantes, dividendos e sinais;
+- permitir iniciar e encerrar acompanhamento;
+- não apresentar alertas como recomendação de compra;
+- explicar segmento, riscos, renda, eventos e qualidade dos dados.
 
 ### PV-6 — Validação de preço e cobrança
 
-- testar proposta de preço, periodicidade e disposição a pagar;
+- testar preço, periodicidade e disposição a pagar;
 - comparar recorrência, créditos e pagamento avulso;
 - definir evidência mínima com usuários externos;
-- registrar a decisão comercial antes de implementar cobrança;
-- não criar checkout nesta sprint.
+- registrar decisão comercial antes de qualquer checkout.
 
 ### PV-7 — Checkout e assinaturas
 
-- implementar checkout somente após decisão comercial registrada;
+- implementar somente após decisão comercial registrada;
 - incluir recorrência, cancelamento, reembolso e comunicação transparente;
-- processar webhooks de forma autenticada e idempotente;
-- entitlement permanece server-side;
-- nenhuma variável pública concede plano;
-- falha de cobrança não pode apagar histórico ou carteira.
+- webhooks autenticados e idempotentes;
+- entitlement exclusivamente server-side;
+- falha de cobrança não apaga carteira ou histórico.
 
 ### PV-8 — Histórico avançado, retorno e atribuição
 
-- retorno total, dividendos, valorização, aportes e atribuição separados;
-- competência, caixa e custo médio com regras versionadas;
-- reconciliação e migração sem perda de histórico;
-- comparações deixam explícitos período, benchmark e cobertura.
+- separar retorno total, dividendos, valorização, aportes e atribuição;
+- versionar competência, caixa e custo médio;
+- reconciliar e migrar sem perda de histórico;
+- explicitar período, benchmark e cobertura.
 
 ### PV-9 — Screener e comparador
 
 - screener, comparador e filtros salvos;
-- fair value por categoria, nunca uma fórmula única para todos os segmentos;
-- dados insuficientes devem permanecer explícitos;
-- ranking não pode esconder qualidade, liquidez ou limitações da fonte.
+- fair value por categoria, nunca fórmula única para todos os segmentos;
+- dados insuficientes permanecem explícitos;
+- ranking não esconde qualidade, liquidez ou limitações da fonte.
 
 Cada sprint exige escopo fechado, testes automatizados, Preview, produção e evidência antes de ser marcada como concluída.
 
@@ -242,27 +209,29 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 1. Route Handler → autenticação/schema → controller/application service → domínio → repository → Firestore/provedor.
 2. Nenhum `route.ts` importa Firestore diretamente.
 3. Componente React não contém regra financeira, entitlement ou persistência de domínio.
-4. Métricas e sinais da carteira ficam em módulos puros, testáveis e independentes de UI.
+4. Métricas, sinais e diferenças da carteira ficam em módulos puros e testáveis.
 5. IA nunca é fonte de verdade para cálculo financeiro.
-6. A camada de IA recebe somente sinais e evidências sanitizados; não recebe a carteira bruta por conveniência.
-7. Título, severidade, confiança, código e evidência de um sinal não podem ser substituídos pela IA.
-8. Saída de IA incompatível, com número novo ou recomendação falha fechado e usa fallback determinístico.
-9. Gráfico e cards que representam o mesmo conceito usam a mesma série consolidada.
+6. A camada de IA recebe somente sinais, diferenças e evidências sanitizados.
+7. Título, severidade, confiança, código e evidência não podem ser substituídos pela IA.
+8. Saída incompatível, com número novo ou recomendação falha fechado e usa fallback determinístico.
+9. Gráfico e cards equivalentes usam a mesma série consolidada.
 10. Ausência não vira zero; `NaN`, infinito, data futura e valor inválido falham fechado.
 11. Competência usa `YYYY-MM`.
 12. Snapshot automático não é editável como manual.
-13. Proveniência, data-base e timestamps são obrigatórios.
+13. Proveniência, data-base, versão e timestamps são obrigatórios.
 14. Logs e telemetria não contêm valores financeiros, posições, e-mail, token ou cookie.
 15. Eventos de produto usam identidade pseudonimizada e não persistem `ownerId` bruto.
-16. Plano, admin, identidade, allowlist e entitlement vêm do servidor.
-17. Interesse comercial não equivale a entitlement.
-18. Risk Lab permanece read-only no Premium.
-19. Conteúdo editorial conjuntural exige data-base, fonte e limitação explícitas.
-20. Página sem qualidade mínima não é indexada ou publicada.
-21. Correções são gerais, sem hardcode por ticker, e-mail ou usuário.
-22. CI é gate de merge e deploy.
-23. Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand` é aceita como correção funcional.
-24. Nenhuma validação manual substitui esses gates.
+16. Eventos editoriais são anônimos, allowlistados e não recebem parâmetros livres.
+17. Plano, admin, identidade, allowlist e entitlement vêm do servidor.
+18. Interesse comercial não equivale a entitlement.
+19. Risk Lab permanece read-only no Premium.
+20. Conteúdo editorial conjuntural exige data-base, fonte e limitação explícitas.
+21. Página sem qualidade mínima não é indexada ou publicada.
+22. Slug editorial desconhecido retorna 404; não existe conteúdo genérico por fallback.
+23. Correções são gerais, sem hardcode por ticker, e-mail ou usuário.
+24. CI é gate de merge e deploy.
+25. Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand` é aceita como correção funcional.
+26. Nenhuma validação manual substitui esses gates.
 
 ## 7. Arquivos, branches, commits e PRs existentes
 
@@ -270,176 +239,143 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 
 - Repositório: `IsraelJr/dados-fii`.
 - Branch principal: `main`.
-- Commit de merge da PV-2C na `main`: `68e35df5a211c1baf380cf939466656ff1f110c8`.
-- Branch da PV-3: `agent/pv-3-premium-discovery`.
-- SHA funcional da PV-3 antes da atualização documental: `2a5ac46d1c7cd248be6c46d53d2bc463690c38cd`.
+- Branch da PV-3.5: `agent/pv-3-5-seo-market-content`.
 - PR `#177`: PV-2A, mergeada.
 - PR `#178`: PV-2B, mergeada.
-- PR `#180`: PV-2C, mergeada por squash.
-- PR `#181`: PV-3 e atualização deste Handoff; mergear somente após todos os gates verdes no mesmo SHA final.
-- PR `#170`: fechada sem merge, substituída pela PR `#178`.
-- PR `#168`: bloqueada; não mergear sem remoção comprovada de segredos e escopo privilegiado legado.
+- PR `#180`: PV-2C, mergeada.
+- PR `#181`: PV-3, mergeada no commit `38e1aa803d62f88c249ca29ff6d919efd8125ad4`.
+- PR `#182`: PV-3.5 e Handoff v10.6.0; merge somente após CI final verde no mesmo SHA.
+- PR `#170`: fechada sem merge.
+- PR `#168`: bloqueada; não mergear sem auditoria específica de segredos e sessão.
 
-### Arquivos centrais da PV-3
+### Arquivos centrais da PV-3.5
 
-- `src/lib/premium-discovery/PremiumDiscovery.ts`;
-- `src/lib/premium-discovery/PremiumDiscoveryRepository.ts`;
-- `src/lib/premium-discovery/PremiumDiscoveryService.ts`;
-- `src/lib/premium-discovery/index.ts`;
-- `src/lib/premiumSecurity.ts`;
-- `src/lib/featureFlags.ts`;
-- `src/server/controllers/PremiumDiscoveryController.ts`;
-- `src/server/repositories/FirestorePremiumDiscoveryRepository.ts`;
-- `src/server/repositories/FirestoreProductEventRepository.ts`;
-- `src/app/api/premium/discovery/route.ts`;
-- `src/app/components/PremiumDiscoveryPanel.tsx`;
-- `src/app/components/PortfolioIntelligencePanel.tsx`;
-- `tests/premium-discovery.test.ts`;
-- `tests/premium-discovery-architecture.test.mjs`;
-- `tests/e2e/premium-discovery.spec.ts`;
-- `.env.example`;
-- `docs/operations/runtime-environment-inventory.md`;
-- `vercel.json`.
-
-### Evidências da PV-3 antes do Handoff v10.5.0
-
-- `Phase 2 Closure CI`: run `30930438283`, sucesso no SHA `2a5ac46d1c7cd248be6c46d53d2bc463690c38cd`.
-- `Risk Lab CI`: run `30930438323`, sucesso no mesmo SHA.
-- A atualização documental gera novo SHA e exige nova execução completa antes do merge.
+- `src/lib/editorial/marketContent.ts`;
+- `src/lib/editorial/EditorialEvent.ts`;
+- `src/app/mercado/page.tsx`;
+- `src/app/mercado/[slug]/page.tsx`;
+- `src/app/components/MarketArticlePage.tsx`;
+- `src/app/components/EditorialTelemetry.tsx`;
+- `src/app/api/editorial/events/route.ts`;
+- `src/server/controllers/EditorialEventController.ts`;
+- `src/server/repositories/FirestoreEditorialEventRepository.ts`;
+- `src/app/sitemap.ts`;
+- `src/app/components/SiteNav.tsx`;
+- `tests/market-content.test.ts`;
+- `tests/market-content-architecture.test.mjs`;
+- `tests/e2e/market-content.spec.ts`.
 
 ## 8. Funcionalidades concluídas, parciais e pendentes
 
 ### Concluídas
 
-- ingestão e normalização regulatória;
-- reconciliação, QA, publicação e rollback;
-- `RegulatoryDataService` como acesso canônico;
-- score, Health, Validation, Admin e observabilidade;
-- relatórios gratuito e Premium existentes;
-- AI Insights e explicação opcional da carteira;
-- Risk Lab Premium read-only;
-- carteira, histórico manual e snapshots consolidados;
-- sinais determinísticos e evidências da carteira;
-- proposta Premium em validação;
-- lista de interesse para o beta;
-- entitlement beta server-side;
-- telemetria pseudonimizada por audiência;
-- rollback da descoberta Premium por feature flag.
+- ingestão e reconciliação regulatória;
+- catálogo, score, Health, Validation e Admin;
+- carteira, histórico manual, snapshots e gráficos;
+- relatório Premium automático e Risk Lab read-only;
+- Inteligência da Carteira determinística, apresentação e explicação opcional por IA;
+- descoberta Premium, lista de interesse e beta controlado;
+- infraestrutura SEO de fundos com gate, manifesto e sitemap fail-closed;
+- hub e cenários editoriais por segmento.
 
 ### Parciais
 
-- validação comercial: infraestrutura concluída, mas depende de tráfego e usuários externos reais;
-- SEO técnico: canonicalização, sitemap, manifesto, `noindex` e páginas públicas já possuem base, mas a expansão editorial segmentada pertence à PV-3.5;
-- Premium: recursos existem, porém preço, cobrança e checkout ainda não foram decididos;
-- alertas: e-mail existe, unificação e política final ainda requerem evolução.
+- Premium possui recursos e beta, mas preço e cobrança ainda não foram validados;
+- páginas de fundos continuam dependentes do gate editorial individual;
+- Google Search Console precisa de acompanhamento operacional após publicação;
+- produção da PV-3.5 ainda exige verificação separada pós-merge.
 
 ### Pendentes
 
-- hub e páginas editoriais de mercado e segmentos;
-- relatório incremental;
-- acompanhar fundo fora da carteira, com 1 grátis e 10 Premium;
-- validação de preço e forma de cobrança;
-- checkout, recorrência e cancelamento;
-- histórico avançado e atribuição;
-- screener e comparador;
-- alertas por WhatsApp ou Telegram;
-- AdSense;
-- grandes alterações visuais.
+- relatório incremental da PV-4;
+- acompanhar fundo fora da carteira, 1 Grátis e 10 Premium;
+- validação de preço;
+- checkout e assinaturas;
+- histórico avançado e retorno total;
+- screener, comparador e filtros salvos;
+- alertas por WhatsApp ou Telegram, se aprovados posteriormente.
 
 ## 9. Decisões de segurança
 
-- Firebase ID token é verificado e revogado no servidor para rotas Premium.
-- Origem da requisição é validada antes de operações protegidas.
-- `PREMIUM_BETA_UIDS` e `PREMIUM_BETA_EMAILS` são server-only.
-- Nenhuma variável `NEXT_PUBLIC_*` concede plano, admin, beta, ownership ou allowlist.
-- Solicitar beta não concede entitlement.
-- O mesmo resolvedor server-side protege relatórios e recursos Premium.
-- A flag `ENABLE_PREMIUM_DISCOVERY` falha fechado por padrão.
-- Desligar a descoberta não remove entitlement Premium já existente.
-- Lista de interesse e telemetria são coleções separadas.
-- Telemetria não contém carteira, posições, cotas, patrimônio, dividendos, e-mail, token, cookie ou `ownerId` bruto.
-- Eventos usam `subjectHash`, audiência, correlação e retenção declarada.
-- Segredos não são versionados nem registrados em logs.
-- PR `#168` continua bloqueada.
-- Conteúdo editorial não pode transformar inferência em fato ou omitir data-base de cenário.
+- autenticação, identidade, plano e entitlement são resolvidos no servidor;
+- variáveis `NEXT_PUBLIC_*` nunca concedem privilégio;
+- Route Handlers não acessam Firestore diretamente;
+- segredos permanecem server-only e passam por secret scan;
+- telemetria de produto usa hash e não persiste identidade bruta;
+- telemetria editorial não usa identidade, parâmetros financeiros ou texto livre;
+- eventos editoriais possuem enumeração, UUID, versão e expiração;
+- páginas privadas permanecem `noindex`;
+- páginas editoriais desconhecidas retornam 404;
+- conteúdo não contém recomendação individual, preço-alvo ou promessa de rentabilidade;
+- falhas de fonte, schema, IA ou persistência são sanitizadas e falham fechado;
+- nenhuma ação automática de compra, venda ou alteração de carteira é permitida.
 
 ## 10. Variáveis de ambiente
 
-### Descoberta Premium
+### Obrigatórias conforme ambiente
 
-- `ENABLE_PREMIUM_DISCOVERY`: habilita a proposta e a lista de interesse; padrão no código é `false`; rollback define `false`.
-- `PREMIUM_BETA_UIDS`: UIDs Firebase autorizados manualmente no beta; server-only; vazio não libera ninguém por UID.
-- `PREMIUM_BETA_EMAILS`: e-mails verificados autorizados manualmente no beta; server-only; vazio não libera ninguém por e-mail.
-- `PREMIUM_PREVIEW_EMAILS`: exceção server-only preexistente para preview controlado.
+- credenciais Firebase públicas apenas para inicialização do cliente;
+- `FIREBASE_SERVICE_ACCOUNT_JSON` server-only;
+- `OPENAI_API_KEY` server-only;
+- `CRON_SECRET` server-only;
+- credenciais de e-mail e integrações operacionais server-only.
 
-### Segurança e infraestrutura
+### Produto e rollout
 
-- `FIREBASE_SERVICE_ACCOUNT_KEY`;
-- `ADMIN_EMAILS`;
-- `CRON_SECRET`;
-- `OPENAI_API_KEY` e modelos/tetos associados;
-- `RESEND_API_KEY` e remetentes;
-- tokens e chaves de mercado/planilhas;
-- flags do Risk Lab e relatório automático.
+- `ENABLE_RISK_LAB_PREMIUM_READONLY`;
+- `ENABLE_WALLET_RISK_REPORT_AUTOMATIC`;
+- `ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK`;
+- `ENABLE_PREMIUM_DISCOVERY`;
+- `PREMIUM_BETA_UIDS`;
+- `PREMIUM_BETA_EMAILS`;
+- `PREMIUM_PREVIEW_EMAILS`.
 
-O inventário completo, sem valores, permanece em `docs/operations/runtime-environment-inventory.md`. Toda variável nova exige classificação, fallback, rollback e teste. Nenhuma credencial da Search Console deve ser pública ou inserida no conteúdo editorial.
+A PV-3.5 não adiciona credencial de Search Console nem variável pública com poder de indexação. O registro editorial versionado decide quais páginas existem; o sitemap só inclui páginas allowlistadas e válidas.
 
 ## 11. Testes obrigatórios
 
-Cada PR funcional deve executar, no mesmo SHA:
+Toda PR funcional deve executar, no mesmo SHA:
 
-1. instalação congelada de dependências;
-2. governança do GitHub Actions;
-3. validação do Handoff canônico;
+1. instalação congelada por lockfile;
+2. governança de GitHub Actions;
+3. teste canônico do Handoff;
 4. auditoria de dependências de produção;
-5. detecção de segredos;
+5. secret scan;
 6. lint;
 7. TypeScript;
-8. suíte unitária, integração e contratos;
-9. regras do Firestore;
+8. suíte completa unitária, integração e contratos;
+9. Firestore Rules no Emulator;
 10. cobertura financeira crítica;
 11. mutation sanity;
 12. build de produção;
 13. smoke HTTP real;
 14. E2E desktop/mobile;
-15. Risk Lab completo quando o workflow for acionado.
+15. acessibilidade sem violações sérias ou críticas.
 
-Testes específicos da PV-3 devem provar:
+Para conteúdo editorial, também são obrigatórios:
 
-- payload aceita somente origem e motivação allowlisted;
-- campos extras do cliente são ignorados;
-- pedido não libera acesso automaticamente;
-- interesse permanece pendente até entitlement server-side;
-- beta, Premium e proprietário são distinguidos no servidor;
-- eventos não transportam dados financeiros ou identidade bruta;
-- eventos possuem versão, audiência, correlação e retenção;
-- rotas permanecem finas e sem Firestore direto;
-- interface comunica “Em validação”, ausência de cobrança e ausência de garantia automática;
-- nenhum request autenticado é disparado para usuário deslogado;
-- desktop e mobile passam acessibilidade crítica.
-
-Testes da PV-3.5 deverão incluir metadados, canonical, sitemap, dados estruturados, conteúdo específico por segmento, data-base, fontes, `noindex` de páginas insuficientes, links internos, acessibilidade, renderização e regressão das jornadas atuais.
-
-Nenhuma validação manual substitui esses gates.
+- registro com slugs únicos e allowlistados;
+- conteúdo específico por segmento;
+- data-base e fontes HTTPS verificáveis;
+- canonical, sitemap e dados estruturados;
+- 404 para slug desconhecido;
+- ausência de campos proibidos na telemetria;
+- links internos para jornada editorial e carteira;
+- teste de que AdSense não foi antecipado.
 
 ## 12. Pendências e decisões ainda abertas
 
-- preço de cada plano;
-- periodicidade mensal, anual, créditos ou pagamento avulso;
-- provedor de cobrança;
-- critérios quantitativos mínimos para avançar da validação à cobrança;
-- tamanho e processo operacional da coorte beta;
-- rotina de limpeza física dos eventos após a retenção declarada;
-- painel administrativo da lista de interesse e métricas agregadas;
-- estrutura final das URLs editoriais da PV-3.5;
-- calendário editorial e frequência de atualização de cenários;
-- fontes oficiais obrigatórias por categoria de conteúdo;
-- uso futuro de WhatsApp ou Telegram;
-- unificação final dos e-mails;
-- ativação futura do AdSense;
-- política de reembolso e inadimplência;
-- implementação final do relatório incremental;
-- regras detalhadas do acompanhamento de fundos fora da carteira;
-- verificação separada de Preview e produção após cada merge.
+- preço inicial do Premium e do Super Premium;
+- mensalidade, créditos, pagamento avulso ou combinação;
+- evidência mínima de usuários externos para avançar à cobrança;
+- provedor de pagamento e regras de reembolso;
+- cadência editorial e responsável por atualização dos cenários;
+- operação do Google Search Console após publicação;
+- quais fundos receberão revisão editorial individual primeiro;
+- WhatsApp ou Telegram para alertas, mantendo consentimento, custo e privacidade;
+- eventual AdSense, ainda congelado;
+- definição detalhada da política de materialidade da PV-4;
+- retenção e migração de análises anteriores para comparação incremental;
+- verificação pós-merge e pós-deploy da PV-3.5 em produção.
 
-A próxima execução oficial deve começar pela **PV-3.5 — SEO e Conteúdo de Mercado**, sem antecipar checkout, cobrança, WhatsApp, Telegram ou AdSense.
+Nenhuma dessas decisões abertas autoriza checkout, anúncio, mensagem externa ou mudança de entitlement sem sprint própria, testes e registro canônico.
