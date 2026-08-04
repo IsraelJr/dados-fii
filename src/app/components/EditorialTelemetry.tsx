@@ -9,8 +9,8 @@ function classifyEntry(): EditorialEntryClass {
     const referrer = new URL(document.referrer);
     if (referrer.hostname === window.location.hostname) return "internal";
     const host = referrer.hostname.toLowerCase();
-    if (["google.", "bing.", "duckduckgo.", "yahoo.", "ecosia."].some((token) => host.includes(token))) return "search";
-    if (["facebook.", "instagram.", "linkedin.", "twitter.", "t.co", "whatsapp.", "telegram."].some((token) => host.includes(token))) return "social";
+    if (["google.", "bing.", "duckduckgo.", "yahoo.", "ecosia."].some((domainPattern) => host.includes(domainPattern))) return "search";
+    if (["facebook.", "instagram.", "linkedin.", "twitter.", "t.co", "whatsapp.", "telegram."].some((domainPattern) => host.includes(domainPattern))) return "social";
     return "other";
   } catch {
     return "other";
