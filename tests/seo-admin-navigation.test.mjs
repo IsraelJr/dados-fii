@@ -8,6 +8,7 @@ test("public navigation does not expose the administrative area", () => {
   const navigation = read("src/app/components/SiteNav.tsx");
 
   assert.doesNotMatch(navigation, /AdminEntryLink/);
+  assert.doesNotMatch(navigation, /ShieldCheck/);
   assert.doesNotMatch(navigation, /href=["']\/admin(?:\/|["'])/);
   assert.equal(
     existsSync(new URL("../src/app/components/AdminEntryLink.tsx", import.meta.url)),
