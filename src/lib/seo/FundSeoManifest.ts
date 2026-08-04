@@ -58,10 +58,14 @@ export function buildFundSeoManifest(
   const entries = candidates.map((candidate): FundSeoManifestEntry => {
     const eligibility = evaluateFundSeoEligibility(candidate.input);
     const fingerprint = normalizedFingerprint(candidate.contentFingerprint);
-    const duplicateEditorialContent = Boolean(fingerprint && (fingerprintCounts.get(fingerprint) || 0) > 1);
-    const blockers = duplicateEditorialContent && eligibility.decision !== "not-found"
-      ? unique([...eligibility.blockers, "DUPLICATE_EDITORIAL_CONTENT"])
-      : eligibility.blockers;
+    const editorialBlockers = eligibility.decision === "not-found"
+      ? []
+      : !fingerprint
+        ? ["MISSING_EDITORIAL_FINGERPRINT"]
+        : (fingerprintCounts.get(fingerprint) || 0) > 1
+          ? ["DUPLICATE_EDITORIAL_CONTENT"]
+          : [];
+    const blockers = unique([...eligibility.blockers, ...editorialBlockers]);
     const decision: SeoIndexingDecision = eligibility.decision === "not-found"
       ? "not-found"
       : blockers.length
