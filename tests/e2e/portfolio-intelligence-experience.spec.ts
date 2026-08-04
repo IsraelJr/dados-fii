@@ -18,11 +18,84 @@ async function expectNoHighImpactAccessibilityViolations(page: Page) {
   expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact || ""))).toEqual([]);
 }
 
-test.beforeEach(async ({ page }) => {
-  await page.route(/^https:\/\//, (route) => route.abort());
-});
+function incrementalReference(options: { fingerprint: string; generatedAt: string; asOf: string; latestIncome: number }) {
+  return {
+    schemaVersion: 1,
+    fingerprint: options.fingerprint,
+    policyVersion: "1.0.0",
+    generatedAt: options.generatedAt,
+    asOf: options.asOf,
+    signals: [],
+    metrics: {
+      latestClosedCompetence: "2026-06",
+      latestIncome: options.latestIncome,
+      blockVariationPercent: 0,
+      sixMonthCoefficientOfVariationPercent: 0,
+      largestPositionSharePercent: 100,
+      topThreeSharePercent: 100,
+      patrimonyHhi: 10_000,
+      largestIncomeContributorTicker: "TGAR11",
+      largestIncomeContributorSharePercent: 100,
+      estimatedIncomeTotal: options.latestIncome,
+      patrimonyCoveragePercent: 100,
+      segmentCoveragePercent: 100,
+      incomeCoveragePercent: 100,
+      monthsAvailable: 6,
+    },
+    quality: { state: "sufficient", reasonCodes: [], warningCodes: [] },
+  };
+}
 
-test("carteira exibe análise, evidências, expansão e explicação sob demanda acessíveis", async ({ page }) => {
+function changedComparison() {
+  const previous = incrementalReference({
+    fingerprint: "previous-fingerprint",
+    generatedAt: "2026-08-03T12:00:00.000Z",
+    asOf: "2026-08-03T12:00:00.000Z",
+    latestIncome: 110,
+  });
+  const current = incrementalReference({
+    fingerprint: "current-fingerprint",
+    generatedAt: "2026-08-04T12:00:00.000Z",
+    asOf: "2026-08-04T12:00:00.000Z",
+    latestIncome: 100,
+  });
+  const materialChange = {
+    id: "data:LATEST_INCOME_CHANGED:aggravated",
+    category: "data",
+    state: "aggravated",
+    code: "LATEST_INCOME_CHANGED",
+    title: "A renda do último mês fechado mudou",
+    summary: "A renda do último mês encerrado variou além da política de materialidade.",
+    material: true,
+    before: 110,
+    after: 100,
+    evidence: {
+      previousAsOf: previous.asOf,
+      currentAsOf: current.asOf,
+      previousFingerprint: previous.fingerprint,
+      currentFingerprint: current.fingerprint,
+      threshold: "3% relativos",
+    },
+  };
+  return {
+    schemaVersion: 1,
+    policyVersion: "1.0.0",
+    status: "changed",
+    previous,
+    current,
+    changes: [materialChange],
+    materialChanges: [materialChange],
+    unchangedSignalCodes: ["RENDA_ESTAVEL"],
+    summary: {
+      materialChangeCount: 1,
+      totalChangeCount: 1,
+      unchangedSignalCount: 1,
+      message: "1 mudança material desde a análise anterior.",
+    },
+  };
+}
+
+async function preparePortfolio(page: Page) {
   const competences = previousClosedCompetences(6);
   const currentMonth = new Intl.DateTimeFormat("en-US", {
     month: "long",
@@ -77,10 +150,18 @@ test("carteira exibe análise, evidências, expansão e explicação sob demanda
       }),
     });
   });
+}
 
-  let explanationRequests = 0;
+test.beforeEach(async ({ page }) => {
+  await page.route(/^https:\/\//, (route) => route.abort());
+});
+
+test("carteira exibe análise incremental, evidências e explicações sob demanda acessíveis", async ({ page }) => {
+  await preparePortfolio(page);
+
+  let signalExplanationRequests = 0;
   await page.route("**/api/portfolio/intelligence/explanation", async (route) => {
-    explanationRequests += 1;
+    signalExplanationRequests += 1;
     await new Promise((resolve) => setTimeout(resolve, 120));
     await route.fulfill({
       status: 200,
@@ -118,6 +199,58 @@ test("carteira exibe análise, evidências, expansão e explicação sob demanda
     });
   });
 
+  let incrementalRequests = 0;
+  await page.route("**/api/portfolio/incremental-analysis", async (route) => {
+    incrementalRequests += 1;
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        comparison: changedComparison(),
+        persistence: { stored: true, baselineState: "found" },
+      }),
+    });
+  });
+
+  let incrementalExplanationRequests = 0;
+  await page.route("**/api/portfolio/incremental-analysis/explanation", async (route) => {
+    incrementalExplanationRequests += 1;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        degraded: false,
+        explanation: {
+          version: "1.0.0",
+          source: "ai",
+          summary: "A comparação identificou uma mudança material já validada pelo domínio determinístico.",
+          changeExplanations: [{
+            id: "data:LATEST_INCOME_CHANGED:aggravated",
+            title: "A renda do último mês fechado mudou",
+            explanation: "A renda recente ficou abaixo da referência anterior e ultrapassou o limiar definido.",
+            whyItMatters: "A mudança merece acompanhamento sem transformar uma única comparação em previsão futura.",
+          }],
+          limitations: [
+            "A explicação não recalcula valores, categorias ou materialidade.",
+            "A comparação depende das duas referências válidas.",
+          ],
+          disclaimer: "Explicação informativa de mudanças já calculadas. Não é recomendação de compra, venda, manutenção ou aporte.",
+          metadata: {
+            engineVersion: "test-engine",
+            promptVersion: "portfolio-incremental-explanation-v1",
+            model: "test-model",
+            fingerprint: "incremental-test-fingerprint",
+            generatedAt: "2026-08-04T19:00:00.000Z",
+            cached: false,
+          },
+        },
+      }),
+    });
+  });
+
   await page.goto("/carteira");
   await expect(page.getByTestId("portfolio-intelligence-loading")).toBeVisible();
 
@@ -131,26 +264,87 @@ test("carteira exibe análise, evidências, expansão e explicação sob demanda
   await expect(panel.getByRole("heading", { name: "Dados usados nesta análise" })).toBeVisible();
   await expect(panel.getByText("Conteúdo informativo, sem recomendação de investimento.")).toBeVisible();
 
+  const incrementalPanel = page.getByTestId("portfolio-incremental-report");
+  await expect(incrementalPanel).toHaveAttribute("data-incremental-state", "changed");
+  await expect(incrementalPanel.getByRole("heading", { name: "O que mudou desde a última análise" })).toBeVisible();
+  await expect(incrementalPanel.getByText("1 mudança material desde a análise anterior.")).toBeVisible();
+  await expect(incrementalPanel.locator('[data-incremental-change="LATEST_INCOME_CHANGED"]')).toBeVisible();
+  expect(incrementalRequests).toBe(1);
+
+  const evidenceButton = incrementalPanel.getByRole("button", { name: "Ver evidências da comparação" });
+  await expect(evidenceButton).toHaveAttribute("aria-expanded", "false");
+  await evidenceButton.click();
+  await expect(evidenceButton).toHaveAttribute("aria-expanded", "true");
+  await expect(incrementalPanel.getByText("3% relativos")).toBeVisible();
+  await expect(incrementalPanel.getByText(/previous → current/)).toBeVisible();
+
+  const incrementalExplanationPanel = page.getByTestId("portfolio-incremental-explanation");
+  const incrementalExplanationButton = incrementalExplanationPanel.getByRole("button", { name: "Explicar estas mudanças" });
+  expect(incrementalExplanationRequests).toBe(0);
+  await incrementalExplanationButton.click();
+  await expect(incrementalExplanationPanel.getByRole("status")).toContainText("Traduzindo as mudanças");
+  await expect(incrementalExplanationPanel.locator('[data-incremental-explanation-source="ai"]')).toBeVisible();
+  await expect(incrementalExplanationPanel.getByText("Explicado por IA")).toBeVisible();
+  await expect(incrementalExplanationPanel.getByText("Por que importa:")).toBeVisible();
+  await expect(incrementalExplanationPanel.getByRole("heading", { name: "Limitações desta leitura" })).toBeVisible();
+  expect(incrementalExplanationRequests).toBe(1);
+
   const expansion = panel.locator('button[aria-controls="portfolio-intelligence-signals"]');
   await expect(expansion).toHaveAccessibleName(/Ver todos os .* sinais/);
-  await expect(expansion).toHaveAttribute("aria-expanded", "false");
   await expansion.click();
-  await expect(expansion).toHaveAttribute("aria-expanded", "true");
   await expect(expansion).toHaveAccessibleName("Recolher sinais");
   await expect.poll(() => panel.locator("[data-signal-code]").count()).toBeGreaterThan(3);
 
   const explanationPanel = page.getByTestId("portfolio-intelligence-explanation");
   const explanationButton = explanationPanel.getByRole("button", { name: "Explicar estes sinais" });
-  await expect(explanationButton).toBeVisible();
-  expect(explanationRequests).toBe(0);
+  expect(signalExplanationRequests).toBe(0);
   await explanationButton.click();
   await expect(explanationPanel.getByRole("status")).toContainText("Traduzindo os sinais");
   await expect(explanationPanel.locator('[data-explanation-source="ai"]')).toBeVisible();
-  await expect(explanationPanel.getByText("Explicado por IA")).toBeVisible();
-  await expect(explanationPanel.getByText("Por que importa:")).toBeVisible();
-  await expect(explanationPanel.getByRole("heading", { name: "Limitações desta leitura" })).toBeVisible();
-  await expect(explanationPanel.getByText(/Não é recomendação de compra, venda ou manutenção/)).toBeVisible();
-  expect(explanationRequests).toBe(1);
+  expect(signalExplanationRequests).toBe(1);
 
   await expectNoHighImpactAccessibilityViolations(page);
+});
+
+test("primeira análise cria referência sem inventar mudanças", async ({ page }) => {
+  await preparePortfolio(page);
+  const current = incrementalReference({
+    fingerprint: "baseline-fingerprint",
+    generatedAt: "2026-08-04T12:00:00.000Z",
+    asOf: "2026-08-04T12:00:00.000Z",
+    latestIncome: 100,
+  });
+  await page.route("**/api/portfolio/incremental-analysis", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        comparison: {
+          schemaVersion: 1,
+          policyVersion: "1.0.0",
+          status: "baseline",
+          previous: null,
+          current,
+          changes: [],
+          materialChanges: [],
+          unchangedSignalCodes: [],
+          summary: {
+            materialChangeCount: 0,
+            totalChangeCount: 0,
+            unchangedSignalCount: 0,
+            message: "Esta é a primeira análise válida. Ela foi salva como referência para a próxima comparação.",
+          },
+        },
+        persistence: { stored: true, baselineState: "missing" },
+      }),
+    });
+  });
+
+  await page.goto("/carteira");
+  const incrementalPanel = page.getByTestId("portfolio-incremental-report");
+  await expect(incrementalPanel).toHaveAttribute("data-incremental-state", "baseline");
+  await expect(incrementalPanel.getByText("Primeira referência criada")).toBeVisible();
+  await expect(incrementalPanel.getByText(/primeira análise válida/i)).toBeVisible();
+  await expect(page.getByTestId("portfolio-incremental-explanation")).toHaveCount(0);
 });
