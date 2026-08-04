@@ -5,16 +5,20 @@ import test from "node:test";
 
 const ROOT = process.cwd();
 const DOMAIN_DIR = path.join(ROOT, "src/lib/portfolio-intelligence");
+const SERVER_ADAPTERS = new Set(["PortfolioIntelligenceExplanationService.ts"]);
 
-async function domainSources() {
-  const names = (await readdir(DOMAIN_DIR)).filter((name) => name.endsWith(".ts"));
+async function domainSources({ includeServerAdapters = false } = {}) {
+  const names = (await readdir(DOMAIN_DIR)).filter((name) => (
+    name.endsWith(".ts")
+    && (includeServerAdapters || !SERVER_ADAPTERS.has(name))
+  ));
   return Promise.all(names.map(async (name) => ({
     name,
     source: await readFile(path.join(DOMAIN_DIR, name), "utf8"),
   })));
 }
 
-test("domínio de inteligência não depende de React, Next, Firestore ou OpenAI", async () => {
+test("núcleo determinístico e contratos puros não dependem de React, Next, Firestore ou OpenAI", async () => {
   const sources = await domainSources();
   const combined = sources.map(({ source }) => source).join("\n");
   assert.doesNotMatch(combined, /from\s+["']react["']/);
@@ -64,7 +68,7 @@ test("adaptadores mapeiam a série consolidada e as posições sem acoplamento d
   );
 });
 
-test("não existe route handler, persistência ou chamada de IA para o diagnóstico", async () => {
+test("núcleo determinístico não possui route handler, persistência ou chamada de IA", async () => {
   const routesRoot = path.join(ROOT, "src/app/api");
   const pending = [routesRoot];
   const matchingRoutes = [];
@@ -82,12 +86,13 @@ test("não existe route handler, persistência ou chamada de IA para o diagnóst
   assert.doesNotMatch(combined, /fetch\(|generateText|AIInsights|adminDb|firebase-admin/i);
 });
 
-test("barrel público expõe somente contratos e funções do núcleo determinístico", async () => {
+test("barrel público expõe contratos e funções puras, nunca o adaptador server-only", async () => {
   const source = await readFile(path.join(DOMAIN_DIR, "index.ts"), "utf8");
   for (const moduleName of [
     "PortfolioIntelligence",
     "PortfolioIntelligenceAdapters",
     "PortfolioIntelligenceDataQuality",
+    "PortfolioIntelligenceExplanation",
     "PortfolioIntelligenceMetrics",
     "PortfolioIntelligencePolicy",
     "PortfolioIntelligenceService",
@@ -95,11 +100,11 @@ test("barrel público expõe somente contratos e funções do núcleo determiní
   ]) {
     assert.match(source, new RegExp(`export \\* from ["']\\./${moduleName}["']`));
   }
-  assert.doesNotMatch(source, /Panel|Component|Page|Route|Repository/);
+  assert.doesNotMatch(source, /PortfolioIntelligenceExplanationService|Panel|Component|Page|Route|Repository/);
 });
 
 test("arquitetura não altera autenticação, entitlement, Risk Lab ou relatório Premium", async () => {
-  const changedRuntimeReferences = (await domainSources())
+  const changedRuntimeReferences = (await domainSources({ includeServerAdapters: true }))
     .map(({ source }) => source)
     .join("\n");
   assert.doesNotMatch(
