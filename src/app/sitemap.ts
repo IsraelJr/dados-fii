@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { MARKET_ARTICLES } from "@/lib/editorial/marketContent";
 import { isFundSeoManifestFresh } from "@/lib/seo/FundSeoManifest";
 import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestRuntime";
 import { SITE_URL } from "@/lib/site";
@@ -6,10 +7,11 @@ import { SITE_URL } from "@/lib/site";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const LAST_EDITORIAL_REVIEW = new Date("2026-07-27T12:00:00-03:00");
+const LAST_EDITORIAL_REVIEW = new Date("2026-08-04T12:00:00-03:00");
 
 const ROUTES = [
   { path: "", changeFrequency: "daily" as const, priority: 1 },
+  { path: "/mercado", changeFrequency: "weekly" as const, priority: 0.95 },
   { path: "/guias", changeFrequency: "monthly" as const, priority: 0.9 },
   { path: "/guias/fundos-imobiliarios", changeFrequency: "monthly" as const, priority: 0.9 },
   { path: "/guias/dividendos-de-fiis", changeFrequency: "monthly" as const, priority: 0.9 },
@@ -34,10 +36,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
+  const marketRoutes: MetadataRoute.Sitemap = MARKET_ARTICLES
+    .filter((article) => article.indexable)
+    .map((article) => ({
+      url: `${SITE_URL}/mercado/${article.slug}`,
+      lastModified: new Date(`${article.asOf}T12:00:00-03:00`),
+      changeFrequency: "monthly" as const,
+      priority: 0.85,
+    }));
+  const editorialRoutes = [...staticRoutes, ...marketRoutes];
 
   try {
     const manifest = await fundSeoManifestService.getCurrent();
-    if (!isFundSeoManifestFresh(manifest)) return staticRoutes;
+    if (!isFundSeoManifestFresh(manifest)) return editorialRoutes;
     const fundRoutes: MetadataRoute.Sitemap = manifest.entries
       .filter((entry) => entry.indexable && entry.canonicalPath && entry.lastModified)
       .map((entry) => ({
@@ -46,9 +57,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "daily" as const,
         priority: 0.8,
       }));
-    return [...staticRoutes, ...fundRoutes];
+    return [...editorialRoutes, ...fundRoutes];
   } catch (error) {
     console.error("SEO sitemap manifest error", error instanceof Error ? error.message : "unknown");
-    return staticRoutes;
+    return editorialRoutes;
   }
 }
