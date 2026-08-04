@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Native strip-types requires explicit extension.
-import { validateFundSeoManifest } from "../src/lib/seo/FundSeoManifestRepository.ts";
+import { validateFundSeoManifest } from "../src/lib/seo/FundSeoManifestValidation.ts";
 import type { FundSeoManifest } from "../src/lib/seo/FundSeoManifest.ts";
 
 function validManifest(): FundSeoManifest {
@@ -23,7 +23,7 @@ function validManifest(): FundSeoManifest {
   };
 }
 
-test("valid persisted SEO manifest is accepted", () => {
+test("valid persisted SEO manifest is accepted without loading Firebase infrastructure", () => {
   assert.doesNotThrow(() => validateFundSeoManifest(validManifest()));
 });
 
