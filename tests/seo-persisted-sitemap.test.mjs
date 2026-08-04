@@ -9,15 +9,17 @@ test("sitemap reads one persisted manifest and never queries funds individually"
 
   assert.match(sitemap, /fundSeoManifestService\.getCurrent\(\)/);
   assert.equal((sitemap.match(/\.getCurrent\(/g) || []).length, 1);
+  assert.match(sitemap, /isFundSeoManifestFresh\(manifest\)/);
   assert.match(sitemap, /entry\.indexable && entry\.canonicalPath && entry\.lastModified/);
   assert.match(sitemap, /url: `\$\{SITE_URL\}\$\{entry\.canonicalPath\}`/);
   assert.doesNotMatch(sitemap, /getByTicker|getMany|listFunds|getFundDirectory|rebuild\(/);
   assert.doesNotMatch(sitemap, /adminDb|firebase-admin|RegulatoryRepository/);
 });
 
-test("sitemap fails closed to static routes when the manifest read fails", () => {
+test("sitemap fails closed to static routes when the manifest is absent, stale or unreadable", () => {
   const sitemap = read("src/app/sitemap.ts");
 
+  assert.match(sitemap, /if \(!isFundSeoManifestFresh\(manifest\)\) return staticRoutes/);
   assert.match(sitemap, /try\s*\{/);
   assert.match(sitemap, /catch \(error\)/);
   assert.match(sitemap, /return staticRoutes/);
@@ -34,6 +36,8 @@ test("manifest persistence is isolated in a repository with size and consistency
   assert.match(repository, /FIRESTORE_SAFE_DOCUMENT_BYTES/);
   assert.match(repository, /tickers duplicados/);
   assert.match(repository, /ordenado por ticker/);
+  assert.match(repository, /canonical incompatível/);
+  assert.match(repository, /data de modificação inválida/);
   assert.match(repository, /action: "seo-manifest"/);
 });
 
