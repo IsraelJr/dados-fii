@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { isFundSeoManifestFresh } from "@/lib/seo/FundSeoManifest";
 import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestService";
 import { SITE_URL } from "@/lib/site";
 
@@ -36,11 +37,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const manifest = await fundSeoManifestService.getCurrent();
-    const fundRoutes: MetadataRoute.Sitemap = (manifest?.entries || [])
+    if (!isFundSeoManifestFresh(manifest)) return staticRoutes;
+    const fundRoutes: MetadataRoute.Sitemap = manifest.entries
       .filter((entry) => entry.indexable && entry.canonicalPath && entry.lastModified)
       .map((entry) => ({
         url: `${SITE_URL}${entry.canonicalPath}`,
-        lastModified: new Date(entry.lastModified as string),
+        lastModified: new Date(entry.lastModified!),
         changeFrequency: "daily" as const,
         priority: 0.8,
       }));
