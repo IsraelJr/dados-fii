@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
-import {
-  PORTFOLIO_EXPLANATION_DISCLAIMER,
-  buildDeterministicPortfolioExplanation,
-  derivePortfolioExplanationConfidence,
-  normalizePortfolioExplanationOutput,
-  sanitizePortfolioExplanationInput,
-} from "../src/lib/portfolio-intelligence/PortfolioIntelligenceExplanation.ts";
+import { PORTFOLIO_EXPLANATION_DISCLAIMER, buildDeterministicPortfolioExplanation, derivePortfolioExplanationConfidence, normalizePortfolioExplanationOutput, sanitizePortfolioExplanationInput } from "../src/lib/portfolio-intelligence/PortfolioIntelligenceExplanation.ts";
 import type { AIInsightsMetadata } from "../src/types/ai-insights.ts";
 
 const metadata: AIInsightsMetadata = {
@@ -19,7 +13,7 @@ const metadata: AIInsightsMetadata = {
   cached: false,
 };
 
-function rawResult() {
+function rawResult(): any {
   return {
     policyVersion: "1.0.0",
     generatedAt: "2026-08-04T15:00:00.000Z",
