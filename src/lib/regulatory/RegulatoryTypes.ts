@@ -17,6 +17,7 @@ export const REGULATORY_COLLECTIONS = {
   catalogRuns: "RegulatoryCatalogRuns",
   catalogAudits: "RegulatoryCatalogAudits",
   catalogDirectory: "RegulatoryCatalogDirectory",
+  seoManifests: "RegulatorySeoManifests",
   phase2ClosureRuns: "RegulatoryPhase2ClosureRuns",
   premiumPeerSnapshots: "RegulatoryPremiumPeerSnapshots",
   premiumProductionSmokeRuns: "PremiumProductionSmokeRuns",

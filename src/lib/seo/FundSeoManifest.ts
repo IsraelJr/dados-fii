@@ -5,6 +5,7 @@ import {
 } from "./SeoEligibilityEvaluator";
 
 export const FUND_SEO_MANIFEST_SCHEMA_VERSION = 1 as const;
+export const FUND_SEO_MANIFEST_MAX_AGE_MS = 36 * 60 * 60_000;
 
 export type FundSeoManifestCandidate = {
   input: FundSeoEligibilityInput;
@@ -43,6 +44,19 @@ function normalizedGeneratedAt(value: string | Date) {
 
 function unique(values: string[]) {
   return [...new Set(values)];
+}
+
+export function isFundSeoManifestFresh(
+  manifest: FundSeoManifest | null,
+  now: string | Date | number = Date.now(),
+  maxAgeMs = FUND_SEO_MANIFEST_MAX_AGE_MS,
+): manifest is FundSeoManifest {
+  if (!manifest || !Number.isFinite(maxAgeMs) || maxAgeMs <= 0) return false;
+  const generatedAt = new Date(manifest.generatedAt).getTime();
+  const current = now instanceof Date ? now.getTime() : typeof now === "number" ? now : new Date(now).getTime();
+  if (!Number.isFinite(generatedAt) || !Number.isFinite(current)) return false;
+  const age = current - generatedAt;
+  return age >= 0 && age <= maxAgeMs;
 }
 
 export function buildFundSeoManifest(

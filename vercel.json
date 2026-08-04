@@ -31,6 +31,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/seo-manifest",
+      "schedule": "30 12 * * *"
+    },
+    {
       "path": "/api/cron/ifix-membership",
       "schedule": "0 9 1-7 1,5,9 *"
     },

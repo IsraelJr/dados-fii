@@ -1,5 +1,10 @@
 import type { MetadataRoute } from "next";
+import { isFundSeoManifestFresh } from "@/lib/seo/FundSeoManifest";
+import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestRuntime";
 import { SITE_URL } from "@/lib/site";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const LAST_EDITORIAL_REVIEW = new Date("2026-07-27T12:00:00-03:00");
 
@@ -22,11 +27,28 @@ const ROUTES = [
   { path: "/politica-de-privacidade", changeFrequency: "yearly" as const, priority: 0.3 },
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  return ROUTES.map((route) => ({
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const staticRoutes: MetadataRoute.Sitemap = ROUTES.map((route) => ({
     url: `${SITE_URL}${route.path}`,
     lastModified: LAST_EDITORIAL_REVIEW,
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
+
+  try {
+    const manifest = await fundSeoManifestService.getCurrent();
+    if (!isFundSeoManifestFresh(manifest)) return staticRoutes;
+    const fundRoutes: MetadataRoute.Sitemap = manifest.entries
+      .filter((entry) => entry.indexable && entry.canonicalPath && entry.lastModified)
+      .map((entry) => ({
+        url: `${SITE_URL}${entry.canonicalPath}`,
+        lastModified: new Date(entry.lastModified!),
+        changeFrequency: "daily" as const,
+        priority: 0.8,
+      }));
+    return [...staticRoutes, ...fundRoutes];
+  } catch (error) {
+    console.error("SEO sitemap manifest error", error instanceof Error ? error.message : "unknown");
+    return staticRoutes;
+  }
 }
