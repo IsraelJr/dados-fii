@@ -3,10 +3,7 @@ import test from "node:test";
 // @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
 import { sanitizePortfolioExplanationInput } from "../src/lib/portfolio-intelligence/PortfolioIntelligenceExplanation.ts";
 // @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
-import {
-  PortfolioIntelligenceExplanationError,
-  PortfolioIntelligenceExplanationService,
-} from "../src/lib/portfolio-intelligence/PortfolioIntelligenceExplanationService.ts";
+import { PortfolioIntelligenceExplanationError, PortfolioIntelligenceExplanationService } from "../src/lib/portfolio-intelligence/PortfolioIntelligenceExplanationService.ts";
 import type { AITextGeneration, AITextMessage } from "../src/types/ai-insights.ts";
 
 function input(signals = true) {
@@ -93,7 +90,7 @@ test("service sends only sanitized immutable signals, caps cost and reuses ident
 
 test("concurrent identical requests share one provider call", async () => {
   let calls = 0;
-  let release: (() => void) | null = null;
+  let release: () => void = () => undefined;
   const waiting = new Promise<void>((resolve) => { release = resolve; });
   const service = new PortfolioIntelligenceExplanationService({
     async generateText() {
@@ -105,7 +102,7 @@ test("concurrent identical requests share one provider call", async () => {
 
   const first = service.generate(input());
   const second = service.generate(input());
-  release?.();
+  release();
   const [firstResult, secondResult] = await Promise.all([first, second]);
   assert.equal(calls, 1);
   assert.equal(firstResult.metadata?.cached, false);
