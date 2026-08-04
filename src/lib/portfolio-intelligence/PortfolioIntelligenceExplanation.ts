@@ -1,4 +1,3 @@
-import type { AIInsightsMetadata } from "@/types/ai-insights";
 import type {
   PortfolioIntelligenceConfidence,
   PortfolioIntelligenceDataQualityReasonCode,
@@ -54,6 +53,15 @@ const QUALITY_STATES: readonly PortfolioIntelligenceQualityState[] = ["sufficien
 
 export type PortfolioExplanationEvidenceValue = string | number | boolean | null;
 
+export type PortfolioExplanationMetadata = Readonly<{
+  engineVersion: string;
+  promptVersion: string;
+  model: string;
+  fingerprint: string;
+  generatedAt: string;
+  cached: boolean;
+}>;
+
 export type PortfolioExplanationInput = Readonly<{
   policyVersion: string;
   asOf: string;
@@ -96,7 +104,7 @@ export type PortfolioIntelligenceExplanation = Readonly<{
   overallConfidence: PortfolioIntelligenceConfidence;
   limitations: readonly string[];
   disclaimer: typeof PORTFOLIO_EXPLANATION_DISCLAIMER;
-  metadata: AIInsightsMetadata | null;
+  metadata: PortfolioExplanationMetadata | null;
 }>;
 
 export const PORTFOLIO_EXPLANATION_SCHEMA = {
@@ -313,7 +321,7 @@ function assertSafeAiNarrative(values: readonly string[]) {
 export function normalizePortfolioExplanationOutput(
   value: unknown,
   input: PortfolioExplanationInput,
-  metadata: AIInsightsMetadata,
+  metadata: PortfolioExplanationMetadata,
 ): PortfolioIntelligenceExplanation {
   if (!isRecord(value)) throw new Error("Saída da explicação inválida.");
   const summary = outputText(value.summary, "Resumo da explicação", 1000);
