@@ -42,11 +42,11 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.5\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.6\.0/);
   assert.match(body, /Produto Validável/);
-  assert.match(body, /PV-3\.5 — SEO e Conteúdo de Mercado/);
+  assert.match(body, /PV-4 — Relatório incremental: mudanças desde a última análise/);
   assert.match(body, /PV-1 está concluída funcionalmente/);
-  assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C e PV-3 ficam formalmente concluídas/);
+  assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C, PV-3 e PV-3\.5 ficam formalmente concluídas/);
   assert.match(body, /Google AdSense continua congelado/);
 });
 
@@ -74,18 +74,20 @@ test("Handoff contém as doze seções obrigatórias na ordem", () => {
   }
 });
 
-test("estado atual protege fonte única, IA explicativa, descoberta Premium e próxima sprint", () => {
+test("estado atual protege fonte única, IA explicativa, descoberta Premium e SEO editorial", () => {
   const body = text();
   assert.match(body, /PR `#166` consolidou gráfico e resumo sobre `consolidatedSnapshots`/);
   assert.match(body, /PR `#167` restaurou o layout original dos seis cards/);
   assert.match(body, /PR `#177` integrou a PV-2A/);
   assert.match(body, /PR `#178` integrou a PV-2B/);
   assert.match(body, /PR `#180` encerrou a PV-2C/);
-  assert.match(body, /PR `#181` encerra a PV-3/);
+  assert.match(body, /PR `#181` encerrou a PV-3/);
+  assert.match(body, /PR `#182` encerra a PV-3\.5/);
   assert.match(body, /IA nunca é fonte de verdade para cálculo financeiro/);
   assert.match(body, /A explicação por IA ocorre apenas após ação explícita do usuário/);
   assert.match(body, /Solicitar beta não concede entitlement/);
   assert.match(body, /hub público sobre o mercado de fundos imobiliários/);
+  assert.match(body, /sete cenários segmentados/);
   assert.match(body, /Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand`/);
 });
 
@@ -96,9 +98,19 @@ test("regras críticas de arquitetura, privacidade editorial e conclusão perman
   assert.match(body, /Eventos de produto usam identidade pseudonimizada/);
   assert.match(body, /Conteúdo editorial conjuntural exige data-base, fonte e limitação explícitas/);
   assert.match(body, /Página sem qualidade mínima não é indexada ou publicada/);
+  assert.match(body, /Slug editorial desconhecido retorna 404/);
   assert.match(body, /CI é gate de merge e deploy/);
   assert.match(body, /Nenhuma validação manual substitui esses gates/);
   assert.match(body, /número novo ou recomendação falha fechado e usa fallback determinístico/);
+});
+
+test("evidência funcional da PV-3.5 e próxima sprint ficam registradas", () => {
+  const body = text();
+  assert.match(body, /6a57d3dbcdc58ba0f7a2a19705d461ffe689a294/);
+  assert.match(body, /30954725742/);
+  assert.match(body, /PV-3\.5 — SEO e Conteúdo de Mercado \| Concluída com o merge da PR `#182`/);
+  assert.match(body, /A próxima entrega funcional é a PV-4/);
+  assert.match(body, /Não há evidência de deploy em produção da PV-3\.5/);
 });
 
 test("documentos auxiliares canônicos existem e estão atualizados", () => {
