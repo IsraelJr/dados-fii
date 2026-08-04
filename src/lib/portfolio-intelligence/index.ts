@@ -5,3 +5,4 @@ export * from "./PortfolioIntelligenceMetrics";
 export * from "./PortfolioIntelligencePolicy";
 export * from "./PortfolioIntelligenceService";
 export * from "./PortfolioIntelligenceSignals";
+export * from "./PortfolioIntelligencePresentation";
