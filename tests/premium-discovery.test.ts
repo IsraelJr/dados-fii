@@ -43,14 +43,16 @@ test("request contract accepts only allowlisted origins and motivations", () => 
   );
 });
 
-test("event contract contains correlation and retention without financial fields", () => {
+test("event contract contains audience, correlation and retention without financial fields", () => {
   const event = createPremiumDiscoveryEvent(
     "premium_discovery_viewed",
     "portfolio_intelligence",
+    "external",
     "correlation-00000001",
     now(),
   );
   assert.equal(event.schemaVersion, 1);
+  assert.equal(event.audience, "external");
   assert.equal(event.retentionDays, 90);
   assert.equal(event.occurredAt, "2026-08-04T16:00:00.000Z");
   const serialized = JSON.stringify(event);
@@ -78,6 +80,7 @@ test("eligible user can request beta without receiving access automatically", as
     "premium_discovery_viewed",
     "premium_interest_requested",
   ]);
+  assert.deepEqual(repository.events.map(({ event }) => event.audience), ["external", "external"]);
 });
 
 test("interest remains requested until a server entitlement is present", async () => {
@@ -96,6 +99,9 @@ test("interest remains requested until a server entitlement is present", async (
   assert.equal(beta.access, "beta");
   assert.equal(beta.hasPremiumAccess, true);
   assert.equal(repository.events.at(-1)?.event.name, "premium_beta_accessed");
+  assert.equal(repository.events.at(-1)?.event.audience, "beta");
+  const betaEvents = repository.events.slice(-2).map(({ event }) => event);
+  assert.equal(betaEvents[0]?.correlationId, betaEvents[1]?.correlationId);
 });
 
 test("status labels owner, premium and beta distinctly", () => {
