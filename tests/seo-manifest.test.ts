@@ -94,6 +94,16 @@ test("duplicate editorial fingerprints block every affected page", () => {
   assert.equal(manifest.entries.find((entry) => entry.ticker === "MXRF11")?.indexable, true);
 });
 
+test("missing editorial fingerprint blocks an otherwise valid fund", () => {
+  const manifest = buildFundSeoManifest([
+    { input: validInput("KNCR11") },
+  ], "2026-08-04T15:00:00Z");
+
+  assert.equal(manifest.indexableTotal, 0);
+  assert.equal(manifest.entries[0].decision, "noindex");
+  assert.ok(manifest.entries[0].blockers.includes("MISSING_EDITORIAL_FINGERPRINT"));
+});
+
 test("not-found decision has precedence over duplicate content detection", () => {
   const invalid = validInput("MXRF11");
   invalid.ticker = "INVALID";
