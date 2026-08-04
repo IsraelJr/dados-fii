@@ -14,7 +14,7 @@ test("hub apresenta sete cenários específicos e links de continuidade", async 
   await expect(page.getByRole("link", { name: "Abrir análise" })).toHaveCount(7);
   await expect(page.getByText("FIAGRO e agronegócio: cenário da safra, crédito e riscos")).toBeVisible();
   await expect(page.getByText("FIIs de galpões e logística: demanda, contratos e localização")).toBeVisible();
-  await expect(page.getByText("FIIs de shoppings: vendas, ocupação e qualidade do portfólio")).toBeVisible();
+  await expect(page.getByText("FIIs de shoppings: consumo, vendas, ocupação e NOI")).toBeVisible();
   await expect(page.getByRole("link", { name: /Analisar minha carteira/ })).toHaveAttribute("href", "/carteira");
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact || ""))).toEqual([]);
