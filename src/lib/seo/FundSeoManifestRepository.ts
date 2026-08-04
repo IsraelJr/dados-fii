@@ -12,7 +12,7 @@ function validIsoDate(value: unknown) {
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
 }
 
-function validateManifest(manifest: FundSeoManifest) {
+export function validateFundSeoManifest(manifest: FundSeoManifest) {
   if (manifest.schemaVersion !== 1) throw new Error("Versão do manifesto SEO inválida.");
   if (!validIsoDate(manifest.generatedAt)) throw new Error("Data de geração do manifesto SEO inválida.");
   if (!Array.isArray(manifest.entries) || manifest.entries.length > MAX_MANIFEST_ENTRIES) {
@@ -61,13 +61,13 @@ export class FundSeoManifestRepository {
     const snapshot = await adminDb.collection(REGULATORY_COLLECTIONS.seoManifests).doc("current").get();
     if (!snapshot.exists) return null;
     const manifest = snapshot.data() as FundSeoManifest;
-    validateManifest(manifest);
+    validateFundSeoManifest(manifest);
     return manifest;
   }
 
   async saveCurrent(manifest: FundSeoManifest, actor: string) {
     if (!actor.trim()) throw new Error("Ator do manifesto SEO obrigatório.");
-    validateManifest(manifest);
+    validateFundSeoManifest(manifest);
     const sizeBytes = Buffer.byteLength(JSON.stringify(manifest), "utf8");
     if (sizeBytes > FIRESTORE_SAFE_DOCUMENT_BYTES) {
       throw new Error("Manifesto SEO excedeu o limite operacional seguro do Firestore.");
