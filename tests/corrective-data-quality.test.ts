@@ -23,13 +23,14 @@ function recentDividendHistory(monthlyValue: number, priceAtDateWith = 90) {
   const result: Record<string, Record<string, unknown>> = {};
   const now = new Date();
   for (let offset = 0; offset < 12; offset += 1) {
-    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 15));
-    const yearKey = `earnings${date.getUTCFullYear()}`;
+    const paymentDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+    const dateWith = new Date(Date.UTC(paymentDate.getUTCFullYear(), paymentDate.getUTCMonth(), 0));
+    const yearKey = `earnings${paymentDate.getUTCFullYear()}`;
     result[yearKey] ||= {};
-    result[yearKey][MONTHS[date.getUTCMonth()]] = {
+    result[yearKey][MONTHS[paymentDate.getUTCMonth()]] = {
       earnings: monthlyValue,
-      payment_date: `${String(date.getUTCDate()).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`,
-      date_with: `${String(date.getUTCDate() - 5).padStart(2, "0")}/${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`,
+      payment_date: `${String(paymentDate.getUTCDate()).padStart(2, "0")}/${String(paymentDate.getUTCMonth() + 1).padStart(2, "0")}/${paymentDate.getUTCFullYear()}`,
+      date_with: `${String(dateWith.getUTCDate()).padStart(2, "0")}/${String(dateWith.getUTCMonth() + 1).padStart(2, "0")}/${dateWith.getUTCFullYear()}`,
       price_date_with: priceAtDateWith,
     };
   }
