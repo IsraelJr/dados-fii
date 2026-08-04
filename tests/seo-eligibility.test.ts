@@ -146,7 +146,7 @@ test("absolute blockers cannot be compensated by a high score", () => {
   assert.ok(implausibleResult.blockers.includes("IMPLAUSIBLE_PRICE"));
 });
 
-test("catalog and editorial quality gates remain mandatory", () => {
+test("catalog and editorial quality gates remain mandatory regardless of score", () => {
   const input = validInput();
   input.catalog!.dataQuality!.basicComplete = false;
   input.editorial!.unique = false;
@@ -155,8 +155,23 @@ test("catalog and editorial quality gates remain mandatory", () => {
   const result = evaluateFundSeoEligibility(input);
 
   assert.equal(result.decision, "noindex");
+  assert.ok(result.score >= 80);
   assert.ok(result.blockers.includes("INCOMPLETE_BASIC_CATALOG"));
   assert.ok(result.blockers.includes("NON_UNIQUE_EDITORIAL_CONTENT"));
   assert.ok(result.blockers.includes("INSUFFICIENT_EDITORIAL_EXPLANATION"));
+  assert.equal(result.blockers.includes("SCORE_BELOW_MINIMUM"), false);
+});
+
+test("score threshold blocks a sparse but real fund", () => {
+  const input = validInput();
+  input.market = null;
+  input.dividend = null;
+
+  const result = evaluateFundSeoEligibility(input);
+
+  assert.equal(result.decision, "noindex");
+  assert.equal(result.score, 70);
   assert.ok(result.blockers.includes("SCORE_BELOW_MINIMUM"));
+  assert.ok(result.blockers.includes("MISSING_PRICE"));
+  assert.ok(result.blockers.includes("MISSING_DIVIDEND"));
 });
