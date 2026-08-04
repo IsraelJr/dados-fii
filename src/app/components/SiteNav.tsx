@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { BarChart3, BookOpen, CalendarDays, Home, LibraryBig, Wallet } from "lucide-react";
-import AdminEntryLink from "./AdminEntryLink";
 
 const links = [
   { href: "/", label: "Início", icon: Home },
@@ -22,7 +21,6 @@ export default function SiteNav() {
           {links.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-white hover:text-indigo-700 hover:shadow-sm md:text-sm"><Icon size={15} /> {label}</Link>
           ))}
-          <AdminEntryLink />
         </div>
       </nav>
     </header>
