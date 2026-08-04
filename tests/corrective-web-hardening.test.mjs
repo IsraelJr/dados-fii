@@ -24,18 +24,25 @@ test("[REG-DEF-19] página de fundo possui um único h1 e não transfere QA ao u
   assert.doesNotMatch(`${sourcePage}\n${footer}`, /Confirme dados relevantes|Confirme antes de decidir/);
 });
 
-test("canonical usa www e páginas privadas ou programáticas ficam fora do índice", () => {
+test("canonical usa www, páginas privadas ficam fora do índice e fundos usam gate fail-closed", () => {
   const site = readFileSync("src/lib/site.ts", "utf8");
   const walletLayout = readFileSync("src/app/carteira/layout.tsx", "utf8");
   const adminLayout = readFileSync("src/app/admin/layout.tsx", "utf8");
   const fundLayout = readFileSync("src/app/fii/[ticker]/layout.tsx", "utf8");
+  const fundPageData = readFileSync("src/lib/seo/FundSeoPageData.ts", "utf8");
+  const editorialRegistry = readFileSync("src/lib/seo/FundSeoEditorialRegistry.ts", "utf8");
   const sitemap = readFileSync("src/app/sitemap.ts", "utf8");
   const robots = readFileSync("src/app/robots.ts", "utf8");
 
   assert.match(site, /https:\/\/www\.dadosfii\.com\.br/);
   assert.match(walletLayout, /robots:\s*\{\s*index:\s*false,\s*follow:\s*false/s);
   assert.match(adminLayout, /index:\s*false/);
-  assert.match(fundLayout, /index:\s*false,\s*follow:\s*true/);
+  assert.match(fundLayout, /eligibility\.decision === "index"/);
+  assert.match(fundLayout, /eligibility\.decision !== "not-found"/);
+  assert.match(fundLayout, /eligibility\.decision === "not-found"\) notFound\(\)/);
+  assert.match(fundPageData, /regulatoryDataService\.getByTicker/);
+  assert.match(editorialRegistry, /Object\.freeze\(\{\}\)/);
+  assert.doesNotMatch(fundLayout, /index:\s*true/);
   assert.doesNotMatch(sitemap, /\/fii\//);
   assert.doesNotMatch(sitemap, /regulatoryDataService|getFundDirectory|FALLBACK_TICKERS/);
   assert.match(sitemap, /SITE_URL/);
