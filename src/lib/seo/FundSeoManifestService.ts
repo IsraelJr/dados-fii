@@ -26,13 +26,20 @@ function editorialFingerprint(explanation: string) {
 
 export class FundSeoManifestService {
   private readonly cache = new RegulatoryCache<FundSeoManifest>(SEO_MANIFEST_CACHE_TTL_MS, 1);
+  private readonly dataService: RegulatoryDataService;
+  private readonly repository: FundSeoManifestRepository;
+  private readonly reviewsProvider: EditorialReviewsProvider;
   private rebuildPromise: Promise<FundSeoManifest> | null = null;
 
   constructor(
-    private readonly dataService: RegulatoryDataService = regulatoryDataService,
-    private readonly repository: FundSeoManifestRepository = fundSeoManifestRepository,
-    private readonly reviewsProvider: EditorialReviewsProvider = listFundSeoEditorialReviews,
-  ) {}
+    dataService: RegulatoryDataService = regulatoryDataService,
+    repository: FundSeoManifestRepository = fundSeoManifestRepository,
+    reviewsProvider: EditorialReviewsProvider = listFundSeoEditorialReviews,
+  ) {
+    this.dataService = dataService;
+    this.repository = repository;
+    this.reviewsProvider = reviewsProvider;
+  }
 
   async getCurrent(options?: { force?: boolean }) {
     const cached = options?.force ? null : this.cache.get("current");
