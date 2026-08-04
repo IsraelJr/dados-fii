@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { adminJson, authorizeAdminRequest } from "@/lib/adminApi";
-import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestService";
+import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestRuntime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
