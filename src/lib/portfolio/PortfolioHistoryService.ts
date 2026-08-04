@@ -2,6 +2,7 @@ import {
   assertCanEditPortfolioHistory,
   createManualPortfolioHistoryEntry,
   detectPortfolioHistoryConflict,
+  requirePortfolioHistoryCompetence,
   type ManualPortfolioHistoryInput,
   type PortfolioHistoryEntry,
 } from "./PortfolioHistory";
@@ -120,6 +121,18 @@ export class PortfolioHistoryService {
       ownerId: actor.ownerId,
       portfolioId: entry.portfolioId,
       competence: entry.competence,
+    });
+  }
+
+  async deleteManualByCompetence(
+    actor: PortfolioActor,
+    portfolioId: string,
+    competence: unknown,
+  ): Promise<void> {
+    await this.repository.deleteManual({
+      ownerId: actor.ownerId,
+      portfolioId,
+      competence: requirePortfolioHistoryCompetence(competence),
     });
   }
 }

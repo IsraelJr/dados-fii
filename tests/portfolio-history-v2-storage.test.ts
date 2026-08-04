@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { portfolioHistoryAnnualDocumentId } from "../src/lib/portfolio/PortfolioHistoryRepository";
 
 const repositorySource = readFileSync("src/server/repositories/FirestorePortfolioHistoryRepository.ts", "utf8");
+const repositoryCoreSource = readFileSync("src/server/repositories/FirestorePortfolioHistoryRepositoryCore.ts", "utf8");
 const panelSource = readFileSync("src/app/components/PortfolioHistoryPanel.tsx", "utf8");
 
 test("usa um documento anual por owner e carteira", () => {
@@ -29,10 +30,21 @@ test("usa um documento anual por owner e carteira", () => {
 });
 
 test("persiste meses como mapa dentro do documento anual", () => {
-  assert.match(repositorySource, /schemaVersion:\s*SCHEMA_VERSION/);
-  assert.match(repositorySource, /\[`months\.\$\{month\}`\]/);
-  assert.match(repositorySource, /SCHEMA_VERSION = 2/);
-  assert.doesNotMatch(repositorySource, /doc\(portfolioHistoryDocumentId\(key\)\)/);
+  assert.match(repositoryCoreSource, /schemaVersion:\s*SCHEMA_VERSION/);
+  assert.match(repositoryCoreSource, /months:\s*\{[\s\S]*?\[month\]:/);
+  assert.match(repositoryCoreSource, /SCHEMA_VERSION = 2/);
+  assert.doesNotMatch(repositoryCoreSource, /\[`months\.\$\{month\}`\]:\s*\{/);
+  assert.doesNotMatch(repositoryCoreSource, /doc\(portfolioHistoryDocumentId\(key\)\)/);
+  assert.match(repositorySource, /FirestorePortfolioHistoryRepositoryCore/);
+});
+
+test("compatibilidade literal é restrita à migração e remoção lazy", () => {
+  assert.match(repositoryCoreSource, /legacyMonthField/);
+  assert.match(repositoryCoreSource, /"migrate" \| "deduplicate" \| "conflict"/);
+  assert.match(repositoryCoreSource, /runTransaction/);
+  assert.match(repositoryCoreSource, /PORTFOLIO_HISTORY_LEGACY_CONFLICT/);
+  assert.match(repositoryCoreSource, /console\.warn\(diagnostic\.code, \{ year: diagnostic\.year, month: diagnostic\.month \}\)/);
+  assert.doesNotMatch(repositoryCoreSource, /console\.warn\([^\n]*(?:ownerId|dividends)/);
 });
 
 test("não lê estrutura legada e publica atualização otimista para consumidores", () => {

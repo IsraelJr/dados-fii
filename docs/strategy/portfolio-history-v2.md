@@ -10,6 +10,32 @@ UserPortfolioHistory/{ownerHash}__{portfolioId}__{year}
 
 Cada documento contém `schemaVersion: 2`, `ownerId`, `portfolioId`, `year` e um mapa `months`. Cada mês preserva `dividends`, `source`, `createdAt` e `updatedAt`.
 
+O mapa aninhado é obrigatório. Por exemplo, fevereiro é armazenado como:
+
+```json
+{
+  "months": {
+    "02": {
+      "dividends": 450.03,
+      "source": "manual"
+    }
+  }
+}
+```
+
+Um campo top-level cujo nome literal seja `months.02` não pertence ao formato canônico. Em `set(data, { merge: true })`, chaves do objeto são nomes literais; a semântica de field path pontuado pertence a operações como `update`. A implementação sempre envia um objeto `months` aninhado ao `set`, preservando os demais meses do documento anual.
+
+## Compatibilidade lazy com o campo literal defeituoso
+
+A compatibilidade é restrita ao documento anual do usuário e da carteira acessados; não existe varredura global.
+
+- somente literal: a mesma transação copia o mês para `months[MM]` e remove o campo literal;
+- canônico e literal idênticos: mantém o canônico e remove o duplicado literal;
+- canônico e literal diferentes: lê o canônico, preserva o literal e emite somente o diagnóstico `PORTFOLIO_HISTORY_LEGACY_CONFLICT` com ano e mês;
+- entrada persistida inválida: falha fechado e não sobrescreve o conteúdo existente.
+
+O diagnóstico não contém usuário, carteira, e-mail, valores financeiros ou conteúdo do registro. Uma exclusão manual válida remove os dois formatos da competência solicitada, sem remover o documento anual ou outros meses. Repetir a exclusão é uma operação idempotente.
+
 ## Fonte de verdade
 
 - Não há leitura nem migração da estrutura legada existente em `User`.
