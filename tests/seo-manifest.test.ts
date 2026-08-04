@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Native strip-types requires explicit extension.
 import { buildFundSeoManifest } from "../src/lib/seo/FundSeoManifest.ts";
-// @ts-expect-error Native strip-types requires explicit extension.
 import type { FundSeoEligibilityInput } from "../src/lib/seo/SeoEligibilityEvaluator.ts";
 
 const explanation = "O fundo possui uma estratégia própria cuja geração de renda depende dos ativos, contratos e indexadores descritos nesta página. A revisão acompanha dividendos, riscos específicos, qualidade dos dados e os indicadores capazes de alterar a tese.";
