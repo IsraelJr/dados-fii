@@ -20,9 +20,17 @@ export const PREMIUM_DISCOVERY_EVENT_NAMES = [
   "premium_beta_accessed",
 ] as const;
 
+export const PREMIUM_DISCOVERY_AUDIENCES = [
+  "external",
+  "beta",
+  "premium",
+  "owner",
+] as const;
+
 export type PremiumDiscoveryOrigin = (typeof PREMIUM_DISCOVERY_ORIGINS)[number];
 export type PremiumDiscoveryMotivation = (typeof PREMIUM_DISCOVERY_MOTIVATIONS)[number];
 export type PremiumDiscoveryEventName = (typeof PREMIUM_DISCOVERY_EVENT_NAMES)[number];
+export type PremiumDiscoveryAudience = (typeof PREMIUM_DISCOVERY_AUDIENCES)[number];
 export type PremiumDiscoveryAccess = "eligible" | "requested" | "beta" | "premium" | "owner";
 
 export type PremiumDiscoveryRequest = Readonly<{
@@ -44,6 +52,7 @@ export type PremiumDiscoveryEvent = Readonly<{
   name: PremiumDiscoveryEventName;
   schemaVersion: 1;
   origin: PremiumDiscoveryOrigin;
+  audience: PremiumDiscoveryAudience;
   correlationId: string;
   retentionDays: typeof PREMIUM_DISCOVERY_RETENTION_DAYS;
   occurredAt: string;
@@ -71,14 +80,25 @@ export function createPremiumDiscoveryRequest(value: unknown): PremiumDiscoveryR
   return Object.freeze({ origin, motivation });
 }
 
+export function premiumDiscoveryAudience(access: PremiumDiscoveryAccess): PremiumDiscoveryAudience {
+  if (access === "beta") return "beta";
+  if (access === "premium") return "premium";
+  if (access === "owner") return "owner";
+  return "external";
+}
+
 export function createPremiumDiscoveryEvent(
   name: PremiumDiscoveryEventName,
   origin: PremiumDiscoveryOrigin,
+  audience: PremiumDiscoveryAudience,
   correlationId: string,
   now = new Date(),
 ): PremiumDiscoveryEvent {
   if (!PREMIUM_DISCOVERY_EVENT_NAMES.includes(name)) {
     throw new PremiumDiscoveryValidationError("Evento de descoberta Premium inválido.");
+  }
+  if (!PREMIUM_DISCOVERY_AUDIENCES.includes(audience)) {
+    throw new PremiumDiscoveryValidationError("Audiência do evento inválida.");
   }
   const normalizedCorrelationId = String(correlationId || "").trim();
   if (!/^[a-zA-Z0-9-]{16,128}$/.test(normalizedCorrelationId)) {
@@ -88,6 +108,7 @@ export function createPremiumDiscoveryEvent(
     name,
     schemaVersion: 1,
     origin,
+    audience,
     correlationId: normalizedCorrelationId,
     retentionDays: PREMIUM_DISCOVERY_RETENTION_DAYS,
     occurredAt: now.toISOString(),
