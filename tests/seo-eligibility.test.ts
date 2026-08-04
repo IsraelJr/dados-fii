@@ -76,6 +76,16 @@ test("fully qualified fund is indexable with the maximum score", () => {
   assert.equal(result.lastModified, "2026-08-04T12:00:00.000Z");
 });
 
+test("ticker is normalized before canonical eligibility is evaluated", () => {
+  const input = validInput();
+  input.ticker = "mxrf11";
+
+  const result = evaluateFundSeoEligibility(input);
+
+  assert.equal(result.ticker, "MXRF11");
+  assert.equal(result.decision, "index");
+});
+
 test("invalid, inactive and unlisted funds fail as not found", () => {
   const invalidTicker = evaluateFundSeoEligibility(validInput("INVALID"));
   assert.equal(invalidTicker.decision, "not-found");
