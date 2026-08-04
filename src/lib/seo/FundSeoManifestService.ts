@@ -1,13 +1,10 @@
 import { createHash } from "crypto";
 import { RegulatoryCache } from "@/lib/regulatory/RegulatoryCache";
-import { regulatoryDataService, type RegulatoryDataService } from "@/lib/regulatoryDataService";
+import type { RegulatoryDataService } from "@/lib/regulatoryDataService";
 import { nowIso } from "@/lib/regulatory/RegulatoryNormalizer";
 import { listFundSeoEditorialReviews } from "./FundSeoEditorialRegistry";
 import { buildFundSeoManifest, type FundSeoManifest } from "./FundSeoManifest";
-import {
-  fundSeoManifestRepository,
-  type FundSeoManifestRepository,
-} from "./FundSeoManifestRepository";
+import type { FundSeoManifestRepository } from "./FundSeoManifestRepository";
 import { buildFundSeoEligibilityInput } from "./FundSeoPagePolicy";
 
 const SEO_MANIFEST_CACHE_TTL_MS = 10 * 60_000;
@@ -32,8 +29,8 @@ export class FundSeoManifestService {
   private rebuildPromise: Promise<FundSeoManifest> | null = null;
 
   constructor(
-    dataService: RegulatoryDataService = regulatoryDataService,
-    repository: FundSeoManifestRepository = fundSeoManifestRepository,
+    dataService: RegulatoryDataService,
+    repository: FundSeoManifestRepository,
     reviewsProvider: EditorialReviewsProvider = listFundSeoEditorialReviews,
   ) {
     this.dataService = dataService;
@@ -86,5 +83,3 @@ export class FundSeoManifestService {
     this.cache.clear();
   }
 }
-
-export const fundSeoManifestService = new FundSeoManifestService();
