@@ -16,6 +16,7 @@ import {
   type PortfolioIntelligenceResult,
   type PortfolioIntelligenceSignalView,
 } from "@/lib/portfolio-intelligence";
+import PortfolioIntelligenceExplanationPanel from "./PortfolioIntelligenceExplanationPanel";
 
 function SignalSeverityIcon({ signal }: { signal: PortfolioIntelligenceSignalView }) {
   if (signal.severity === "warning") return <AlertTriangle size={16} aria-hidden="true" />;
@@ -171,6 +172,8 @@ export default function PortfolioIntelligencePanel({ result }: { result: Portfol
           <p className="mt-4 text-sm font-semibold text-slate-600 dark:text-slate-300">Nenhuma ressalva de cobertura foi identificada.</p>
         )}
       </div>
+
+      <PortfolioIntelligenceExplanationPanel key={`${result.generatedAt}:${result.asOf}`} result={result} />
 
       <p className="mt-5 border-t border-slate-200 pt-4 text-xs font-semibold leading-5 text-slate-600 dark:border-gray-800 dark:text-gray-300">
         Conteúdo informativo, sem recomendação de investimento.
