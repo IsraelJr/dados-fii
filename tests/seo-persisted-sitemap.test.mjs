@@ -26,19 +26,23 @@ test("sitemap fails closed to static routes when the manifest is absent, stale o
   assert.doesNotMatch(sitemap, /FALLBACK_TICKERS/);
 });
 
-test("manifest persistence is isolated in a repository with size and consistency guards", () => {
+test("manifest persistence is isolated from pure consistency validation", () => {
   const repository = read("src/lib/seo/FundSeoManifestRepository.ts");
+  const validation = read("src/lib/seo/FundSeoManifestValidation.ts");
   const collections = read("src/lib/regulatory/RegulatoryTypes.ts");
 
   assert.match(collections, /seoManifests: "RegulatorySeoManifests"/);
   assert.match(repository, /REGULATORY_COLLECTIONS\.seoManifests/);
   assert.match(repository, /doc\("current"\)/);
   assert.match(repository, /FIRESTORE_SAFE_DOCUMENT_BYTES/);
-  assert.match(repository, /tickers duplicados/);
-  assert.match(repository, /ordenado por ticker/);
-  assert.match(repository, /canonical incompatível/);
-  assert.match(repository, /data de modificação inválida/);
+  assert.match(repository, /validateFundSeoManifest/);
   assert.match(repository, /action: "seo-manifest"/);
+
+  assert.match(validation, /tickers duplicados/);
+  assert.match(validation, /ordenado por ticker/);
+  assert.match(validation, /canonical incompatível/);
+  assert.match(validation, /data de modificação inválida/);
+  assert.doesNotMatch(validation, /firebaseAdmin|adminDb|adminFieldValue|RegulatoryRepository/);
 });
 
 test("admin and cron routes invoke the domain service without direct Firestore access", () => {
@@ -67,4 +71,5 @@ test("manifest builder loads reviewed funds once in batch and does not create a 
   assert.doesNotMatch(service, /getByTicker|listFunds/);
   assert.match(service, /new RegulatoryCache<FundSeoManifest>/);
   assert.match(service, /this\.rebuildPromise/);
+  assert.doesNotMatch(service, /constructor\([^)]*private readonly/s);
 });
