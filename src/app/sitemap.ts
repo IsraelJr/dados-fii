@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { isFundSeoManifestFresh } from "@/lib/seo/FundSeoManifest";
-import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestService";
+import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestRuntime";
 import { SITE_URL } from "@/lib/site";
 
 export const runtime = "nodejs";
