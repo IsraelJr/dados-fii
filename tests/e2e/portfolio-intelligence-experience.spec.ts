@@ -91,11 +91,13 @@ test("carteira exibe loading, análise determinística, evidências e expansão 
   await expect(panel.getByRole("heading", { name: "Dados usados nesta análise" })).toBeVisible();
   await expect(panel.getByText("Conteúdo informativo, sem recomendação de investimento.")).toBeVisible();
 
-  const expansion = panel.getByRole("button", { name: /Ver todos os .* sinais/ });
-  await expect(expansion).toBeVisible();
+  const expansion = panel.locator('button[aria-controls="portfolio-intelligence-signals"]');
+  await expect(expansion).toHaveAccessibleName(/Ver todos os .* sinais/);
+  await expect(expansion).toHaveAttribute("aria-expanded", "false");
   await expansion.click();
   await expect(expansion).toHaveAttribute("aria-expanded", "true");
-  await expect(panel.locator("[data-signal-code]").count()).resolves.toBeGreaterThan(3);
+  await expect(expansion).toHaveAccessibleName("Recolher sinais");
+  await expect.poll(() => panel.locator("[data-signal-code]").count()).toBeGreaterThan(3);
 
   await expectNoHighImpactAccessibilityViolations(page);
 });
