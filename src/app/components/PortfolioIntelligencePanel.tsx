@@ -16,6 +16,7 @@ import {
   type PortfolioIntelligenceResult,
   type PortfolioIntelligenceSignalView,
 } from "@/lib/portfolio-intelligence";
+import PortfolioIncrementalReportPanel from "./PortfolioIncrementalReportPanel";
 import PortfolioIntelligenceExplanationPanel from "./PortfolioIntelligenceExplanationPanel";
 import PremiumDiscoveryPanel from "./PremiumDiscoveryPanel";
 
@@ -175,6 +176,7 @@ export default function PortfolioIntelligencePanel({ result }: { result: Portfol
           )}
         </div>
 
+        <PortfolioIncrementalReportPanel key={`incremental:${result.generatedAt}:${result.asOf}`} result={result} />
         <PortfolioIntelligenceExplanationPanel key={`${result.generatedAt}:${result.asOf}`} result={result} />
 
         <p className="mt-5 border-t border-slate-200 pt-4 text-xs font-semibold leading-5 text-slate-600 dark:border-gray-800 dark:text-gray-300">
