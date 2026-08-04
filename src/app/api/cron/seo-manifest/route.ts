@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestService";
+import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestRuntime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
