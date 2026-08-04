@@ -1,5 +1,6 @@
 export * from "./PortfolioIntelligence";
 export * from "./PortfolioIntelligenceAdapters";
+export * from "./PortfolioIntelligenceAIContract";
 export * from "./PortfolioIntelligenceDataQuality";
 export * from "./PortfolioIntelligenceMetrics";
 export * from "./PortfolioIntelligencePolicy";
