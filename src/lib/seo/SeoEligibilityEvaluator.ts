@@ -2,6 +2,7 @@ export type SeoIndexingDecision = "index" | "noindex" | "not-found";
 
 export type FundSeoEligibilityInput = {
   ticker: unknown;
+  publicRecordFound?: boolean;
   catalog?: {
     identity?: {
       cnpj?: unknown;
@@ -137,6 +138,7 @@ function unique(values: string[]) {
 export function evaluateFundSeoEligibility(input: FundSeoEligibilityInput): FundSeoEligibility {
   const ticker = normalizedTicker(input.ticker);
   const catalog = input.catalog || null;
+  const publicRecordFound = input.publicRecordFound ?? Boolean(catalog);
   const identity = catalog?.identity || null;
   const classification = catalog?.classification || null;
   const lifecycle = catalog?.lifecycle || null;
@@ -149,7 +151,8 @@ export function evaluateFundSeoEligibility(input: FundSeoEligibilityInput): Fund
   if (ticker) score += 4;
   else blockers.push("INVALID_TICKER");
 
-  if (!catalog) blockers.push("FUND_NOT_FOUND");
+  if (!publicRecordFound) blockers.push("FUND_NOT_FOUND");
+  else if (!catalog) blockers.push("MISSING_OFFICIAL_CATALOG");
 
   const lifecycleStatus = text(lifecycle?.status)?.toLowerCase() || null;
   if (lifecycleStatus === "inactive" || isoDate(lifecycle?.canceledAt)) blockers.push("INACTIVE_FUND");
