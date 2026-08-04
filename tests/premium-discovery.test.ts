@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
 import { createPremiumDiscoveryEvent, createPremiumDiscoveryRequest, PremiumDiscoveryService, PremiumDiscoveryValidationError, premiumDiscoveryStatus } from "../src/lib/premium-discovery/index.ts";
-// @ts-expect-error Node's native strip-types runner requires the explicit .ts suffix.
 import type { PremiumDiscoveryEvent, PremiumDiscoveryRepository, PremiumInterestRecord } from "../src/lib/premium-discovery/index.ts";
 
 class MemoryRepository implements PremiumDiscoveryRepository {
