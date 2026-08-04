@@ -15,11 +15,19 @@ export type PremiumDiscoveryEntitlement = Readonly<{
 }> | null;
 
 export class PremiumDiscoveryService {
+  private readonly repository: PremiumDiscoveryRepository;
+  private readonly now: () => Date;
+  private readonly correlationId: () => string;
+
   constructor(
-    private readonly repository: PremiumDiscoveryRepository,
-    private readonly now: () => Date = () => new Date(),
-    private readonly correlationId: () => string = () => crypto.randomUUID(),
-  ) {}
+    repository: PremiumDiscoveryRepository,
+    now: () => Date = () => new Date(),
+    correlationId: () => string = () => crypto.randomUUID(),
+  ) {
+    this.repository = repository;
+    this.now = now;
+    this.correlationId = correlationId;
+  }
 
   async status(
     subject: PremiumDiscoverySubject,
