@@ -51,9 +51,11 @@ function generation(text: string): AITextGeneration {
 class FakeGenerator {
   calls = 0;
   inputs: AITextMessage[][] = [];
-  constructor(
-    private readonly response: () => Promise<AITextGeneration>,
-  ) {}
+  private readonly response: () => Promise<AITextGeneration>;
+
+  constructor(response: () => Promise<AITextGeneration>) {
+    this.response = response;
+  }
 
   async generateText(options: { input: AITextMessage[] }) {
     this.calls += 1;
