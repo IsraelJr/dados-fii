@@ -71,6 +71,7 @@ async function getFiisSnapshot(limit?: number) {
 }
 
 async function runEnrichment(limit?: number, dryRun = false, resultLimit?: number) {
+  const calculationAsOf = new Date();
   const snapshot = await getFiisSnapshot(limit);
   const results: Array<{ ticker: string; status: string; updatedFields?: string[]; error?: string }> = [];
   const fieldCounts = new Map<string, number>();
@@ -82,7 +83,7 @@ async function runEnrichment(limit?: number, dryRun = false, resultLimit?: numbe
     try {
       const data = doc.data() || {};
       const ticker = String(data.code || data.ticker || data.symbol || doc.id || "").trim().toUpperCase();
-      const derived = deriveFiiRiskData(data);
+      const derived = deriveFiiRiskData(data, { asOf: calculationAsOf });
 
       if (!hasObjectData(derived)) {
         skipped += 1;

@@ -18,6 +18,11 @@ const MAX_PVP = 10;
 const MIN_PVP = 0.1;
 const MIN_VP_COTA = 0.01;
 const MAX_VP_COTA = 100_000;
+const FINANCIAL_TIME_ZONE = "America/Sao_Paulo";
+
+export type FiiDerivedDataOptions = Readonly<{
+  asOf: Date | string;
+}>;
 
 function numberOf(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -78,18 +83,91 @@ function firstPlausibleNumber(data: any, paths: string[], predicate: (value: num
   return undefined;
 }
 
-function parseDateBR(value: unknown) {
+function canonicalCivilDate(year: number, month: number, day: number) {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) return null;
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseDateBRKey(value: unknown) {
   const text = cleanText(value);
   const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) return null;
 
   const [, day, month, year] = match;
-  const date = new Date(Number(year), Number(month) - 1, Number(day));
-  return Number.isNaN(date.getTime()) ? null : date;
+  return canonicalCivilDate(Number(year), Number(month), Number(day));
 }
 
-function toDateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
+function parseOffsetTimestamp(value: string) {
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(?:Z|[+-](?:(?:0\d|1[0-3]):[0-5]\d|14:00))$/i,
+  );
+  if (!match) return null;
+  const [, year, month, day] = match;
+  if (!canonicalCivilDate(Number(year), Number(month), Number(day))) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function dateKeyInSaoPaulo(value: Date | string) {
+  let date: Date;
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      const [year, month, day] = text.split("-").map(Number);
+      const canonical = canonicalCivilDate(year, month, day);
+      if (!canonical) throw new TypeError("asOf must be a valid civil date");
+      return canonical;
+    }
+    const parsed = parseOffsetTimestamp(text);
+    if (!parsed) throw new TypeError("asOf timestamp must include a valid timezone offset");
+    date = parsed;
+  } else {
+    date = new Date(value.getTime());
+  }
+
+  if (!Number.isFinite(date.getTime())) throw new TypeError("asOf must be a valid date");
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: FINANCIAL_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date).map((part) => [part.type, part.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function parseTemporalKey(value: unknown) {
+  const text = cleanText(value);
+  if (!text) return null;
+  const brKey = parseDateBRKey(text);
+  if (brKey) return brKey;
+  try {
+    return dateKeyInSaoPaulo(text);
+  } catch {
+    return null;
+  }
+}
+
+function shiftDateKeyMonths(dateKey: string, months: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const targetIndex = year * 12 + month - 1 + months;
+  const targetYear = Math.floor(targetIndex / 12);
+  const targetMonthIndex = ((targetIndex % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonthIndex + 1, 0)).getUTCDate();
+  return canonicalCivilDate(targetYear, targetMonthIndex + 1, Math.min(day, lastDay))!;
+}
+
+function competenceEndKey(year: number, month: string) {
+  const monthIndex = MONTHS.indexOf(month);
+  if (monthIndex < 0 || !Number.isInteger(year)) return null;
+  const lastDay = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  return canonicalCivilDate(year, monthIndex + 1, lastDay);
 }
 
 function removeUndefinedFields<T>(value: T): T {
@@ -186,6 +264,7 @@ function getEarningsEntries(data: any) {
     paymentDate?: string;
     paymentKey?: string;
     dateWith?: string;
+    knownKey?: string;
     priceDateWith?: number;
   }> = [];
 
@@ -197,22 +276,50 @@ function getEarningsEntries(data: any) {
     Object.entries(yearData as Record<string, any>).forEach(([month, info]) => {
       const value = positiveNumberOf(info?.earnings);
       const paymentDate = cleanText(info?.payment_date);
-      const date = parseDateBR(paymentDate);
+      const dateWith = cleanText(info?.date_with);
+      const announcementDate = cleanText(
+        info?.announcement_date
+        ?? info?.announcementDate
+        ?? info?.announced_at
+        ?? info?.announcedAt,
+      );
+      const referenceDate = cleanText(
+        info?.reference_date
+        ?? info?.referenceDate
+        ?? info?.data_base
+        ?? info?.dataBase,
+      );
+      const paymentKey = parseTemporalKey(paymentDate);
+      const dateWithKey = parseTemporalKey(dateWith);
+      const announcementKey = parseTemporalKey(announcementDate);
+      const referenceKey = parseTemporalKey(referenceDate);
+      const explicitKnownKeys = [announcementKey, referenceKey, dateWithKey, paymentKey]
+        .filter((key): key is string => Boolean(key))
+        .sort();
+      const knownKey = explicitKnownKeys[0]
+        || competenceEndKey(year, month)
+        || undefined;
 
       if (!value) return;
       entries.push({
         year,
         month,
         value,
-        paymentDate: paymentDate || undefined,
-        paymentKey: date ? toDateKey(date) : undefined,
-        dateWith: cleanText(info?.date_with) || undefined,
+        paymentDate: paymentKey ? paymentDate : undefined,
+        paymentKey: paymentKey || undefined,
+        dateWith: dateWith || undefined,
+        knownKey,
         priceDateWith: positiveNumberOf(info?.price_date_with),
       });
     });
   });
 
-  return entries.sort((a, b) => String(a.paymentKey || `${a.year}-${MONTHS.indexOf(a.month) + 1}`).localeCompare(String(b.paymentKey || `${b.year}-${MONTHS.indexOf(b.month) + 1}`)));
+  return entries.sort((a, b) => (
+    String(a.knownKey || a.paymentKey || "9999-99-99")
+      .localeCompare(String(b.knownKey || b.paymentKey || "9999-99-99"))
+    || a.year - b.year
+    || MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month)
+  ));
 }
 
 function stddev(values: number[]) {
@@ -222,21 +329,21 @@ function stddev(values: number[]) {
   return Math.sqrt(variance);
 }
 
-function buildDividendSummary(data: any, price?: number) {
+function buildDividendSummary(data: any, asOf: Date | string, price?: number) {
   const entries = getEarningsEntries(data);
-  const now = new Date();
-  const oneYearAgo = new Date(now);
-  oneYearAgo.setFullYear(now.getFullYear() - 1);
-  const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(now.getMonth() - 6);
+  const asOfKey = dateKeyInSaoPaulo(asOf);
+  const oneYearAgoKey = shiftDateKeyMonths(asOfKey, -12);
+  const sixMonthsAgoKey = shiftDateKeyMonths(asOfKey, -6);
 
-  const paidEntries = entries.filter((entry) => {
-    if (!entry.paymentKey) return true;
-    return new Date(entry.paymentKey) <= now;
-  });
-  const last = paidEntries.at(-1) || entries.at(-1);
-  const last12 = entries.filter((entry) => entry.paymentKey && new Date(entry.paymentKey) >= oneYearAgo && new Date(entry.paymentKey) <= now);
-  const last6 = entries.filter((entry) => entry.paymentKey && new Date(entry.paymentKey) >= sixMonthsAgo && new Date(entry.paymentKey) <= now);
+  const paidEntries = entries
+    .filter((entry) => entry.paymentKey && entry.paymentKey <= asOfKey)
+    .sort((left, right) => left.paymentKey!.localeCompare(right.paymentKey!));
+  const knownEntries = entries
+    .filter((entry) => entry.knownKey && entry.knownKey <= asOfKey)
+    .sort((left, right) => left.knownKey!.localeCompare(right.knownKey!));
+  const last = knownEntries.at(-1);
+  const last12 = paidEntries.filter((entry) => entry.paymentKey! >= oneYearAgoKey);
+  const last6 = paidEntries.filter((entry) => entry.paymentKey! >= sixMonthsAgoKey);
   const last12Values = last12.map((entry) => entry.value);
   const last6Values = last6.map((entry) => entry.value);
   const sum12 = last12Values.reduce((sum, value) => sum + value, 0);
@@ -252,6 +359,7 @@ function buildDividendSummary(data: any, price?: number) {
   return removeUndefinedFields({
     lastDividend: last?.value ? round(last.value, 6) : undefined,
     lastDividendDate: last?.paymentDate,
+    lastDividendKnownAsOf: last?.knownKey,
     lastDividendMonth: last?.month,
     averageDividend12m: average12 ? round(average12, 6) : undefined,
     totalDividend12m: sum12 ? round(sum12, 6) : undefined,
@@ -337,11 +445,12 @@ function buildValuation(data: any, price?: number) {
   });
 }
 
-export function deriveFiiRiskData(data: any) {
+export function deriveFiiRiskData(data: any, options: FiiDerivedDataOptions) {
+  if (!options || !("asOf" in options)) throw new TypeError("asOf is required");
   const price = firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
   const legacyDividendYield = firstNumber(data, ["dividendYield", "dy", "DY", "dy12m", "dividendYield12m", "valuation.dy12m"]);
   const valuation = buildValuation(data, price);
-  const dividendSummary = buildDividendSummary(data, price);
+  const dividendSummary = buildDividendSummary(data, options.asOf, price);
   const sector = cleanText(firstValue(data, ["sector", "setor"])) || classifySector(data);
   const fundType = cleanText(firstValue(data, ["fundType", "type", "tipo", "tipoFundo"])) || classifyFundType(data);
   const total12m = dividendSummary.totalDividend12m || null;
@@ -394,7 +503,7 @@ export function deriveFiiRiskData(data: any) {
       latestDividend,
       "dividends.lastDividendPriceDateWith",
       priceAtDateWith,
-      dividendSummary.lastDividendDate || null,
+      dividendSummary.lastDividendKnownAsOf || null,
       "Cálculo Dados FII: último rendimento / cotação na data-com",
       !latestDividend ? "missing_last_dividend" : !priceAtDateWith ? "missing_base_date_price" : undefined,
     ),
