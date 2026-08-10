@@ -153,6 +153,7 @@ export class RegulatoryDataService {
     legacyRecord: LegacyFundRecord | null,
     overlay: RegulatoryOverlay | null,
     quote: MarketQuote | null,
+    calculationAsOf: Date | string,
     includeScores = true,
     ifixCompositionData: IfixComposition | null = null,
   ) {
@@ -171,7 +172,7 @@ export class RegulatoryDataService {
     const officialReference = getOfficialFundReference(ticker);
     const canonical = canonicalFrom(ticker, baseData, overlay);
     const membership = ifixMembership(ticker, canonical.kind, ifixCompositionData);
-    const derivedData = deriveFiiRiskData(baseData);
+    const derivedData = deriveFiiRiskData(baseData, { asOf: calculationAsOf });
     const marketDataUpdatedAt = quote ? nowIso() : null;
     const assessment = assessFundDataQuality(canonical, {
       ...baseData,
@@ -238,7 +239,11 @@ export class RegulatoryDataService {
     return publicData;
   }
 
-  private refreshCachedMarketData(cached: PublicFundData, quote: MarketQuote | null): PublicFundData {
+  private refreshCachedMarketData(
+    cached: PublicFundData,
+    quote: MarketQuote | null,
+    calculationAsOf: Date | string,
+  ): PublicFundData {
     const base = { ...cached } as Record<string, unknown>;
     for (const key of [
       "scores",
@@ -261,7 +266,7 @@ export class RegulatoryDataService {
     ]) delete base[key];
     Object.assign(base, quote || marketFallback(cached.ticker));
     const marketDataUpdatedAt = quote ? nowIso() : null;
-    const derived = deriveFiiRiskData(base);
+    const derived = deriveFiiRiskData(base, { asOf: calculationAsOf });
     const refreshed = {
       ...base,
       ...derived,
@@ -309,8 +314,12 @@ export class RegulatoryDataService {
     return refreshed;
   }
 
-  async getByTicker(value: unknown, options?: { bypassCache?: boolean; marketQuote?: MarketQuote | null }): Promise<PublicFundData | null> {
+  async getByTicker(
+    value: unknown,
+    options?: { bypassCache?: boolean; marketQuote?: MarketQuote | null; asOf?: Date | string },
+  ): Promise<PublicFundData | null> {
     return this.observability.track("regulatory.read", async () => {
+      const calculationAsOf = options?.asOf ?? new Date();
       const ticker = normalizeTicker(value);
       if (!ticker) return null;
       const cached = options?.bypassCache ? null : this.fundCache.get(ticker);
@@ -318,7 +327,7 @@ export class RegulatoryDataService {
         const cachedQuote = options && "marketQuote" in options
           ? options.marketQuote || null
           : (await this.getMarketQuotes()).find((item) => item.code === ticker) || null;
-        return this.refreshCachedMarketData(cached, cachedQuote);
+        return this.refreshCachedMarketData(cached, cachedQuote, calculationAsOf);
       }
 
       const [legacyRecord, overlay, quotes, ifixCompositionData] = await Promise.all([
@@ -330,13 +339,25 @@ export class RegulatoryDataService {
       const quote = options && "marketQuote" in options ? options.marketQuote : quotes.find((item) => item.code === ticker) || null;
       if (!legacyRecord && !overlay && !quote) return null;
 
-      const publicData = this.composePublicData(ticker, legacyRecord, overlay, quote || null, true, ifixCompositionData);
+      const publicData = this.composePublicData(
+        ticker,
+        legacyRecord,
+        overlay,
+        quote || null,
+        calculationAsOf,
+        true,
+        ifixCompositionData,
+      );
       this.fundCache.set(ticker, publicData);
       return publicData;
     });
   }
 
-  async listFunds(limit = 500, options?: { includeMarket?: boolean; includeScores?: boolean }) {
+  async listFunds(
+    limit = 500,
+    options?: { includeMarket?: boolean; includeScores?: boolean; asOf?: Date | string },
+  ) {
+    const calculationAsOf = options?.asOf ?? new Date();
     const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 2_000);
     const [legacyRecords, overlayRecords, quotes, ifixCompositionData] = await Promise.all([
       this.repository.listLegacy(safeLimit),
@@ -353,6 +374,7 @@ export class RegulatoryDataService {
       legacyMap.get(ticker) || null,
       overlayMap.get(ticker) || null,
       quoteMap.get(ticker) || null,
+      calculationAsOf,
       options?.includeScores !== false,
       ifixCompositionData,
     ));
@@ -471,11 +493,18 @@ export class RegulatoryDataService {
     return { missing, processed: page.records.length, nextCursor: page.nextCursor, hasMore: page.hasMore };
   }
 
-  async getMany(values: unknown[], limit = 80) {
+  async getMany(values: unknown[], limit = 80, options?: { asOf?: Date | string }) {
+    const calculationAsOf = options?.asOf ?? new Date();
     const tickers = Array.from(new Set(values.map(normalizeTicker).filter(Boolean))).slice(0, limit);
     const quotes = await this.getMarketQuotes();
     const quoteMap = new Map(quotes.map((item) => [item.code, item]));
-    const entries = await Promise.all(tickers.map(async (ticker) => [ticker, await this.getByTicker(ticker, { marketQuote: quoteMap.get(ticker) || null })] as const));
+    const entries = await Promise.all(tickers.map(async (ticker) => [
+      ticker,
+      await this.getByTicker(ticker, {
+        marketQuote: quoteMap.get(ticker) || null,
+        asOf: calculationAsOf,
+      }),
+    ] as const));
     const items: Record<string, PublicFundData> = {};
     const errors: Record<string, string> = {};
     for (const [ticker, item] of entries) {
@@ -509,28 +538,34 @@ export class RegulatoryDataService {
     });
   }
 
-  async getFreeReport(value: unknown): Promise<FreeFundReport | null> {
+  async getFreeReport(value: unknown, options?: { asOf?: Date }): Promise<FreeFundReport | null> {
     return this.observability.track("report.free", async () => {
+      const calculationAsOf = options?.asOf ? new Date(options.asOf.getTime()) : new Date();
       const ticker = normalizeTicker(value);
       if (!ticker) return null;
       const [fund, timeline] = await Promise.all([
-        this.getByTicker(ticker),
+        this.getByTicker(ticker, { asOf: calculationAsOf }),
         this.getTimeline(ticker, { limit: 5 }),
       ]);
       if (!fund) return null;
-      return this.freeReports.generate(fund, timeline, nowIso());
+      return this.freeReports.generate(fund, timeline, calculationAsOf.toISOString());
     });
   }
 
   async rebuildPremiumPeerSnapshot(actor: string) {
     return this.observability.track("premium.peers.rebuild", async () => {
-      const funds = await this.listFunds(2_000, { includeMarket: false, includeScores: true });
+      const calculationAsOf = new Date();
+      const funds = await this.listFunds(2_000, {
+        includeMarket: false,
+        includeScores: true,
+        asOf: calculationAsOf,
+      });
       const snapshot = buildPremiumPeerSnapshot(funds.map((fund) => ({
         ticker: fund.ticker,
         fundKind: fund.fundKind,
         segment: String(fund.segment_new || fund.segment || fund.segmento || "").trim() || null,
         scores: fund.scores,
-      })), nowIso());
+      })), calculationAsOf.toISOString());
       if (snapshot.sourceFundCount < 5) {
         throw new Error("Catálogo insuficiente para materializar pares Premium.");
       }
@@ -551,12 +586,14 @@ export class RegulatoryDataService {
     holdings?: Array<{ ticker: string; quotas: number }>;
     auditActor?: string | null;
     accessPlan?: string | null;
+    asOf?: Date;
   }): Promise<PremiumFundReport | null> {
     if (!featureEnabled("ENABLE_REPORT_PREMIUM")) {
       throw new PremiumReportError("Relatório Premium está desabilitado.", "PREMIUM_REPORT_DISABLED", 503);
     }
     return this.observability.track("report.premium", async () => {
-      const freeReport = await this.getFreeReport(value);
+      const calculationAsOf = options?.asOf ? new Date(options.asOf.getTime()) : new Date();
+      const freeReport = await this.getFreeReport(value, { asOf: calculationAsOf });
       if (!freeReport) return null;
       const holdingMap = new Map<string, number>();
       for (const item of options?.holdings || []) {
@@ -568,7 +605,9 @@ export class RegulatoryDataService {
       const holdings = Array.from(holdingMap, ([ticker, quotas]) => ({ ticker, quotas }));
       const [peerSnapshot, portfolioData] = await Promise.all([
         this.repository.getPremiumPeerSnapshot(),
-        holdings.length ? this.getMany(holdings.map((item) => item.ticker), 120) : Promise.resolve(null),
+        holdings.length
+          ? this.getMany(holdings.map((item) => item.ticker), 120, { asOf: calculationAsOf })
+          : Promise.resolve(null),
       ]);
       try {
         assertFreshPremiumPeerSnapshot(peerSnapshot);
@@ -593,7 +632,13 @@ export class RegulatoryDataService {
           isFundOfFunds: freeReport.identity.isFundOfFunds,
         },
       });
-      const draft = this.premiumReports.prepare(freeReport, peerSnapshot, nowIso(), portfolioHoldings, riskLab);
+      const draft = this.premiumReports.prepare(
+        freeReport,
+        peerSnapshot,
+        calculationAsOf.toISOString(),
+        portfolioHoldings,
+        riskLab,
+      );
       const aiAnalysis = await this.aiInsights.generatePremiumInsights(draft, { requestKey: options?.requestKey });
       const report = this.premiumReports.complete(draft, aiAnalysis);
       const correlationId = options?.requestKey || this.requestFingerprint([

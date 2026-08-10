@@ -208,11 +208,17 @@ function calculatedMarketCap(currentPrice?: number, numberShares?: number) {
   return Number((currentPrice * numberShares).toFixed(2));
 }
 
-export async function buildPortfolioSnapshot(userDocId: string, email: string, wallet: WalletItem[]) {
+export async function buildPortfolioSnapshot(
+  userDocId: string,
+  email: string,
+  wallet: WalletItem[],
+  asOf: Date = new Date(),
+) {
+  const calculationAsOf = new Date(asOf.getTime());
   const sheetPrices = await getSheetPrices();
   const assets = await Promise.all(wallet.map(async (item) => {
     const data = await getFiiDoc(item.ticker);
-    const derived = deriveFiiRiskData(data) as any;
+    const derived = deriveFiiRiskData(data, { asOf: calculationAsOf }) as any;
     const currentPrice = sheetPrices.get(item.ticker) || firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
     const averagePrice = item.averagePrice && item.averagePrice > 0 ? item.averagePrice : undefined;
     const currentValue = currentPrice && currentPrice > 0 ? currentPrice * item.quotas : undefined;
@@ -283,8 +289,8 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
   const cleanSnapshot = removeUndefinedFields({
     userDocId,
     email,
-    date: dateKey(),
-    month: monthKey(),
+    date: dateKey(calculationAsOf),
+    month: monthKey(calculationAsOf),
     cadence: "monthly",
     totalValue: Number(totalValue.toFixed(2)),
     investedValue: investedValue ? Number(investedValue.toFixed(2)) : undefined,
@@ -308,11 +314,18 @@ export async function buildPortfolioSnapshot(userDocId: string, email: string, w
   };
 }
 
-export async function saveMonthlyPortfolioSnapshot(args: { userDocId: string; email: string; wallet: unknown; force?: boolean }) {
+export async function saveMonthlyPortfolioSnapshot(args: {
+  userDocId: string;
+  email: string;
+  wallet: unknown;
+  force?: boolean;
+  asOf?: Date;
+}) {
   const wallet = walletFrom(args.wallet);
   if (!wallet.length) return { saved: false, reason: "empty_wallet" };
 
-  const month = monthKey();
+  const calculationAsOf = args.asOf ? new Date(args.asOf.getTime()) : new Date();
+  const month = monthKey(calculationAsOf);
   const id = sha256(`${args.userDocId}:${month}:monthly-portfolio-snapshot`);
   const ref = adminDb.collection(COLLECTION).doc(id);
 
@@ -321,7 +334,7 @@ export async function saveMonthlyPortfolioSnapshot(args: { userDocId: string; em
     if (current.exists) return { saved: false, reason: "already_exists", snapshotId: id };
   }
 
-  const snapshot = await buildPortfolioSnapshot(args.userDocId, args.email, wallet);
+  const snapshot = await buildPortfolioSnapshot(args.userDocId, args.email, wallet, calculationAsOf);
   await ref.set(snapshot, { merge: true });
 
   return { saved: true, snapshotId: id, month, totalValue: snapshot.totalValue, assetCount: snapshot.assetCount };
