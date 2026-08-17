@@ -231,9 +231,9 @@ test("Firestore mantém fonte canônica e par incremental monotônico e isolado"
       );
 
       for (const operation of [
-        resolveEmailSessionWithDependencies(authRequest(emailA, "synthetic-missing"), dependencies),
-        resolveEmailSessionWithDependencies(authRequest(emailA, expiredToken), dependencies),
-        resolveEmailSessionWithDependencies(authRequest(emailA, mismatchedToken), dependencies),
+        () => resolveEmailSessionWithDependencies(authRequest(emailA, "synthetic-missing"), dependencies),
+        () => resolveEmailSessionWithDependencies(authRequest(emailA, expiredToken), dependencies),
+        () => resolveEmailSessionWithDependencies(authRequest(emailA, mismatchedToken), dependencies),
       ]) {
         await assert.rejects(operation, (error: unknown) => (
           error instanceof VerifiedWalletIdentityCoreError
