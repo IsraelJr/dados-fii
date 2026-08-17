@@ -46,10 +46,14 @@ test("listagem do histórico não depende de índice composto implantado separad
 });
 
 test("identidade por e-mail exige sessão validada e cookie anônimo exige usuário existente", () => {
-  const body = text("src/server/auth/WalletIdentityResolver.ts");
-  assert.match(body, /WalletSessions/);
-  assert.match(body, /sha256\(`\$\{email\}:\$\{token\}`\)/);
-  assert.match(body, /expiresAt/);
-  assert.match(body, /cookieStore\.get\("anonId"\)/);
-  assert.match(body, /USER_NOT_FOUND/);
+  const resolver = text("src/server/auth/WalletIdentityResolver.ts");
+  const core = text("src/server/auth/VerifiedWalletIdentityCore.ts");
+  const firestore = text("src/server/auth/FirestoreVerifiedWalletIdentity.ts");
+  assert.match(firestore, /WalletSessions/);
+  assert.match(core, /verifiedWalletSessionDocumentId/);
+  assert.match(core, /createHash\("sha256"\)/);
+  assert.match(core, /expiresAt/);
+  assert.match(resolver, /firestoreVerifiedWalletIdentityDependencies\(adminDb\)/);
+  assert.match(resolver, /cookieStore\.get\("anonId"\)/);
+  assert.match(`${resolver}\n${core}`, /USER_NOT_FOUND/);
 });

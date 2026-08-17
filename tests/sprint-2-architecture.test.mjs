@@ -287,7 +287,9 @@ test("FII quotes have two decimal places and wallet sync follows the page header
 test("verified wallet sessions synchronize the current local portfolio promptly", () => {
   const sync = read("src/app/components/WalletEmailVerifiedSync.tsx");
   assert.match(sync, /AUTO_SAVE_DELAY_MS = 5 \* 1000/);
-  assert.match(sync, /storedToken \? "" : walletSignature\(initialWallet\)/);
+  assert.match(sync, /hasConfirmedCloudSignature/);
+  assert.match(sync, /cloudCache\.signature === initialSignature/);
+  assert.match(sync, /!storedToken \|\| hasConfirmedCloudSignature/);
   assert.match(sync, /lastSavedSignature\.current = ""/);
   assert.match(sync, /Sincronizar agora/);
 });

@@ -164,6 +164,17 @@ function validateDate(value: Date | string, code: "INVALID_AS_OF") {
   return date;
 }
 
+export function normalizePortfolioIntelligenceCanonicalInput(
+  input: PortfolioIntelligenceInput,
+  asOf: Date | string,
+) {
+  const referenceDate = validateDate(asOf, "INVALID_AS_OF");
+  return Object.freeze({
+    history: normalizeSnapshots(input.snapshots, competenceAt(referenceDate)),
+    positions: normalizePositions(input.positions),
+  });
+}
+
 export class PortfolioIntelligenceService {
   private readonly policy: PortfolioIntelligencePolicy;
   private readonly clock: () => Date;
@@ -182,8 +193,9 @@ export class PortfolioIntelligenceService {
   ): PortfolioIntelligenceResult {
     const asOf = validateDate(options.asOf, "INVALID_AS_OF");
     const generatedAt = validateDate(options.generatedAt ?? this.clock(), "INVALID_AS_OF");
-    const normalizedHistory = normalizeSnapshots(input.snapshots, competenceAt(asOf));
-    const positions = normalizePositions(input.positions);
+    const normalized = normalizePortfolioIntelligenceCanonicalInput(input, asOf);
+    const normalizedHistory = normalized.history;
+    const positions = normalized.positions;
     const incomeResult = calculateIncomeMetrics(normalizedHistory.months, this.policy);
     const portfolio = calculatePortfolioMetrics(positions);
     const qualityResult = assessPortfolioIntelligenceDataQuality({
