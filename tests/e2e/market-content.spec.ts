@@ -39,7 +39,10 @@ test("matéria do Copom publica decisão oficial com datas SEO coerentes", async
   await expect(page.getByRole("heading", { level: 1, name: /Fundos Imobiliários em agosto de 2026/ })).toBeVisible();
   await expect(page.getByText("14,00% ao ano", { exact: true })).toBeVisible();
   await expect(page.getByText(/mantém a trajetória de flexibilização iniciada em março de 2026/)).toBeVisible();
-  await expect(page.getByRole("link", { name: /280ª reunião/ })).toHaveAttribute(
+  await expect(page.getByRole("link", {
+    name: "Copom reduz a taxa Selic para 14,00% a.a. — 280ª reunião",
+    exact: true,
+  })).toHaveAttribute(
     "href",
     "https://www.bcb.gov.br/api/servico/sitebcb/copom/comunicados_detalhes?nro_reuniao=280",
   );
