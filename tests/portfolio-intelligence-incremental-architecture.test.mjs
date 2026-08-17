@@ -136,7 +136,8 @@ test("preflight server-only remove a superfície antes de ler credenciais", () =
   assert.match(report, /if \(!available \|\| disposed \|\| incrementalDisabledForTab\) return/);
   assert.match(report, /availabilityResponse\.status !== 204[\s\S]*available = true;[\s\S]*scheduleRefresh\(0\)/);
   assert.match(report, /PORTFOLIO_INCREMENTAL_DISABLED"\) \{[\s\S]*incrementalDisabledForTab = true;[\s\S]*available = false;[\s\S]*setState\("disabled"\)/);
-  assert.match(report, /event\.key === null \|\| event\.key === EMAIL_KEY \|\| event\.key === TOKEN_KEY/);
+  assert.match(report, /event\.key === null \|\| event\.key === EMAIL_KEY/);
+  assert.doesNotMatch(report, /event\.key === null \|\| event\.key === EMAIL_KEY \|\| event\.key === TOKEN_KEY/);
   assert.match(report, /addEventListener\("storage", refreshAfterCrossTabSessionChange\)/);
   assert.match(report, /removeEventListener\("storage", refreshAfterCrossTabSessionChange\)/);
   assert.doesNotMatch(`${availabilityRoute}\n${availability}\n${report}`, /NEXT_PUBLIC_ENABLE_INCREMENTAL_PORTFOLIO_REPORT/);
