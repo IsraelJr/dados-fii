@@ -42,7 +42,7 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.7\.1/);
+  assert.match(body, /\*\*Versão:\*\* 10\.7\.2/);
   assert.match(body, /Produto Validável/);
   assert.match(body, /PV-4 — Relatório incremental: mudanças desde a última análise/);
   assert.match(body, /Hotfix — recuperação da sessão da carteira/);
@@ -116,6 +116,9 @@ test("evidências funcionais da PV-4 e do hotfix ficam registradas", () => {
   assert.match(body, /6f926decaafc77e8bac85ab352b242feeb5af1d8/);
   assert.match(body, /32044107480/);
   assert.match(body, /Hotfix — recuperação da sessão da carteira \| Concluído pela PR `#188`/);
+  assert.match(body, /095907087087abd4f8f46dad8e30c0f319792773/);
+  assert.match(body, /32046295007/);
+  assert.match(body, /Atualização editorial — Copom agosto de 2026 \| Concluída pela PR `#184`/);
   assert.match(body, /Não há evidência de deploy em produção da PV-4/);
 });
 
