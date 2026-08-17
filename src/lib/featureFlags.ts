@@ -8,7 +8,8 @@ export type Phase2Feature =
   | "ENABLE_RISK_LAB_ADMIN"
   | "ENABLE_RISK_LAB_PREMIUM_READONLY"
   | "ENABLE_PREMIUM_DISCOVERY"
-  | "ENABLE_INCREMENTAL_PORTFOLIO_REPORT";
+  | "ENABLE_INCREMENTAL_PORTFOLIO_REPORT"
+  | "ENABLE_FUND_RADAR";
 
 export function featureEnabled(name: Phase2Feature, defaultValue = true) {
   const value = process.env[name];

@@ -1,7 +1,8 @@
 import { safeLog, sanitizeForLog } from "@/lib/observability/SafeLogger";
 
 export type ObservabilityEventInput = {
-  type: "fii_lookup" | "fii_batch_lookup" | "risk_report" | "portfolio_notifications" | "system";
+  type: "fii_lookup" | "fii_batch_lookup" | "risk_report" | "portfolio_notifications" | "system"
+    | "radar_follow_started" | "radar_follow_removed" | "radar_limit_reached" | "radar_update_opened";
   ok: boolean;
   statusCode?: number;
   ticker?: string;
