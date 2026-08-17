@@ -7,7 +7,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
 **PR de encerramento da versão anterior:** `#189`
-**PR corretiva desta versão:** a registrar nesta PR
+**PR corretiva desta versão:** `#190`
 **SHA final da `main` antes da correção documental:** `df1d0bbeea9afc1021a89b950b618f1672a22727`
 **CI da `main` final:** `Phase 2 Closure CI` — run `32052213156` — sucesso
 **Produção no SHA final:** Vercel deployment `5948464030` — `success`; `Risk Lab Premium Production Gate` — run `32052314513` — sucesso; `Production Premium Smoke` — run `32052314449` — sucesso
@@ -340,6 +340,7 @@ Além desses critérios, toda sprint que crie ou amplie superfície pública dev
 
 - Repositório: `IsraelJr/dados-fii`.
 - Branch principal: `main`.
+- Branch corretiva do Handoff v10.8.1: `agent/handoff-v10-8-1-correction`.
 - Branch da PV-4: `agent/pv4-reconciliation`.
 - Branch da PV-5: `agent/pv5-fund-radar`.
 - PR `#177`: PV-2A, mergeada.
@@ -353,6 +354,7 @@ Além desses critérios, toda sprint que crie ou amplie superfície pública dev
 - PR `#188`: hotfix de recuperação da sessão e Handoff v10.7.1, mergeada em `14a81f919928f91ab221a25ab73b1136cbf2b883`.
 - PR `#184`: atualização editorial do Copom e Handoff v10.7.2, mergeada em `81ba4811b82c6ffc2955595b6570b9353d85626a`.
 - PR `#189`: PV-5 e Handoff v10.8.0, mergeada em `df1d0bbeea9afc1021a89b950b618f1672a22727`.
+- PR `#190`: correção exclusivamente documental do Handoff v10.8.1; merge somente após os gates documentais/canônicos verdes no mesmo SHA.
 - PR `#183`: fechada sem merge e substituída pela PR limpa `#187`.
 - PR `#170`: fechada sem merge.
 - PRs `#168`, `#179`, `#1` e `#2`: fechadas sem merge após reconciliação como legado, substituídas ou obsoletas.
