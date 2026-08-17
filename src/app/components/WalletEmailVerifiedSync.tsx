@@ -264,7 +264,7 @@ export default function WalletEmailVerifiedSync() {
       setSessionState("validating");
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key === WALLET_SESSION_KEY) syncStoredSession();
+      if (event.key === null || event.key === WALLET_SESSION_KEY) syncStoredSession();
     };
     window.addEventListener(WALLET_SESSION_INVALID_EVENT, markSessionInvalid);
     window.addEventListener(WALLET_SESSION_UPDATED_EVENT, syncStoredSession);

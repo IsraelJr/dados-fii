@@ -223,7 +223,7 @@ export default function PortfolioIncrementalReportPanel() {
     const refreshAfterPersistence = () => scheduleRefresh(REFRESH_DEBOUNCE_MS);
     const refreshAfterSessionChange = () => scheduleRefresh(0);
     const refreshAfterCrossTabSessionChange = (event: StorageEvent) => {
-      if (event.key === null || event.key === EMAIL_KEY || event.key === TOKEN_KEY) {
+      if (event.key === null || event.key === EMAIL_KEY) {
         scheduleRefresh(0);
       }
     };

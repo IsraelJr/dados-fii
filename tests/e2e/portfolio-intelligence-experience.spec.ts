@@ -679,7 +679,7 @@ test("troca de identidade e logout em outra aba removem dados incrementais anter
   await sibling.evaluate(() => {
     window.localStorage.setItem("dados-fii-wallet-email", "portfolio-e2e-b@example.test");
   });
-  await expect(panel).toHaveAttribute("data-incremental-state", "unavailable");
+  await expect(panel).toHaveAttribute("data-incremental-state", "signed-out");
   await expect(panel.locator("[data-incremental-change]")).toHaveCount(0);
 
   await sibling.evaluate(() => {
