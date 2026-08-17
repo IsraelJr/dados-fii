@@ -42,11 +42,12 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.6\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.7\.0/);
   assert.match(body, /Produto Validável/);
   assert.match(body, /PV-4 — Relatório incremental: mudanças desde a última análise/);
+  assert.match(body, /Hotfix — recuperação da sessão da carteira/);
   assert.match(body, /PV-1 está concluída funcionalmente/);
-  assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C, PV-3 e PV-3\.5 ficam formalmente concluídas/);
+  assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3\.5 e PV-4 ficam formalmente concluídas/);
   assert.match(body, /Google AdSense continua congelado/);
 });
 
@@ -82,7 +83,10 @@ test("estado atual protege fonte única, IA explicativa, descoberta Premium e SE
   assert.match(body, /PR `#178` integrou a PV-2B/);
   assert.match(body, /PR `#180` encerrou a PV-2C/);
   assert.match(body, /PR `#181` encerrou a PV-3/);
-  assert.match(body, /PR `#182` encerra a PV-3\.5/);
+  assert.match(body, /PR `#182` encerrou a PV-3\.5/);
+  assert.match(body, /PR `#185` atualizou o `nanoid` vulnerável/);
+  assert.match(body, /PR `#186` tornou derivados financeiros temporalmente determinísticos/);
+  assert.match(body, /PR `#187` encerra a PV-4/);
   assert.match(body, /IA nunca é fonte de verdade para cálculo financeiro/);
   assert.match(body, /A explicação por IA ocorre apenas após ação explícita do usuário/);
   assert.match(body, /Solicitar beta não concede entitlement/);
@@ -104,13 +108,13 @@ test("regras críticas de arquitetura, privacidade editorial e conclusão perman
   assert.match(body, /número novo ou recomendação falha fechado e usa fallback determinístico/);
 });
 
-test("evidência funcional da PV-3.5 e próxima sprint ficam registradas", () => {
+test("evidência funcional da PV-4 e próximo hotfix ficam registrados", () => {
   const body = text();
-  assert.match(body, /6a57d3dbcdc58ba0f7a2a19705d461ffe689a294/);
-  assert.match(body, /30954725742/);
-  assert.match(body, /PV-3\.5 — SEO e Conteúdo de Mercado \| Concluída com o merge da PR `#182`/);
-  assert.match(body, /A próxima entrega funcional é a PV-4/);
-  assert.match(body, /Não há evidência de deploy em produção da PV-3\.5/);
+  assert.match(body, /4203e3b0c5bc586ee32643bc47976545b91731c9/);
+  assert.match(body, /32038322839/);
+  assert.match(body, /PV-4 — relatório incremental \| Concluída com o merge da PR `#187`/);
+  assert.match(body, /próximo item urgente é o hotfix de recuperação da sessão da carteira/i);
+  assert.match(body, /Não há evidência de deploy em produção da PV-4/);
 });
 
 test("documentos auxiliares canônicos existem e estão atualizados", () => {
