@@ -42,7 +42,7 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.7\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.7\.1/);
   assert.match(body, /Produto Validável/);
   assert.match(body, /PV-4 — Relatório incremental: mudanças desde a última análise/);
   assert.match(body, /Hotfix — recuperação da sessão da carteira/);
@@ -108,12 +108,14 @@ test("regras críticas de arquitetura, privacidade editorial e conclusão perman
   assert.match(body, /número novo ou recomendação falha fechado e usa fallback determinístico/);
 });
 
-test("evidência funcional da PV-4 e próximo hotfix ficam registrados", () => {
+test("evidências funcionais da PV-4 e do hotfix ficam registradas", () => {
   const body = text();
   assert.match(body, /4203e3b0c5bc586ee32643bc47976545b91731c9/);
   assert.match(body, /32038322839/);
   assert.match(body, /PV-4 — relatório incremental \| Concluída com o merge da PR `#187`/);
-  assert.match(body, /próximo item urgente é o hotfix de recuperação da sessão da carteira/i);
+  assert.match(body, /6f926decaafc77e8bac85ab352b242feeb5af1d8/);
+  assert.match(body, /32044107480/);
+  assert.match(body, /Hotfix — recuperação da sessão da carteira \| Concluído pela PR `#188`/);
   assert.match(body, /Não há evidência de deploy em produção da PV-4/);
 });
 

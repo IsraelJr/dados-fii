@@ -2,15 +2,15 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 10.7.0
+**Versão:** 10.7.1
 **Data:** 17/08/2026
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**PR de encerramento desta versão:** `#187`
-**SHA funcional da PV-4 antes da atualização documental:** `4203e3b0c5bc586ee32643bc47976545b91731c9`
-**CI funcional:** `Phase 2 Closure CI` — run `32038322839` — sucesso
+**PR de encerramento desta versão:** `#188`
+**SHA funcional do hotfix antes da atualização documental:** `6f926decaafc77e8bac85ab352b242feeb5af1d8`
+**CI funcional:** `Phase 2 Closure CI` — run `32044107480` — sucesso
 **Fase vigente:** `Produto Validável`  
-**Próximo item urgente após o merge deste documento:** `Hotfix — recuperação da sessão da carteira`, antes da PV-5
+**Próxima etapa após o merge deste documento:** reconciliação curta do passivo e PR `#184`; depois, PV-5
 
 ## Decisões vigentes que substituem decisões anteriores
 
@@ -18,13 +18,13 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 |---|---|---|
 | PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3.5 e PV-4 ficam formalmente concluídas com o merge da PR `#187`. | O Handoff v10.6.0 tratava PV-4 como sprint atual. | O produto passa a comparar referências server-owned e mostrar somente mudanças materiais rastreáveis. |
 | PR `#185` concluiu o saneamento do `nanoid` no lockfile e PR `#186` concluiu a dívida de determinismo temporal. | Esses dois bloqueadores precediam a integração segura da PV-4. | Segurança de dependência e relógio determinístico são pré-requisitos concluídos da PV-4. |
-| O hotfix de recuperação da sessão da carteira é o próximo item urgente antes da PV-5. | PV-5 poderia começar imediatamente após a PV-4. | O roadmap funcional não muda; a correção de sessão recebe prioridade operacional própria. |
+| O hotfix de recuperação da sessão da carteira fica concluído pela PR `#188`, antes da PV-5. | Presença de token no navegador era tratada como sessão válida. | Todo 401 autenticado converge para recuperação central, preservando carteira, snapshots e histórico. |
 | O hub `/mercado` e sete páginas segmentadas são a superfície editorial oficial desta fase. | SEO editorial ainda não possuía rotas próprias. | Mercado de FIIs, FIAGRO, logística, shoppings, escritórios, recebíveis e renda urbana têm conteúdo específico, data-base e fontes. |
 | Página editorial desconhecida ou sem qualidade mínima não é publicada nem indexada. | Uma rota dinâmica poderia gerar conteúdo raso por fallback. | O registro editorial é allowlistado e slug desconhecido retorna 404 real. |
 | Telemetria editorial é anônima, mínima e retida por 90 dias. | Eventos editoriais poderiam reutilizar identidade ou dados financeiros. | Nenhum evento contém e-mail, `ownerId`, carteira, posição, ticker, dividendo, patrimônio, token ou cookie. |
 | Google AdSense continua congelado. | SEO poderia ser confundido com antecipação de anúncios. | O objetivo é tráfego qualificado e utilidade; publicidade não integra esta entrega. |
 | Cobrança continua adiada até a PV-6, e checkout permanece na PV-7. | Monetização poderia ser antecipada sem evidência comercial. | Interesse, beta e uso continuam separados de pagamento e entitlement comercial. |
-| O Handoff v10.7.0 é a única fonte canônica ativa. | Handoffs v10.6.0 e anteriores. | Este documento prevalece em caso de divergência. |
+| O Handoff v10.7.1 é a única fonte canônica ativa. | Handoffs v10.7.0 e anteriores. | Este documento prevalece em caso de divergência. |
 
 ## 1. Estado atual do projeto
 
@@ -42,11 +42,15 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - PR `#186` tornou derivados financeiros temporalmente determinísticos e foi integrada pelo merge commit `f8101234359fa27c41e263e9dfa67bafd4c4572c`.
 - PR `#187` encerra a PV-4 sobre a base `f810123`, substituindo a implementação histórica da PR `#183`, fechada sem merge.
 - O SHA funcional `4203e3b0c5bc586ee32643bc47976545b91731c9` passou governança, Handoff vigente, auditoria, secret scan, lint, TypeScript, 859 testes, Firestore Rules/Emulator, cobertura crítica, mutation, build, smoke HTTP e 42 E2E desktop/mobile com acessibilidade no run `32038322839`.
+- PR `#188` conclui o hotfix de recuperação da sessão da carteira sobre a main da PV-4.
+- O SHA funcional `6f926decaafc77e8bac85ab352b242feeb5af1d8` passou instalação congelada, governança, Handoff, auditoria, secret scan, lint, TypeScript, 868 testes, Firestore Rules/Emulator, cobertura crítica, mutation, build, smoke HTTP e 50 E2E desktop/mobile com acessibilidade no run `32044107480`.
+- A causa raiz do hotfix era considerar a presença local do token como prova de sessão válida. A política central agora remove somente a credencial rejeitada, interrompe consumidores autenticados e oferece novo código sem apagar e-mail, carteira, snapshots ou histórico manual.
+- Troca de sessão entre abas só libera consumidores depois da validação server-side, evitando uso antecipado do token e requisições duplicadas.
 - PR `#170` continua fechada sem merge, substituída pela implementação limpa da PR `#178`.
 - PR `#168` permanece bloqueada e não deve ser mergeada enquanto houver risco de reintrodução de segredos ou alterações privilegiadas fora do escopo.
 - A PV-4 reconstrói entrada financeira server-side, mantém referência versionada e transacional, trata replay, concorrência e stale write e deixa a IA somente como explicadora opcional.
 - A revisão adicional corrigiu a janela histórica para os 120 meses mais recentes, preservou renda conhecida igual a zero, tornou o rollback fail-closed durável durante remount da mesma aba e eliminou atualização redundante de posição idêntica.
-- O próximo item urgente é o hotfix de recuperação da sessão da carteira, em escopo próprio e antes da PV-5.
+- O próximo trabalho é a reconciliação curta do passivo e a PR `#184`; a próxima sprint funcional permanece a PV-5.
 - Não há evidência de deploy em produção da PV-4 neste documento; merge e CI não substituem verificação posterior do ambiente produtivo.
 
 ### Matriz atual
@@ -64,7 +68,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | PV-3 — descoberta Premium/beta | Concluída |
 | PV-3.5 — SEO e Conteúdo de Mercado | Concluída pela PR `#182` |
 | PV-4 — relatório incremental | Concluída com o merge da PR `#187` |
-| Hotfix — recuperação da sessão da carteira | Próximo item urgente antes da PV-5 |
+| Hotfix — recuperação da sessão da carteira | Concluído pela PR `#188` |
 | PV-5 — acompanhar fundos | Planejada |
 | Checkout/cobrança | Não iniciado |
 | AdSense | Congelado |
@@ -140,13 +144,19 @@ Inclui:
 - leitura dos 120 meses mais recentes em ordem canônica e distinção explícita entre renda conhecida `0` e ausência `null`;
 - E2E desktop/mobile, múltiplas abas, estados autenticado e sem sessão e acessibilidade sem violações sérias ou críticas.
 
+### Hotfix — recuperação da sessão da carteira
+
+**Estado:** concluído pela PR `#188`.
+
+Inclui validação explícita no servidor, estado de sessão separado da presença do token, invalidação central de 401 restrita à geração rejeitada, recuperação por novo código, coordenação entre abas e preservação integral da carteira, snapshots e histórico local. Autosave, autoload, relatório de risco e análise incremental param de usar a credencial rejeitada e retomam somente após uma nova sessão válida.
+
 ## 3. Sprint atual
 
-### Hotfix urgente — recuperação da sessão da carteira
+### Reconciliação pós-hotfix
 
-**Prioridade:** executar em PR própria antes de iniciar a PV-5.
+**Prioridade:** classificar e encerrar o passivo antigo, tratar a PR `#184` em escopo próprio e então iniciar a PV-5.
 
-Este registro não autoriza implementação dentro da PV-4. O hotfix deve tratar somente a recuperação da sessão inválida da carteira, preservar autenticação e isolamento existentes e passar os mesmos gates canônicos antes de qualquer merge. O roadmap funcional PV-5 a PV-9 permanece inalterado.
+O hotfix está isolado na PR `#188` e não altera autenticação server-side, expiração, rate limit ou entitlement. O roadmap funcional PV-5 a PV-9 permanece inalterado.
 
 ## 4. Ordem oficial das próximas sprints
 
@@ -250,6 +260,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - PR `#185`: saneamento do `nanoid`, mergeada em `025ced8f8fb42c204f380e96827c2f073bd8d115`.
 - PR `#186`: determinismo temporal, mergeada em `f8101234359fa27c41e263e9dfa67bafd4c4572c`.
 - PR `#187`: PV-4 e Handoff v10.7.0; merge somente após CI final verde no mesmo SHA documental.
+- PR `#188`: hotfix de recuperação da sessão e Handoff v10.7.1; merge somente após CI final verde no mesmo SHA documental.
 - PR `#183`: fechada sem merge e substituída pela PR limpa `#187`.
 - PR `#170`: fechada sem merge.
 - PR `#168`: bloqueada; não mergear sem auditoria específica de segredos e sessão.
@@ -282,6 +293,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - infraestrutura SEO de fundos com gate, manifesto e sitemap fail-closed;
 - hub e cenários editoriais por segmento;
 - relatório incremental PV-4 server-owned, determinístico, versionado, transacional e fail-closed.
+- recuperação de sessão inválida sem reload obrigatório ou perda de carteira, snapshots e histórico.
 
 ### Parciais
 
@@ -292,7 +304,6 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 
 ### Pendentes
 
-- hotfix de recuperação da sessão da carteira, antes da PV-5;
 - acompanhar fundo fora da carteira, 1 Grátis e 10 Premium;
 - validação de preço;
 - checkout e assinaturas;
@@ -313,6 +324,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - páginas editoriais desconhecidas retornam 404;
 - conteúdo não contém recomendação individual, preço-alvo ou promessa de rentabilidade;
 - falhas de fonte, schema, IA ou persistência são sanitizadas e falham fechado;
+- 401 autenticado remove somente a geração rejeitada da sessão da carteira e interrompe consumidores até nova validação;
 - nenhuma ação automática de compra, venda ou alteração de carteira é permitida.
 
 ## 10. Variáveis de ambiente
@@ -380,7 +392,6 @@ Para conteúdo editorial, também são obrigatórios:
 - quais fundos receberão revisão editorial individual primeiro;
 - WhatsApp ou Telegram para alertas, mantendo consentimento, custo e privacidade;
 - eventual AdSense, ainda congelado;
-- hotfix de recuperação da sessão da carteira, em PR própria antes da PV-5;
 - verificação pós-merge e pós-deploy da PV-4 em produção.
 
 Nenhuma dessas decisões abertas autoriza checkout, anúncio, mensagem externa ou mudança de entitlement sem sprint própria, testes e registro canônico.
