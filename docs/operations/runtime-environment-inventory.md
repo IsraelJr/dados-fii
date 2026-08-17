@@ -1,6 +1,6 @@
 # Dados FII — Inventário de variáveis de ambiente
 
-**Data:** 04/08/2026  
+**Data:** 17/08/2026
 **Política:** este inventário contém somente nomes, finalidade e classificação. Valores secretos nunca são versionados.
 
 ## Públicas e não autorizativas
@@ -79,6 +79,7 @@
 - `ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK`
 - `ENABLE_PREMIUM_DISCOVERY`: habilita a proposta e a lista de interesse; o código falha fechado quando ausente ou falso. Rollback: definir `false` sem remover entitlements Premium existentes.
 - `ENABLE_INCREMENTAL_PORTFOLIO_REPORT`: habilita a comparação server-side com a última referência válida. O código falha fechado quando a variável está ausente ou falsa. O rollout versionado da Vercel define `true`; rollback: definir `false`, o que bloqueia análise, leitura da referência e explicação sem apagar dados. Owner: produto/engenharia. Ambientes: preview e produção. Condição de remoção: após estabilização da PV-4 e substituição por configuração persistida, caso aprovada.
+- `ENABLE_FUND_RADAR`: habilita o Radar server-side. Ausente ou falsa bloqueia APIs, monitor e UI sem apagar acompanhamentos. O rollout versionado da Vercel define `true`; rollback: definir `false`. Owner: produto/engenharia. Ambientes: preview e produção. Condição de remoção: após estabilização da PV-5 e substituição por configuração persistida, caso aprovada.
 
 ## Runtime e deployment
 
