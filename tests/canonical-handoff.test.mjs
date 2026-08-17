@@ -42,14 +42,30 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.8\.0/);
+  assert.match(body, /\*\*Versão:\*\* 10\.8\.1/);
   assert.match(body, /Produto Validável/);
   assert.match(body, /PV-4 — Relatório incremental: mudanças desde a última análise/);
   assert.match(body, /Hotfix — recuperação da sessão da carteira/);
   assert.match(body, /PV-5 — Radar\/Acompanhar fundo fora da carteira/);
   assert.match(body, /PV-1 está concluída funcionalmente/);
-  assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3\.5 e PV-4 ficam formalmente concluídas/);
+  assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3\.5, PV-4 e PV-5 ficam formalmente concluídas/);
   assert.match(body, /Google AdSense continua congelado/);
+});
+
+test("Handoff corretivo restaura sprint atual, roadmap e SEO transversal", () => {
+  const body = text();
+  assert.match(body, /\*\*Sprint funcional atual:\*\* PV-6 — validação de preço e cobrança/);
+  assert.match(body, /SEO-S1A → SEO-S1B → SEO-S2 → SEO-S3 → SEO-S4/);
+  assert.match(body, /não forma uma sprint exclusiva/);
+  assert.match(body, /Search Console deve ter acompanhamento operacional recorrente de indexação, impressões, cliques, CTR, posição/);
+  assert.match(body, /aproximadamente 20 fundos/);
+  assert.match(body, /PV-2D — Painel Executivo\/score explicável/);
+  assert.match(body, /pendente de reconciliação funcional/);
+  assert.match(body, /PV-9A — Screener, comparador de pares e filtros salvos/);
+  assert.match(body, /PV-9B — Fair value e sustentabilidade por categoria/);
+  assert.match(body, /PV-10 — Análise técnica secundária/);
+  assert.match(body, /PV-7 permanece bloqueada até que a PV-6 registre evidência comercial suficiente/);
+  assert.match(body, /validação quantitativa de conversão ou preço não deve ser tratada como representativa sem amostra externa mínima/);
 });
 
 test("Handoff contém as doze seções obrigatórias na ordem", () => {
@@ -109,7 +125,7 @@ test("regras críticas de arquitetura, privacidade editorial e conclusão perman
   assert.match(body, /número novo ou recomendação falha fechado e usa fallback determinístico/);
 });
 
-test("evidências funcionais da PV-4 e do hotfix ficam registradas", () => {
+test("evidências funcionais e de produção ficam registradas", () => {
   const body = text();
   assert.match(body, /4203e3b0c5bc586ee32643bc47976545b91731c9/);
   assert.match(body, /32038322839/);
@@ -123,7 +139,12 @@ test("evidências funcionais da PV-4 e do hotfix ficam registradas", () => {
   assert.match(body, /f4e604d596bb70a1f20db67bf9fc72ae20ef2647/);
   assert.match(body, /32051239202/);
   assert.match(body, /PV-5 — Radar\/Acompanhar fundos \| Concluída pela PR `#189`/);
-  assert.match(body, /Não há evidência de deploy em produção da PV-4/);
+  assert.match(body, /df1d0bbeea9afc1021a89b950b618f1672a22727/);
+  assert.match(body, /deployment Vercel `5948464030` concluiu em `success`/);
+  assert.match(body, /Risk Lab Premium Production Gate` passou no run `32052314513`/);
+  assert.match(body, /Production Premium Smoke` passou no run `32052314449`/);
+  assert.doesNotMatch(body, /produção da main consolidada ainda exige verificação/);
+  assert.doesNotMatch(body, /Não há evidência de deploy em produção da PV-4/);
 });
 
 test("documentos auxiliares canônicos existem e estão atualizados", () => {
