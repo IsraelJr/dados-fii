@@ -396,7 +396,7 @@ export default function WalletPage() {
       const email = window.localStorage.getItem(EMAIL_KEY)?.trim().toLowerCase();
       const token = window.localStorage.getItem(TOKEN_KEY);
       if (!email || !token) {
-        setManualHistory([]);
+        setManualHistory(readManualHistoryCache());
         return;
       }
       try {

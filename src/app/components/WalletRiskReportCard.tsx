@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Crown, Download, FileText, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  WALLET_SESSION_INVALID_EVENT,
+  WALLET_SESSION_UPDATED_EVENT,
+} from "@/lib/users/WalletSessionRecoveryClient";
 import LottieAnimation from "./LottieAnimation";
 
 type ReportStatus = {
@@ -73,19 +77,28 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
   const [reportMarkdown, setReportMarkdown] = useState("");
 
   useEffect(() => {
-    const storedEmail = window.localStorage.getItem(EMAIL_KEY) || "";
-    const storedToken = window.localStorage.getItem(TOKEN_KEY) || "";
-    const cleanEmail = storedEmail.trim().toLowerCase();
-
-    if (!cleanEmail || !storedToken) {
+    let disposed = false;
+    let requestGeneration = 0;
+    const onSessionInvalid = () => {
+      requestGeneration += 1;
       setVisible(false);
-      return;
-    }
-
-    setEmail(cleanEmail);
-    setSessionToken(storedToken);
+      setSessionToken("");
+      setStatus(null);
+      setLoadingStatus(false);
+      setGenerating(false);
+      setDownloadingPdf(false);
+    };
 
     async function loadStatus() {
+      const generation = ++requestGeneration;
+      const cleanEmail = String(window.localStorage.getItem(EMAIL_KEY) || "").trim().toLowerCase();
+      const storedToken = window.localStorage.getItem(TOKEN_KEY) || "";
+      if (!cleanEmail || !storedToken) {
+        onSessionInvalid();
+        return;
+      }
+      setEmail(cleanEmail);
+      setSessionToken(storedToken);
       setLoadingStatus(true);
       setMessage("");
 
@@ -99,19 +112,31 @@ export default function WalletRiskReportCard({ walletCount }: { walletCount: num
 
         if (!response.ok || !json?.ok) throw new Error(json?.error || "Não foi possível consultar o status do relatório.");
 
+        if (disposed || generation !== requestGeneration) return;
         setVisible(Boolean(json.isVip || json.canGenerate));
         setStatus(json);
         if (json.reportMarkdown) setReportMarkdown(json.reportMarkdown);
       } catch (error: unknown) {
         const reason = error instanceof Error ? error.message : "Não foi possível consultar o status do relatório.";
-        setVisible(false);
-        setMessage(reason);
+        if (!disposed && generation === requestGeneration) {
+          setVisible(false);
+          setMessage(reason);
+        }
       } finally {
-        setLoadingStatus(false);
+        if (!disposed && generation === requestGeneration) setLoadingStatus(false);
       }
     }
 
-    loadStatus();
+    const onSessionUpdated = () => void loadStatus();
+    window.addEventListener(WALLET_SESSION_INVALID_EVENT, onSessionInvalid);
+    window.addEventListener(WALLET_SESSION_UPDATED_EVENT, onSessionUpdated);
+    void loadStatus();
+    return () => {
+      disposed = true;
+      requestGeneration += 1;
+      window.removeEventListener(WALLET_SESSION_INVALID_EVENT, onSessionInvalid);
+      window.removeEventListener(WALLET_SESSION_UPDATED_EVENT, onSessionUpdated);
+    };
   }, []);
 
   function applyGeneratedReport(json: GeneratedReport) {

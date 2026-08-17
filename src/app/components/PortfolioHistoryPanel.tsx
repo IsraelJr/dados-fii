@@ -77,10 +77,14 @@ function authHeaders(): Record<string, string> {
   return email && token ? { "x-wallet-email": email, "x-wallet-session": token } : {};
 }
 async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>, keepalive = false) {
+  const headers = authHeaders();
+  if (!headers["x-wallet-email"] || !headers["x-wallet-session"]) {
+    throw new Error("Confirme novamente o e-mail para sincronizar o histórico.");
+  }
   const response = await fetch(`/api/portfolio/history?portfolioId=${PORTFOLIO_ID}`, {
     method,
     keepalive,
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...headers },
     body: method === "GET" ? undefined : JSON.stringify({ portfolioId: PORTFOLIO_ID, ...body }),
   });
   const json = await response.json().catch(() => ({}));
@@ -158,6 +162,11 @@ export default function PortfolioHistoryPanel() {
         setSyncState("synced");
         return;
       }
+      const currentCredentials = credentials();
+      if (!currentCredentials.email || !currentCredentials.token) {
+        setSyncState("local");
+        return;
+      }
       inFlightUpserts.current = new Set(upserts.map((entry) => entry.competence));
       setSyncState("syncing");
       try {
@@ -227,6 +236,14 @@ export default function PortfolioHistoryPanel() {
     if (cached.length) {
       setEntries(sortEntries(cached));
       publishHistory(sortEntries(cached));
+    }
+    const currentCredentials = credentials();
+    if (!currentCredentials.email || !currentCredentials.token) {
+      const pending = readPending();
+      pendingRef.current = pending;
+      setSyncState(cached.length || Object.keys(pending.upserts).length || pending.deletes.length ? "local" : "synced");
+      setLoading(false);
+      return;
     }
     try {
       const json = await api("GET");

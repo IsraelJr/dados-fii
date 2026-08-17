@@ -2,6 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mail } from "lucide-react";
+import {
+  handleWalletSessionResponse,
+  notifyWalletSessionUpdated,
+  WALLET_EMAIL_KEY,
+  WALLET_SESSION_INVALID_EVENT,
+  WALLET_SESSION_KEY,
+  WALLET_SESSION_UPDATED_EVENT,
+  walletSessionControls,
+  type WalletSessionState,
+} from "@/lib/users/WalletSessionRecoveryClient";
 
 type WalletItem = {
   ticker: string;
@@ -34,8 +44,6 @@ type WalletSnapshot = {
 
 const STORAGE_KEY = "dados-fii-wallet-v1";
 const SNAPSHOT_KEY = "dados-fii-wallet-monthly-snapshots-v1";
-const EMAIL_KEY = "dados-fii-wallet-email";
-const TOKEN_KEY = "dados-fii-wallet-session";
 const CLOUD_LOAD_CACHE_KEY = "dados-fii-wallet-cloud-load-cache-v1";
 const SNAPSHOT_HYDRATION_KEY = "dados-fii-wallet-snapshots-hydrated-v1";
 const PORTFOLIO_SAVED_EVENT = "dados-fii-wallet-saved";
@@ -148,6 +156,7 @@ export default function WalletEmailVerifiedSync() {
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [token, setToken] = useState("");
+  const [sessionState, setSessionState] = useState<WalletSessionState>("unknown");
   const [wallet, setWallet] = useState<WalletItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
@@ -161,7 +170,24 @@ export default function WalletEmailVerifiedSync() {
   const toastTimerRef = useRef<number | null>(null);
   const autoLoadDoneRef = useRef(false);
   const snapshotLoadDoneRef = useRef(false);
-  const hasSession = Boolean(token);
+  const requestCodeInFlightRef = useRef(false);
+  const verifyCodeInFlightRef = useRef(false);
+  const controls = walletSessionControls(sessionState, {
+    validEmail: isEmail(email),
+    hasPin: Boolean(pin.trim()),
+    busy: loading || autoSaving,
+  });
+  const hasSession = controls.sessionValid;
+
+  function markSessionInvalid() {
+    setToken("");
+    tokenRef.current = "";
+    autoLoadDoneRef.current = false;
+    snapshotLoadDoneRef.current = false;
+    setAutoSaving(false);
+    setSessionState("invalid");
+    setMessage("Sua sessão da carteira expirou. Solicite um novo código para continuar.");
+  }
 
   function showToast(nextToast: ToastState) {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
@@ -182,12 +208,13 @@ export default function WalletEmailVerifiedSync() {
 
   useEffect(() => {
     const initialWallet = readWallet();
-    const storedEmail = window.localStorage.getItem(EMAIL_KEY) || "";
-    const storedToken = window.localStorage.getItem(TOKEN_KEY) || "";
+    const storedEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || "";
+    const storedToken = window.localStorage.getItem(WALLET_SESSION_KEY) || "";
     setEmail(storedEmail);
     setToken(storedToken);
     emailRef.current = storedEmail;
     tokenRef.current = storedToken;
+    setSessionState(storedToken && isEmail(storedEmail) ? "validating" : "invalid");
     walletRef.current = initialWallet;
     setWallet(initialWallet);
     const initialSignature = walletSignature(initialWallet);
@@ -220,9 +247,35 @@ export default function WalletEmailVerifiedSync() {
       }
     }, 1500);
 
+    const syncStoredSession = () => {
+      const nextEmail = window.localStorage.getItem(WALLET_EMAIL_KEY) || emailRef.current;
+      const nextToken = window.localStorage.getItem(WALLET_SESSION_KEY) || "";
+      if (!nextToken) {
+        markSessionInvalid();
+        return;
+      }
+      if (nextToken === tokenRef.current) return;
+      setEmail(nextEmail);
+      setToken(nextToken);
+      emailRef.current = nextEmail;
+      tokenRef.current = nextToken;
+      autoLoadDoneRef.current = false;
+      snapshotLoadDoneRef.current = false;
+      setSessionState("validating");
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === WALLET_SESSION_KEY) syncStoredSession();
+    };
+    window.addEventListener(WALLET_SESSION_INVALID_EVENT, markSessionInvalid);
+    window.addEventListener(WALLET_SESSION_UPDATED_EVENT, syncStoredSession);
+    window.addEventListener("storage", onStorage);
+
     return () => {
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
       window.clearInterval(interval);
+      window.removeEventListener(WALLET_SESSION_INVALID_EVENT, markSessionInvalid);
+      window.removeEventListener(WALLET_SESSION_UPDATED_EVENT, syncStoredSession);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
@@ -232,13 +285,15 @@ export default function WalletEmailVerifiedSync() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const json = await response.json();
+    const json = await response.json().catch(() => ({}));
+    const rejectedToken = typeof payload.sessionToken === "string" ? payload.sessionToken : undefined;
+    handleWalletSessionResponse(response, rejectedToken);
 
     if (!response.ok || !json?.ok) throw new Error(json?.error || "Erro ao sincronizar carteira.");
     return json;
   }
 
-  async function hydrateSnapshotsFromCloud(options?: { auto?: boolean }) {
+  async function hydrateSnapshotsFromCloud(options?: { auto?: boolean; validatesSession?: boolean }) {
     const cleanEmail = (emailRef.current || email).trim().toLowerCase();
     const currentToken = tokenRef.current || token;
 
@@ -246,8 +301,12 @@ export default function WalletEmailVerifiedSync() {
 
     try {
       const json = await callApi({ email: cleanEmail, sessionToken: currentToken }, "/api/wallet/snapshots");
+      if (options?.validatesSession && tokenRef.current === currentToken) {
+        setSessionState("valid");
+        notifyWalletSessionUpdated();
+      }
       const snapshots = normalizeSnapshots(json?.snapshots);
-      if (!snapshots.length) return false;
+      if (!snapshots.length) return true;
 
       const nextSignature = snapshotSignature(snapshots);
       const currentStored = normalizeSnapshots(JSON.parse(window.localStorage.getItem(SNAPSHOT_KEY) || "[]"));
@@ -272,7 +331,12 @@ export default function WalletEmailVerifiedSync() {
 
       return true;
     } catch (err: any) {
-      if (!options?.auto) setMessage(err.message || "Erro ao carregar histórico patrimonial.");
+      if (options?.validatesSession && tokenRef.current === currentToken) {
+        setSessionState("invalid");
+        setMessage(err.message || "Não foi possível validar a sessão. Solicite um novo código para continuar.");
+      } else if (!options?.auto) {
+        setMessage(err.message || "Erro ao carregar histórico patrimonial.");
+      }
       return false;
     }
   }
@@ -301,6 +365,7 @@ export default function WalletEmailVerifiedSync() {
         body: JSON.stringify({ email: cleanEmail, sessionToken: currentToken, wallet: currentWallet }),
       });
       const json = await response.json().catch(() => ({}));
+      handleWalletSessionResponse(response, currentToken);
       if (!response.ok || !json?.ok) throw new Error(json?.error || "Erro ao salvar carteira.");
 
       lastSavedSignature.current = signature;
@@ -312,7 +377,9 @@ export default function WalletEmailVerifiedSync() {
       setMessage(options?.silent ? "Carteira sincronizada automaticamente." : `Carteira sincronizada com sucesso. Total salvo: ${Number(json.saved || currentWallet.length)} FII(s).`);
       return true;
     } catch (err: any) {
-      setMessage(err.message || "Erro ao sincronizar carteira automaticamente.");
+      if (tokenRef.current === currentToken) {
+        setMessage(err.message || "Erro ao sincronizar carteira automaticamente.");
+      }
       return false;
     } finally {
       if (options?.silent) setAutoSaving(false);
@@ -370,7 +437,7 @@ export default function WalletEmailVerifiedSync() {
   }
 
   useEffect(() => {
-    if (!token || !isEmail(email)) return;
+    if (sessionState !== "valid" || !token || !isEmail(email)) return;
 
     const signature = walletSignature(wallet);
     if (signature === lastSavedSignature.current) return;
@@ -381,21 +448,21 @@ export default function WalletEmailVerifiedSync() {
     }, AUTO_SAVE_DELAY_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [email, token, wallet]);
+  }, [email, token, wallet, sessionState]);
 
   useEffect(() => {
     if (!token || !isEmail(email) || snapshotLoadDoneRef.current) return;
 
     snapshotLoadDoneRef.current = true;
-    hydrateSnapshotsFromCloud({ auto: true });
-  }, [email, token]);
+    hydrateSnapshotsFromCloud({ auto: true, validatesSession: sessionState === "validating" });
+  }, [email, token, sessionState]);
 
   useEffect(() => {
-    if (!token || !isEmail(email) || autoLoadDoneRef.current) return;
+    if (sessionState !== "valid" || !token || !isEmail(email) || autoLoadDoneRef.current) return;
 
     autoLoadDoneRef.current = true;
     loadWalletFromCloud({ auto: true });
-  }, [email, token]);
+  }, [email, token, sessionState]);
 
   useEffect(() => {
     function handlePageHide() {
@@ -425,31 +492,36 @@ export default function WalletEmailVerifiedSync() {
       setMessage("Este dispositivo já está confirmado. Alterações serão salvas automaticamente.");
       return;
     }
+    if (requestCodeInFlightRef.current) return;
 
     if (!isEmail(cleanEmail)) {
       setMessage("Informe um e-mail válido.");
       return;
     }
 
+    const previousState = sessionState;
+    requestCodeInFlightRef.current = true;
+    setSessionState("requesting_code");
     setLoading(true);
     setMessage("");
 
     try {
       const json = await callApi({ action: "request-code", email: cleanEmail });
-      window.localStorage.setItem(EMAIL_KEY, cleanEmail);
-      window.localStorage.removeItem(TOKEN_KEY);
-      window.localStorage.removeItem(CLOUD_LOAD_CACHE_KEY);
-      window.localStorage.removeItem(`${SNAPSHOT_HYDRATION_KEY}:${cleanEmail}`);
+      window.localStorage.setItem(WALLET_EMAIL_KEY, cleanEmail);
+      window.localStorage.removeItem(WALLET_SESSION_KEY);
       setEmail(cleanEmail);
       setToken("");
       emailRef.current = cleanEmail;
       tokenRef.current = "";
       autoLoadDoneRef.current = false;
       snapshotLoadDoneRef.current = false;
+      setSessionState("code_sent");
       setMessage(json.message || "Código enviado para seu e-mail.");
     } catch (err: any) {
+      setSessionState(previousState === "code_sent" ? "code_sent" : "invalid");
       setMessage(err.message || "Erro ao enviar código.");
     } finally {
+      requestCodeInFlightRef.current = false;
       setLoading(false);
     }
   }
@@ -457,19 +529,22 @@ export default function WalletEmailVerifiedSync() {
   async function confirmCode() {
     const cleanEmail = email.trim().toLowerCase();
 
-    if (!isEmail(cleanEmail) || !pin.trim()) {
+    if (!isEmail(cleanEmail) || !pin.trim() || sessionState !== "code_sent") {
       setMessage("Informe o e-mail e o código recebido.");
       return;
     }
 
+    if (verifyCodeInFlightRef.current) return;
+    verifyCodeInFlightRef.current = true;
+    setSessionState("verifying");
     setLoading(true);
     setMessage("");
 
     try {
       const json = await callApi({ action: "verify-code", email: cleanEmail, code: pin.trim() });
-      window.localStorage.setItem(EMAIL_KEY, cleanEmail);
-      window.localStorage.setItem(TOKEN_KEY, json.sessionToken);
-      window.dispatchEvent(new Event("dados-fii-wallet-session-updated"));
+      if (typeof json.sessionToken !== "string" || !json.sessionToken) throw new Error("Resposta inválida ao confirmar o código.");
+      window.localStorage.setItem(WALLET_EMAIL_KEY, cleanEmail);
+      window.localStorage.setItem(WALLET_SESSION_KEY, json.sessionToken);
       lastSavedSignature.current = "";
       setToken(json.sessionToken);
       emailRef.current = cleanEmail;
@@ -477,10 +552,14 @@ export default function WalletEmailVerifiedSync() {
       autoLoadDoneRef.current = false;
       snapshotLoadDoneRef.current = false;
       setPin("");
+      setSessionState("valid");
+      notifyWalletSessionUpdated();
       setMessage("E-mail confirmado. Use Carregar para trazer a carteira e o histórico salvos neste dispositivo.");
     } catch (err: any) {
+      setSessionState("code_sent");
       setMessage(err.message || "Código inválido.");
     } finally {
+      verifyCodeInFlightRef.current = false;
       setLoading(false);
     }
   }
@@ -493,7 +572,7 @@ export default function WalletEmailVerifiedSync() {
       return;
     }
 
-    if (!token) {
+    if (!hasSession || !token) {
       setMessage("Confirme o código enviado para o e-mail antes de carregar.");
       return;
     }
@@ -514,7 +593,13 @@ export default function WalletEmailVerifiedSync() {
               Sua carteira fica salva neste navegador e pode ser recuperada pelo e-mail confirmado.
             </p>
             <p className="mt-1 text-xs font-medium leading-5 text-gray-400">
-              {hasSession ? "Este dispositivo já está confirmado. Alterações serão salvas automaticamente." : "Não enviaremos spam. O e-mail será usado apenas para recuperar e sincronizar sua carteira."}
+              {sessionState === "validating"
+                ? "Validando a sessão salva neste dispositivo..."
+                : hasSession
+                  ? "Este dispositivo já está confirmado. Alterações serão salvas automaticamente."
+                  : sessionState === "code_sent"
+                    ? "Código enviado. Informe o PIN recebido para confirmar este dispositivo."
+                    : "Sua sessão pode ser recuperada sem apagar os dados locais da carteira."}
             </p>
           </div>
 
@@ -537,13 +622,13 @@ export default function WalletEmailVerifiedSync() {
                 onChange={(event) => setPin(event.target.value)}
                 placeholder="Código recebido"
                 inputMode="numeric"
-                disabled={hasSession}
+                disabled={sessionState !== "code_sent"}
                 className="block w-full min-w-0 max-w-full rounded-lg border border-gray-700 bg-gray-800 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60 sm:text-base"
               />
               <button
                 type="button"
                 onClick={confirmCode}
-                disabled={loading || !pin.trim() || hasSession}
+                disabled={!controls.canConfirmCode}
                 className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-4 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 sm:w-auto sm:text-base"
               >
                 Confirmar
@@ -554,16 +639,16 @@ export default function WalletEmailVerifiedSync() {
               <button
                 type="button"
                 onClick={hasSession ? () => saveCurrentWallet() : sendCode}
-                disabled={loading || autoSaving}
+                disabled={hasSession ? loading || autoSaving : !controls.canRequestCode}
                 className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
               >
                 {loading || autoSaving ? <Loader2 className="shrink-0 animate-spin" size={16} /> : <Mail className="shrink-0" size={16} />}
-                <span className="whitespace-nowrap">{hasSession ? "Sincronizar agora" : "Enviar código"}</span>
+                <span className="whitespace-nowrap">{hasSession ? "Sincronizar agora" : sessionState === "code_sent" ? "Reenviar código" : "Enviar novo código"}</span>
               </button>
               <button
                 type="button"
                 onClick={syncLoad}
-                disabled={loading || autoSaving || !token}
+                disabled={loading || autoSaving || !hasSession}
                 className="inline-flex min-h-11 w-full min-w-0 items-center justify-center rounded-lg bg-gray-800 px-3 py-2 text-sm font-bold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
               >
                 <span className="whitespace-nowrap">Carregar</span>
