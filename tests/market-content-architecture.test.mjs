@@ -10,6 +10,7 @@ const REQUIRED_FILES = [
   "src/app/components/MarketArticlePage.tsx",
   "src/app/components/EditorialTelemetry.tsx",
   "src/lib/editorial/marketContent.ts",
+  "src/lib/editorial/copomAugust2026.ts",
   "src/lib/editorial/EditorialEvent.ts",
   "src/app/api/editorial/events/route.ts",
   "src/server/controllers/EditorialEventController.ts",
@@ -39,6 +40,8 @@ test("metadados, canonical, Article e BreadcrumbList são derivados do registro"
   assert.match(hub, /"@type": "ItemList"/);
   assert.match(route, /alternates: \{ canonical: `\/mercado\/\$\{article\.slug\}` \}/);
   assert.match(route, /generateStaticParams/);
+  assert.match(route, /publishedTime: article\.datePublished/);
+  assert.match(route, /modifiedTime: article\.dateModified/);
   assert.match(article, /"@type": "Article"/);
   assert.match(article, /"@type": "BreadcrumbList"/);
   assert.match(article, /citation: article\.sources\.map/);
@@ -47,9 +50,10 @@ test("metadados, canonical, Article e BreadcrumbList são derivados do registro"
 test("sitemap e navegação incluem o hub sem liberar páginas desconhecidas", () => {
   const sitemap = read("src/app/sitemap.ts");
   const nav = read("src/app/components/SiteNav.tsx");
-  assert.match(sitemap, /MARKET_ARTICLES/);
+  assert.match(sitemap, /PUBLISHED_MARKET_ARTICLES/);
   assert.match(sitemap, /\/mercado\/\$\{article\.slug\}/);
   assert.match(sitemap, /filter\(\(article\) => article\.indexable\)/);
+  assert.match(sitemap, /article\.dateModified/);
   assert.match(nav, /href: "\/mercado"/);
   assert.match(nav, /label: "Mercado"/);
 });
@@ -80,9 +84,10 @@ test("telemetria editorial não envia identidade ou valores financeiros", () => 
 test("conteúdo exibe data-base, fontes, limitações e ausência de recomendação", () => {
   const article = read("src/app/components/MarketArticlePage.tsx");
   const registry = read("src/lib/editorial/marketContent.ts");
+  const copomUpdate = read("src/lib/editorial/copomAugust2026.ts");
   assert.match(article, /Data-base:/);
   assert.match(article, /Fontes e atualização/);
   assert.match(article, /Sem recomendação de compra ou venda/);
   assert.match(registry, /Limitações desta leitura/g);
-  assert.doesNotMatch(registry, /compre agora|venda agora|recomendamos comprar|recomendamos vender/i);
+  assert.doesNotMatch(`${registry}\n${copomUpdate}`, /compre agora|venda agora|recomendamos comprar|recomendamos vender/i);
 });

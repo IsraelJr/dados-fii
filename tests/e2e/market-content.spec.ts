@@ -34,6 +34,32 @@ test("página de cenário expõe data-base, fontes, limitações e schema editor
   expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact || ""))).toEqual([]);
 });
 
+test("matéria do Copom publica decisão oficial com datas SEO coerentes", async ({ page }) => {
+  await page.goto("/mercado/mercado-de-fiis");
+  await expect(page.getByRole("heading", { level: 1, name: /Fundos Imobiliários em agosto de 2026/ })).toBeVisible();
+  await expect(page.getByText("14,00% ao ano", { exact: true })).toBeVisible();
+  await expect(page.getByText(/mantém a trajetória de flexibilização iniciada em março de 2026/)).toBeVisible();
+  await expect(page.getByRole("link", {
+    name: "Copom reduz a taxa Selic para 14,00% a.a. — 280ª reunião",
+    exact: true,
+  })).toHaveAttribute(
+    "href",
+    "https://www.bcb.gov.br/api/servico/sitebcb/copom/comunicados_detalhes?nro_reuniao=280",
+  );
+
+  const schemas = await page.locator('script[type="application/ld+json"]').allTextContents();
+  const articleSchema = schemas.map((schema) => JSON.parse(schema)).find((schema) => schema["@type"] === "Article");
+  expect(articleSchema?.datePublished).toBe("2026-08-05");
+  expect(articleSchema?.dateModified).toBe("2026-08-17");
+  await expect(page.locator('meta[property="article:published_time"]')).toHaveAttribute("content", "2026-08-05");
+  await expect(page.locator('meta[property="article:modified_time"]')).toHaveAttribute("content", "2026-08-17");
+
+  const visibleText = await page.locator("main").innerText();
+  expect(visibleText).not.toMatch(/\b(?:recomendamos\s+(?:comprar|vender)|é hora de (?:comprar|vender)|preço-alvo)\b/i);
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact || ""))).toEqual([]);
+});
+
 test("slug desconhecido retorna 404 real", async ({ page }) => {
   const response = await page.goto("/mercado/cenario-generico-inexistente");
   expect(response?.status()).toBe(404);
