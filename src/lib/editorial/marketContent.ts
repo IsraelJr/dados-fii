@@ -34,6 +34,8 @@ export type MarketArticle = Readonly<{
   description: string;
   summary: string;
   asOf: string;
+  datePublished: string;
+  dateModified: string;
   reviewPolicy: string;
   indexable: true;
   signals: readonly MarketSignal[];
@@ -131,6 +133,8 @@ export const MARKET_ARTICLES: readonly MarketArticle[] = Object.freeze([
     description: "Leitura do mercado brasileiro de FIIs com data-base, fontes oficiais e os canais pelos quais juros, inflação e atividade chegam às cotas e aos dividendos.",
     summary: "O mercado de FIIs combina crescimento estrutural da base de investidores com um ambiente de juros ainda altos. Isso favorece a seleção por qualidade, liquidez e geração de caixa, em vez de uma leitura automática de que toda queda de juros beneficia todos os fundos da mesma forma.",
     asOf: "2026-08-04",
+    datePublished: "2026-08-04",
+    dateModified: "2026-08-04",
     reviewPolicy: "Revisão mensal ou após decisão do Copom, novo IPCA, mudança regulatória material ou atualização relevante da B3.",
     indexable: true,
     signals: [
@@ -186,6 +190,8 @@ export const MARKET_ARTICLES: readonly MarketArticle[] = Object.freeze([
     description: "Como produção agrícola, preços, clima, crédito e garantias afetam FIAGROs, com data-base e fontes oficiais.",
     summary: "A estimativa de safra recorde é positiva para atividade e logística, mas não elimina risco de crédito. Em FIAGRO, volume produzido, preço recebido, custo, seguro, estrutura da dívida e qualidade das garantias precisam ser analisados em conjunto.",
     asOf: "2026-08-04",
+    datePublished: "2026-08-04",
+    dateModified: "2026-08-04",
     reviewPolicy: "Revisão após cada levantamento relevante da Conab, alteração material de juros ou evento de crédito divulgado pelos fundos.",
     indexable: true,
     signals: [
@@ -242,6 +248,8 @@ export const MARKET_ARTICLES: readonly MarketArticle[] = Object.freeze([
     description: "Leitura específica para fundos logísticos: ocupação, concentração, contratos, localização e efeito dos juros no valor dos ativos.",
     summary: "O segmento logístico depende menos de uma narrativa genérica de comércio eletrônico e mais da utilidade concreta do imóvel: acesso, raio de entrega, padrão construtivo, possibilidade de expansão, custo de reposição e força do locatário.",
     asOf: "2026-08-04",
+    datePublished: "2026-08-04",
+    dateModified: "2026-08-04",
     reviewPolicy: "Revisão trimestral ou após divulgação material de vacância, aquisição, venda, revisão de aluguel ou mudança macro relevante.",
     indexable: true,
     signals: [MACRO_SIGNALS[0], MACRO_SIGNALS[2], {
@@ -291,6 +299,8 @@ export const MARKET_ARTICLES: readonly MarketArticle[] = Object.freeze([
     description: "Como atividade, varejo, inflação, ocupação e estrutura de receitas afetam fundos de shopping centers.",
     summary: "Shopping é uma operação, não apenas um imóvel. Vendas dos lojistas, fluxo, ocupação, aluguel mínimo, aluguel percentual, estacionamento, mídia, inadimplência e despesas determinam a qualidade do resultado.",
     asOf: "2026-08-04",
+    datePublished: "2026-08-04",
+    dateModified: "2026-08-04",
     reviewPolicy: "Revisão após novos dados relevantes de varejo e após resultados trimestrais dos fundos acompanhados.",
     indexable: true,
     signals: [MACRO_SIGNALS[1], MACRO_SIGNALS[2], {
@@ -340,6 +350,8 @@ export const MARKET_ARTICLES: readonly MarketArticle[] = Object.freeze([
     description: "Cenário para lajes corporativas com foco em microrregião, padrão do prédio, contratos, absorção e custo de reposição.",
     summary: "Escritórios são altamente locais. A média da cidade pode esconder microrregiões com absorção forte e outras com excesso de oferta. Qualidade do edifício, acesso, eficiência e concentração de inquilinos são decisivos.",
     asOf: "2026-08-04",
+    datePublished: "2026-08-04",
+    dateModified: "2026-08-04",
     reviewPolicy: "Revisão trimestral ou após mudança material de vacância, locação, venda, retrofit ou atividade econômica.",
     indexable: true,
     signals: [MACRO_SIGNALS[0], MACRO_SIGNALS[2], {
@@ -389,6 +401,8 @@ export const MARKET_ARTICLES: readonly MarketArticle[] = Object.freeze([
     description: "Como indexadores, duration, garantias, LTV, inadimplência e estrutura dos CRIs afetam fundos de papel.",
     summary: "Fundos de papel podem ganhar receita nominal com CDI ou inflação elevados, mas o mesmo cenário pressiona devedores. O rendimento só é defensivo quando o crédito, as garantias e a recuperação são compatíveis com o risco assumido.",
     asOf: "2026-08-04",
+    datePublished: "2026-08-04",
+    dateModified: "2026-08-04",
     reviewPolicy: "Revisão após Copom, IPCA ou eventos materiais de crédito, reestruturação e provisão divulgados pelos fundos.",
     indexable: true,
     signals: [MACRO_SIGNALS[0], MACRO_SIGNALS[1], {
@@ -438,6 +452,8 @@ export const MARKET_ARTICLES: readonly MarketArticle[] = Object.freeze([
     description: "Análise de renda urbana com foco em concentração, contratos atípicos, revisões, crédito do locatário e uso alternativo do imóvel.",
     summary: "Renda urbana reúne estratégias diferentes, como varejo, educação, saúde e imóveis monousuário. A previsibilidade depende do contrato e do locatário, mas também da capacidade de reutilizar o imóvel se a relação terminar.",
     asOf: "2026-08-04",
+    datePublished: "2026-08-04",
+    dateModified: "2026-08-04",
     reviewPolicy: "Revisão trimestral ou após renovação, revisional, desocupação, venda, aquisição ou mudança material na saúde do locatário.",
     indexable: true,
     signals: [MACRO_SIGNALS[0], MACRO_SIGNALS[1], {
@@ -491,6 +507,9 @@ export function validateMarketArticle(article: MarketArticle): readonly string[]
   const errors: string[] = [];
   if (!article.title.trim() || !article.description.trim() || !article.summary.trim()) errors.push("missing-copy");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(article.asOf)) errors.push("invalid-as-of");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(article.datePublished)) errors.push("invalid-date-published");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(article.dateModified)) errors.push("invalid-date-modified");
+  if (article.datePublished > article.dateModified) errors.push("published-after-modified");
   if (article.sections.length < 4) errors.push("insufficient-sections");
   if (article.sources.length < 3) errors.push("insufficient-sources");
   if (article.signals.length < 3) errors.push("insufficient-signals");

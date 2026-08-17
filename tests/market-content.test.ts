@@ -25,6 +25,9 @@ test("registro editorial publica sete cenários específicos e válidos", () => 
   for (const article of MARKET_ARTICLES) {
     assert.deepEqual(validateMarketArticle(article), [], article.slug);
     assert.equal(article.indexable, true);
+    assert.match(article.datePublished, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(article.dateModified, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(article.datePublished <= article.dateModified);
     assert.ok(article.sections.length >= 4);
     assert.ok(article.sources.length >= 3);
     assert.ok(article.signals.length >= 3);

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { MARKET_ARTICLES } from "@/lib/editorial/marketContent";
+import { PUBLISHED_MARKET_ARTICLES } from "@/lib/editorial/copomAugust2026";
 import { isFundSeoManifestFresh } from "@/lib/seo/FundSeoManifest";
 import { fundSeoManifestService } from "@/lib/seo/FundSeoManifestRuntime";
 import { SITE_URL } from "@/lib/site";
@@ -36,11 +36,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: route.changeFrequency,
     priority: route.priority,
   }));
-  const marketRoutes: MetadataRoute.Sitemap = MARKET_ARTICLES
+  const marketRoutes: MetadataRoute.Sitemap = PUBLISHED_MARKET_ARTICLES
     .filter((article) => article.indexable)
     .map((article) => ({
       url: `${SITE_URL}/mercado/${article.slug}`,
-      lastModified: new Date(`${article.asOf}T12:00:00-03:00`),
+      lastModified: new Date(`${article.dateModified}T12:00:00-03:00`),
       changeFrequency: "monthly" as const,
       priority: 0.85,
     }));

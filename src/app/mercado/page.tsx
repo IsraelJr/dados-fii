@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BarChart3, Building2, Factory, Landmark, ShoppingBag, Sprout, Store, WalletCards } from "lucide-react";
 import EditorialTelemetry from "../components/EditorialTelemetry";
-import { applyAugust2026CopomUpdate } from "@/lib/editorial/copomAugust2026";
-import { MARKET_ARTICLES } from "@/lib/editorial/marketContent";
+import { PUBLISHED_MARKET_ARTICLES } from "@/lib/editorial/copomAugust2026";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -17,8 +16,6 @@ export const metadata: Metadata = {
     url: "/mercado",
   },
 };
-
-const UPDATED_MARKET_ARTICLES = MARKET_ARTICLES.map(applyAugust2026CopomUpdate);
 
 const ICONS = {
   "mercado-de-fiis": BarChart3,
@@ -41,7 +38,7 @@ export default function MarketHubPage() {
     publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
     mainEntity: {
       "@type": "ItemList",
-      itemListElement: UPDATED_MARKET_ARTICLES.map((article, index) => ({
+      itemListElement: PUBLISHED_MARKET_ARTICLES.map((article, index) => ({
         "@type": "ListItem",
         position: index + 1,
         name: article.title,
@@ -91,7 +88,7 @@ export default function MarketHubPage() {
           <p className="mt-3 text-base leading-7 text-slate-600">As categorias não são intercambiáveis. Crédito, imóveis, contratos, devedores e ciclos econômicos exigem critérios diferentes.</p>
         </div>
         <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {UPDATED_MARKET_ARTICLES.map((article) => {
+          {PUBLISHED_MARKET_ARTICLES.map((article) => {
             const Icon = ICONS[article.slug];
             return (
               <article key={article.slug} className="flex h-full flex-col rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
