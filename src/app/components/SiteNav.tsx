@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { BarChart3, BookOpen, CalendarDays, Home, Landmark, LibraryBig, Wallet } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, Home, Landmark, LibraryBig, Radar, Wallet } from "lucide-react";
 
 const links = [
   { href: "/", label: "Início", icon: Home },
   { href: "/mercado", label: "Mercado", icon: Landmark },
   { href: "/guias", label: "Guias", icon: LibraryBig },
   { href: "/carteira", label: "Carteira", icon: Wallet },
+  { href: "/radar", label: "Radar", icon: Radar },
   { href: "/calendario-dividendos-fiis", label: "Calendário", icon: CalendarDays },
   { href: "/glossario", label: "Glossário", icon: BookOpen },
 ];

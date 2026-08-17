@@ -135,11 +135,19 @@ function activeFund(fund: PublicFundData) {
 }
 
 export class FundRadarService {
+  private readonly repository: FundRadarRepository;
+  private readonly dataSource: FundRadarDataSource;
+  private readonly now: () => Date;
+
   constructor(
-    private readonly repository: FundRadarRepository,
-    private readonly dataSource: FundRadarDataSource,
-    private readonly now: () => Date = () => new Date(),
-  ) {}
+    repository: FundRadarRepository,
+    dataSource: FundRadarDataSource,
+    now: () => Date = () => new Date(),
+  ) {
+    this.repository = repository;
+    this.dataSource = dataSource;
+    this.now = now;
+  }
 
   private nowIso() {
     return this.now().toISOString();

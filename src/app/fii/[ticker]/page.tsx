@@ -4,6 +4,7 @@ import { ExternalLink, Newspaper } from "lucide-react";
 import PageHeader from "../../components/PageHeader";
 import WalletQuickAddButton from "../../components/WalletQuickAddButton";
 import FiiAlert from "../../components/FiiAlert";
+import FundRadarButton from "../../components/FundRadarButton";
 import RegulatoryTimeline from "../../components/RegulatoryTimeline";
 import FreeFundReport from "../../components/FreeFundReport";
 import AIInsightsPanel from "../../components/AIInsightsPanel";
@@ -290,6 +291,7 @@ export default async function FiiPage({ params }: PageProps) {
         action={ticker ? (
           <div className="flex items-center gap-2">
             <WalletQuickAddButton ticker={ticker} />
+            <FundRadarButton ticker={ticker} />
             <FiiAlert fiiCode={ticker} />
           </div>
         ) : null}
