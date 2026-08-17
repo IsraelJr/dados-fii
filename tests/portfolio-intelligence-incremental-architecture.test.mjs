@@ -131,9 +131,11 @@ test("preflight server-only remove a superfície antes de ler credenciais", () =
   assert.match(core, /createPortfolioIncrementalAvailabilityHandler/);
   assert.match(report, /incremental-analysis\/availability/);
   assert.match(report, /if \(state === "checking" \|\| state === "disabled"\) return null/);
-  assert.match(report, /if \(!available \|\| disposed\) return/);
+  assert.match(report, /let incrementalDisabledForTab = false/);
+  assert.match(report, /if \(incrementalDisabledForTab\)[\s\S]*setState\("disabled"\)/);
+  assert.match(report, /if \(!available \|\| disposed \|\| incrementalDisabledForTab\) return/);
   assert.match(report, /availabilityResponse\.status !== 204[\s\S]*available = true;[\s\S]*scheduleRefresh\(0\)/);
-  assert.match(report, /PORTFOLIO_INCREMENTAL_DISABLED"\) \{[\s\S]*available = false;[\s\S]*setState\("disabled"\)/);
+  assert.match(report, /PORTFOLIO_INCREMENTAL_DISABLED"\) \{[\s\S]*incrementalDisabledForTab = true;[\s\S]*available = false;[\s\S]*setState\("disabled"\)/);
   assert.match(report, /event\.key === null \|\| event\.key === EMAIL_KEY \|\| event\.key === TOKEN_KEY/);
   assert.match(report, /addEventListener\("storage", refreshAfterCrossTabSessionChange\)/);
   assert.match(report, /removeEventListener\("storage", refreshAfterCrossTabSessionChange\)/);

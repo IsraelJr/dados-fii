@@ -28,6 +28,8 @@ const PORTFOLIO_SAVED_EVENT = "dados-fii-wallet-saved";
 const SESSION_UPDATED_EVENT = "dados-fii-wallet-session-updated";
 const REFRESH_DEBOUNCE_MS = 300;
 
+let incrementalDisabledForTab = false;
+
 type IncrementalResponse = Readonly<{
   ok?: boolean;
   comparison?: PortfolioIncrementalComparison;
@@ -135,11 +137,19 @@ function ChangeCard({ change }: { change: PortfolioIncrementalChange }) {
 }
 
 export default function PortfolioIncrementalReportPanel() {
-  const [state, setState] = useState<LoadState>("checking");
+  const [state, setState] = useState<LoadState>(() => (
+    incrementalDisabledForTab ? "disabled" : "checking"
+  ));
   const [response, setResponse] = useState<IncrementalResponse | null>(null);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
+    if (incrementalDisabledForTab) {
+      setResponse(null);
+      setState("disabled");
+      return;
+    }
+
     let disposed = false;
     let available = false;
     let refreshTimer: number | null = null;
@@ -174,6 +184,7 @@ export default function PortfolioIncrementalReportPanel() {
         const body = await fetchResponse.json().catch(() => null) as IncrementalResponse | null;
         if (disposed || controller.signal.aborted || activeRequest !== controller) return;
         if (fetchResponse.status === 404 && body?.code === "PORTFOLIO_INCREMENTAL_DISABLED") {
+          incrementalDisabledForTab = true;
           available = false;
           setResponse(null);
           setState("disabled");
@@ -196,7 +207,7 @@ export default function PortfolioIncrementalReportPanel() {
     }
 
     function scheduleRefresh(delay: number) {
-      if (!available || disposed) return;
+      if (!available || disposed || incrementalDisabledForTab) return;
       activeRequest?.abort();
       activeRequest = null;
       if (refreshTimer !== null) window.clearTimeout(refreshTimer);
@@ -230,13 +241,17 @@ export default function PortfolioIncrementalReportPanel() {
         });
         if (disposed || availabilityRequest.signal.aborted) return;
         if (availabilityResponse.status !== 204) {
+          incrementalDisabledForTab = true;
           setState("disabled");
           return;
         }
         available = true;
         scheduleRefresh(0);
       } catch {
-        if (!disposed && !availabilityRequest.signal.aborted) setState("disabled");
+        if (!disposed && !availabilityRequest.signal.aborted) {
+          incrementalDisabledForTab = true;
+          setState("disabled");
+        }
       }
     })();
 
