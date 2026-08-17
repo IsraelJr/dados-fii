@@ -592,7 +592,10 @@ export default function WalletPage() {
     setItems((current) => {
       const existing = current.find((item) => item.ticker === code);
       existed = Boolean(existing);
-      if (existing) return current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item);
+      if (existing) {
+        if (existing.quotas === totalQuotas) return current;
+        return current.map((item) => item.ticker === code ? { ...item, quotas: totalQuotas } : item);
+      }
       return [...current, { ticker: code, quotas: totalQuotas }].sort((a, b) => a.ticker.localeCompare(b.ticker));
     });
     setTicker("");

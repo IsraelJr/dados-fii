@@ -38,6 +38,7 @@ const EMAIL_KEY = "dados-fii-wallet-email";
 const TOKEN_KEY = "dados-fii-wallet-session";
 const CLOUD_LOAD_CACHE_KEY = "dados-fii-wallet-cloud-load-cache-v1";
 const SNAPSHOT_HYDRATION_KEY = "dados-fii-wallet-snapshots-hydrated-v1";
+const PORTFOLIO_SAVED_EVENT = "dados-fii-wallet-saved";
 const AUTO_CLOUD_LOAD_TTL_MS = 12 * 60 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 5 * 1000;
 
@@ -189,7 +190,17 @@ export default function WalletEmailVerifiedSync() {
     tokenRef.current = storedToken;
     walletRef.current = initialWallet;
     setWallet(initialWallet);
-    lastSavedSignature.current = storedToken ? "" : walletSignature(initialWallet);
+    const initialSignature = walletSignature(initialWallet);
+    const cloudCache = readCloudLoadCache();
+    const hasConfirmedCloudSignature = Boolean(
+      storedToken
+      && cloudCache
+      && cloudCache.email.trim().toLowerCase() === storedEmail.trim().toLowerCase()
+      && cloudCache.signature === initialSignature,
+    );
+    lastSavedSignature.current = !storedToken || hasConfirmedCloudSignature
+      ? initialSignature
+      : "";
 
     const interval = window.setInterval(() => {
       const latestWallet = readWallet();
@@ -296,6 +307,7 @@ export default function WalletEmailVerifiedSync() {
       walletRef.current = currentWallet;
       setWallet(currentWallet);
       saveCloudLoadCache(cleanEmail, signature);
+      window.dispatchEvent(new Event(PORTFOLIO_SAVED_EVENT));
       await hydrateSnapshotsFromCloud({ auto: true });
       setMessage(options?.silent ? "Carteira sincronizada automaticamente." : `Carteira sincronizada com sucesso. Total salvo: ${Number(json.saved || currentWallet.length)} FII(s).`);
       return true;

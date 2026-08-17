@@ -2,28 +2,29 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 10.6.0  
-**Data:** 04/08/2026  
+**Versão:** 10.7.0
+**Data:** 17/08/2026
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**PR de encerramento desta versão:** `#182`  
-**SHA funcional da PV-3.5 antes da atualização documental:** `6a57d3dbcdc58ba0f7a2a19705d461ffe689a294`  
-**CI funcional:** `Phase 2 Closure CI` — run `30954725742` — sucesso  
+**PR de encerramento desta versão:** `#187`
+**SHA funcional da PV-4 antes da atualização documental:** `4203e3b0c5bc586ee32643bc47976545b91731c9`
+**CI funcional:** `Phase 2 Closure CI` — run `32038322839` — sucesso
 **Fase vigente:** `Produto Validável`  
-**Sprint atual após o merge deste documento:** `PV-4 — Relatório incremental: mudanças desde a última análise`
+**Próximo item urgente após o merge deste documento:** `Hotfix — recuperação da sessão da carteira`, antes da PV-5
 
 ## Decisões vigentes que substituem decisões anteriores
 
 | Decisão vigente | Decisão substituída | Efeito |
 |---|---|---|
-| PV-1, PV-2A, PV-2B, PV-2C, PV-3 e PV-3.5 ficam formalmente concluídas com o merge da PR `#182`. | O Handoff v10.5.0 tratava PV-3.5 como sprint atual. | O produto passa a ter descoberta Premium validável e aquisição orgânica com conteúdo segmentado. |
-| PV-4 é a próxima sprint oficial. | A prioridade funcional anterior era SEO editorial. | O foco passa a ser mostrar somente mudanças materiais desde a última análise da carteira. |
+| PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3.5 e PV-4 ficam formalmente concluídas com o merge da PR `#187`. | O Handoff v10.6.0 tratava PV-4 como sprint atual. | O produto passa a comparar referências server-owned e mostrar somente mudanças materiais rastreáveis. |
+| PR `#185` concluiu o saneamento do `nanoid` no lockfile e PR `#186` concluiu a dívida de determinismo temporal. | Esses dois bloqueadores precediam a integração segura da PV-4. | Segurança de dependência e relógio determinístico são pré-requisitos concluídos da PV-4. |
+| O hotfix de recuperação da sessão da carteira é o próximo item urgente antes da PV-5. | PV-5 poderia começar imediatamente após a PV-4. | O roadmap funcional não muda; a correção de sessão recebe prioridade operacional própria. |
 | O hub `/mercado` e sete páginas segmentadas são a superfície editorial oficial desta fase. | SEO editorial ainda não possuía rotas próprias. | Mercado de FIIs, FIAGRO, logística, shoppings, escritórios, recebíveis e renda urbana têm conteúdo específico, data-base e fontes. |
 | Página editorial desconhecida ou sem qualidade mínima não é publicada nem indexada. | Uma rota dinâmica poderia gerar conteúdo raso por fallback. | O registro editorial é allowlistado e slug desconhecido retorna 404 real. |
 | Telemetria editorial é anônima, mínima e retida por 90 dias. | Eventos editoriais poderiam reutilizar identidade ou dados financeiros. | Nenhum evento contém e-mail, `ownerId`, carteira, posição, ticker, dividendo, patrimônio, token ou cookie. |
 | Google AdSense continua congelado. | SEO poderia ser confundido com antecipação de anúncios. | O objetivo é tráfego qualificado e utilidade; publicidade não integra esta entrega. |
 | Cobrança continua adiada até a PV-6, e checkout permanece na PV-7. | Monetização poderia ser antecipada sem evidência comercial. | Interesse, beta e uso continuam separados de pagamento e entitlement comercial. |
-| O Handoff v10.6.0 é a única fonte canônica ativa. | Handoffs v10.5.0 e anteriores. | Este documento prevalece em caso de divergência. |
+| O Handoff v10.7.0 é a única fonte canônica ativa. | Handoffs v10.6.0 e anteriores. | Este documento prevalece em caso de divergência. |
 
 ## 1. Estado atual do projeto
 
@@ -36,12 +37,17 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - PR `#178` integrou a PV-2B, com apresentação acessível dos sinais da carteira.
 - PR `#180` encerrou a PV-2C, com explicação opcional por IA, validação de saída e fallback determinístico.
 - PR `#181` encerrou a PV-3, com proposta “Premium em validação”, lista de interesse, beta server-side e telemetria pseudonimizada.
-- PR `#182` encerra a PV-3.5, com hub público, sete cenários segmentados, fontes oficiais, SEO técnico e telemetria editorial privada.
-- O SHA funcional `6a57d3dbcdc58ba0f7a2a19705d461ffe689a294` passou governança, Handoff vigente, auditoria, secret scan, lint, TypeScript, suíte completa, Firestore, cobertura crítica, mutation, build, smoke HTTP e E2E desktop/mobile no run `30954725742`.
+- PR `#182` encerrou a PV-3.5, com hub público, sete cenários segmentados, fontes oficiais, SEO técnico e telemetria editorial privada.
+- PR `#185` atualizou o `nanoid` vulnerável no lockfile e foi integrada pelo merge commit `025ced8f8fb42c204f380e96827c2f073bd8d115`.
+- PR `#186` tornou derivados financeiros temporalmente determinísticos e foi integrada pelo merge commit `f8101234359fa27c41e263e9dfa67bafd4c4572c`.
+- PR `#187` encerra a PV-4 sobre a base `f810123`, substituindo a implementação histórica da PR `#183`, fechada sem merge.
+- O SHA funcional `4203e3b0c5bc586ee32643bc47976545b91731c9` passou governança, Handoff vigente, auditoria, secret scan, lint, TypeScript, 859 testes, Firestore Rules/Emulator, cobertura crítica, mutation, build, smoke HTTP e 42 E2E desktop/mobile com acessibilidade no run `32038322839`.
 - PR `#170` continua fechada sem merge, substituída pela implementação limpa da PR `#178`.
 - PR `#168` permanece bloqueada e não deve ser mergeada enquanto houver risco de reintrodução de segredos ou alterações privilegiadas fora do escopo.
-- A próxima entrega funcional é a PV-4, sem recalcular fatos por IA e sem repetir alertas quando nada mudou.
-- Não há evidência de deploy em produção da PV-3.5 neste documento; merge e CI não substituem verificação posterior do ambiente produtivo.
+- A PV-4 reconstrói entrada financeira server-side, mantém referência versionada e transacional, trata replay, concorrência e stale write e deixa a IA somente como explicadora opcional.
+- A revisão adicional corrigiu a janela histórica para os 120 meses mais recentes, preservou renda conhecida igual a zero, tornou o rollback fail-closed durável durante remount da mesma aba e eliminou atualização redundante de posição idêntica.
+- O próximo item urgente é o hotfix de recuperação da sessão da carteira, em escopo próprio e antes da PV-5.
+- Não há evidência de deploy em produção da PV-4 neste documento; merge e CI não substituem verificação posterior do ambiente produtivo.
 
 ### Matriz atual
 
@@ -56,8 +62,9 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | PV-2B — apresentação dos sinais | Concluída |
 | PV-2C — explicação por IA | Concluída |
 | PV-3 — descoberta Premium/beta | Concluída |
-| PV-3.5 — SEO e Conteúdo de Mercado | Concluída com o merge da PR `#182` |
-| PV-4 — relatório incremental | Sprint atual após o merge |
+| PV-3.5 — SEO e Conteúdo de Mercado | Concluída pela PR `#182` |
+| PV-4 — relatório incremental | Concluída com o merge da PR `#187` |
+| Hotfix — recuperação da sessão da carteira | Próximo item urgente antes da PV-5 |
 | PV-5 — acompanhar fundos | Planejada |
 | Checkout/cobrança | Não iniciado |
 | AdSense | Congelado |
@@ -114,47 +121,42 @@ Inclui:
 - telemetria editorial sem identidade ou valores financeiros, com retenção de 90 dias;
 - testes de conteúdo, arquitetura, privacidade, sitemap, acessibilidade e E2E desktop/mobile.
 
-## 3. Sprint atual
-
 ### PV-4 — Relatório incremental: mudanças desde a última análise
 
-**Objetivo:** informar o que realmente mudou na carteira desde a análise anterior, reduzindo repetição e destacando somente alterações materiais e rastreáveis.
+**Estado:** concluída com o merge da PR `#187`.
 
-### Escopo
+Inclui:
 
-- persistir uma referência versionada da última análise válida;
-- comparar análise atual e anterior por sinais, métricas, qualidade e proveniência;
-- separar mudança de dado, mudança de regra, mudança de cobertura e mudança de qualidade;
-- classificar alterações como nova, agravada, reduzida, resolvida ou inalterada;
-- destacar apenas mudanças materiais conforme política determinística;
-- não repetir alertas sem alteração real;
-- permitir leitura resumida e expansão das evidências;
-- manter a IA apenas como explicadora opcional das mudanças já determinadas;
-- registrar versão da política, datas-base e fingerprints das duas análises;
-- preservar privacidade e não enviar carteira bruta ao provedor de IA;
-- manter rollback e compatibilidade com análises antigas ou ausentes.
+- entrada financeira reconstruída no servidor a partir da carteira, snapshots e histórico canônicos;
+- navegador enviando somente a intenção allowlistada `{ portfolioId: "default" }`;
+- referência mínima versionada, server-owned, isolada por usuário e persistida transacionalmente;
+- idempotência para mesmo `asOf` e mesmo fingerprint, avanço monotônico, rejeição de stale write, replay, conflito e concorrência;
+- fingerprint alinhado à entrada normalizada do domínio, sem incluir competência ainda aberta;
+- comparação determinística de dados, regra, cobertura e qualidade, sem IA decidir mudança financeira;
+- explicação opcional sanitizada, acionada pelo usuário e baseada somente no par persistido;
+- reconciliação remota antes de atualizar a experiência após POST, PATCH ou DELETE do histórico;
+- preflight server-only, autenticação, same-origin, rate limit e feature flag server-side;
+- rollback fail-closed durável na mesma aba, inclusive após remount, sem reenviar dados financeiros para descobrir a flag;
+- leitura dos 120 meses mais recentes em ordem canônica e distinção explícita entre renda conhecida `0` e ausência `null`;
+- E2E desktop/mobile, múltiplas abas, estados autenticado e sem sessão e acessibilidade sem violações sérias ou críticas.
 
-### Critérios de aceite
+## 3. Sprint atual
 
-- primeira análise informa honestamente que não existe base anterior;
-- comparação usa somente snapshots/análises válidos e pertencentes ao mesmo usuário;
-- mudança financeira é decidida por domínio determinístico, nunca por IA;
-- alertas inalterados não reaparecem como novidade;
-- alterações de regra ou qualidade não são apresentadas como mudança do fundo;
-- evidências permitem reproduzir o antes e o depois;
-- ausência não vira zero e dados inválidos falham fechado;
-- desktop e mobile passam acessibilidade e E2E;
-- todos os gates da CI ficam verdes no mesmo SHA;
-- produção somente é considerada concluída com evidência separada do ambiente produtivo.
+### Hotfix urgente — recuperação da sessão da carteira
+
+**Prioridade:** executar em PR própria antes de iniciar a PV-5.
+
+Este registro não autoriza implementação dentro da PV-4. O hotfix deve tratar somente a recuperação da sessão inválida da carteira, preservar autenticação e isolamento existentes e passar os mesmos gates canônicos antes de qualquer merge. O roadmap funcional PV-5 a PV-9 permanece inalterado.
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **PV-4 — Relatório incremental: mudanças desde a última análise.**
-2. **PV-5 — Radar/Acompanhar fundo fora da carteira: 1 grátis e 10 Premium.**
-3. **PV-6 — Validação de preço e cobrança.**
-4. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial.**
-5. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
-6. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
+1. **PV-5 — Radar/Acompanhar fundo fora da carteira: 1 grátis e 10 Premium.**
+2. **PV-6 — Validação de preço e cobrança.**
+3. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial.**
+4. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
+5. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
+
+O hotfix de recuperação da sessão tem prioridade operacional antes desta sequência e não altera o roadmap funcional.
 
 AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados.
 
@@ -162,7 +164,7 @@ AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados.
 
 ### PV-4 — Relatório incremental
 
-Aceite conforme a seção 3. Deve comparar estados versionados, destacar somente mudanças materiais, preservar evidência e não usar IA para decidir se uma mudança financeira ocorreu.
+**Concluída pela PR `#187`.** Compara estados versionados, destaca somente mudanças materiais, preserva evidência e não usa IA para decidir se uma mudança financeira ocorreu.
 
 ### PV-5 — Acompanhar fundo fora da carteira
 
@@ -239,31 +241,33 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 
 - Repositório: `IsraelJr/dados-fii`.
 - Branch principal: `main`.
-- Branch da PV-3.5: `agent/pv-3-5-seo-market-content`.
+- Branch da PV-4: `agent/pv4-reconciliation`.
 - PR `#177`: PV-2A, mergeada.
 - PR `#178`: PV-2B, mergeada.
 - PR `#180`: PV-2C, mergeada.
 - PR `#181`: PV-3, mergeada no commit `38e1aa803d62f88c249ca29ff6d919efd8125ad4`.
-- PR `#182`: PV-3.5 e Handoff v10.6.0; merge somente após CI final verde no mesmo SHA.
+- PR `#182`: PV-3.5 e Handoff v10.6.0, mergeada.
+- PR `#185`: saneamento do `nanoid`, mergeada em `025ced8f8fb42c204f380e96827c2f073bd8d115`.
+- PR `#186`: determinismo temporal, mergeada em `f8101234359fa27c41e263e9dfa67bafd4c4572c`.
+- PR `#187`: PV-4 e Handoff v10.7.0; merge somente após CI final verde no mesmo SHA documental.
+- PR `#183`: fechada sem merge e substituída pela PR limpa `#187`.
 - PR `#170`: fechada sem merge.
 - PR `#168`: bloqueada; não mergear sem auditoria específica de segredos e sessão.
 
-### Arquivos centrais da PV-3.5
+### Arquivos centrais da PV-4
 
-- `src/lib/editorial/marketContent.ts`;
-- `src/lib/editorial/EditorialEvent.ts`;
-- `src/app/mercado/page.tsx`;
-- `src/app/mercado/[slug]/page.tsx`;
-- `src/app/components/MarketArticlePage.tsx`;
-- `src/app/components/EditorialTelemetry.tsx`;
-- `src/app/api/editorial/events/route.ts`;
-- `src/server/controllers/EditorialEventController.ts`;
-- `src/server/repositories/FirestoreEditorialEventRepository.ts`;
-- `src/app/sitemap.ts`;
-- `src/app/components/SiteNav.tsx`;
-- `tests/market-content.test.ts`;
-- `tests/market-content-architecture.test.mjs`;
-- `tests/e2e/market-content.spec.ts`.
+- `src/lib/portfolio-intelligence/PortfolioIncrementalIntelligence.ts`;
+- `src/server/services/PortfolioIntelligenceReferenceFactory.ts`;
+- `src/server/services/PortfolioIncrementalAnalysisService.ts`;
+- `src/server/repositories/FirestorePortfolioIntelligenceSourceRepositoryCore.ts`;
+- `src/server/repositories/FirestorePortfolioIntelligenceReferenceRepositoryCore.ts`;
+- `src/server/controllers/PortfolioIncrementalControllerCore.ts`;
+- `src/app/api/portfolio/incremental-analysis/route.ts`;
+- `src/app/api/portfolio/incremental-analysis/availability/route.ts`;
+- `src/app/components/PortfolioIncrementalReportPanel.tsx`;
+- `tests/portfolio-intelligence-incremental.test.ts`;
+- `tests/firestore-portfolio-intelligence-reference-repository.test.ts`;
+- `tests/e2e/portfolio-intelligence-experience.spec.ts`.
 
 ## 8. Funcionalidades concluídas, parciais e pendentes
 
@@ -276,18 +280,19 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - Inteligência da Carteira determinística, apresentação e explicação opcional por IA;
 - descoberta Premium, lista de interesse e beta controlado;
 - infraestrutura SEO de fundos com gate, manifesto e sitemap fail-closed;
-- hub e cenários editoriais por segmento.
+- hub e cenários editoriais por segmento;
+- relatório incremental PV-4 server-owned, determinístico, versionado, transacional e fail-closed.
 
 ### Parciais
 
 - Premium possui recursos e beta, mas preço e cobrança ainda não foram validados;
 - páginas de fundos continuam dependentes do gate editorial individual;
 - Google Search Console precisa de acompanhamento operacional após publicação;
-- produção da PV-3.5 ainda exige verificação separada pós-merge.
+- produção da PV-4 ainda exige verificação separada pós-merge.
 
 ### Pendentes
 
-- relatório incremental da PV-4;
+- hotfix de recuperação da sessão da carteira, antes da PV-5;
 - acompanhar fundo fora da carteira, 1 Grátis e 10 Premium;
 - validação de preço;
 - checkout e assinaturas;
@@ -326,6 +331,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - `ENABLE_WALLET_RISK_REPORT_AUTOMATIC`;
 - `ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK`;
 - `ENABLE_PREMIUM_DISCOVERY`;
+- `ENABLE_INCREMENTAL_PORTFOLIO_REPORT`;
 - `PREMIUM_BETA_UIDS`;
 - `PREMIUM_BETA_EMAILS`;
 - `PREMIUM_PREVIEW_EMAILS`.
@@ -374,8 +380,7 @@ Para conteúdo editorial, também são obrigatórios:
 - quais fundos receberão revisão editorial individual primeiro;
 - WhatsApp ou Telegram para alertas, mantendo consentimento, custo e privacidade;
 - eventual AdSense, ainda congelado;
-- definição detalhada da política de materialidade da PV-4;
-- retenção e migração de análises anteriores para comparação incremental;
-- verificação pós-merge e pós-deploy da PV-3.5 em produção.
+- hotfix de recuperação da sessão da carteira, em PR própria antes da PV-5;
+- verificação pós-merge e pós-deploy da PV-4 em produção.
 
 Nenhuma dessas decisões abertas autoriza checkout, anúncio, mensagem externa ou mudança de entitlement sem sprint própria, testes e registro canônico.
