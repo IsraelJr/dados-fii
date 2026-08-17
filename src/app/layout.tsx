@@ -6,6 +6,7 @@ import CookieBanner from "./components/CookieBanner";
 import SiteFooter from "./components/SiteFooter";
 import SiteNav from "./components/SiteNav";
 import UserNotificationCenter from "./components/UserNotificationCenter";
+import WalletSessionRecoveryBoundary from "./components/WalletSessionRecoveryBoundary";
 import { ADSENSE_PUBLISHER_ID, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -88,6 +89,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </Script>
       <body className={`${geistSans.variable} ${geistMono.variable} bg-slate-50 text-slate-900 antialiased`}>
         <AdSenseLoader />
+        <WalletSessionRecoveryBoundary />
         <SiteNav />
         <UserNotificationCenter />
         {children}
