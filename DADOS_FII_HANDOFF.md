@@ -2,32 +2,41 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 10.8.0
+**Versão:** 10.8.1
 **Data:** 17/08/2026
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**PR de encerramento desta versão:** `#189`
-**SHA funcional antes da atualização documental:** `f4e604d596bb70a1f20db67bf9fc72ae20ef2647`
-**CI funcional:** `Phase 2 Closure CI` — run `32051239202` — sucesso
+**PR de encerramento da versão anterior:** `#189`
+**PR corretiva desta versão:** a registrar nesta PR
+**SHA final da `main` antes da correção documental:** `df1d0bbeea9afc1021a89b950b618f1672a22727`
+**CI da `main` final:** `Phase 2 Closure CI` — run `32052213156` — sucesso
+**Produção no SHA final:** Vercel deployment `5948464030` — `success`; `Risk Lab Premium Production Gate` — run `32052314513` — sucesso; `Production Premium Smoke` — run `32052314449` — sucesso
 **Fase vigente:** `Produto Validável`  
-**Próxima etapa após o merge deste documento:** PV-6 — validação de preço e cobrança
+**Sprint funcional atual:** PV-6 — validação de preço e cobrança
+**Trilha transversal paralela:** SEO-S1A → SEO-S1B → SEO-S2 → SEO-S3 → SEO-S4
 
 ## Decisões vigentes que substituem decisões anteriores
 
 | Decisão vigente | Decisão substituída | Efeito |
 |---|---|---|
-| PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3.5 e PV-4 ficam formalmente concluídas com o merge da PR `#187`. | O Handoff v10.6.0 tratava PV-4 como sprint atual. | O produto passa a comparar referências server-owned e mostrar somente mudanças materiais rastreáveis. |
+| PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3.5, PV-4 e PV-5 ficam formalmente concluídas após o merge da PR `#189`. | O Handoff v10.8.0 ainda tratava a integração da PR `#189` como etapa futura. | A `main` final da PV-5 é `df1d0bbeea9afc1021a89b950b618f1672a22727`; a sprint funcional atual passa a ser PV-6. |
 | PR `#185` concluiu o saneamento do `nanoid` no lockfile e PR `#186` concluiu a dívida de determinismo temporal. | Esses dois bloqueadores precediam a integração segura da PV-4. | Segurança de dependência e relógio determinístico são pré-requisitos concluídos da PV-4. |
 | O hotfix de recuperação da sessão da carteira fica concluído pela PR `#188`, antes da PV-5. | Presença de token no navegador era tratada como sessão válida. | Todo 401 autenticado converge para recuperação central, preservando carteira, snapshots e histórico. |
 | A PR `#184` publica a decisão do Copom de agosto de 2026 com fonte oficial permanente e datas editoriais separadas. | A versão anterior usava uma página mutável e confundia data-base, publicação e modificação. | Comunicado, ata, metadata, JSON-LD e sitemap ficam coerentes, sem tratar a continuidade da flexibilização como mudança de direção. |
 | A PV-5 fica concluída pela PR `#189`, com Radar separado da carteira e limites server-side de 1 fundo Grátis e 10 Premium. | Acompanhamento de fundo fora da carteira estava somente planejado. | Usuário acompanha fundos sem criar posição; concorrência, downgrade, deduplicação, monitor e rollback são tratados deterministicamente. |
+| A produção da `main` final da PV-5 está comprovada no SHA `df1d0bbeea9afc1021a89b950b618f1672a22727`. | O Handoff v10.8.0 mantinha ressalvas de produção ainda não verificada. | O deployment Vercel `5948464030`, o `Risk Lab Premium Production Gate` `32052314513` e o `Production Premium Smoke` `32052314449` concluíram com sucesso no mesmo SHA. |
 | A branch `main` exige o check interno `validate`, em modo estrito e também para administradores. | O merge já havia sido possível com CI vermelho. | O gate canônico interno bloqueia integração; status externo de quota Vercel não foi tornado obrigatório. |
 | O hub `/mercado` e sete páginas segmentadas são a superfície editorial oficial desta fase. | SEO editorial ainda não possuía rotas próprias. | Mercado de FIIs, FIAGRO, logística, shoppings, escritórios, recebíveis e renda urbana têm conteúdo específico, data-base e fontes. |
 | Página editorial desconhecida ou sem qualidade mínima não é publicada nem indexada. | Uma rota dinâmica poderia gerar conteúdo raso por fallback. | O registro editorial é allowlistado e slug desconhecido retorna 404 real. |
 | Telemetria editorial é anônima, mínima e retida por 90 dias. | Eventos editoriais poderiam reutilizar identidade ou dados financeiros. | Nenhum evento contém e-mail, `ownerId`, carteira, posição, ticker, dividendo, patrimônio, token ou cookie. |
+| SEO volta a ser requisito contínuo e paralelo, na sequência SEO-S1A → SEO-S1B → SEO-S2 → SEO-S3 → SEO-S4. | A conclusão da PV-3.5 podia ser interpretada como encerramento de todo o SEO. | A PV-3.5 entregou uma parte relevante da trilha, mas Search Console, baseline, páginas prioritárias, diferenciação e autoridade continuam com estado próprio. |
+| Toda funcionalidade nova com expressão pública útil avalia SEO na própria sprint. | SEO poderia se acumular para uma sprint funcional exclusiva posterior. | Metadata, canonical, indexabilidade, SSR, schema, links internos, intenção de busca, CTA e medição são avaliados junto da funcionalidade aplicável; não existe sprint exclusiva de SEO. |
+| PV-2D — Painel Executivo/score explicável volta ao roadmap como pendência de reconciliação funcional. | PV-2D desapareceu do roadmap sem decisão explícita de conclusão ou cancelamento. | Primeiro se audita quanto já existe; somente depois se decide o delta e seu encaixe, sem implementar nada nesta correção documental. |
+| PV-9 volta a ser separada em PV-9A e PV-9B, e PV-10 volta ao roadmap futuro. | O Handoff v10.8.0 reuniu comparador e fair value em uma única PV-9 e omitiu a análise técnica secundária. | Screener/comparador/filtros salvos ficam separados de fair value/sustentabilidade por categoria; análise técnica permanece futura, secundária e isolada do score fundamental. |
 | Google AdSense continua congelado. | SEO poderia ser confundido com antecipação de anúncios. | O objetivo é tráfego qualificado e utilidade; publicidade não integra esta entrega. |
-| Cobrança continua adiada até a PV-6, e checkout permanece na PV-7. | Monetização poderia ser antecipada sem evidência comercial. | Interesse, beta e uso continuam separados de pagamento e entitlement comercial. |
-| O Handoff v10.8.0 é a única fonte canônica ativa. | Handoffs v10.7.2 e anteriores. | Este documento prevalece em caso de divergência. |
+| PV-6 pode avançar qualitativamente com baixo tráfego, mas sua leitura quantitativa depende de amostra externa mínima. | Baixa aquisição poderia ser interpretada como rejeição representativa de conversão ou preço. | Entrevistas, proposta de valor e testes qualitativos avançam; conversão e disposição a pagar só sustentam decisão quantitativa quando o denominador externo for suficiente e explícito. |
+| PV-7 permanece condicionada à evidência comercial produzida pela PV-6. | Checkout poderia ser antecipado sem validação suficiente. | Interesse, beta e uso continuam separados de pagamento e entitlement comercial; ausência de amostra não autoriza cobrança. |
+| O Handoff v10.8.1 é a única fonte canônica ativa. | Handoff v10.8.0 e anteriores. | Este documento prevalece em caso de divergência. |
 
 ## 1. Estado atual do projeto
 
@@ -54,6 +63,9 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - Página, metadata, JSON-LD e sitemap usam separadamente data-base `2026-08-05`, `datePublished` `2026-08-05` e `dateModified` `2026-08-17`; os testes editoriais analisam o conteúdo final transformado.
 - PR `#189` conclui a PV-5 em uma branch limpa sobre a main consolidada, sem misturar sessão, cobrança ou checkout.
 - O SHA funcional `f4e604d596bb70a1f20db67bf9fc72ae20ef2647` passou instalação congelada, governança, Handoff, auditoria, secret scan, lint, TypeScript, 904 testes descobertos com 901 aprovados e 3 skips de infraestrutura, Firestore Rules/Emulator, cobertura crítica, mutation, build, smoke HTTP e 58 E2E desktop/mobile com acessibilidade no run `32051239202`.
+- A PR `#189` foi mergeada em `main` em 17/08/2026, gerando o SHA final `df1d0bbeea9afc1021a89b950b618f1672a22727`.
+- O SHA final `df1d0bbeea9afc1021a89b950b618f1672a22727` passou o `Phase 2 Closure CI` no run `32052213156`.
+- A produção foi comprovada no mesmo SHA: o deployment Vercel `5948464030` concluiu em `success`, o `Risk Lab Premium Production Gate` passou no run `32052314513` e o `Production Premium Smoke` passou no run `32052314449`.
 - O Radar usa recurso próprio por usuário, transação Firestore, entitlement server-side, limite atômico 1/10, reconciliação com carteira e downgrade sem apagar registros.
 - Atualizações usam fingerprint determinístico; replay e cron concorrente não duplicam notificação, e IA não é executada automaticamente.
 - A feature flag `ENABLE_FUND_RADAR` é server-only e fail-closed; desligá-la bloqueia APIs, monitor e UI sem apagar acompanhamentos.
@@ -62,8 +74,9 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - PRs `#168`, `#179`, `#1` e `#2` foram fechadas sem merge como legado, substituídas ou obsoletas; nenhum delta funcional necessário permaneceu nelas.
 - A PV-4 reconstrói entrada financeira server-side, mantém referência versionada e transacional, trata replay, concorrência e stale write e deixa a IA somente como explicadora opcional.
 - A revisão adicional corrigiu a janela histórica para os 120 meses mais recentes, preservou renda conhecida igual a zero, tornou o rollback fail-closed durável durante remount da mesma aba e eliminou atualização redundante de posição idêntica.
-- O próximo trabalho funcional é a PV-6 — validação de preço e cobrança; PV-7 continua responsável por checkout e entitlement comercial.
-- Não há evidência de deploy em produção da PV-4 neste documento; merge e CI não substituem verificação posterior do ambiente produtivo.
+- O trabalho funcional atual é a PV-6 — validação de preço e cobrança; PV-7 continua responsável por checkout e entitlement comercial e somente pode começar após evidência comercial suficiente da PV-6.
+- A validação qualitativa da PV-6 pode avançar com recrutamento direto e baixo tráfego. Resultados quantitativos de conversão ou preço não são representativos sem amostra externa mínima, denominador explícito e origem de aquisição registrada.
+- SEO continua em paralelo à PV-6 e às sprints seguintes; a PV-3.5 não encerrou a trilha orgânica.
 
 ### Matriz atual
 
@@ -78,11 +91,15 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | PV-2B — apresentação dos sinais | Concluída |
 | PV-2C — explicação por IA | Concluída |
 | PV-3 — descoberta Premium/beta | Concluída |
-| PV-3.5 — SEO e Conteúdo de Mercado | Concluída pela PR `#182` |
+| PV-3.5 — SEO e Conteúdo de Mercado | Entrega funcional concluída pela PR `#182`; não encerra a trilha SEO contínua |
 | PV-4 — relatório incremental | Concluída com o merge da PR `#187` |
 | Hotfix — recuperação da sessão da carteira | Concluído pela PR `#188` |
 | Atualização editorial — Copom agosto de 2026 | Concluída pela PR `#184` |
 | PV-5 — Radar/Acompanhar fundos | Concluída pela PR `#189` |
+| Produção da `main` final da PV-5 | Comprovada no SHA `df1d0bbeea9afc1021a89b950b618f1672a22727` |
+| PV-6 — validação de preço e cobrança | Sprint funcional atual |
+| PV-2D — Painel Executivo/score explicável | Pendente de reconciliação funcional; auditar antes de decidir delta |
+| SEO-S1A → SEO-S4 | Trilha transversal contínua e paralela; estados detalhados na seção 3 |
 | Checkout/cobrança | Não iniciado |
 | AdSense | Congelado |
 
@@ -122,7 +139,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 ### PV-3.5 — SEO e Conteúdo de Mercado
 
-**Estado:** concluída com o merge da PR `#182`.
+**Estado funcional:** concluída com o merge da PR `#182`. Esta conclusão registra a entrega do hub e dos cenários editoriais, não o encerramento da trilha SEO contínua.
 
 Inclui:
 
@@ -137,6 +154,8 @@ Inclui:
 - navegação pública com acesso ao hub;
 - telemetria editorial sem identidade ou valores financeiros, com retenção de 90 dias;
 - testes de conteúdo, arquitetura, privacidade, sitemap, acessibilidade e E2E desktop/mobile.
+
+A PV-3.5 absorveu parte relevante de SEO-S1B e SEO-S2. Ela não comprova, por si só, Search Console operacional com baseline, seleção e cobertura editorial dos aproximadamente 20 fundos prioritários, histórico público sanitizado por fundo, comparações públicas, autoridade ou distribuição.
 
 ### PV-4 — Relatório incremental: mudanças desde a última análise
 
@@ -171,20 +190,45 @@ Inclui recurso próprio separado da posição de carteira, limites server-side d
 
 ## 3. Sprint atual
 
-### Encerramento da PV-5
+### PV-6 — Validação de preço e cobrança
 
-**Prioridade:** integrar a PR `#189` somente com CI final verde no mesmo SHA documental e então iniciar a PV-6.
+**Estado:** sprint funcional atual, sem checkout.
 
-O hotfix permaneceu isolado na PR `#188`; a atualização do Copom permaneceu isolada na PR `#184`; e o Radar permaneceu isolado na PR `#189`. A PV-5 reutiliza o entitlement existente sem implementar cobrança ou checkout.
+**Objetivo:** testar proposta de valor, embalagem, preço, periodicidade e disposição a pagar antes de implementar cobrança.
+
+A validação qualitativa pode avançar mesmo com baixo tráfego, por entrevistas, recrutamento direto e testes de proposta. A validação quantitativa de conversão ou preço não deve ser tratada como representativa sem amostra externa mínima, denominador explícito e origem de aquisição registrada. Baixa aquisição não equivale a rejeição de preço.
+
+PV-7 permanece bloqueada até que a PV-6 registre evidência comercial suficiente e uma decisão explícita. PV-6 não cria checkout, cobrança, recorrência ou entitlement comercial.
+
+### Trilha SEO contínua e paralela
+
+**Sequência vigente:** SEO-S1A → SEO-S1B → SEO-S2 → SEO-S3 → SEO-S4.
+
+Esta trilha acompanha o desenvolvimento funcional e não forma uma sprint exclusiva. Toda nova funcionalidade que possua expressão pública útil deve avaliar, dentro da própria sprint, metadata, canonical, indexabilidade, renderização server-side, schema quando aplicável, links internos, intenção de busca, CTA e medição de conversão.
+
+| Etapa | Estado reconciliado | Próxima obrigação |
+|---|---|---|
+| SEO-S1A — inventário e baseline operacional | Parcial; requer reconciliação operacional | Confirmar Search Console, indexação, baseline de impressões, cliques, CTR e posição, calendário/intenção de busca e priorização dos aproximadamente 20 fundos. |
+| SEO-S1B — fundação técnica e templates | Parcialmente absorvida pela PV-3.5 | Auditar cobertura real de canonical, sitemap, robots, schemas, SSR, links internos, Core Web Vitals e indexabilidade nas páginas individuais de fundos. |
+| SEO-S2 — páginas prioritárias | Parcial | O hub e sete páginas segmentadas existem; selecionar os aproximadamente 20 fundos e comprovar conteúdo individual substancial, único, rastreável e útil. PV-2D permanece uma dependência a reconciliar para o painel executivo/score explicável. |
+| SEO-S3 — diferenciação | Parcialmente habilitada | PV-4 e PV-5 criaram capacidades privadas, mas não comprovam histórico público sanitizado por fundo, comparações, buscas de alta intenção ou automação editorial revisada. Incorporar o componente público às sprints funcionais correspondentes, incluindo PV-9A. |
+| SEO-S4 — autoridade e distribuição | Futura | Estudos originais, distribuição legítima, referências externas e revisão de 90 dias; nenhuma compra de links. |
+
+Search Console deve ter acompanhamento operacional recorrente de indexação, impressões, cliques, CTR, posição, consultas, páginas de entrada e conversão para cadastro, Radar e carteira. Baseline e mudanças de período precisam registrar data e denominador; credenciais permanecem fora do repositório e do cliente.
 
 ## 4. Ordem oficial das próximas sprints
 
 1. **PV-6 — Validação de preço e cobrança.**
-2. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial.**
-3. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
-4. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
+2. **PV-2D — Painel Executivo/score explicável: reconciliação funcional antes de decidir o delta e seu encaixe.**
+3. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial, somente após evidência comercial suficiente da PV-6.**
+4. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
+5. **PV-9A — Screener, comparador de pares e filtros salvos.**
+6. **PV-9B — Fair value e sustentabilidade por categoria.**
+7. **PV-10 — Análise técnica secundária, futura e isolada do score fundamental.**
 
-O hotfix de recuperação da sessão tem prioridade operacional antes desta sequência e não altera o roadmap funcional.
+PV-2D não está autorizada para implementação nesta correção: primeiro deve ser auditado quanto do painel executivo do fundo já existe, o que foi absorvido por outras entregas e qual delta permanece. Só então seu escopo e posição de implementação podem ser decididos.
+
+A trilha SEO-S1A → SEO-S4 ocorre em paralelo a toda a sequência. Ela não altera a numeração funcional e não cria uma sprint exclusiva de SEO.
 
 AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados.
 
@@ -198,16 +242,28 @@ AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados.
 
 **Concluída pela PR `#189`.** Permite acompanhar fundo sem transformá-lo em posição, aplica limite server-side de 1 fundo no Grátis e 10 no Premium, deduplica atualizações e preserva explicitamente qualidade, fonte, data-base e dados insuficientes sem recomendação de compra.
 
+### PV-2D — Painel Executivo/score explicável
+
+**Estado:** pendente de reconciliação funcional, sem implementação autorizada por este Handoff corretivo.
+
+- auditar quanto já existe em páginas de fundos, score, confiança, idade e qualidade dos dados, decomposição, risco, sustentabilidade da renda, faixa de valor quando justificável e fatos que mudariam a tese;
+- distinguir o painel público de um fundo da inteligência privada da carteira entregue em PV-2B;
+- mapear dependências e cobertura de dados, incluindo a relação com SEO-S2;
+- decidir somente após a auditoria se existe delta, qual é seu escopo e onde entra no roadmap;
+- não reconstruir nem declarar concluído o que já existir de forma comprovada.
+
 ### PV-6 — Validação de preço e cobrança
 
 - testar preço, periodicidade e disposição a pagar;
 - comparar recorrência, créditos e pagamento avulso;
-- definir evidência mínima com usuários externos;
+- avançar em entrevistas, proposta de valor, embalagem e testes qualitativos mesmo com baixo tráfego;
+- definir amostra externa mínima, denominador, origem de aquisição e critério de representatividade antes de interpretar conversão ou preço quantitativamente;
+- não tratar ausência de tráfego como rejeição comercial;
 - registrar decisão comercial antes de qualquer checkout.
 
 ### PV-7 — Checkout e assinaturas
 
-- implementar somente após decisão comercial registrada;
+- implementar somente após a PV-6 produzir evidência comercial suficiente e decisão registrada;
 - incluir recorrência, cancelamento, reembolso e comunicação transparente;
 - webhooks autenticados e idempotentes;
 - entitlement exclusivamente server-side;
@@ -220,14 +276,29 @@ AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados.
 - reconciliar e migrar sem perda de histórico;
 - explicitar período, benchmark e cobertura.
 
-### PV-9 — Screener e comparador
+### PV-9A — Screener, comparador de pares e filtros salvos
 
 - screener, comparador e filtros salvos;
-- fair value por categoria, nunca fórmula única para todos os segmentos;
 - dados insuficientes permanecem explícitos;
 - ranking não esconde qualidade, liquidez ou limitações da fonte.
 
+### PV-9B — Fair value e sustentabilidade por categoria
+
+- usar modelos e premissas específicos por categoria, nunca fórmula única para todos os segmentos;
+- apresentar faixa, confiança, cobertura, fontes e fatores que invalidam o modelo;
+- separar fato, cálculo, estimativa e inferência;
+- não avançar quando a cobertura mínima de dados não estiver comprovada.
+
+### PV-10 — Análise técnica secundária
+
+- permanecer futura, opcional e secundária;
+- ficar isolada do score fundamental e não alterar regras, sinais ou fatos fundamentais;
+- explicitar janela, fonte, limitações e natureza técnica dos indicadores;
+- não produzir recomendação automática de compra ou venda.
+
 Cada sprint exige escopo fechado, testes automatizados, Preview, produção e evidência antes de ser marcada como concluída.
+
+Além desses critérios, toda sprint que crie ou amplie superfície pública deve avaliar e entregar o componente SEO aplicável na própria sprint, ou registrar de forma explícita por que ele não se aplica. SEO não deve ser acumulado para uma sprint exclusiva posterior.
 
 ## 6. Regras arquiteturais obrigatórias
 
@@ -259,6 +330,9 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 26. Nenhuma validação manual substitui esses gates.
 27. Radar e carteira são recursos separados; fundo comprado deixa de consumir limite do Radar sem apagar histórico.
 28. Limite, downgrade, deduplicação e entitlement do Radar são decididos no servidor e persistidos atomicamente.
+29. Toda nova funcionalidade pública avalia SEO na própria sprint: metadata, canonical, indexabilidade, SSR, schema quando aplicável, links internos, intenção de busca, CTA e medição.
+30. Nenhuma etapa SEO autoriza página rasa, geração em massa sem revisão, credencial pública, recomendação financeira ou relaxamento dos gates de segurança.
+31. Análise técnica futura permanece secundária e isolada do score fundamental.
 
 ## 7. Arquivos, branches, commits e PRs existentes
 
@@ -278,7 +352,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - PR `#187`: PV-4 e Handoff v10.7.0, mergeada em `e5f21f7b78f80561ad2836b5b9e7a578bcf62317`.
 - PR `#188`: hotfix de recuperação da sessão e Handoff v10.7.1, mergeada em `14a81f919928f91ab221a25ab73b1136cbf2b883`.
 - PR `#184`: atualização editorial do Copom e Handoff v10.7.2, mergeada em `81ba4811b82c6ffc2955595b6570b9353d85626a`.
-- PR `#189`: PV-5 e Handoff v10.8.0; merge somente após CI final verde no mesmo SHA documental.
+- PR `#189`: PV-5 e Handoff v10.8.0, mergeada em `df1d0bbeea9afc1021a89b950b618f1672a22727`.
 - PR `#183`: fechada sem merge e substituída pela PR limpa `#187`.
 - PR `#170`: fechada sem merge.
 - PRs `#168`, `#179`, `#1` e `#2`: fechadas sem merge após reconciliação como legado, substituídas ou obsoletas.
@@ -332,15 +406,22 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 
 - Premium possui recursos e beta, mas preço e cobrança ainda não foram validados;
 - páginas de fundos continuam dependentes do gate editorial individual;
-- Google Search Console precisa de acompanhamento operacional após publicação;
-- produção da main consolidada ainda exige verificação separada pós-merge.
+- SEO-S1A requer reconciliação operacional de Search Console, baseline e priorização dos aproximadamente 20 fundos;
+- SEO-S1B foi parcialmente absorvida pela PV-3.5, mas a cobertura técnica das páginas individuais de fundos ainda deve ser auditada;
+- SEO-S2 possui hub e páginas de segmentos, mas o conjunto de fundos prioritários e seus conteúdos individuais superiores não está comprovado como concluído;
+- SEO-S3 foi parcialmente habilitada por PV-4 e PV-5, sem comprovar histórico público sanitizado, comparações e buscas de alta intenção;
+- PV-2D aguarda reconciliação funcional antes de qualquer decisão de implementação.
 
 ### Pendentes
 
 - validação de preço;
-- checkout e assinaturas;
+- definição da amostra externa mínima e dos critérios quantitativos da PV-6;
+- checkout e assinaturas, condicionados à evidência comercial da PV-6;
 - histórico avançado e retorno total;
-- screener, comparador e filtros salvos;
+- screener, comparador de pares e filtros salvos na PV-9A;
+- fair value e sustentabilidade por categoria na PV-9B;
+- análise técnica secundária na PV-10;
+- SEO-S4 — autoridade, distribuição legítima e revisão de 90 dias;
 - alertas por WhatsApp ou Telegram, se aprovados posteriormente.
 
 ## 9. Decisões de segurança
@@ -383,7 +464,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - `PREMIUM_BETA_EMAILS`;
 - `PREMIUM_PREVIEW_EMAILS`.
 
-A PV-3.5 não adiciona credencial de Search Console nem variável pública com poder de indexação. O registro editorial versionado decide quais páginas existem; o sitemap só inclui páginas allowlistadas e válidas.
+A PV-3.5 não adiciona credencial de Search Console nem variável pública com poder de indexação. O registro editorial versionado decide quais páginas existem; o sitemap só inclui páginas allowlistadas e válidas. A operação de Search Console usa credenciais fora do repositório e não altera entitlement, dados financeiros ou privacidade.
 
 ## 11. Testes obrigatórios
 
@@ -416,17 +497,23 @@ Para conteúdo editorial, também são obrigatórios:
 - links internos para jornada editorial e carteira;
 - teste de que AdSense não foi antecipado.
 
+Para uma PR exclusivamente documental e canônica, executar no mesmo SHA ao menos o teste canônico do Handoff, a governança de workflows e a verificação de integridade do diff. Os demais gates continuam obrigatórios quando a automação canônica os acionar; nenhuma alteração documental pode enfraquecer os gates das PRs funcionais.
+
 ## 12. Pendências e decisões ainda abertas
 
 - preço inicial do Premium e do Super Premium;
 - mensalidade, créditos, pagamento avulso ou combinação;
-- evidência mínima de usuários externos para avançar à cobrança;
+- amostra externa mínima, denominador e critério de representatividade para conversão e preço;
+- evidência comercial suficiente da PV-6 para autorizar ou não a PV-7;
 - provedor de pagamento e regras de reembolso;
 - cadência editorial e responsável por atualização dos cenários;
-- operação do Google Search Console após publicação;
-- quais fundos receberão revisão editorial individual primeiro;
+- configuração/validação operacional do Google Search Console e registro da baseline de indexação, impressões, cliques, CTR e posição;
+- acompanhamento recorrente de consultas, páginas de entrada e conversão orgânica para cadastro, Radar e carteira;
+- seleção e priorização dos aproximadamente 20 fundos de SEO-S2 por busca, liquidez, usuários e relevância;
+- auditoria da cobertura de SEO-S1B nas páginas individuais de fundos;
+- reconciliação funcional da PV-2D antes de decidir qualquer delta ou implementação;
 - WhatsApp ou Telegram para alertas, mantendo consentimento, custo e privacidade;
 - eventual AdSense, ainda congelado;
-- verificação pós-merge e pós-deploy da main consolidada em produção.
+- implementação futura e isolada de PV-9A, PV-9B e PV-10 conforme seus gates próprios.
 
-Nenhuma dessas decisões abertas autoriza checkout, anúncio, mensagem externa ou mudança de entitlement sem sprint própria, testes e registro canônico.
+Nenhuma dessas decisões abertas autoriza checkout, anúncio, mensagem externa, mudança visual ampla ou mudança de entitlement sem sprint própria, testes e registro canônico. SEO permanece transversal e paralelo ao produto; não deve ser convertido em sprint funcional exclusiva.
