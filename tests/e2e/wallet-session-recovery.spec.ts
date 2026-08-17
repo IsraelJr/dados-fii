@@ -108,10 +108,10 @@ test("envio, erros do PIN, reenvio e confirmação recuperam a sessão sem requi
 
   await page.goto("/carteira");
   const send = page.getByRole("button", { name: "Enviar novo código" });
-  await page.evaluate(() => {
-    const button = [...document.querySelectorAll("button")].find((item) => item.textContent?.includes("Enviar novo código"));
-    button?.click();
-    button?.click();
+  await expect(send).toBeEnabled();
+  await send.evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
   });
   await expect(page.getByRole("status").filter({ hasText: "Código enviado" })).toBeVisible();
   expect(requestCodeCalls).toBe(1);
