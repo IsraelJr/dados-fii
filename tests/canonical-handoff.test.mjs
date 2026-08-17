@@ -42,10 +42,11 @@ test("existe somente um Handoff canônico ativo", () => {
 test("Handoff identifica fase, sprint e governança vigentes", () => {
   const body = text();
   assert.equal(body.split(/\r?\n/, 1)[0], EXACT_FIRST_LINE);
-  assert.match(body, /\*\*Versão:\*\* 10\.7\.2/);
+  assert.match(body, /\*\*Versão:\*\* 10\.8\.0/);
   assert.match(body, /Produto Validável/);
   assert.match(body, /PV-4 — Relatório incremental: mudanças desde a última análise/);
   assert.match(body, /Hotfix — recuperação da sessão da carteira/);
+  assert.match(body, /PV-5 — Radar\/Acompanhar fundo fora da carteira/);
   assert.match(body, /PV-1 está concluída funcionalmente/);
   assert.match(body, /PV-1, PV-2A, PV-2B, PV-2C, PV-3, PV-3\.5 e PV-4 ficam formalmente concluídas/);
   assert.match(body, /Google AdSense continua congelado/);
@@ -119,6 +120,9 @@ test("evidências funcionais da PV-4 e do hotfix ficam registradas", () => {
   assert.match(body, /095907087087abd4f8f46dad8e30c0f319792773/);
   assert.match(body, /32046295007/);
   assert.match(body, /Atualização editorial — Copom agosto de 2026 \| Concluída pela PR `#184`/);
+  assert.match(body, /f4e604d596bb70a1f20db67bf9fc72ae20ef2647/);
+  assert.match(body, /32051239202/);
+  assert.match(body, /PV-5 — Radar\/Acompanhar fundos \| Concluída pela PR `#189`/);
   assert.match(body, /Não há evidência de deploy em produção da PV-4/);
 });
 
@@ -130,6 +134,7 @@ test("documentos auxiliares canônicos existem e estão atualizados", () => {
   assert.match(text(ENV_INVENTORY), /`ENABLE_PREMIUM_DISCOVERY`/);
   assert.match(text(ENV_INVENTORY), /`PREMIUM_BETA_UIDS`/);
   assert.match(text(ENV_INVENTORY), /`PREMIUM_BETA_EMAILS`/);
+  assert.match(text(ENV_INVENTORY), /`ENABLE_FUND_RADAR`/);
 });
 
 test("evidência histórica permanece íntegra", () => {

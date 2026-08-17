@@ -2,15 +2,15 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 
 # Dados FII — Documento Canônico de Handoff
 
-**Versão:** 10.7.2
+**Versão:** 10.8.0
 **Data:** 17/08/2026
 **Repositório:** `IsraelJr/dados-fii`  
 **Branch principal:** `main`  
-**PR de encerramento desta versão:** `#184`
-**SHA funcional editorial antes da atualização documental:** `095907087087abd4f8f46dad8e30c0f319792773`
-**CI funcional:** `Phase 2 Closure CI` — run `32046295007` — sucesso
+**PR de encerramento desta versão:** `#189`
+**SHA funcional antes da atualização documental:** `f4e604d596bb70a1f20db67bf9fc72ae20ef2647`
+**CI funcional:** `Phase 2 Closure CI` — run `32051239202` — sucesso
 **Fase vigente:** `Produto Validável`  
-**Próxima etapa após o merge deste documento:** verificação curta da governança; depois, PV-5
+**Próxima etapa após o merge deste documento:** PV-6 — validação de preço e cobrança
 
 ## Decisões vigentes que substituem decisões anteriores
 
@@ -20,12 +20,14 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | PR `#185` concluiu o saneamento do `nanoid` no lockfile e PR `#186` concluiu a dívida de determinismo temporal. | Esses dois bloqueadores precediam a integração segura da PV-4. | Segurança de dependência e relógio determinístico são pré-requisitos concluídos da PV-4. |
 | O hotfix de recuperação da sessão da carteira fica concluído pela PR `#188`, antes da PV-5. | Presença de token no navegador era tratada como sessão válida. | Todo 401 autenticado converge para recuperação central, preservando carteira, snapshots e histórico. |
 | A PR `#184` publica a decisão do Copom de agosto de 2026 com fonte oficial permanente e datas editoriais separadas. | A versão anterior usava uma página mutável e confundia data-base, publicação e modificação. | Comunicado, ata, metadata, JSON-LD e sitemap ficam coerentes, sem tratar a continuidade da flexibilização como mudança de direção. |
+| A PV-5 fica concluída pela PR `#189`, com Radar separado da carteira e limites server-side de 1 fundo Grátis e 10 Premium. | Acompanhamento de fundo fora da carteira estava somente planejado. | Usuário acompanha fundos sem criar posição; concorrência, downgrade, deduplicação, monitor e rollback são tratados deterministicamente. |
+| A branch `main` exige o check interno `validate`, em modo estrito e também para administradores. | O merge já havia sido possível com CI vermelho. | O gate canônico interno bloqueia integração; status externo de quota Vercel não foi tornado obrigatório. |
 | O hub `/mercado` e sete páginas segmentadas são a superfície editorial oficial desta fase. | SEO editorial ainda não possuía rotas próprias. | Mercado de FIIs, FIAGRO, logística, shoppings, escritórios, recebíveis e renda urbana têm conteúdo específico, data-base e fontes. |
 | Página editorial desconhecida ou sem qualidade mínima não é publicada nem indexada. | Uma rota dinâmica poderia gerar conteúdo raso por fallback. | O registro editorial é allowlistado e slug desconhecido retorna 404 real. |
 | Telemetria editorial é anônima, mínima e retida por 90 dias. | Eventos editoriais poderiam reutilizar identidade ou dados financeiros. | Nenhum evento contém e-mail, `ownerId`, carteira, posição, ticker, dividendo, patrimônio, token ou cookie. |
 | Google AdSense continua congelado. | SEO poderia ser confundido com antecipação de anúncios. | O objetivo é tráfego qualificado e utilidade; publicidade não integra esta entrega. |
 | Cobrança continua adiada até a PV-6, e checkout permanece na PV-7. | Monetização poderia ser antecipada sem evidência comercial. | Interesse, beta e uso continuam separados de pagamento e entitlement comercial. |
-| O Handoff v10.7.2 é a única fonte canônica ativa. | Handoffs v10.7.1 e anteriores. | Este documento prevalece em caso de divergência. |
+| O Handoff v10.8.0 é a única fonte canônica ativa. | Handoffs v10.7.2 e anteriores. | Este documento prevalece em caso de divergência. |
 
 ## 1. Estado atual do projeto
 
@@ -47,14 +49,20 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 - O SHA funcional `6f926decaafc77e8bac85ab352b242feeb5af1d8` passou instalação congelada, governança, Handoff, auditoria, secret scan, lint, TypeScript, 868 testes, Firestore Rules/Emulator, cobertura crítica, mutation, build, smoke HTTP e 50 E2E desktop/mobile com acessibilidade no run `32044107480`.
 - A causa raiz do hotfix era considerar a presença local do token como prova de sessão válida. A política central agora remove somente a credencial rejeitada, interrompe consumidores autenticados e oferece novo código sem apagar e-mail, carteira, snapshots ou histórico manual.
 - Troca de sessão entre abas só libera consumidores depois da validação server-side, evitando uso antecipado do token e requisições duplicadas.
-- PR `#184` consolida o comunicado da 280ª reunião do Copom e a ata de 11/08/2026 em fontes permanentes do Banco Central, mantendo Selic de 14,00% a.a. e corte de 0,25 p.p. como fatos oficiais.
+- PR `#184` consolidou o comunicado da 280ª reunião do Copom e a ata de 11/08/2026 em fontes permanentes do Banco Central, mantendo Selic de 14,00% a.a. e corte de 0,25 p.p. como fatos oficiais; foi integrada no merge `81ba4811b82c6ffc2955595b6570b9353d85626a`.
 - O SHA funcional `095907087087abd4f8f46dad8e30c0f319792773` passou instalação congelada, governança, Handoff, auditoria, secret scan, lint, TypeScript, suíte completa, Firestore Rules/Emulator, cobertura crítica, mutation, build, smoke HTTP e 52 E2E desktop/mobile com acessibilidade no run `32046295007`.
 - Página, metadata, JSON-LD e sitemap usam separadamente data-base `2026-08-05`, `datePublished` `2026-08-05` e `dateModified` `2026-08-17`; os testes editoriais analisam o conteúdo final transformado.
+- PR `#189` conclui a PV-5 em uma branch limpa sobre a main consolidada, sem misturar sessão, cobrança ou checkout.
+- O SHA funcional `f4e604d596bb70a1f20db67bf9fc72ae20ef2647` passou instalação congelada, governança, Handoff, auditoria, secret scan, lint, TypeScript, 904 testes descobertos com 901 aprovados e 3 skips de infraestrutura, Firestore Rules/Emulator, cobertura crítica, mutation, build, smoke HTTP e 58 E2E desktop/mobile com acessibilidade no run `32051239202`.
+- O Radar usa recurso próprio por usuário, transação Firestore, entitlement server-side, limite atômico 1/10, reconciliação com carteira e downgrade sem apagar registros.
+- Atualizações usam fingerprint determinístico; replay e cron concorrente não duplicam notificação, e IA não é executada automaticamente.
+- A feature flag `ENABLE_FUND_RADAR` é server-only e fail-closed; desligá-la bloqueia APIs, monitor e UI sem apagar acompanhamentos.
+- A proteção da `main` exige o check `validate`, com `strict=true` e `enforce_admins=true`; Vercel não integra os checks obrigatórios por ser dependência externa sujeita a quota.
 - PR `#170` continua fechada sem merge, substituída pela implementação limpa da PR `#178`.
 - PRs `#168`, `#179`, `#1` e `#2` foram fechadas sem merge como legado, substituídas ou obsoletas; nenhum delta funcional necessário permaneceu nelas.
 - A PV-4 reconstrói entrada financeira server-side, mantém referência versionada e transacional, trata replay, concorrência e stale write e deixa a IA somente como explicadora opcional.
 - A revisão adicional corrigiu a janela histórica para os 120 meses mais recentes, preservou renda conhecida igual a zero, tornou o rollback fail-closed durável durante remount da mesma aba e eliminou atualização redundante de posição idêntica.
-- O próximo trabalho é a verificação curta da governança; a próxima sprint funcional permanece a PV-5.
+- O próximo trabalho funcional é a PV-6 — validação de preço e cobrança; PV-7 continua responsável por checkout e entitlement comercial.
 - Não há evidência de deploy em produção da PV-4 neste documento; merge e CI não substituem verificação posterior do ambiente produtivo.
 
 ### Matriz atual
@@ -74,7 +82,7 @@ Este documento substitui todos os planejamentos anteriores quando houver diverg�
 | PV-4 — relatório incremental | Concluída com o merge da PR `#187` |
 | Hotfix — recuperação da sessão da carteira | Concluído pela PR `#188` |
 | Atualização editorial — Copom agosto de 2026 | Concluída pela PR `#184` |
-| PV-5 — acompanhar fundos | Planejada |
+| PV-5 — Radar/Acompanhar fundos | Concluída pela PR `#189` |
 | Checkout/cobrança | Não iniciado |
 | AdSense | Congelado |
 
@@ -155,21 +163,26 @@ Inclui:
 
 Inclui validação explícita no servidor, estado de sessão separado da presença do token, invalidação central de 401 restrita à geração rejeitada, recuperação por novo código, coordenação entre abas e preservação integral da carteira, snapshots e histórico local. Autosave, autoload, relatório de risco e análise incremental param de usar a credencial rejeitada e retomam somente após uma nova sessão válida.
 
+### PV-5 — Radar/Acompanhar fundo fora da carteira
+
+**Estado:** concluída pela PR `#189`.
+
+Inclui recurso próprio separado da posição de carteira, limites server-side de 1 fundo no Grátis e 10 no Premium, criação idempotente, concorrência atômica, isolamento, remoção, notificações opcionais, downgrade sem exclusão, reconciliação determinística quando o fundo entra na carteira, dados canônicos, ausência diferente de zero, atualizações materialmente novas com fingerprint e monitor reaproveitado sem custo automático de IA. A UI cobre desktop/mobile e expõe qualidade, data-base, dividendos, eventos, riscos e dados insuficientes sem recomendação de compra ou venda.
+
 ## 3. Sprint atual
 
-### Reconciliação pós-hotfix
+### Encerramento da PV-5
 
-**Prioridade:** concluir a verificação curta da governança e então iniciar a PV-5.
+**Prioridade:** integrar a PR `#189` somente com CI final verde no mesmo SHA documental e então iniciar a PV-6.
 
-O hotfix permaneceu isolado na PR `#188`; a atualização do Copom permaneceu isolada na PR `#184`. Nenhuma delas altera entitlement ou o roadmap funcional PV-5 a PV-9.
+O hotfix permaneceu isolado na PR `#188`; a atualização do Copom permaneceu isolada na PR `#184`; e o Radar permaneceu isolado na PR `#189`. A PV-5 reutiliza o entitlement existente sem implementar cobrança ou checkout.
 
 ## 4. Ordem oficial das próximas sprints
 
-1. **PV-5 — Radar/Acompanhar fundo fora da carteira: 1 grátis e 10 Premium.**
-2. **PV-6 — Validação de preço e cobrança.**
-3. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial.**
-4. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
-5. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
+1. **PV-6 — Validação de preço e cobrança.**
+2. **PV-7 — Checkout, recorrência, cancelamento e entitlement comercial.**
+3. **PV-8 — Carteira histórica avançada, retorno total e atribuição.**
+4. **PV-9 — Screener, comparador, filtros salvos e fair value por categoria.**
 
 O hotfix de recuperação da sessão tem prioridade operacional antes desta sequência e não altera o roadmap funcional.
 
@@ -183,12 +196,7 @@ AdSense, WhatsApp, Telegram e grandes mudanças visuais continuam adiados.
 
 ### PV-5 — Acompanhar fundo fora da carteira
 
-- permitir acompanhar fundo sem transformá-lo em posição;
-- limite inicial: 1 fundo no Grátis e até 10 no Premium;
-- deduplicar notícias, fatos relevantes, dividendos e sinais;
-- permitir iniciar e encerrar acompanhamento;
-- não apresentar alertas como recomendação de compra;
-- explicar segmento, riscos, renda, eventos e qualidade dos dados.
+**Concluída pela PR `#189`.** Permite acompanhar fundo sem transformá-lo em posição, aplica limite server-side de 1 fundo no Grátis e 10 no Premium, deduplica atualizações e preserva explicitamente qualidade, fonte, data-base e dados insuficientes sem recomendação de compra.
 
 ### PV-6 — Validação de preço e cobrança
 
@@ -249,6 +257,8 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 24. CI é gate de merge e deploy.
 25. Nenhuma transformação de código-fonte em `predev`, `prebuild` ou `buildCommand` é aceita como correção funcional.
 26. Nenhuma validação manual substitui esses gates.
+27. Radar e carteira são recursos separados; fundo comprado deixa de consumir limite do Radar sem apagar histórico.
+28. Limite, downgrade, deduplicação e entitlement do Radar são decididos no servidor e persistidos atomicamente.
 
 ## 7. Arquivos, branches, commits e PRs existentes
 
@@ -257,6 +267,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - Repositório: `IsraelJr/dados-fii`.
 - Branch principal: `main`.
 - Branch da PV-4: `agent/pv4-reconciliation`.
+- Branch da PV-5: `agent/pv5-fund-radar`.
 - PR `#177`: PV-2A, mergeada.
 - PR `#178`: PV-2B, mergeada.
 - PR `#180`: PV-2C, mergeada.
@@ -266,7 +277,8 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - PR `#186`: determinismo temporal, mergeada em `f8101234359fa27c41e263e9dfa67bafd4c4572c`.
 - PR `#187`: PV-4 e Handoff v10.7.0, mergeada em `e5f21f7b78f80561ad2836b5b9e7a578bcf62317`.
 - PR `#188`: hotfix de recuperação da sessão e Handoff v10.7.1, mergeada em `14a81f919928f91ab221a25ab73b1136cbf2b883`.
-- PR `#184`: atualização editorial do Copom e Handoff v10.7.2; merge somente após CI final verde no mesmo SHA documental.
+- PR `#184`: atualização editorial do Copom e Handoff v10.7.2, mergeada em `81ba4811b82c6ffc2955595b6570b9353d85626a`.
+- PR `#189`: PV-5 e Handoff v10.8.0; merge somente após CI final verde no mesmo SHA documental.
 - PR `#183`: fechada sem merge e substituída pela PR limpa `#187`.
 - PR `#170`: fechada sem merge.
 - PRs `#168`, `#179`, `#1` e `#2`: fechadas sem merge após reconciliação como legado, substituídas ou obsoletas.
@@ -286,6 +298,19 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - `tests/firestore-portfolio-intelligence-reference-repository.test.ts`;
 - `tests/e2e/portfolio-intelligence-experience.spec.ts`.
 
+### Arquivos centrais da PV-5
+
+- `src/lib/fund-radar/FundRadar.ts`;
+- `src/lib/fund-radar/FundRadarService.ts`;
+- `src/lib/fund-radar/FundRadarObservation.ts`;
+- `src/server/repositories/FirestoreFundRadarRepositoryCore.ts`;
+- `src/server/controllers/FundRadarControllerCore.ts`;
+- `src/app/api/fund-radar/route.ts`;
+- `src/app/components/FundRadarPanel.tsx`;
+- `src/server/services/FundRadarBatchRuntime.ts`;
+- `tests/firestore-fund-radar-repository.test.ts`;
+- `tests/e2e/fund-radar.spec.ts`.
+
 ## 8. Funcionalidades concluídas, parciais e pendentes
 
 ### Concluídas
@@ -301,6 +326,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - relatório incremental PV-4 server-owned, determinístico, versionado, transacional e fail-closed.
 - recuperação de sessão inválida sem reload obrigatório ou perda de carteira, snapshots e histórico.
 - atualização editorial do Copom de agosto de 2026 com fonte oficial permanente, datas SEO coerentes e conteúdo final sem recomendação direta.
+- Radar de fundos separado da carteira, com limites server-side 1/10, concorrência atômica, downgrade conservador, deduplicação, monitor e rollback.
 
 ### Parciais
 
@@ -311,7 +337,6 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 
 ### Pendentes
 
-- acompanhar fundo fora da carteira, 1 Grátis e 10 Premium;
 - validação de preço;
 - checkout e assinaturas;
 - histórico avançado e retorno total;
@@ -332,6 +357,8 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - conteúdo não contém recomendação individual, preço-alvo ou promessa de rentabilidade;
 - falhas de fonte, schema, IA ou persistência são sanitizadas e falham fechado;
 - 401 autenticado remove somente a geração rejeitada da sessão da carteira e interrompe consumidores até nova validação;
+- acompanhamento de fundo não aparece em logs ou telemetria com UID, e-mail, ticker ou valores financeiros;
+- limite e plano do Radar nunca são aceitos do navegador; o servidor resolve entitlement e serializa concorrência;
 - nenhuma ação automática de compra, venda ou alteração de carteira é permitida.
 
 ## 10. Variáveis de ambiente
@@ -351,6 +378,7 @@ Cada sprint exige escopo fechado, testes automatizados, Preview, produção e ev
 - `ENABLE_WALLET_RISK_REPORT_MANUAL_FALLBACK`;
 - `ENABLE_PREMIUM_DISCOVERY`;
 - `ENABLE_INCREMENTAL_PORTFOLIO_REPORT`;
+- `ENABLE_FUND_RADAR`;
 - `PREMIUM_BETA_UIDS`;
 - `PREMIUM_BETA_EMAILS`;
 - `PREMIUM_PREVIEW_EMAILS`.

@@ -8,6 +8,7 @@ const readModelSource = readFileSync("src/lib/risk-lab/RiskLabPremiumReadModel.t
 const discoveryControllerSource = readFileSync("src/server/controllers/PremiumDiscoveryController.ts", "utf8");
 
 const ALLOWED_PRODUCT_FLAGS = [
+  "ENABLE_FUND_RADAR",
   "ENABLE_INCREMENTAL_PORTFOLIO_REPORT",
   "ENABLE_PREMIUM_DISCOVERY",
   "ENABLE_RISK_LAB_PREMIUM_READONLY",
@@ -16,6 +17,7 @@ const ALLOWED_PRODUCT_FLAGS = [
 ].sort();
 
 test("rollout Vercel contém somente flags de produto explicitamente auditadas", () => {
+  assert.equal(vercelConfig.env?.ENABLE_FUND_RADAR, "true");
   assert.equal(vercelConfig.env?.ENABLE_INCREMENTAL_PORTFOLIO_REPORT, "true");
   assert.equal(vercelConfig.env?.ENABLE_PREMIUM_DISCOVERY, "true");
   assert.equal(vercelConfig.env?.ENABLE_RISK_LAB_PREMIUM_READONLY, "true");

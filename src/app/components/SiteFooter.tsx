@@ -23,6 +23,7 @@ export default function SiteFooter() {
             <Link href="/educacao" className="hover:text-indigo-700">Educação</Link>
             <Link href="/glossario" className="hover:text-indigo-700">Glossário</Link>
             <Link href="/carteira" className="hover:text-indigo-700">Minha carteira</Link>
+            <Link href="/radar" className="hover:text-indigo-700">Radar de fundos</Link>
           </div>
         </div>
 
