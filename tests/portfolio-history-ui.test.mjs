@@ -34,7 +34,8 @@ test("relatório incremental atualiza somente após confirmação remota sem pay
   const report = text("src/app/components/PortfolioIncrementalReportPanel.tsx");
   assert.match(panel, /new Event\(PORTFOLIO_HISTORY_PERSISTED_EVENT\)/);
   assert.doesNotMatch(panel, /new CustomEvent\(PORTFOLIO_HISTORY_PERSISTED_EVENT/);
-  assert.match(flush, /if \(remoteMutationCompleted\) input\.onPersisted\(\)/);
+  assert.match(flush, /if \(remoteStateConfirmed\) input\.onPersisted\(\)/);
+  assert.match(flush, /return remoteStateConfirmed/);
   assert.match(report, /addEventListener\(PORTFOLIO_HISTORY_PERSISTED_EVENT, refreshAfterPersistence\)/);
   assert.match(report, /scheduleRefresh\(REFRESH_DEBOUNCE_MS\)/);
 });
