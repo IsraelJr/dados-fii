@@ -139,7 +139,7 @@ test("valuation ignores corrupted derived fields and recovers P/VP from equity a
     netWorth: 2.3,
     equityValue: "R$ 4.111.884.081",
     numberShares: 437_325_297,
-  });
+  }, { asOf: "2026-08-10" });
   assert.equal(derived.netWorth, 4_111_884_081);
   assert.equal(derived.vpCota, 9.4023);
   assert.equal(derived.pvp, 1.0338);
@@ -154,7 +154,7 @@ test("VGIA11 uses the official reference and rejects the inconsistent legacy P/V
     pvp: 0.05,
     equityValuePerShare: 203.79,
   });
-  const derived = deriveFiiRiskData(corrected);
+  const derived = deriveFiiRiskData(corrected, { asOf: "2026-08-10" });
 
   assert.equal(corrected.cnpj, "41.081.088/0001-09");
   assert.equal(derived.vpCota, 9.5);

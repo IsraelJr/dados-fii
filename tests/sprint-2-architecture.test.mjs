@@ -86,6 +86,25 @@ test("Sprint 2.1 has separate service, repository, normalizer, validator, cache 
   assert.match(service, /async runValidation/);
 });
 
+test("RegulatoryDataService captures one financial asOf and propagates it through batch reads", () => {
+  const service = read("src/lib/regulatoryDataService.ts");
+  const getMany = service.slice(service.indexOf("async getMany"), service.indexOf("async getTimeline"));
+
+  assert.match(getMany, /const calculationAsOf = options\?\.asOf \?\? new Date\(\)/);
+  assert.match(getMany, /asOf: calculationAsOf/);
+  assert.match(service, /refreshCachedMarketData\(cached, cachedQuote, calculationAsOf\)/);
+  assert.match(service, /deriveFiiRiskData\(baseData, \{ asOf: calculationAsOf \}\)/);
+  assert.match(service, /deriveFiiRiskData\(base, \{ asOf: calculationAsOf \}\)/);
+  const deriveCalls = service.split("\n").filter((line) => line.includes("deriveFiiRiskData("));
+  assert.equal(deriveCalls.length, 2);
+  assert.ok(deriveCalls.every((line) => line.includes("{ asOf: calculationAsOf }")));
+
+  const premiumReport = service.slice(service.indexOf("async getPremiumReport"), service.indexOf("async getObservability"));
+  assert.match(premiumReport, /getFreeReport\(value, \{ asOf: calculationAsOf \}\)/);
+  assert.match(premiumReport, /getMany\([^;]+\{ asOf: calculationAsOf \}\)/s);
+  assert.match(premiumReport, /calculationAsOf\.toISOString\(\)/);
+});
+
 test("Sprint 2.2 exposes one ScoreEngine with every required calculated score", () => {
   const service = read("src/lib/regulatoryDataService.ts");
   const engine = read("src/lib/scores/ScoreEngine.ts");
@@ -268,7 +287,9 @@ test("FII quotes have two decimal places and wallet sync follows the page header
 test("verified wallet sessions synchronize the current local portfolio promptly", () => {
   const sync = read("src/app/components/WalletEmailVerifiedSync.tsx");
   assert.match(sync, /AUTO_SAVE_DELAY_MS = 5 \* 1000/);
-  assert.match(sync, /storedToken \? "" : walletSignature\(initialWallet\)/);
+  assert.match(sync, /hasConfirmedCloudSignature/);
+  assert.match(sync, /cloudCache\.signature === initialSignature/);
+  assert.match(sync, /!storedToken \|\| hasConfirmedCloudSignature/);
   assert.match(sync, /lastSavedSignature\.current = ""/);
   assert.match(sync, /Sincronizar agora/);
 });

@@ -20,6 +20,7 @@ type BuildInputArgs = {
   email: string;
   userData: Record<string, unknown>;
   fundLoader: WalletRiskFundLoader;
+  asOf?: Date;
 };
 
 function removeUndefinedFields<T>(value: T): T {
@@ -105,14 +106,14 @@ function normalizeRiskTolerance(value: unknown): RiskReportClientProfile["riskTo
   return "unknown";
 }
 
-function dateParts() {
+function dateParts(date: Date) {
   return Object.fromEntries(
     new Intl.DateTimeFormat("en-CA", {
       timeZone: TIME_ZONE,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).formatToParts(new Date()).map((part) => [part.type, part.value]),
+    }).formatToParts(date).map((part) => [part.type, part.value]),
   );
 }
 
@@ -164,7 +165,7 @@ function marketMetrics(data: Record<string, unknown>) {
   });
 }
 
-async function buildSnapshot(args: BuildInputArgs) {
+async function buildSnapshot(args: BuildInputArgs, calculationAsOf: Date) {
   const wallet = extractSnapshotWallet(args.userData).slice(0, MAX_WALLET_ITEMS);
   if (!wallet.length) {
     throw Object.assign(new Error("Carteira não encontrada para gerar o relatório."), { status: 404 });
@@ -173,7 +174,7 @@ async function buildSnapshot(args: BuildInputArgs) {
   const sheetPrices = await getSheetPrices();
   const assets = await Promise.all(wallet.map(async (item) => {
     const data = (await args.fundLoader(item.ticker)) || {};
-    const derived = deriveFiiRiskData(data as never) as Record<string, any>;
+    const derived = deriveFiiRiskData(data as never, { asOf: calculationAsOf }) as Record<string, any>;
     const metrics = marketMetrics(data);
     const currentPrice = sheetPrices.get(item.ticker)
       || firstNumber(data, ["price", "currentPrice", "cotacao", "marketData.price"]);
@@ -251,7 +252,7 @@ async function buildSnapshot(args: BuildInputArgs) {
     byAsset.set(asset.ticker, value);
   }
 
-  const parts = dateParts();
+  const parts = dateParts(calculationAsOf);
   const snapshot = removeUndefinedFields({
     userDocId: args.userDocId,
     email: args.email,
@@ -409,11 +410,12 @@ export function buildPortfolioDataQuality(portfolio: RiskReportPortfolioItem[]) 
 }
 
 export async function buildWalletRiskReportInput(args: BuildInputArgs) {
+  const calculationAsOf = args.asOf ? new Date(args.asOf.getTime()) : new Date();
   const [{ unavailable: benchmarkUnavailable, ...benchmarkData }, built] = await Promise.all([
     getMarketBenchmarks()
       .then((data) => ({ unavailable: false, ...data }))
       .catch(() => ({ unavailable: true, error: "Benchmarks indisponíveis" })),
-    buildSnapshot(args),
+    buildSnapshot(args, calculationAsOf),
   ]);
 
   const cleanSnapshot = built.snapshot as Record<string, unknown>;
@@ -436,7 +438,7 @@ export async function buildWalletRiskReportInput(args: BuildInputArgs) {
   const input: RiskReportInput = removeUndefinedFields({
     portfolio,
     totalValue: numberOf(cleanSnapshot.totalValue) || undefined,
-    generatedAt: new Date().toISOString(),
+    generatedAt: calculationAsOf.toISOString(),
     benchmarkData: benchmarkPayload as Record<string, unknown>,
     dataQualitySummary: buildPortfolioDataQuality(portfolio),
     clientProfile,

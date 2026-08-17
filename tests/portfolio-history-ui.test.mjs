@@ -16,13 +16,28 @@ test("painel de histórico usa API server-side e não Firestore", () => {
 
 test("painel permite incluir, sobrescrever e excluir registros manuais", () => {
   const source = text("src/app/components/PortfolioHistoryPanel.tsx");
-  assert.match(source, /api\("POST"/);
-  assert.match(source, /api\("PATCH"/);
-  assert.match(source, /api\("DELETE"/);
+  const flush = text("src/lib/portfolio/PortfolioHistoryFlush.ts");
+  assert.match(flush, /input\.request\("POST"/);
+  assert.match(flush, /input\.request\("PATCH"/);
+  assert.match(flush, /input\.request\("DELETE"/);
   assert.match(source, /entry\.source !== "manual"/);
   assert.match(source, /pendingRef/);
+  assert.match(source, /reconcilePortfolioHistoryQueueAfterFlush/);
+  assert.match(source, /inFlightUpserts/);
   assert.match(source, /Meses informados/);
   assert.match(source, /Salvar mês/);
+});
+
+test("relatório incremental atualiza somente após confirmação remota sem payload sensível", () => {
+  const panel = text("src/app/components/PortfolioHistoryPanel.tsx");
+  const flush = text("src/lib/portfolio/PortfolioHistoryFlush.ts");
+  const report = text("src/app/components/PortfolioIncrementalReportPanel.tsx");
+  assert.match(panel, /new Event\(PORTFOLIO_HISTORY_PERSISTED_EVENT\)/);
+  assert.doesNotMatch(panel, /new CustomEvent\(PORTFOLIO_HISTORY_PERSISTED_EVENT/);
+  assert.match(flush, /if \(remoteStateConfirmed\) input\.onPersisted\(\)/);
+  assert.match(flush, /return remoteStateConfirmed/);
+  assert.match(report, /addEventListener\(PORTFOLIO_HISTORY_PERSISTED_EVENT, refreshAfterPersistence\)/);
+  assert.match(report, /scheduleRefresh\(REFRESH_DEBOUNCE_MS\)/);
 });
 
 test("histórico manual está integrado à página da carteira", () => {

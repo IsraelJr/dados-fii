@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Cloud, CloudUpload, Save, Trash2 } from "lucide-react";
+import {
+  flushPortfolioHistoryOperations,
+  PORTFOLIO_HISTORY_PERSISTED_EVENT,
+  reconcilePortfolioHistoryQueueAfterFlush,
+} from "@/lib/portfolio/PortfolioHistoryFlush";
 import AppToast from "./AppToast";
 
 type HistorySource = "manual" | "automatic_snapshot" | "legacy";
@@ -72,10 +77,14 @@ function authHeaders(): Record<string, string> {
   return email && token ? { "x-wallet-email": email, "x-wallet-session": token } : {};
 }
 async function api(method: "GET" | "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>, keepalive = false) {
+  const headers = authHeaders();
+  if (!headers["x-wallet-email"] || !headers["x-wallet-session"]) {
+    throw new Error("Confirme novamente o e-mail para sincronizar o histórico.");
+  }
   const response = await fetch(`/api/portfolio/history?portfolioId=${PORTFOLIO_ID}`, {
     method,
     keepalive,
-    headers: { "Content-Type": "application/json", ...authHeaders() },
+    headers: { "Content-Type": "application/json", ...headers },
     body: method === "GET" ? undefined : JSON.stringify({ portfolioId: PORTFOLIO_ID, ...body }),
   });
   const json = await response.json().catch(() => ({}));
@@ -94,6 +103,9 @@ function track(name: ProductEventName) {
 }
 function publishHistory(entries: readonly HistoryEntry[]) {
   window.dispatchEvent(new CustomEvent(HISTORY_UPDATED_EVENT, { detail: { entries } }));
+}
+function publishHistoryPersistence() {
+  window.dispatchEvent(new Event(PORTFOLIO_HISTORY_PERSISTED_EVENT));
 }
 function readPending(): PendingHistory {
   try {
@@ -129,6 +141,8 @@ export default function PortfolioHistoryPanel() {
   const pendingRef = useRef<PendingHistory>({ upserts: {}, deletes: [] });
   const syncTimer = useRef<number | null>(null);
   const flushInProgress = useRef<Promise<void> | null>(null);
+  const inFlightUpserts = useRef(new Set<string>());
+  const flushRef = useRef<(keepalive?: boolean) => Promise<void>>(async () => undefined);
 
   const applyEntries = useCallback((next: readonly HistoryEntry[]) => {
     const sorted = sortEntries(next);
@@ -139,50 +153,82 @@ export default function PortfolioHistoryPanel() {
 
   const flush = useCallback(async (keepalive = false) => {
     if (flushInProgress.current) return flushInProgress.current;
+    let completed = false;
     const operation = (async () => {
-      const pending = pendingRef.current;
-      const upserts = Object.values(pending.upserts);
-      const deletes = [...pending.deletes];
+      const captured = pendingRef.current;
+      const upserts = Object.values(captured.upserts);
+      const deletes = [...captured.deletes];
       if (!upserts.length && !deletes.length) {
         setSyncState("synced");
         return;
       }
+      const currentCredentials = credentials();
+      if (!currentCredentials.email || !currentCredentials.token) {
+        setSyncState("local");
+        return;
+      }
+      inFlightUpserts.current = new Set(upserts.map((entry) => entry.competence));
       setSyncState("syncing");
       try {
-        for (const entry of upserts) {
-          const [year, month] = entry.competence.split("-").map(Number);
-          if (persistedCompetences.current.has(entry.competence)) {
-            await api("PATCH", { competence: entry.competence, dividends: entry.dividends }, keepalive);
-            track("history_month_updated");
-          } else {
-            await api("POST", { year, month, dividends: entry.dividends }, keepalive);
-            persistedCompetences.current.add(entry.competence);
-            track("history_month_added");
-          }
-        }
-        for (const competence of deletes) {
-          if (persistedCompetences.current.has(competence)) {
-            await api("DELETE", { competence }, keepalive);
-            persistedCompetences.current.delete(competence);
-            track("history_month_deleted");
-          }
-        }
-        pendingRef.current = { upserts: {}, deletes: [] };
+        await flushPortfolioHistoryOperations({
+          upserts,
+          deletes,
+          isPersisted: (competence) => persistedCompetences.current.has(competence),
+          refreshPersisted: async () => {
+            const remote = await api("GET");
+            const remoteEntries: HistoryEntry[] = Array.isArray(remote.entries) ? remote.entries : [];
+            persistedCompetences.current = new Set(remoteEntries.map((entry) => entry.competence));
+          },
+          request: (method, body) => api(method, { ...body }, keepalive),
+          markPersisted: (competence) => persistedCompetences.current.add(competence),
+          markDeleted: (competence) => persistedCompetences.current.delete(competence),
+          track,
+          onPersisted: publishHistoryPersistence,
+        });
+        pendingRef.current = reconcilePortfolioHistoryQueueAfterFlush(
+          pendingRef.current,
+          captured,
+        ) as PendingHistory;
         writePending(pendingRef.current);
-        setSyncState("synced");
+        completed = true;
+        setSyncState(
+          Object.keys(pendingRef.current.upserts).length || pendingRef.current.deletes.length
+            ? "local"
+            : "synced",
+        );
       } catch (error) {
         setSyncState("error");
         setToast({ message: error instanceof Error ? error.message : "Não foi possível sincronizar o histórico.", variant: "error" });
       }
     })();
     flushInProgress.current = operation;
-    try { await operation; } finally { flushInProgress.current = null; }
+    try { await operation; } finally {
+      flushInProgress.current = null;
+      inFlightUpserts.current.clear();
+      if (
+        completed
+        && (Object.keys(pendingRef.current.upserts).length || pendingRef.current.deletes.length)
+      ) {
+        if (syncTimer.current !== null) window.clearTimeout(syncTimer.current);
+        syncTimer.current = window.setTimeout(() => {
+          syncTimer.current = null;
+          void flushRef.current();
+        }, 0);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
 
   const scheduleFlush = useCallback(() => {
     if (syncTimer.current !== null) window.clearTimeout(syncTimer.current);
-    syncTimer.current = window.setTimeout(() => void flush(), SYNC_DELAY_MS);
-  }, [flush]);
+    syncTimer.current = window.setTimeout(() => {
+      syncTimer.current = null;
+      void flushRef.current();
+    }, SYNC_DELAY_MS);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -190,6 +236,14 @@ export default function PortfolioHistoryPanel() {
     if (cached.length) {
       setEntries(sortEntries(cached));
       publishHistory(sortEntries(cached));
+    }
+    const currentCredentials = credentials();
+    if (!currentCredentials.email || !currentCredentials.token) {
+      const pending = readPending();
+      pendingRef.current = pending;
+      setSyncState(cached.length || Object.keys(pending.upserts).length || pending.deletes.length ? "local" : "synced");
+      setLoading(false);
+      return;
     }
     try {
       const json = await api("GET");
@@ -310,6 +364,7 @@ export default function PortfolioHistoryPanel() {
     pendingRef.current = {
       upserts,
       deletes: persistedCompetences.current.has(entry.competence)
+        || inFlightUpserts.current.has(entry.competence)
         ? Array.from(new Set([...pendingRef.current.deletes, entry.competence]))
         : pendingRef.current.deletes,
     };

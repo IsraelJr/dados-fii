@@ -66,13 +66,13 @@ const GROUPS = [
   },
 ];
 
-function currentDateKey() {
+function currentDateKey(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(new Date());
+  }).formatToParts(date);
   const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${byType.year}-${byType.month}-${byType.day}`;
 }
@@ -150,7 +150,7 @@ async function getFiisSnapshot(limit?: number): Promise<{ docs: any[] }> {
   return query.get();
 }
 
-function auditDocs(docs: Array<{ id: string; data: any }>) {
+function auditDocs(docs: Array<{ id: string; data: any }>, calculationAsOf: Date) {
   const total = docs.length;
   const allFieldPaths = new Map<string, number>();
   docs.forEach((doc) => collectPaths(doc.data, "", allFieldPaths));
@@ -201,8 +201,8 @@ function auditDocs(docs: Array<{ id: string; data: any }>) {
     .sort((a, b) => a.coverage - b.coverage || b.missing - a.missing);
 
   return {
-    generatedAt: new Date().toISOString(),
-    date: currentDateKey(),
+    generatedAt: calculationAsOf.toISOString(),
+    date: currentDateKey(calculationAsOf),
     mode: "derived-preview",
     note: "Auditoria simulando os campos derivados sem depender de já estarem gravados na coleção Fiis.",
     totalFiis: total,
@@ -214,13 +214,14 @@ function auditDocs(docs: Array<{ id: string; data: any }>) {
 }
 
 async function runAudit(limit?: number) {
+  const calculationAsOf = new Date();
   const snapshot = await getFiisSnapshot(limit);
   const docs = snapshot.docs.map((doc: any) => {
     const raw = doc.data() || {};
-    return { id: doc.id, data: { ...raw, ...deriveFiiRiskData(raw) } };
+    return { id: doc.id, data: { ...raw, ...deriveFiiRiskData(raw, { asOf: calculationAsOf }) } };
   });
   const audit = {
-    ...auditDocs(docs),
+    ...auditDocs(docs, calculationAsOf),
     limitApplied: limit || null,
   };
 
